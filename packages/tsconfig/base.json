@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "@djafat/tsconfig/base",
+  "extends": "../../tsconfig.base.json"
+}

@@ -1,0 +1,33 @@
+import { Module } from '@nestjs/common';
+import { LedgerModule } from '../ledger/ledger.module';
+import { PaymentProviderRegistry } from './payment-provider.registry';
+import { PAYMENT_PROVIDER } from './payments.tokens';
+import { CashPaymentProvider } from './providers/cash/cash-payment.provider';
+import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
+
+/**
+ * At Bloc 0 only `cash` and `mock` providers are registered. Real Mobile Money
+ * providers (airtel_money, moov_money) and card get their own provider classes
+ * in Bloc 5, once access is verified (decision A1). There is deliberately NO
+ * placeholder Airtel/Moov integration.
+ *
+ * `payments` may depend on `ledger` (DAG — docs/05 §5.3) but NEVER on `orders`;
+ * it consumes `OrderAmountPort` (from `@djafat/types`) via events instead.
+ */
+@Module({
+  imports: [LedgerModule],
+  providers: [
+    CashPaymentProvider,
+    MockPaymentProvider,
+    { provide: PAYMENT_PROVIDER, useExisting: CashPaymentProvider },
+    { provide: PAYMENT_PROVIDER, useExisting: MockPaymentProvider },
+    {
+      provide: PaymentProviderRegistry,
+      useFactory: (cash: CashPaymentProvider, mock: MockPaymentProvider) =>
+        new PaymentProviderRegistry([cash, mock]),
+      inject: [CashPaymentProvider, MockPaymentProvider],
+    },
+  ],
+  exports: [PaymentProviderRegistry],
+})
+export class PaymentsModule {}

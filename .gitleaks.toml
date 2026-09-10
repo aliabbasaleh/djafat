@@ -1,0 +1,29 @@
+# Gitleaks configuration — DJAFAT
+# Runs in CI (security.yml) and as a pre-commit / pre-push hook.
+# Extends the default ruleset; adds project-specific allowlist for KNOWN placeholders only.
+
+title = "DJAFAT gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented placeholders that are safe by construction"
+paths = [
+  '''(.*?)\.env\.example$''',
+  '''(.*?)/__fixtures__/(.*)''',
+  '''pnpm-lock\.yaml$''',
+  '''DJAFAT-architecture-complete\.md$''',
+]
+regexes = [
+  # Explicit placeholder tokens used across .env.example and docs
+  '''REPLACE_ME''',
+  '''CHANGE_ME''',
+  '''your-[a-z-]+-here''',
+  '''example\.com''',
+  # Local dev-only credentials for docker-compose (never used outside localhost)
+  '''postgres:postgres@localhost''',
+  '''djafat:djafat_local_dev@''',
+  '''redis://localhost:6379''',
+  '''minioadmin''',
+]

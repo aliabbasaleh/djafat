@@ -1,0 +1,10 @@
+{
+  "name": "@djafat/mock-sms",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  }
+}

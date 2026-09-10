@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "files": [],
+  "references": [
+    { "path": "packages/tsconfig" },
+    { "path": "packages/types" },
+    { "path": "packages/core" },
+    { "path": "packages/validation" },
+    { "path": "packages/config" },
+    { "path": "packages/tokens" },
+    { "path": "packages/i18n" },
+    { "path": "packages/sdk" },
+    { "path": "packages/testing" },
+    { "path": "apps/api" },
+    { "path": "apps/worker" }
+  ]
+}

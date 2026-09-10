@@ -1,0 +1,18 @@
+{
+  "extends": "@djafat/tsconfig/react-native.json",
+  "compilerOptions": {
+    "types": ["react", "expo"],
+    "paths": { "@/*": ["./src/*"] },
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "app.config.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": ["node_modules"]
+}

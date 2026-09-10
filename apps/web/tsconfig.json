@@ -1,0 +1,9 @@
+{
+  "extends": "@djafat/tsconfig/next.json",
+  "compilerOptions": {
+    "types": ["node", "react", "react-dom"],
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", ".next"]
+}

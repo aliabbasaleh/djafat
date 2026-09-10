@@ -1,0 +1,6 @@
+# Best-effort local secret scan before pushing. CI runs the authoritative check.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --config .gitleaks.toml
+else
+  echo "gitleaks not installed locally — skipping (CI will run it)."
+fi

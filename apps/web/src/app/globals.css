@@ -1,0 +1,38 @@
+/* Design tokens are generated from @djafat/tokens at build time (see
+   src/app/tokens.css.ts). This file holds the base reset only. Mobile-first. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--djafat-type-family, system-ui, sans-serif);
+  font-size: var(--djafat-type-size-body, 15px);
+  line-height: 1.5;
+  color: var(--djafat-color-text-primary, #1b1712);
+  background: var(--djafat-color-bg-canvas, #fbf7f2);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: var(--djafat-color-brand-primary, #e8531b);
+}
+
+:focus-visible {
+  outline: 2px solid var(--djafat-color-brand-primary, #e8531b);
+  outline-offset: 2px;
+}
