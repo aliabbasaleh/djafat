@@ -1,14 +1,15 @@
 import 'reflect-metadata';
-import { Logger, VersioningType } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import { API_VERSION_PREFIX } from '@djafat/config';
 import { AppModule } from './app.module';
-import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
+import { configureApp } from './bootstrap';
 import { AppConfigService } from './common/config/config.service';
 
 async function bootstrap(): Promise<void> {
@@ -25,6 +26,14 @@ async function bootstrap(): Promise<void> {
   app.useLogger(app.get(PinoLogger));
   const config = app.get(AppConfigService);
 
+  // Socket.IO on namespace /rt (docs/07 §7.12, docs/18 §18) — single instance
+  // at Bloc 0.5, no Redis adapter yet (Bloc 7).
+  app.useWebSocketAdapter(new IoAdapter(app));
+
+  // Raw-body parser + URI versioning + global exception filter — shared with
+  // the integration test harness so the two can never drift (docs/18 §14).
+  configureApp(app);
+
   // Security baseline (docs/16 §21).
   // The standalone @fastify/* plugin types and the fastify instance bundled by
   // @nestjs/platform-fastify are structurally identical but nominally distinct;
@@ -35,11 +44,6 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
 
-  // /v1 URI versioning (docs/07 §7.1).
-  app.setGlobalPrefix(API_VERSION_PREFIX);
-  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
-
-  app.useGlobalFilters(new AllExceptionsFilter());
   app.enableShutdownHooks();
 
   // OpenAPI foundation (protected outside production by an ops-only proxy later).
