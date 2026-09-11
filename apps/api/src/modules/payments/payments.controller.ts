@@ -11,7 +11,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
+import type { OrderAmountPort } from '@djafat/types';
+import { ORDER_AMOUNT_PORT } from '../../common/ports/order-amount.port';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
+import { RequireAuth, RequireOwnership, RequireRole } from '../auth/decorators';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentSchema, type CreatePaymentInput } from './dto/create-payment.schema';
 
@@ -20,8 +23,16 @@ import { CreatePaymentSchema, type CreatePaymentInput } from './dto/create-payme
 export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
 
+  /** Owner of the ORDER being paid, or staff with `payments:read` — resolved via `OrderAmountPort`, never a direct `orders` import (docs/18 AD-09, docs/19 §21). */
   @Post()
   @HttpCode(201)
+  @RequireAuth()
+  @RequireRole('customer')
+  @RequireOwnership<OrderAmountPort>(
+    ORDER_AMOUNT_PORT,
+    (orderAmount, req) => orderAmount.getOwnerUserId((req.body as { orderId: string }).orderId),
+    'payments:read',
+  )
   async create(
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body(new ZodValidationPipe(CreatePaymentSchema)) body: CreatePaymentInput,
@@ -44,7 +55,8 @@ export class PaymentsController {
   /**
    * Signed webhook receiver (docs/08 §8.6). The raw body is preserved by a
    * custom Fastify content-type parser (`main.ts`) so the HMAC is verified
-   * against the exact bytes sent, not a re-serialised object.
+   * against the exact bytes sent, not a re-serialised object. Provider-to-
+   * server, never a user — deliberately no `@RequireAuth()` here.
    */
   @Post('webhook/:provider')
   @HttpCode(200)

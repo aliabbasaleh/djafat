@@ -63,4 +63,59 @@ export class PlatformService {
       ? row.value
       : PLATFORM_SETTINGS_DEFAULTS.unpaid_order_ttl_seconds;
   }
+
+  // ── Bloc 1 — Identity & Access (docs/19 §7-§8) ────────────────────────────
+
+  private async getNumberSetting(key: string, fallback: number): Promise<number> {
+    const row = await this.prisma.platformSetting.findFirst({ where: { key, scope: 'global' } });
+    return typeof row?.value === 'number' ? row.value : fallback;
+  }
+
+  async getOtpTtlSeconds(): Promise<number> {
+    return this.getNumberSetting('otp_ttl_seconds', PLATFORM_SETTINGS_DEFAULTS.otp_ttl_seconds);
+  }
+
+  async getOtpMaxAttempts(): Promise<number> {
+    return this.getNumberSetting('otp_max_attempts', PLATFORM_SETTINGS_DEFAULTS.otp_max_attempts);
+  }
+
+  async getPhoneLockThreshold(): Promise<number> {
+    return this.getNumberSetting(
+      'phone_lock_threshold',
+      PLATFORM_SETTINGS_DEFAULTS.phone_lock_threshold,
+    );
+  }
+
+  async getPhoneLockDurationSeconds(): Promise<number> {
+    return this.getNumberSetting(
+      'phone_lock_duration_seconds',
+      PLATFORM_SETTINGS_DEFAULTS.phone_lock_duration_seconds,
+    );
+  }
+
+  private async getRateLimitSetting(
+    key: string,
+    fallback: { limit: number; window_seconds: number },
+  ): Promise<{ limit: number; windowSeconds: number }> {
+    const row = await this.prisma.platformSetting.findFirst({ where: { key, scope: 'global' } });
+    const v = row?.value as { limit?: unknown; window_seconds?: unknown } | undefined;
+    const limit = typeof v?.limit === 'number' ? v.limit : fallback.limit;
+    const windowSeconds =
+      typeof v?.window_seconds === 'number' ? v.window_seconds : fallback.window_seconds;
+    return { limit, windowSeconds };
+  }
+
+  getOtpRateLimitPerPhone(): Promise<{ limit: number; windowSeconds: number }> {
+    return this.getRateLimitSetting(
+      'otp_rate_limit_per_phone',
+      PLATFORM_SETTINGS_DEFAULTS.otp_rate_limit_per_phone,
+    );
+  }
+
+  getOtpRateLimitPerIp(): Promise<{ limit: number; windowSeconds: number }> {
+    return this.getRateLimitSetting(
+      'otp_rate_limit_per_ip',
+      PLATFORM_SETTINGS_DEFAULTS.otp_rate_limit_per_ip,
+    );
+  }
 }

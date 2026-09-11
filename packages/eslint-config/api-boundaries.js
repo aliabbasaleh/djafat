@@ -17,6 +17,18 @@ import boundaries from 'eslint-plugin-boundaries';
  * In particular **`orders` may NOT import `payments`** (the port lives in
  * `@djafat/types`; the link is made via events + `OrderAmountPort`).
  *
+ * `auth`/`users` are the foundational identity layer (docs/19 §43): every
+ * BUSINESS module may reach them, but `auth`/`users` themselves reach
+ * nothing business-shaped, and `auth` may only reach `users` (find-or-create
+ * identity, resolve roles) — never the other way around (would make the two
+ * mutually dependent). NOTE: `auth`/`users` are deliberately listed
+ * per-module below (not lumped into the generic "every module" rule like
+ * `platform`/`geo`) — `eslint-plugin-boundaries` UNIONS every matching
+ * rule's `allow` list for a given `from`, so a generic rule would also grant
+ * `auth`→`auth` and `users`→`auth` (self/reciprocal access), silently
+ * defeating the one-way edge. Verified by lint: a probe `users`→`auth`
+ * import was correctly rejected only after switching to this explicit form.
+ *
  * @type {import('eslint').Linter.Config[]}
  */
 export default [
@@ -57,8 +69,13 @@ export default [
                 ['api-module', { module: 'geo' }],
               ],
             },
-            // --- DAG edges (docs/05 §5.3) -------------------------------------
-            { from: [['api-module', { module: 'auth' }]], allow: [] },
+            // --- DAG edges (docs/05 §5.3, docs/19 §43) ------------------------
+            // `auth` may reach `users` — the only edge between the two.
+            {
+              from: [['api-module', { module: 'auth' }]],
+              allow: [['api-module', { module: 'users' }]],
+            },
+            // `users` reaches nothing (base layer, same tier as `auth`).
             { from: [['api-module', { module: 'users' }]], allow: [] },
             { from: [['api-module', { module: 'catalog' }]], allow: [] },
             { from: [['api-module', { module: 'pricing' }]], allow: [] },
@@ -68,6 +85,8 @@ export default [
               allow: [
                 ['api-module', { module: 'pricing' }],
                 ['api-module', { module: 'catalog' }],
+                ['api-module', { module: 'auth' }],
+                ['api-module', { module: 'users' }],
               ],
             },
             {
@@ -76,23 +95,49 @@ export default [
                 ['api-module', { module: 'carts' }],
                 ['api-module', { module: 'pricing' }],
                 ['api-module', { module: 'catalog' }],
+                ['api-module', { module: 'auth' }],
+                ['api-module', { module: 'users' }],
               ],
               // NOTE: `payments` is intentionally ABSENT.
             },
             {
               from: [['api-module', { module: 'payments' }]],
-              allow: [['api-module', { module: 'ledger' }]],
+              allow: [
+                ['api-module', { module: 'ledger' }],
+                ['api-module', { module: 'auth' }],
+                ['api-module', { module: 'users' }],
+              ],
             },
             {
               from: [['api-module', { module: 'deliveries' }]],
-              allow: [['api-module', { module: 'ledger' }]],
+              allow: [
+                ['api-module', { module: 'ledger' }],
+                ['api-module', { module: 'auth' }],
+                ['api-module', { module: 'users' }],
+              ],
             },
             {
               from: [['api-module', { module: 'couriers' }]],
-              allow: [['api-module', { module: 'ledger' }]],
+              allow: [
+                ['api-module', { module: 'ledger' }],
+                ['api-module', { module: 'auth' }],
+                ['api-module', { module: 'users' }],
+              ],
             },
-            { from: [['api-module', { module: 'notifications' }]], allow: [] },
-            { from: [['api-module', { module: 'realtime' }]], allow: [] },
+            {
+              from: [['api-module', { module: 'notifications' }]],
+              allow: [
+                ['api-module', { module: 'auth' }],
+                ['api-module', { module: 'users' }],
+              ],
+            },
+            {
+              from: [['api-module', { module: 'realtime' }]],
+              allow: [
+                ['api-module', { module: 'auth' }],
+                ['api-module', { module: 'users' }],
+              ],
+            },
             { from: [['api-module', { module: 'admin' }]], allow: ['api-module'] },
           ],
         },

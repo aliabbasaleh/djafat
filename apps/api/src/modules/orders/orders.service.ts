@@ -92,16 +92,24 @@ export class OrdersService implements OrderAmountPort {
   // ── creation ────────────────────────────────────────────────────────────
 
   async createOrder(
+    customerId: string,
     input: CreateOrderInput,
     idempotencyKey: string,
   ): Promise<{ status: 'created' | 'replayed'; order: OrderDto }> {
-    const run = await this.idempotency.run('orders', idempotencyKey, input, () =>
-      this.doCreateOrder(input, idempotencyKey),
+    // Scoped per-customer (not a bare 'orders' scope): an idempotency key is
+    // client-generated, so namespacing by actor is what actually prevents
+    // one customer's key from ever colliding with another's (docs/19 §2).
+    const run = await this.idempotency.run(`orders:${customerId}`, idempotencyKey, input, () =>
+      this.doCreateOrder(customerId, input, idempotencyKey),
     );
     return { status: run.status, order: run.response };
   }
 
-  private async doCreateOrder(input: CreateOrderInput, idempotencyKey: string): Promise<OrderDto> {
+  private async doCreateOrder(
+    customerId: string,
+    input: CreateOrderInput,
+    idempotencyKey: string,
+  ): Promise<OrderDto> {
     const restaurant = await this.catalog.getActiveRestaurant(input.restaurantId);
     const products = await this.catalog.getAvailableProducts(
       restaurant.id,
@@ -161,7 +169,7 @@ export class OrdersService implements OrderAmountPort {
           idempotencyKey,
           countryId: restaurant.countryId,
           cityId: restaurant.cityId,
-          customerId: input.customerId,
+          customerId,
           restaurantId: restaurant.id,
           courierId,
           status: 'awaiting_payment',
@@ -280,6 +288,17 @@ export class OrdersService implements OrderAmountPort {
   }
 
   // ── reads ───────────────────────────────────────────────────────────────
+
+  /** For `@RequireOwnership(...)` (docs/19 §21) — throws NotFound itself, never returns a sentinel. */
+  async getOwnerUserId(orderId: string): Promise<string> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { customerId: true },
+    });
+    if (!order)
+      throw new NotFoundException({ code: 'NOT_FOUND', message: `Order ${orderId} not found.` });
+    return order.customerId;
+  }
 
   async getOrder(id: string): Promise<OrderDto> {
     const order = await this.prisma.order.findUnique({ where: { id }, include: { items: true } });

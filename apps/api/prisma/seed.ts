@@ -54,11 +54,110 @@ async function main(): Promise<void> {
     { code: 'restaurant_owner', label: 'Propriétaire de restaurant' },
     { code: 'restaurant_staff', label: 'Personnel de restaurant' },
     { code: 'courier', label: 'Livreur' },
+    { code: 'support', label: 'Support client' },
+    { code: 'finance', label: 'Finance' },
     { code: 'admin', label: 'Administrateur' },
     { code: 'super_admin', label: 'Super administrateur' },
   ];
   for (const r of roles) {
     await prisma.role.upsert({ where: { code: r.code }, create: r, update: r });
+  }
+
+  // --- permissions + role_permissions (Bloc 1 — docs/19 §17-19) --------------
+  const permissions: Array<{ code: string; label: string }> = [
+    { code: 'users:read', label: 'Lire les utilisateurs' },
+    { code: 'users:write', label: 'Modifier les utilisateurs' },
+    { code: 'orders:read', label: 'Lire les commandes' },
+    { code: 'orders:write', label: 'Modifier les commandes' },
+    { code: 'restaurants:read', label: 'Lire les restaurants' },
+    { code: 'restaurants:write', label: 'Modifier les restaurants' },
+    { code: 'menus:read', label: 'Lire les menus' },
+    { code: 'menus:write', label: 'Modifier les menus' },
+    { code: 'deliveries:read', label: 'Lire les livraisons' },
+    { code: 'deliveries:write', label: 'Modifier les livraisons' },
+    { code: 'payments:read', label: 'Lire les paiements' },
+    { code: 'payments:refund', label: 'Rembourser un paiement' },
+    { code: 'ledger:read', label: 'Lire le grand livre' },
+    { code: 'ledger:write', label: 'Écrire dans le grand livre' },
+    { code: 'payouts:read', label: 'Lire les virements' },
+    { code: 'payouts:write', label: 'Déclencher un virement' },
+    { code: 'admin:read', label: "Lire la console d'administration" },
+    { code: 'admin:write', label: "Modifier la console d'administration" },
+  ];
+  for (const p of permissions) {
+    await prisma.permission.upsert({ where: { code: p.code }, create: p, update: p });
+  }
+
+  // customer/restaurant_owner/restaurant_staff/courier are deliberately ABSENT
+  // here for their own resources: that access is governed by OWNERSHIP
+  // (docs/19 §21), not a blanket permission grant. `ledger:write` is granted
+  // to NO role — the ledger stays single-writer even for super_admin
+  // (docs/15 AD-02); it exists as a defined permission for future tooling.
+  const rolePermissions: Record<string, string[]> = {
+    restaurant_owner: [
+      'restaurants:read',
+      'restaurants:write',
+      'menus:read',
+      'menus:write',
+      'orders:read',
+    ],
+    restaurant_staff: ['restaurants:read', 'menus:read', 'menus:write', 'orders:read'],
+    courier: ['deliveries:read', 'deliveries:write', 'orders:read'],
+    support: ['users:read', 'orders:read', 'payments:read', 'deliveries:read'],
+    finance: [
+      'payments:read',
+      'payments:refund',
+      'ledger:read',
+      'payouts:read',
+      'payouts:write',
+      'orders:read',
+    ],
+    admin: [
+      'users:read',
+      'users:write',
+      'orders:read',
+      'orders:write',
+      'restaurants:read',
+      'restaurants:write',
+      'menus:read',
+      'menus:write',
+      'deliveries:read',
+      'deliveries:write',
+      'payments:read',
+      'payments:refund',
+      'payouts:read',
+      'payouts:write',
+      'ledger:read',
+      'admin:read',
+      'admin:write',
+    ],
+    super_admin: [
+      'users:read',
+      'users:write',
+      'orders:read',
+      'orders:write',
+      'restaurants:read',
+      'restaurants:write',
+      'menus:read',
+      'menus:write',
+      'deliveries:read',
+      'deliveries:write',
+      'payments:read',
+      'payments:refund',
+      'payouts:read',
+      'payouts:write',
+      'ledger:read',
+      'admin:read',
+      'admin:write',
+    ],
+  };
+  for (const [role, perms] of Object.entries(rolePermissions)) {
+    for (const permission of perms) {
+      await prisma.$executeRaw`
+        INSERT INTO role_permissions (role, permission) VALUES (${role}, ${permission})
+        ON CONFLICT (role, permission) DO NOTHING
+      `;
+    }
   }
 
   // --- payment methods / providers (data-driven — AD-04) --------------------
@@ -228,6 +327,29 @@ async function main(): Promise<void> {
   const courierId = await findOrCreateUser('+23566000002', 'Livreur Test');
   await ensureRole(courierId, 'courier');
 
+  // --- Bloc 1 — Identity & Access: one test user per role (docs/19 §46) -----
+  // Dev/test fixtures ONLY. No password/OTP/MFA secret is seeded here — every
+  // login still goes through the real OTP flow; this just pre-creates the
+  // identity + role grant so `pnpm db:seed` alone is enough to exercise RBAC
+  // end to end in the integration tests.
+  const restaurantOwnerId = await findOrCreateUser('+23566000003', 'Restaurateur Test');
+  await ensureRole(restaurantOwnerId, 'restaurant_owner');
+
+  const restaurantStaffId = await findOrCreateUser('+23566000004', 'Staff Restaurant Test');
+  await ensureRole(restaurantStaffId, 'restaurant_staff');
+
+  const supportId = await findOrCreateUser('+23566000005', 'Support Test');
+  await ensureRole(supportId, 'support');
+
+  const financeId = await findOrCreateUser('+23566000006', 'Finance Test');
+  await ensureRole(financeId, 'finance');
+
+  const adminId = await findOrCreateUser('+23566000007', 'Admin Test');
+  await ensureRole(adminId, 'admin');
+
+  const superAdminId = await findOrCreateUser('+23566000008', 'Super Admin Test');
+  await ensureRole(superAdminId, 'super_admin');
+
   const restaurant = await prisma.restaurant.findFirst({ where: { slug: 'chez-fatime' } });
   const restaurantId = (
     restaurant ??
@@ -279,7 +401,10 @@ async function main(): Promise<void> {
   console.log(
     `Seed OK — market ${country.isoCode}/${city.slug}, ${currencies.length} currencies, ` +
       `${providers.length} payment providers (cash+mock active), ${accounts.length} ledger accounts, ` +
-      `walking-skeleton fixtures: customer ${customerId}, courier ${courierId}, restaurant ${restaurantId} (${products.length} products).`,
+      `${roles.length} roles, ${permissions.length} permissions, ` +
+      `walking-skeleton fixtures: customer ${customerId}, courier ${courierId}, restaurant ${restaurantId} (${products.length} products). ` +
+      `Identity fixtures: restaurant_owner ${restaurantOwnerId}, restaurant_staff ${restaurantStaffId}, ` +
+      `support ${supportId}, finance ${financeId}, admin ${adminId}, super_admin ${superAdminId}.`,
   );
 }
 

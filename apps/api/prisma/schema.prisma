@@ -163,9 +163,11 @@ model User {
   phone           String
   phoneVerifiedAt DateTime? @map("phone_verified_at") @db.Timestamptz(6)
   email           String?
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(6)
   fullName        String?   @map("full_name")
   countryId       String?   @map("country_id") @db.Uuid
   locale          String    @default("fr")
+  /// pending | active | suspended | blocked | deleted — docs/19 §3.
   status          String    @default("active")
   lastSeenAt      DateTime? @map("last_seen_at") @db.Timestamptz(6)
   deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -176,19 +178,43 @@ model User {
 }
 
 model Session {
-  id            String    @id @default(uuid()) @db.Uuid
-  userId        String    @map("user_id") @db.Uuid
-  familyId      String    @map("family_id") @db.Uuid
-  refreshHash   String    @unique @map("refresh_hash")
-  parentId      String?   @map("parent_id") @db.Uuid
-  userAgent     String?   @map("user_agent")
-  ip            String?
-  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(6)
-  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(6)
-  revokedReason String?   @map("revoked_reason")
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  familyId         String    @map("family_id") @db.Uuid
+  refreshHash      String    @unique @map("refresh_hash")
+  parentId         String?   @map("parent_id") @db.Uuid
+  userAgent        String?   @map("user_agent")
+  ip               String?
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedReason    String?   @map("revoked_reason")
+  /// Set when this session's family last passed MFA step-up — docs/19 §23.
+  stepUpVerifiedAt DateTime? @map("step_up_verified_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("sessions")
+}
+
+model Permission {
+  code  String @id
+  label String
+
+  @@map("permissions")
+}
+
+/// One row per enrolled admin/super_admin — TOTP secret, AES-256-GCM
+/// encrypted at rest (docs/19 §22). `enabled=false` until the enrollment
+/// code is confirmed once (avoids locking an admin out of their own account
+/// with a secret they never actually captured in their authenticator app).
+model MfaTotpSecret {
+  userId          String    @id @map("user_id") @db.Uuid
+  secretEncrypted String    @map("secret_encrypted")
+  enabled         Boolean   @default(false)
+  confirmedAt     DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("mfa_totp_secrets")
 }
 
 model OtpCode {
@@ -242,8 +268,12 @@ model AuditLog {
   before         Json?
   after          Json?
   ip             String?
+  userAgent      String?  @map("user_agent")
   traceId        String?  @map("trace_id")
   stepUpVerified Boolean? @map("step_up_verified")
+  /// Free-form context for events with no natural before/after entity state
+  /// (e.g. AUTH_OTP_REQUESTED) — NEVER secrets (docs/19 §24, §40).
+  metadata       Json?
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("audit_logs")

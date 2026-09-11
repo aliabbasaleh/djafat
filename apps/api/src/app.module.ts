@@ -7,6 +7,8 @@ import { RedisModule } from './common/redis/redis.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { HealthModule } from './common/health/health.module';
 import { DomainEventsModule } from './common/events/events.module';
+import { AuditModule } from './common/audit/audit.module';
+import { RateLimitModule } from './common/rate-limit/rate-limit.module';
 
 // Infra
 import { PrismaModule } from './infra/prisma/prisma.module';
@@ -41,6 +43,8 @@ import { AdminModule } from './modules/admin/admin.module';
     ObjectStorageModule,
     IdempotencyModule,
     DomainEventsModule,
+    AuditModule,
+    RateLimitModule,
     HealthModule,
     // domain
     PlatformModule,
