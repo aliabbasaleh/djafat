@@ -31,6 +31,13 @@ export interface OrderAmountPort {
    * (docs/18 §5).
    */
   getAccrualBreakdown(orderId: string): Promise<OrderAccrualBreakdown>;
+  /**
+   * The order's owning customer `userId` — the ONLY way `payments` (or any
+   * other DAG-allowed module) can resolve ownership for `@RequireOwnership`
+   * (docs/19 §21) without importing `orders` directly. Throws `NotFound`
+   * itself if the order doesn't exist.
+   */
+  getOwnerUserId(orderId: string): Promise<string>;
 }
 
 export interface OrderPaymentContext {

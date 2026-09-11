@@ -15,6 +15,11 @@ export const API_ERROR_CODES = [
   'FORBIDDEN',
   'UNAUTHENTICATED',
   'RATE_LIMITED',
+  'OTP_INVALID',
+  'OTP_LOCKED',
+  'MFA_INVALID',
+  'MFA_REQUIRED',
+  'ACCOUNT_INACTIVE',
   'INTERNAL',
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

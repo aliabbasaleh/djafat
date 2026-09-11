@@ -470,9 +470,12 @@ importers:
       '@djafat/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@types/node':
+        specifier: 22.10.5
+        version: 22.10.5
       '@vitest/coverage-v8':
         specifier: 2.1.8
-        version: 2.1.8(vitest@2.1.8(@types/node@22.20.2)(lightningcss@1.27.0)(terser@5.51.2))
+        version: 2.1.8(vitest@2.1.8(@types/node@22.10.5)(lightningcss@1.27.0)(terser@5.51.2))
       eslint:
         specifier: 9.17.0
         version: 9.17.0(jiti@2.6.1)
@@ -484,7 +487,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: 2.1.8
-        version: 2.1.8(@types/node@22.20.2)(lightningcss@1.27.0)(terser@5.51.2)
+        version: 2.1.8(@types/node@22.10.5)(lightningcss@1.27.0)(terser@5.51.2)
 
   packages/eslint-config:
     dependencies:
@@ -9305,7 +9308,7 @@ snapshots:
       '@urql/core': 5.2.0
       wonka: 6.3.6
 
-  '@vitest/coverage-v8@2.1.8(vitest@2.1.8(@types/node@22.20.2)(lightningcss@1.27.0)(terser@5.51.2))':
+  '@vitest/coverage-v8@2.1.8(vitest@2.1.8(@types/node@22.10.5)(lightningcss@1.27.0)(terser@5.51.2))':
     dependencies:
       '@ampproject/remapping': 2.3.0
       '@bcoe/v8-coverage': 0.2.3
@@ -9319,7 +9322,7 @@ snapshots:
       std-env: 3.10.0
       test-exclude: 7.0.2
       tinyrainbow: 1.2.0
-      vitest: 2.1.8(@types/node@22.20.2)(lightningcss@1.27.0)(terser@5.51.2)
+      vitest: 2.1.8(@types/node@22.10.5)(lightningcss@1.27.0)(terser@5.51.2)
     transitivePeerDependencies:
       - supports-color
 

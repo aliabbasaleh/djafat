@@ -1,13 +1,57 @@
-/** Application roles (RBAC). See docs/05 §5.4. */
+/**
+ * Application roles (RBAC). See docs/05 §5.4, docs/19 §5. `support`/`finance`
+ * extend the original docs/05 list per the Bloc 1 brief — not a locked A1–A9
+ * decision, purely additive.
+ */
 export const ROLES = [
   'customer',
   'restaurant_owner',
   'restaurant_staff',
   'courier',
+  'support',
+  'finance',
   'admin',
   'super_admin',
 ] as const;
 export type Role = (typeof ROLES)[number];
+
+/**
+ * Roles that must complete TOTP MFA at login and pass step-up re-auth for
+ * sensitive actions (docs/05 §5.4, docs/19 §11).
+ */
+export const MFA_REQUIRED_ROLES: readonly Role[] = ['admin', 'super_admin'];
+
+/** Account lifecycle (docs/19 §3). `pending` = created, onboarding incomplete. */
+export const USER_STATUSES = ['pending', 'active', 'suspended', 'blocked', 'deleted'] as const;
+export type UserStatus = (typeof USER_STATUSES)[number];
+
+/**
+ * Granular permission codes (docs/19 §6). Data-driven — the DB table
+ * `role_permissions` is the actual source of truth (mirrors `roles`/
+ * `ledger_accounts`' data-driven philosophy); this const array exists only so
+ * `@RequirePermission(...)` call sites get autocomplete + a typo check.
+ */
+export const PERMISSIONS = [
+  'users:read',
+  'users:write',
+  'orders:read',
+  'orders:write',
+  'restaurants:read',
+  'restaurants:write',
+  'menus:read',
+  'menus:write',
+  'deliveries:read',
+  'deliveries:write',
+  'payments:read',
+  'payments:refund',
+  'ledger:read',
+  'ledger:write',
+  'payouts:read',
+  'payouts:write',
+  'admin:read',
+  'admin:write',
+] as const;
+export type Permission = (typeof PERMISSIONS)[number];
 
 /**
  * Canonical order lifecycle. Transition rules live in

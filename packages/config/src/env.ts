@@ -75,6 +75,26 @@ const OtpSchema = z.object({
     ),
   SMS_PROVIDER: nonEmpty.default('mock'),
   SMS_MOCK_URL: url.optional(),
+  /** HMAC pepper for hashing OTP codes at rest (docs/19 §7) — never the same as JWT_ACCESS_SECRET. */
+  OTP_HASH_SECRET: nonEmpty,
+});
+
+/**
+ * Identity & Access (Bloc 1, docs/19). `JWT_ACCESS_SECRET` signs short-lived
+ * access tokens (HS256); refresh tokens are opaque random strings, hashed
+ * with `REFRESH_TOKEN_HASH_SECRET` before being persisted in `sessions`
+ * (docs/19 §12–§14). `MFA_ENCRYPTION_KEY` encrypts TOTP secrets at rest
+ * (AES-256-GCM, docs/19 §22) — 32 raw bytes, base64-encoded.
+ */
+const AuthSchema = z.object({
+  JWT_ACCESS_SECRET: nonEmpty,
+  JWT_ACCESS_TTL_SECONDS: intFromString(900), // 15 min — docs/07 §7 "Auth"
+  JWT_REFRESH_TTL_SECONDS: intFromString(2_592_000), // 30 days
+  JWT_ISSUER: nonEmpty.default('djafat-api'),
+  JWT_AUDIENCE: nonEmpty.default('djafat-clients'),
+  REFRESH_TOKEN_HASH_SECRET: nonEmpty,
+  MFA_ENCRYPTION_KEY: nonEmpty,
+  STEP_UP_WINDOW_SECONDS: intFromString(600), // 10 min — docs/05 §5.4
 });
 
 const PaymentsSchema = z.object({
@@ -93,6 +113,7 @@ export const ApiEnvSchema = CommonSchema.merge(DatabaseSchema)
   .merge(ObjectStorageSchema)
   .merge(ApiSchema)
   .merge(OtpSchema)
+  .merge(AuthSchema)
   .merge(PaymentsSchema)
   .merge(ObservabilitySchema);
 

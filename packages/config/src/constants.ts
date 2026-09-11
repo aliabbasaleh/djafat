@@ -24,6 +24,13 @@ export const PLATFORM_SETTINGS_DEFAULTS = {
   funds_release_policy: { trigger: 'delivered', delay_hours: 0, reserve_percent: 0 }, // A3
   courier_compensation_policy: { type: 'delivery_fee' }, // A5
   otp_channels: ['sms'], // A9
+  // Bloc 1 — Identity & Access (docs/19 §7–§8, docs/05 §5.4).
+  otp_ttl_seconds: 300, // 5 min
+  otp_max_attempts: 5, // per challenge
+  otp_rate_limit_per_phone: { limit: 3, window_seconds: 600 }, // 3 / 10 min / numéro
+  otp_rate_limit_per_ip: { limit: 30, window_seconds: 3600 }, // 30 / h / IP
+  phone_lock_threshold: 10, // failed OTP verifications before a durable lock
+  phone_lock_duration_seconds: 900, // 15 min
 } as const;
 
 export const API_VERSION_PREFIX = 'v1';

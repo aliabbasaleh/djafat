@@ -14,6 +14,10 @@ const baseEnv = {
   OBJECT_STORAGE_SECRET_ACCESS_KEY: 'minioadmin',
   API_PUBLIC_URL: 'http://localhost:3001',
   PAYMENT_WEBHOOK_BASE_URL: 'http://localhost:3001/v1/payments/webhook',
+  OTP_HASH_SECRET: 'test-otp-hash-secret',
+  JWT_ACCESS_SECRET: 'test-jwt-access-secret',
+  REFRESH_TOKEN_HASH_SECRET: 'test-refresh-hash-secret',
+  MFA_ENCRYPTION_KEY: 'dGVzdC1tZmEtZW5jcnlwdGlvbi1rZXktMzJieXRlcyEh', // base64, 32 bytes (test-only)
 };
 
 describe('loadApiEnv', () => {
@@ -25,6 +29,9 @@ describe('loadApiEnv', () => {
     expect(env.API_CORS_ORIGINS).toEqual(['http://a', 'http://b']);
     expect(env.OTP_CHANNELS).toEqual(['sms']);
     expect(env.LEDGER_DB_ROLE).toBe('djafat_ledger');
+    expect(env.JWT_ACCESS_TTL_SECONDS).toBe(900);
+    expect(env.JWT_ISSUER).toBe('djafat-api');
+    expect(env.STEP_UP_WINDOW_SECONDS).toBe(600);
   });
 
   it('throws a readable ConfigValidationError when a required var is missing', () => {
@@ -65,5 +72,18 @@ describe('constants', () => {
       type: 'delivery_fee',
     });
     expect(PLATFORM_SETTINGS_DEFAULTS.otp_channels).toEqual(['sms']);
+  });
+
+  it('exposes the Bloc 1 identity/OTP defaults', () => {
+    expect(PLATFORM_SETTINGS_DEFAULTS.otp_ttl_seconds).toBe(300);
+    expect(PLATFORM_SETTINGS_DEFAULTS.otp_max_attempts).toBe(5);
+    expect(PLATFORM_SETTINGS_DEFAULTS.otp_rate_limit_per_phone).toEqual({
+      limit: 3,
+      window_seconds: 600,
+    });
+    expect(PLATFORM_SETTINGS_DEFAULTS.otp_rate_limit_per_ip).toEqual({
+      limit: 30,
+      window_seconds: 3600,
+    });
   });
 });
