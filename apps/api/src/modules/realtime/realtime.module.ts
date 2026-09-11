@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
+import { RealtimeGateway } from './realtime.gateway';
 
 /**
- * Skeleton (Bloc 0). Bloc 7: Socket.IO gateway + Redis adapter, room auth,
- * outbox -> room fan-out, throttled courier location, polling fallback.
- * Realtime is NEVER a source of truth — every event derives from the outbox.
+ * Bloc 0.5: Socket.IO gateway forwarding in-process domain events
+ * (`order.updated`, `payment.updated`) to `order:{id}` rooms. Bloc 7: Redis
+ * adapter for multi-instance, room-ownership auth, throttled courier
+ * location. See docs/18 §18.
  */
-@Module({})
+@Module({
+  providers: [RealtimeGateway],
+})
 export class RealtimeModule {}

@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
+import { CatalogService } from './catalog.service';
 
 /**
- * Skeleton (Bloc 0). Bloc 2: restaurants, menus, products, options, search
- * (Postgres FTS). Hours are interpreted in `cities.timezone` (decision C16).
+ * Bloc 0.5: minimal restaurant/product reads to create a real order.
+ * Bloc 2: menus, options, search, hours (tz de la ville). Leaf of the DAG.
  */
-@Module({})
+@Module({
+  providers: [CatalogService],
+  exports: [CatalogService],
+})
 export class CatalogModule {}

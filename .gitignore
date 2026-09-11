@@ -46,3 +46,6 @@ pnpm-debug.log*
 # Misc
 tmp/
 .cache/
+
+# Claude Code local session state (not project config)
+.claude/

@@ -127,7 +127,7 @@ export class MockPaymentProvider implements PaymentProvider {
   }
 
   private outcomeOf(input: InitiatePaymentInput): MockOutcome {
-    const raw = (input as { metadata?: { mockOutcome?: string } }).metadata?.mockOutcome;
+    const raw = input.metadata?.['mockOutcome'];
     if (raw === 'fail' || raw === 'pending_then_succeed' || raw === 'timeout') return raw;
     return 'succeed';
   }

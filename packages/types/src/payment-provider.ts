@@ -38,6 +38,8 @@ export interface InitiatePaymentInput {
   readonly idempotencyKey: string;
   readonly payerPhone?: string;
   readonly returnUrl?: string;
+  /** Provider-specific hints (e.g. `MockPaymentProvider`'s `mockOutcome`). Real PSPs ignore unknown keys. */
+  readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export interface InitiatePaymentResult {

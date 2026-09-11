@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "test:unit": "vitest run --passWithNoTests",
+    "test:int": "vitest run --config test/vitest.int.config.ts",
     "clean": "rimraf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
@@ -20,12 +21,14 @@
     "@djafat/types": "workspace:*",
     "bullmq": "5.34.5",
     "ioredis": "5.4.2",
+    "pg": "8.13.1",
     "pino": "9.6.0"
   },
   "devDependencies": {
     "@djafat/eslint-config": "workspace:*",
     "@djafat/tsconfig": "workspace:*",
     "@types/node": "22.10.5",
+    "@types/pg": "8.11.10",
     "eslint": "9.17.0",
     "pino-pretty": "13.0.0",
     "rimraf": "6.0.1",

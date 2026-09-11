@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { LedgerModule } from '../ledger/ledger.module';
 import { PaymentProviderRegistry } from './payment-provider.registry';
 import { PAYMENT_PROVIDER } from './payments.tokens';
+import { PaymentsService } from './payments.service';
+import { PaymentsController } from './payments.controller';
 import { CashPaymentProvider } from './providers/cash/cash-payment.provider';
 import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
 
@@ -16,6 +18,7 @@ import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
  */
 @Module({
   imports: [LedgerModule],
+  controllers: [PaymentsController],
   providers: [
     CashPaymentProvider,
     MockPaymentProvider,
@@ -27,6 +30,7 @@ import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
         new PaymentProviderRegistry([cash, mock]),
       inject: [CashPaymentProvider, MockPaymentProvider],
     },
+    PaymentsService,
   ],
   exports: [PaymentProviderRegistry],
 })

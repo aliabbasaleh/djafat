@@ -6,6 +6,7 @@ import { LoggingModule } from './common/logging/logging.module';
 import { RedisModule } from './common/redis/redis.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { HealthModule } from './common/health/health.module';
+import { DomainEventsModule } from './common/events/events.module';
 
 // Infra
 import { PrismaModule } from './infra/prisma/prisma.module';
@@ -39,6 +40,7 @@ import { AdminModule } from './modules/admin/admin.module';
     OutboxModule,
     ObjectStorageModule,
     IdempotencyModule,
+    DomainEventsModule,
     HealthModule,
     // domain
     PlatformModule,

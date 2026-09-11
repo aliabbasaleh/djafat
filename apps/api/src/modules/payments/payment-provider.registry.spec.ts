@@ -71,7 +71,6 @@ describe('MockPaymentProvider', () => {
       amount: money(1n, 'XAF'),
       orderCode: 'DJF-2',
       idempotencyKey: 'k',
-      // @ts-expect-error metadata is a test-only escape hatch on the mock
       metadata: { mockOutcome: 'fail' },
     });
     expect(fail.status).toBe('failed');

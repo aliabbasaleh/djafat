@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
+import { PricingService } from './pricing.service';
 
 /**
- * Skeleton (Bloc 0). Bloc 4: the server-authoritative price engine — subtotal,
- * delivery fee (zone + distance), service fee, resolved commission & tax
- * (snapshotted on the order). Pure math lives in `@djafat/core`.
- * DAG: `pricing` depends on `platform` and `geo`.
+ * Bloc 0.5: commission resolved for real, delivery fee flat (skeleton — see
+ * docs/18 §4). Bloc 4: full server-authoritative engine (zones, tax).
+ * DAG: `pricing` depends only on shared infra (PrismaService) — no `catalog`.
  */
-@Module({})
+@Module({
+  providers: [PricingService],
+  exports: [PricingService],
+})
 export class PricingModule {}

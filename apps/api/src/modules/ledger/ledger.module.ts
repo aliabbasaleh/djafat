@@ -5,9 +5,11 @@ import { LedgerRepository } from './ledger.repository';
 import { LEDGER_PORT } from './ledger.port';
 
 /**
- * `LedgerModule` is global: other modules inject `LEDGER_PORT` and call
- * `postEntryGroup`. `LedgerRepository` is NOT exported — nothing outside this
- * module can obtain it.
+ * `LedgerModule` is global. Most callers inject `LEDGER_PORT` (the
+ * `@djafat/types` interface). Same-process, DAG-allowed callers that need to
+ * join an ongoing Prisma transaction (`payments`, `deliveries` — docs/18 §5)
+ * inject the concrete `LedgerService` for `postEntryGroupTx`.
+ * `LedgerRepository` is NOT exported — nothing outside this module can obtain it.
  */
 @Global()
 @Module({
@@ -17,6 +19,6 @@ import { LEDGER_PORT } from './ledger.port';
     LedgerService,
     { provide: LEDGER_PORT, useExisting: LedgerService },
   ],
-  exports: [LEDGER_PORT],
+  exports: [LEDGER_PORT, LedgerService],
 })
 export class LedgerModule {}

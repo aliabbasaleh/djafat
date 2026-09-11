@@ -25,6 +25,12 @@ export interface OrderAmountPort {
   /** The frozen, server-authoritative total for an order. */
   getAuthoritativeAmount(orderId: string): Promise<Money>;
   getPaymentContext(orderId: string): Promise<OrderPaymentContext>;
+  /**
+   * The frozen breakdown needed to post `order_accrual` — READ only, never a
+   * write. Keeps `payments` fully ignorant of the `orders` table shape
+   * (docs/18 §5).
+   */
+  getAccrualBreakdown(orderId: string): Promise<OrderAccrualBreakdown>;
 }
 
 export interface OrderPaymentContext {
@@ -34,6 +40,14 @@ export interface OrderPaymentContext {
   readonly cityId: string;
   readonly restaurantId: string;
   readonly currency: string;
+}
+
+export interface OrderAccrualBreakdown {
+  readonly restaurantId: string;
+  readonly courierId: string | null;
+  readonly subtotal: Money;
+  readonly commission: Money;
+  readonly courierFee: Money;
 }
 
 /** Implemented by `payments`. Consumed by `orders` reactions only via events. */

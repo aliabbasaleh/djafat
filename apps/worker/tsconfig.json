@@ -2,11 +2,12 @@
   "extends": "@djafat/tsconfig/nest.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
+    "baseUrl": ".",
     "types": ["node"],
     "emitDecoratorMetadata": false,
     "experimentalDecorators": false
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "test/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -53,4 +53,14 @@ export class PlatformService {
       minAppVersion: { android: '1.0.0', ios: '1.0.0' },
     };
   }
+
+  /** `platform_settings['unpaid_order_ttl_seconds']` (decision A4) — no magic number. */
+  async getUnpaidOrderTtlSeconds(): Promise<number> {
+    const row = await this.prisma.platformSetting.findFirst({
+      where: { key: 'unpaid_order_ttl_seconds', scope: 'global' },
+    });
+    return typeof row?.value === 'number'
+      ? row.value
+      : PLATFORM_SETTINGS_DEFAULTS.unpaid_order_ttl_seconds;
+  }
 }

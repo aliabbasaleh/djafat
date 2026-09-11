@@ -1,9 +1,16 @@
 import { Module } from '@nestjs/common';
+import { LedgerModule } from '../ledger/ledger.module';
+import { DeliveriesService } from './deliveries.service';
+import { DeliveriesController } from './deliveries.controller';
 
 /**
- * Skeleton (Bloc 0). Bloc 6: delivery lifecycle, proof (photo + code), courier
- * fee credited via `LedgerPort` (never a direct wallet write), delivery-fee
- * tampering guard. DAG: `deliveries` depends on `geo` and `ledger`.
+ * Bloc 0.5: minimal delivery path (assign / picked-up / delivered), releasing
+ * funds via `LedgerPort` at `delivered`. DAG: `deliveries` depends on `ledger`
+ * only — never `orders` (docs/05 §5.3). Full dispatch is Bloc 6.
  */
-@Module({})
+@Module({
+  imports: [LedgerModule],
+  controllers: [DeliveriesController],
+  providers: [DeliveriesService],
+})
 export class DeliveriesModule {}

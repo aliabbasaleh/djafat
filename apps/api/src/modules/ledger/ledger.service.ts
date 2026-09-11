@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import type {
   LedgerPort,
   PostEntryGroupInput,
@@ -24,11 +25,38 @@ export class LedgerService implements LedgerPort {
   constructor(private readonly repo: LedgerRepository) {}
 
   async postEntryGroup(input: PostEntryGroupInput): Promise<PostedEntryGroup> {
+    return this.doPost(input);
+  }
+
+  /**
+   * Same as `postEntryGroup`, but joins an ONGOING Prisma transaction owned by
+   * the caller so the ledger write commits atomically with the caller's own
+   * changes (docs/18 §5 — e.g. `payments` marking a payment succeeded).
+   * Not part of `LedgerPort` on purpose: `Prisma.TransactionClient` is a
+   * Nest/Prisma-specific type and `@djafat/types` stays platform-agnostic.
+   * Only same-process, DAG-allowed callers (`payments`, `deliveries`) inject
+   * `LedgerService` directly to reach this method.
+   */
+  async postEntryGroupTx(
+    tx: Prisma.TransactionClient,
+    input: PostEntryGroupInput,
+  ): Promise<PostedEntryGroup> {
+    return this.doPost(input, tx);
+  }
+
+  private async doPost(
+    input: PostEntryGroupInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<PostedEntryGroup> {
     const validated = validateEntryGroup(input); // throws LedgerError if unbalanced
-    const { id, replayed } = await this.repo.persistEntryGroup(validated, {
-      ...(input.refs?.orderId !== undefined ? { orderId: input.refs.orderId } : {}),
-      ...(input.refs?.paymentId !== undefined ? { paymentId: input.refs.paymentId } : {}),
-    });
+    const { id, replayed } = await this.repo.persistEntryGroup(
+      validated,
+      {
+        ...(input.refs?.orderId !== undefined ? { orderId: input.refs.orderId } : {}),
+        ...(input.refs?.paymentId !== undefined ? { paymentId: input.refs.paymentId } : {}),
+      },
+      tx,
+    );
     if (replayed) {
       this.logger.debug(`postEntryGroup replay (idempotencyKey=${input.idempotencyKey})`);
     }

@@ -199,9 +199,87 @@ async function main(): Promise<void> {
     }
   }
 
+  // --- Bloc 0.5 walking skeleton: test customer, test courier, restaurant, products ---
+  // See docs/18 §4 — a single seeded courier is resolved deterministically by
+  // `orders` at creation time; no real dispatch yet (Bloc 6).
+  async function findOrCreateUser(phone: string, fullName: string): Promise<string> {
+    const existing = await prisma.user.findFirst({ where: { phone, deletedAt: null } });
+    if (existing) return existing.id;
+    const created = await prisma.user.create({
+      data: { phone, fullName, countryId: country.id, locale: 'fr', status: 'active' },
+    });
+    return created.id;
+  }
+
+  async function ensureRole(userId: string, role: string): Promise<void> {
+    const existing = await prisma.$queryRaw<Array<{ user_id: string }>>`
+      SELECT user_id FROM user_roles
+      WHERE user_id = ${userId}::uuid AND role = ${role}
+        AND scope_restaurant_id IS NULL AND scope_country_id IS NULL AND scope_city_id IS NULL
+    `;
+    if (existing.length === 0) {
+      await prisma.$executeRaw`INSERT INTO user_roles (user_id, role) VALUES (${userId}::uuid, ${role})`;
+    }
+  }
+
+  const customerId = await findOrCreateUser('+23566000001', 'Client Test');
+  await ensureRole(customerId, 'customer');
+
+  const courierId = await findOrCreateUser('+23566000002', 'Livreur Test');
+  await ensureRole(courierId, 'courier');
+
+  const restaurant = await prisma.restaurant.findFirst({ where: { slug: 'chez-fatime' } });
+  const restaurantId = (
+    restaurant ??
+    (await prisma.restaurant.create({
+      data: {
+        countryId: country.id,
+        cityId: city.id,
+        slug: 'chez-fatime',
+        name: 'Chez Fatimé',
+        currency: 'XAF',
+        status: 'active',
+      },
+    }))
+  ).id;
+
+  const products = [
+    { name: 'Poulet braisé', priceMinor: 3500n },
+    { name: 'Frites', priceMinor: 1000n },
+  ];
+  for (const p of products) {
+    const existingProduct = await prisma.product.findFirst({
+      where: { restaurantId, name: p.name },
+    });
+    if (!existingProduct) {
+      await prisma.product.create({
+        data: {
+          restaurantId,
+          name: p.name,
+          priceMinor: p.priceMinor,
+          currency: 'XAF',
+          isAvailable: true,
+        },
+      });
+    }
+  }
+
+  // Flat delivery fee for the skeleton (real zone pricing is Bloc 6 — docs/18 §4).
+  const flatFee = await prisma.platformSetting.findFirst({
+    where: { key: 'skeleton_flat_delivery_fee_minor', scope: 'global' },
+  });
+  if (flatFee) {
+    await prisma.platformSetting.update({ where: { id: flatFee.id }, data: { value: 1000 } });
+  } else {
+    await prisma.platformSetting.create({
+      data: { key: 'skeleton_flat_delivery_fee_minor', scope: 'global', value: 1000 },
+    });
+  }
+
   console.log(
     `Seed OK — market ${country.isoCode}/${city.slug}, ${currencies.length} currencies, ` +
-      `${providers.length} payment providers (cash+mock active), ${accounts.length} ledger accounts.`,
+      `${providers.length} payment providers (cash+mock active), ${accounts.length} ledger accounts, ` +
+      `walking-skeleton fixtures: customer ${customerId}, courier ${courierId}, restaurant ${restaurantId} (${products.length} products).`,
   );
 }
 
