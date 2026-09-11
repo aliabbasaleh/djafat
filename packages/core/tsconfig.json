@@ -2,7 +2,12 @@
   "extends": "@djafat/tsconfig/library.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    // Type-only: needed for the ambient `crypto` global (Web Crypto API, a
+    // Node 19+/browser runtime global — used by src/mfa/totp.ts). No Node
+    // built-in MODULE is imported anywhere in this package; it stays
+    // runtime-isomorphic (docs/19 §22).
+    "types": ["node"]
   },
   "include": ["src/**/*.ts"],
   "references": [{ "path": "../types" }]

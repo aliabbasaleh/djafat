@@ -9,3 +9,8 @@ export * from './idempotency/canonical-json.js';
 export * from './idempotency/reconcile.js';
 
 export * from './order/state-machine.js';
+
+export * from './mfa/totp.js';
+
+export * from './auth/rotation-policy.js';
+export * from './auth/otp-policy.js';
