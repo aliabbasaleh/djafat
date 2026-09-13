@@ -1,6 +1,8 @@
 import { ApiHttp, type ApiClientOptions } from './http.js';
+import { createCatalogClient } from './catalog.js';
 
 export * from './http.js';
+export * from './catalog.js';
 
 export interface HealthResponse {
   readonly status: 'ok';
@@ -37,6 +39,7 @@ export function createApiClient(options: ApiClientOptions) {
       http.get<PublicConfigResponse>('/config/public', {
         query: cityId ? { cityId } : {},
       }),
+    catalog: createCatalogClient(http),
   };
 }
 
