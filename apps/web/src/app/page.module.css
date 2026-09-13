@@ -1,0 +1,29 @@
+.main {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: calc(var(--djafat-space-4) * 1px) calc(var(--djafat-space-4) * 1px) calc(var(--djafat-space-10) * 1px);
+}
+
+.searchSection {
+  margin-bottom: calc(var(--djafat-space-6) * 1px);
+}
+
+.section {
+  margin-bottom: calc(var(--djafat-space-8) * 1px);
+}
+
+.sectionTitle {
+  margin: 0 0 calc(var(--djafat-space-3) * 1px);
+  font-size: calc(var(--djafat-type-size-h1) * 1px);
+  color: var(--djafat-color-text-primary);
+}
+
+.seeMore {
+  margin-top: calc(var(--djafat-space-4) * 1px);
+  text-align: center;
+}
+
+.seeMore a {
+  font-weight: 600;
+  text-decoration: none;
+}

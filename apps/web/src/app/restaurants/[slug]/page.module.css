@@ -1,0 +1,112 @@
+.main {
+  max-width: 860px;
+  margin: 0 auto;
+  padding-bottom: calc(var(--djafat-space-10) * 1px);
+}
+
+.cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 7;
+  background: var(--djafat-color-bg-surface-alt);
+}
+
+.coverImage {
+  object-fit: cover;
+}
+
+.coverFallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--djafat-type-size-display) * 2px);
+}
+
+.headerCard {
+  display: flex;
+  gap: calc(var(--djafat-space-4) * 1px);
+  padding: calc(var(--djafat-space-4) * 1px);
+  border-bottom: 1px solid var(--djafat-color-border-default);
+}
+
+.logo {
+  flex-shrink: 0;
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  border: 2px solid var(--djafat-color-bg-surface);
+  margin-top: calc(var(--djafat-space-3) * -1px);
+  background: var(--djafat-color-bg-surface);
+  object-fit: cover;
+}
+
+.headerText {
+  min-width: 0;
+  flex: 1;
+}
+
+.nameRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--djafat-space-2) * 1px);
+}
+
+.name {
+  margin: 0;
+  font-size: calc(var(--djafat-type-size-display) * 1px);
+}
+
+.description {
+  margin: calc(var(--djafat-space-2) * 1px) 0 0;
+  color: var(--djafat-color-text-secondary);
+  font-size: calc(var(--djafat-type-size-body) * 1px);
+}
+
+.meta {
+  margin: calc(var(--djafat-space-2) * 1px) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--djafat-space-2) * 1px);
+  color: var(--djafat-color-text-secondary);
+  font-size: calc(var(--djafat-type-size-small) * 1px);
+}
+
+.dot {
+  color: var(--djafat-color-text-muted);
+}
+
+.address {
+  margin: calc(var(--djafat-space-2) * 1px) 0 0;
+  color: var(--djafat-color-text-secondary);
+  font-size: calc(var(--djafat-type-size-small) * 1px);
+}
+
+.menu {
+  padding: 0 calc(var(--djafat-space-4) * 1px);
+}
+
+.category {
+  margin-top: calc(var(--djafat-space-6) * 1px);
+}
+
+.categoryTitle {
+  margin: 0 0 calc(var(--djafat-space-1) * 1px);
+  font-size: calc(var(--djafat-type-size-h1) * 1px);
+}
+
+.productList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 600px) {
+  .headerCard {
+    padding: calc(var(--djafat-space-6) * 1px);
+  }
+
+  .menu {
+    padding: 0 calc(var(--djafat-space-6) * 1px);
+  }
+}

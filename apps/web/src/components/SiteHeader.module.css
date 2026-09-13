@@ -1,0 +1,37 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: var(--djafat-z-header);
+  background: var(--djafat-color-bg-surface);
+  border-bottom: 1px solid var(--djafat-color-border-default);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--djafat-space-3) * 1px);
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: calc(var(--djafat-space-3) * 1px) calc(var(--djafat-space-4) * 1px);
+}
+
+.wordmark {
+  font-size: calc(var(--djafat-type-size-h1) * 1px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--djafat-color-brand-primary);
+  text-decoration: none;
+}
+
+.location {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--djafat-space-1) * 1px);
+  padding: calc(var(--djafat-space-1) * 1px) calc(var(--djafat-space-3) * 1px);
+  border-radius: calc(var(--djafat-radius-pill) * 1px);
+  background: var(--djafat-color-bg-surface-alt);
+  color: var(--djafat-color-text-secondary);
+  font-size: calc(var(--djafat-type-size-small) * 1px);
+  white-space: nowrap;
+}
