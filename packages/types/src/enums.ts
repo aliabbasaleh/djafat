@@ -118,6 +118,38 @@ export const DELIVERY_STATUSES = [
 ] as const;
 export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
+/**
+ * Restaurant lifecycle (docs/20 §6). Visibility to the public catalogue:
+ * `active`/`paused` are visible (paused shows as temporarily unavailable);
+ * `draft`/`pending_review`/`suspended`/`closed` are never visible — the
+ * client never decides this, `RestaurantsService` filters server-side.
+ */
+export const RESTAURANT_STATUSES = [
+  'draft',
+  'pending_review',
+  'active',
+  'paused',
+  'suspended',
+  'closed',
+] as const;
+export type RestaurantStatus = (typeof RESTAURANT_STATUSES)[number];
+
+/** Statuses the public catalogue is allowed to ever return (docs/20 §6). */
+export const RESTAURANT_PUBLIC_STATUSES: readonly RestaurantStatus[] = ['active', 'paused'];
+
+/** The live open/closed signal a client renders — never recomputed independently (docs/20 §23). */
+export const RESTAURANT_AVAILABILITY_STATUSES = [
+  'OPEN',
+  'CLOSED',
+  'PAUSED',
+  'UNAVAILABLE',
+] as const;
+export type RestaurantAvailabilityStatus = (typeof RESTAURANT_AVAILABILITY_STATUSES)[number];
+
+/** How many options a customer may pick within one `ProductOptionGroup` (docs/20 §16). */
+export const OPTION_SELECTION_TYPES = ['single', 'multiple'] as const;
+export type OptionSelectionType = (typeof OPTION_SELECTION_TYPES)[number];
+
 /** Double-entry direction. */
 export type LedgerDirection = 'debit' | 'credit';
 
