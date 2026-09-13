@@ -77,7 +77,13 @@ export default [
             },
             // `users` reaches nothing (base layer, same tier as `auth`).
             { from: [['api-module', { module: 'users' }]], allow: [] },
-            { from: [['api-module', { module: 'catalog' }]], allow: [] },
+            {
+              from: [['api-module', { module: 'catalog' }]],
+              allow: [
+                ['api-module', { module: 'auth' }],
+                ['api-module', { module: 'users' }],
+              ],
+            },
             { from: [['api-module', { module: 'pricing' }]], allow: [] },
             { from: [['api-module', { module: 'ledger' }]], allow: [] },
             {

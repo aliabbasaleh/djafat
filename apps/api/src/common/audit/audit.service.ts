@@ -29,7 +29,17 @@ export type AuditAction =
   | 'USER_SUSPENDED'
   | 'USER_BLOCKED'
   | 'USER_REACTIVATED'
-  | 'USER_DELETED';
+  | 'USER_DELETED'
+  // Bloc 2 — Catalog & Restaurant Discovery (docs/20 §35).
+  | 'RESTAURANT_CREATED'
+  | 'RESTAURANT_UPDATED'
+  | 'MENU_CATEGORY_CREATED'
+  | 'MENU_CATEGORY_UPDATED'
+  | 'PRODUCT_CREATED'
+  | 'PRODUCT_UPDATED'
+  | 'PRODUCT_AVAILABILITY_CHANGED'
+  | 'PRODUCT_OPTION_GROUP_CREATED'
+  | 'PRODUCT_OPTION_GROUP_UPDATED';
 
 export interface AuditLogEntry {
   readonly actorUserId?: string | null;
