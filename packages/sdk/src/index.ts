@@ -1,8 +1,12 @@
 import { ApiHttp, type ApiClientOptions } from './http.js';
 import { createCatalogClient } from './catalog.js';
+import { createCartClient } from './cart.js';
+import { createOrdersClient } from './orders.js';
 
 export * from './http.js';
 export * from './catalog.js';
+export * from './cart.js';
+export * from './orders.js';
 
 export interface HealthResponse {
   readonly status: 'ok';
@@ -40,6 +44,8 @@ export function createApiClient(options: ApiClientOptions) {
         query: cityId ? { cityId } : {},
       }),
     catalog: createCatalogClient(http),
+    cart: createCartClient(http),
+    orders: createOrdersClient(http),
   };
 }
 

@@ -65,6 +65,10 @@ export class ApiHttp {
     return this.request<T>('PATCH', path, options);
   }
 
+  delete<T>(path: string, options?: RequestOptions): Promise<T> {
+    return this.request<T>('DELETE', path, options);
+  }
+
   private async request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
     const url = this.buildUrl(path, options.query);
     const headers = new Headers({ accept: 'application/json', ...this.opts.defaultHeaders });
