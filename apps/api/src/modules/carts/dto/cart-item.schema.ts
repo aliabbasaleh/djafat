@@ -13,12 +13,27 @@ import { UuidSchema } from '@djafat/validation';
  * §2.1). Adding a product from a DIFFERENT restaurant than the cart's
  * current one is refused (`CART_RESTAURANT_MISMATCH`, 409) unless the
  * caller explicitly sets `replaceCart: true` — never a silent merge.
+ *
+ * `selectedOptionIds` is deduplicated here (`.transform`, after the `.max`
+ * length check so a padded-with-duplicates payload is still capped) —
+ * selecting the same option twice isn't a bigger selection, it's the same
+ * one. Without this, a duplicate id passes the length-based min/max-
+ * selections check (`@djafat/core`'s validator counts array length, not
+ * distinct ids) and then hits `cart_item_options`' `UNIQUE(cart_item_id,
+ * option_id)` constraint at insert time — an uncaught Prisma error that
+ * surfaced as a raw 500 instead of a clean validation response.
  */
+const dedupedOptionIds = (max: number) =>
+  z
+    .array(UuidSchema)
+    .max(max)
+    .transform((ids) => [...new Set(ids)]);
+
 export const AddCartItemSchema = z
   .object({
     productId: UuidSchema,
     quantity: z.number().int().min(1).max(99),
-    selectedOptionIds: z.array(UuidSchema).max(50).default([]),
+    selectedOptionIds: dedupedOptionIds(50).default([]),
     replaceCart: z.boolean().optional(),
   })
   .strict();
@@ -27,7 +42,7 @@ export type AddCartItemInput = z.infer<typeof AddCartItemSchema>;
 export const UpdateCartItemSchema = z
   .object({
     quantity: z.number().int().min(1).max(99).optional(),
-    selectedOptionIds: z.array(UuidSchema).max(50).optional(),
+    selectedOptionIds: dedupedOptionIds(50).optional(),
   })
   .strict()
   .refine((v) => v.quantity !== undefined || v.selectedOptionIds !== undefined, {

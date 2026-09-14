@@ -575,6 +575,8 @@ model OrderItemOption {
 model Cart {
   id           String     @id @default(uuid()) @db.Uuid
   userId       String     @map("user_id") @db.Uuid
+  /// Both null (no restaurant chosen yet) or both set — never just one
+  /// (DB CHECK `carts_restaurant_currency_together`, docs/22 §2.1).
   restaurantId String?    @map("restaurant_id") @db.Uuid
   currency     String?    @db.Char(3)
   /// open | converted — docs/22 §3.

@@ -18,7 +18,14 @@ CREATE TABLE carts (
   currency       char(3) REFERENCES currencies(code),
   status         text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'converted')),
   created_at     timestamptz NOT NULL DEFAULT now(),
-  updated_at     timestamptz NOT NULL DEFAULT now()
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  -- Every writer (addItem, clearCart) always sets both together or neither
+  -- — a cart bound to a restaurant with no currency (or vice versa) is
+  -- nonsensical and would break `loadAndValidateCartForCheckout`'s own
+  -- null check. This used to be a code-only invariant (nothing stopped a
+  -- future bug from setting just one); the CHECK makes it a real guarantee
+  -- instead of trusting every future call site to remember.
+  CONSTRAINT carts_restaurant_currency_together CHECK ((restaurant_id IS NULL) = (currency IS NULL))
 );
 -- At most one OPEN cart per user — the orthogonal invariant to "one
 -- restaurant per cart" (that one is enforced in the service layer, since it

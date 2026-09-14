@@ -119,39 +119,47 @@ export class OrdersService implements OrderAmountPort {
   }
 
   private async doCreateOrder(customerId: string, idempotencyKey: string): Promise<OrderDto> {
-    // Re-validates against LIVE catalog data and recomputes from scratch —
-    // never trusts anything the cart merely had stored (docs/22 §3, §6, §9).
-    const validated = await this.carts.loadAndValidateCartForCheckout(customerId);
-    const restaurant = await this.catalog.getActiveRestaurant(validated.restaurantId);
+    const { order: created, lines } = await this.prisma.$transaction(async (tx) => {
+      // Row-locks the caller's open cart for the rest of this transaction
+      // (docs/22 §9). Without this, two concurrent POST /orders calls using
+      // two DIFFERENT idempotency keys (e.g. a double-click, or a client
+      // retry before the first response lands) could both read the same
+      // open cart, both pass validation, and both create a full order
+      // before either commits — idempotency alone only protects against
+      // *replaying the same key*, not this race. The lock forces the second
+      // call to wait for the first to commit (converting the cart), then
+      // re-read it as no-longer-open and fail with CART_EMPTY, exactly like
+      // a genuinely empty cart.
+      const validated = await this.carts.loadAndValidateCartForCheckout(customerId, tx);
+      const restaurant = await this.catalog.getActiveRestaurant(validated.restaurantId);
 
-    // Bloc 0.5 simplification: single seeded test courier, resolved now so the
-    // courier leg of `order_accrual` can post at payment.succeeded exactly like
-    // the validated reference model (docs/08 §8.9, docs/18 §4). Real dispatch
-    // is Bloc 6.
-    const courier = await this.prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT u.id FROM users u
-      JOIN user_roles ur ON ur.user_id = u.id
-      WHERE ur.role = 'courier' AND u.deleted_at IS NULL
-      ORDER BY u.created_at ASC LIMIT 1
-    `;
-    const courierId = courier[0]?.id ?? null;
-    if (!courierId) {
-      this.logger.warn('No seeded courier user found — order will have no courier_id.');
-    }
+      // Bloc 0.5 simplification: single seeded test courier, resolved now so the
+      // courier leg of `order_accrual` can post at payment.succeeded exactly like
+      // the validated reference model (docs/08 §8.9, docs/18 §4). Real dispatch
+      // is Bloc 6.
+      const courier = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT u.id FROM users u
+        JOIN user_roles ur ON ur.user_id = u.id
+        WHERE ur.role = 'courier' AND u.deleted_at IS NULL
+        ORDER BY u.created_at ASC LIMIT 1
+      `;
+      const courierId = courier[0]?.id ?? null;
+      if (!courierId) {
+        this.logger.warn('No seeded courier user found — order will have no courier_id.');
+      }
 
-    const price = await this.pricing.priceOrder({
-      restaurantId: restaurant.id,
-      countryId: restaurant.countryId,
-      cityId: restaurant.cityId,
-      subtotal: validated.subtotal,
-    });
-    const total = addMoney(price.subtotal, price.deliveryFee);
+      const price = await this.pricing.priceOrder({
+        restaurantId: restaurant.id,
+        countryId: restaurant.countryId,
+        cityId: restaurant.cityId,
+        subtotal: validated.subtotal,
+      });
+      const total = addMoney(price.subtotal, price.deliveryFee);
 
-    const ttlSeconds = await this.platform.getUnpaidOrderTtlSeconds();
-    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-    const code = generateOrderCode();
+      const ttlSeconds = await this.platform.getUnpaidOrderTtlSeconds();
+      const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+      const code = generateOrderCode();
 
-    const created = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.create({
         data: {
           code,
@@ -223,10 +231,10 @@ export class OrdersService implements OrderAmountPort {
       // partial unique index allows it once this row leaves `status='open'`).
       await this.carts.markConverted(tx, validated.cartId);
 
-      return order;
+      return { order, lines: validated.lines };
     });
 
-    const itemDtos: OrderItemDto[] = validated.lines.map((l) => ({
+    const itemDtos: OrderItemDto[] = lines.map((l) => ({
       productId: l.productId,
       name: l.name,
       unitPrice: toMoneyJson(l.unitPrice.minor, l.unitPrice.currency),

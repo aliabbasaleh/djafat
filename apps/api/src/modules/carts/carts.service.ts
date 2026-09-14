@@ -4,7 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import type { Money, MoneyJson, OptionSelectionType } from '@djafat/types';
 import {
   computeCartLine,
@@ -178,41 +178,23 @@ export class CartsService {
       });
     }
 
-    // Resolve the restaurant/cart relationship BEFORE validating options: a
-    // mismatched restaurant is a more fundamental problem than an invalid
-    // option, and the caller should hear about it first (docs/22 §2.1).
-    let cart = await this.findOpenCart(userId);
-    if (cart && cart.restaurantId && cart.restaurantId !== restaurant.id) {
-      if (!input.replaceCart) {
-        throw new ConflictException({
-          code: 'CART_RESTAURANT_MISMATCH',
-          message:
-            'Your cart already has items from a different restaurant. Pass replaceCart: true to start a new cart.',
-          details: { currentRestaurantId: cart.restaurantId },
-        });
-      }
-      await this.prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
-      cart = await this.prisma.cart.update({
-        where: { id: cart.id },
-        data: { restaurantId: restaurant.id, currency: restaurant.currency },
-        include: { items: { include: { options: true } } },
-      });
-    }
-    if (!cart) {
-      cart = await this.prisma.cart.create({
-        data: {
-          userId,
-          restaurantId: restaurant.id,
-          currency: restaurant.currency,
-          status: 'open',
-        },
-        include: { items: { include: { options: true } } },
-      });
-    }
-
-    const selected = this.resolveAndValidateSelections(product, input.selectedOptionIds);
-
+    // Resolve the restaurant/cart relationship AND create the item in the
+    // SAME locked transaction (docs/22 §2.1) — a mismatched restaurant is a
+    // more fundamental problem than an invalid option, so it's checked
+    // FIRST, before option validation (which is synchronous/pure and needs
+    // no DB access, so it costs nothing to defer it here). Resolving the
+    // cart in a separate, earlier call (the original shape of this method)
+    // left a real TOCTOU gap: a concurrent `clearCart()`/`replaceCart`
+    // could commit AFTER this method decided which cart to use but BEFORE
+    // it inserted the item, leaving items attached to a cart whose
+    // `restaurantId` had just been unbound — invisible to checkout despite
+    // visibly having items. `FOR UPDATE` closes it: Postgres blocks a
+    // concurrent writer (clearCart's plain `UPDATE`/`DELETE` on this same
+    // row) until this transaction commits, not just other `FOR UPDATE`
+    // readers.
     await this.prisma.$transaction(async (tx) => {
+      const cart = await this.resolveCartForAdd(tx, userId, restaurant, input.replaceCart);
+      const selected = this.resolveAndValidateSelections(product, input.selectedOptionIds);
       const item = await tx.cartItem.create({
         data: {
           cartId: cart.id,
@@ -272,26 +254,39 @@ export class CartsService {
         ? this.resolveAndValidateSelections(product, input.selectedOptionIds)
         : null;
 
-    await this.prisma.$transaction(async (tx) => {
-      if (input.quantity !== undefined) {
-        await tx.cartItem.update({ where: { id: itemId }, data: { quantity: input.quantity } });
-      }
-      if (selected !== null) {
-        await tx.cartItemOption.deleteMany({ where: { cartItemId: itemId } });
-        if (selected.length > 0) {
-          await tx.cartItemOption.createMany({
-            data: selected.map((o) => ({
-              cartItemId: itemId,
-              optionGroupId: o.optionGroupId,
-              optionId: o.id,
-              nameSnapshot: o.name,
-              priceDeltaMinor: o.priceDeltaMinor,
-              currency: o.currency,
-            })),
-          });
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        if (input.quantity !== undefined) {
+          await tx.cartItem.update({ where: { id: itemId }, data: { quantity: input.quantity } });
         }
+        if (selected !== null) {
+          await tx.cartItemOption.deleteMany({ where: { cartItemId: itemId } });
+          if (selected.length > 0) {
+            await tx.cartItemOption.createMany({
+              data: selected.map((o) => ({
+                cartItemId: itemId,
+                optionGroupId: o.optionGroupId,
+                optionId: o.id,
+                nameSnapshot: o.name,
+                priceDeltaMinor: o.priceDeltaMinor,
+                currency: o.currency,
+              })),
+            });
+          }
+        }
+      });
+    } catch (err) {
+      // A concurrent request (another tab, a double-submit) removed this
+      // exact item between the lookup above and this write — same 404 as
+      // "never existed" (docs/22 §6 IDOR discipline: never a 500 here).
+      if (this.isRecordNotFound(err)) {
+        throw new NotFoundException({
+          code: 'NOT_FOUND',
+          message: `Cart item ${itemId} not found.`,
+        });
       }
-    });
+      throw err;
+    }
 
     return (await this.getCart(userId))!;
   }
@@ -302,17 +297,35 @@ export class CartsService {
     if (!cart || !item) {
       throw new NotFoundException({ code: 'NOT_FOUND', message: `Cart item ${itemId} not found.` });
     }
-    await this.prisma.cartItem.delete({ where: { id: itemId } });
+    try {
+      await this.prisma.cartItem.delete({ where: { id: itemId } });
+    } catch (err) {
+      // Already removed by a concurrent request — idempotently treat as
+      // "not found" rather than letting the raw Prisma error surface as 500.
+      if (this.isRecordNotFound(err)) {
+        throw new NotFoundException({
+          code: 'NOT_FOUND',
+          message: `Cart item ${itemId} not found.`,
+        });
+      }
+      throw err;
+    }
     return this.getCart(userId);
   }
 
   async clearCart(userId: string): Promise<CartDto | null> {
-    const cart = await this.findOpenCart(userId);
-    if (!cart) return null;
-    await this.prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
-    await this.prisma.cart.update({
-      where: { id: cart.id },
-      data: { restaurantId: null, currency: null },
+    await this.prisma.$transaction(async (tx) => {
+      // Locks the cart row FIRST (docs/22 §2.1) — see `lockOpenCart`'s doc
+      // comment: without it, a concurrent `addItem` could insert a new item
+      // strictly between this method's item delete and its restaurant
+      // unbind, orphaning that new item under a restaurant-less cart.
+      const existing = await this.lockOpenCart(tx, userId);
+      if (!existing) return;
+      await tx.cartItem.deleteMany({ where: { cartId: existing.id } });
+      await tx.cart.update({
+        where: { id: existing.id },
+        data: { restaurantId: null, currency: null },
+      });
     });
     return this.getCart(userId);
   }
@@ -366,9 +379,30 @@ export class CartsService {
    * its subtotal — the shared core of `computeQuote()` AND order creation
    * (`OrdersService` calls this directly, never the client-facing DTO
    * method, since it needs `Money`, not `MoneyJson`).
+   *
+   * When `tx` is given (order creation only — `computeQuote()` never mutates
+   * anything, so it never needs this), the cart row is locked with
+   * `FOR UPDATE` for the rest of that transaction first — the same pattern
+   * `OrdersService.transitionOrder` already uses on `orders`. Without it,
+   * two concurrent order-creation requests (two different idempotency keys —
+   * a double-click, or a client retry) could both read the same open cart,
+   * both pass validation, and both create a full order before either
+   * commits; idempotency alone only protects against replaying the SAME
+   * key, not this race.
    */
-  async loadAndValidateCartForCheckout(userId: string): Promise<ValidatedCartForCheckout> {
-    const cart = await this.findOpenCart(userId);
+  async loadAndValidateCartForCheckout(
+    userId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ValidatedCartForCheckout> {
+    if (tx) {
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM carts WHERE user_id = ${userId}::uuid AND status = 'open' FOR UPDATE
+      `;
+      if (locked.length === 0) {
+        throw new ConflictException({ code: 'CART_EMPTY', message: 'Your cart is empty.' });
+      }
+    }
+    const cart = await this.findOpenCart(userId, tx ?? this.prisma);
     if (!cart || !cart.restaurantId || !cart.currency || cart.items.length === 0) {
       throw new ConflictException({ code: 'CART_EMPTY', message: 'Your cart is empty.' });
     }
@@ -442,9 +476,25 @@ export class CartsService {
     };
   }
 
-  /** Marks the cart `converted` — called by `OrdersService` inside the SAME transaction that creates the order. */
+  /**
+   * Marks the cart `converted` — called by `OrdersService` inside the SAME
+   * transaction that creates the order, AFTER it has locked this cart via
+   * `loadAndValidateCartForCheckout(userId, tx)`. The `status: 'open'` guard
+   * (via `updateMany` + a count check, since `status` isn't part of the
+   * unique key `update()` requires) is a defensive invariant check, not the
+   * primary safeguard — the row lock is what actually prevents a double
+   * conversion; this only catches a future call site that forgets to lock.
+   */
   async markConverted(tx: Prisma.TransactionClient, cartId: string): Promise<void> {
-    await tx.cart.update({ where: { id: cartId }, data: { status: 'converted' } });
+    const result = await tx.cart.updateMany({
+      where: { id: cartId, status: 'open' },
+      data: { status: 'converted' },
+    });
+    if (result.count !== 1) {
+      throw new Error(
+        `markConverted: expected exactly one open cart ${cartId} to convert, affected ${result.count}.`,
+      );
+    }
   }
 
   // ── option validation (docs/22 §4) — one implementation, two call sites ──
@@ -515,8 +565,122 @@ export class CartsService {
 
   // ── internal ────────────────────────────────────────────────────────────
 
-  private async findOpenCart(userId: string): Promise<CartWithItems | null> {
-    return this.prisma.cart.findFirst({
+  /**
+   * Resolves (or creates) the cart `addItem` should write to, applying the
+   * one-restaurant-per-cart rule (docs/22 §2.1) — called as the FIRST thing
+   * inside `addItem`'s transaction, so item creation happens under the SAME
+   * lock. `FOR UPDATE` on an existing open cart blocks a concurrent writer
+   * (another `addItem`'s replace-branch, `clearCart()`) on that exact row
+   * until this transaction commits — not just other `FOR UPDATE` readers —
+   * which is what actually closes the gap a plain read-then-later-write
+   * left open (docs/22 §2.1, found by real concurrent testing: a
+   * `clearCart()` committing between the old resolve step and the item
+   * insert could leave items attached to a cart with no restaurant bound).
+   *
+   * Recurses exactly once in the ordinary case: if this call loses a create
+   * race against another concurrent `addItem` for the SAME user (two tabs,
+   * a double-click on an empty cart — nothing exists yet for `FOR UPDATE`
+   * to lock), `cart.create()` throws a unique-constraint violation
+   * (`carts_one_open_per_user`) instead of crashing to a raw 500 —
+   * re-running this method locks and re-resolves against whichever request
+   * won, re-applying the same mismatch/replace logic against it.
+   */
+  private async resolveCartForAdd(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    restaurant: { readonly id: string; readonly currency: string },
+    replaceCart: boolean | undefined,
+  ): Promise<{ readonly id: string }> {
+    const existing = await this.lockOpenCart(tx, userId);
+
+    if (existing && existing.restaurant_id && existing.restaurant_id !== restaurant.id) {
+      if (!replaceCart) {
+        throw new ConflictException({
+          code: 'CART_RESTAURANT_MISMATCH',
+          message:
+            'Your cart already has items from a different restaurant. Pass replaceCart: true to start a new cart.',
+          details: { currentRestaurantId: existing.restaurant_id },
+        });
+      }
+      await tx.cartItem.deleteMany({ where: { cartId: existing.id } });
+      await tx.cart.update({
+        where: { id: existing.id },
+        data: { restaurantId: restaurant.id, currency: restaurant.currency },
+      });
+      return { id: existing.id };
+    }
+
+    if (existing && !existing.restaurant_id) {
+      // An open cart that exists but isn't bound to any restaurant yet —
+      // the state `clearCart()` leaves behind (it empties the cart's items
+      // but keeps the row itself, so a later `addItem` can reuse it).
+      await tx.cart.update({
+        where: { id: existing.id },
+        data: { restaurantId: restaurant.id, currency: restaurant.currency },
+      });
+      return { id: existing.id };
+    }
+
+    if (existing) {
+      return { id: existing.id };
+    }
+
+    try {
+      const created = await tx.cart.create({
+        data: {
+          userId,
+          restaurantId: restaurant.id,
+          currency: restaurant.currency,
+          status: 'open',
+        },
+      });
+      return { id: created.id };
+    } catch (err) {
+      if (!this.isUniqueViolation(err)) throw err;
+      return this.resolveCartForAdd(tx, userId, restaurant, replaceCart);
+    }
+  }
+
+  /**
+   * Row-locks the caller's open cart (if any) for the rest of the current
+   * transaction. `FOR UPDATE` only locks the `carts` ROW itself — it does
+   * NOT transitively protect `cart_items` rows referencing it (Postgres
+   * doesn't propagate a row lock across a foreign key on child rows unless
+   * the child write itself touches the locked row). Every write path that
+   * touches a cart's items as a bundle (`resolveCartForAdd`'s replace
+   * branch, `clearCart`) MUST call this FIRST, in the SAME transaction as
+   * its `cart_items` writes — found by real concurrent testing: `clearCart`
+   * used to delete items unlocked, so a concurrent `addItem` on the same
+   * cart could insert a new item strictly BETWEEN `clearCart`'s (unlocked)
+   * delete and its (locked) `carts` update, leaving that new item attached
+   * to a cart whose restaurant had just been unbound.
+   */
+  private async lockOpenCart(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<{ id: string; restaurant_id: string | null; currency: string | null } | undefined> {
+    const locked = await tx.$queryRaw<
+      Array<{ id: string; restaurant_id: string | null; currency: string | null }>
+    >`
+      SELECT id, restaurant_id, currency FROM carts
+      WHERE user_id = ${userId}::uuid AND status = 'open' FOR UPDATE
+    `;
+    return locked[0];
+  }
+
+  private isRecordNotFound(err: unknown): boolean {
+    return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025';
+  }
+
+  private isUniqueViolation(err: unknown): boolean {
+    return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+  }
+
+  private async findOpenCart(
+    userId: string,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+  ): Promise<CartWithItems | null> {
+    return client.cart.findFirst({
       where: { userId, status: 'open' },
       include: { items: { include: { options: true }, orderBy: { createdAt: 'asc' } } },
     });
