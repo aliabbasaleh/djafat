@@ -8,7 +8,28 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
 import { PrismaService } from '../src/infra/prisma/prisma.service';
+import { RedisService } from '../src/common/redis/redis.service';
+import { mockOtpKey } from '../src/modules/auth/providers/mock-otp-delivery.provider';
 import { MockPaymentProvider } from '../src/modules/payments/providers/mock/mock-payment.provider';
+
+const CUSTOMER_PHONE = '+23566000001'; // seeded (apps/api/prisma/seed.ts)
+
+/** Drives a full OTP login for a seeded phone number via real HTTP calls (same as identity.int.spec.ts). */
+async function loginViaOtp(
+  server: Server,
+  redis: RedisService,
+  phone: string,
+): Promise<{ access: string }> {
+  await request(server).post('/v1/auth/otp/request').send({ phone, purpose: 'login' }).expect(202);
+  const code = await redis.client.get(mockOtpKey(phone));
+  if (!code)
+    throw new Error(`No mock OTP code found for ${phone} — did MockOtpDeliveryProvider run?`);
+  const res = await request(server)
+    .post('/v1/auth/otp/verify')
+    .send({ phone, code, purpose: 'login' })
+    .expect(200);
+  return { access: (res.body as { access: string }).access };
+}
 
 /**
  * The Bloc 0.5 walking-skeleton end-to-end flow (docs/18 §21, §28): real
@@ -26,18 +47,22 @@ import { MockPaymentProvider } from '../src/modules/payments/providers/mock/mock
 
 let app: NestFastifyApplication;
 let prisma: PrismaService;
+let redis: RedisService;
 let server: Server;
+let customerAccess: string;
 
 interface Fixtures {
   customerId: string;
   restaurantId: string;
   pouletId: string;
+  /** "Entier" — the zero price-delta choice in Poulet braisé's required "Portion" group (docs/20 seed), so the flow's existing subtotal assertions (3500 for poulet) stay exact. */
+  pouletPortionEntierOptionId: string;
   fritesId: string;
 }
 let fx: Fixtures;
 
 async function loadFixtures(): Promise<Fixtures> {
-  const customer = await prisma.user.findFirst({ where: { phone: '+23566000001' } });
+  const customer = await prisma.user.findFirst({ where: { phone: CUSTOMER_PHONE } });
   const restaurant = await prisma.restaurant.findFirst({ where: { slug: 'chez-fatime' } });
   if (!customer || !restaurant) {
     throw new Error(
@@ -50,10 +75,17 @@ async function loadFixtures(): Promise<Fixtures> {
   const frites = await prisma.product.findFirstOrThrow({
     where: { restaurantId: restaurant.id, name: 'Frites' },
   });
+  const portionGroup = await prisma.productOptionGroup.findFirstOrThrow({
+    where: { productId: poulet.id, name: 'Portion' },
+  });
+  const entier = await prisma.productOption.findFirstOrThrow({
+    where: { optionGroupId: portionGroup.id, name: 'Entier' },
+  });
   return {
     customerId: customer.id,
     restaurantId: restaurant.id,
     pouletId: poulet.id,
+    pouletPortionEntierOptionId: entier.id,
     fritesId: frites.id,
   };
 }
@@ -67,7 +99,9 @@ beforeAll(async () => {
   server = app.getHttpAdapter().getInstance().server as unknown as Server;
 
   prisma = app.get(PrismaService);
+  redis = app.get(RedisService);
   fx = await loadFixtures();
+  ({ access: customerAccess } = await loginViaOtp(server, redis, CUSTOMER_PHONE));
 });
 
 afterAll(async () => {
@@ -90,20 +124,39 @@ describe('system', () => {
 });
 
 describe('walking skeleton — full flow', () => {
-  it('runs catalogue -> order -> payment -> webhook -> delivery -> funds_available end to end', async () => {
-    // ── 1. create the order — the client supplies NO price, only references ──
+  it('runs catalogue -> cart -> quote -> order -> payment -> webhook -> delivery -> funds_available end to end', async () => {
+    // ── 1. build the cart (docs/22 §3-§6) — the client supplies references and
+    // choices only, options are validated server-side, prices are never trusted ──
+    await request(server)
+      .post('/v1/carts/items')
+      .set('Authorization', `Bearer ${customerAccess}`)
+      .send({
+        productId: fx.pouletId,
+        quantity: 1, // 3500
+        selectedOptionIds: [fx.pouletPortionEntierOptionId], // "Entier" — 0 delta, required group
+      })
+      .expect(201);
+    await request(server)
+      .post('/v1/carts/items')
+      .set('Authorization', `Bearer ${customerAccess}`)
+      .send({ productId: fx.fritesId, quantity: 1, selectedOptionIds: [] }) // 1000, "Sauce" is optional
+      .expect(201);
+
+    // ── 2. a live quote (docs/22 §8) — never persisted, never trusted back ──
+    const quoteRes = await request(server)
+      .post('/v1/carts/quote')
+      .set('Authorization', `Bearer ${customerAccess}`)
+      .expect(201);
+    expect(quoteRes.body.subtotal).toEqual({ minor: '4500', currency: 'XAF' });
+    expect(quoteRes.body.total).toEqual({ minor: '5500', currency: 'XAF' });
+
+    // ── 3. create the order FROM the cart — the body carries nothing at all ──
     const orderIdemKey = `int-order-${randomUUID()}`;
     const createOrderRes = await request(server)
       .post('/v1/orders')
+      .set('Authorization', `Bearer ${customerAccess}`)
       .set('idempotency-key', orderIdemKey)
-      .send({
-        customerId: fx.customerId,
-        restaurantId: fx.restaurantId,
-        items: [
-          { productId: fx.pouletId, quantity: 1 }, // 3500
-          { productId: fx.fritesId, quantity: 1 }, //  1000
-        ],
-      })
+      .send({})
       .expect(201);
 
     expect(createOrderRes.body.status).toBe('created');
@@ -116,21 +169,18 @@ describe('walking skeleton — full flow', () => {
     expect(order.courierFee).toEqual(order.deliveryFee); // decision A5, structural
     expect(order.total).toEqual({ minor: '5500', currency: 'XAF' }); // 4500 + 1000
     expect(order.courierId).toEqual(expect.any(String)); // single seeded courier resolved
+    expect(order.items[0].options ?? order.items[1].options).toBeDefined(); // option snapshot present (docs/22 §9)
     const orderId: string = order.id;
     const courierId: string = order.courierId;
 
-    // ── idempotency: replaying the SAME key + body must return the SAME order ──
+    // ── idempotency: replaying the SAME key must return the SAME order — the
+    // cart is already `converted` by now, proving the replay short-circuits
+    // before ever touching it again ──
     const replayOrderRes = await request(server)
       .post('/v1/orders')
+      .set('Authorization', `Bearer ${customerAccess}`)
       .set('idempotency-key', orderIdemKey)
-      .send({
-        customerId: fx.customerId,
-        restaurantId: fx.restaurantId,
-        items: [
-          { productId: fx.pouletId, quantity: 1 },
-          { productId: fx.fritesId, quantity: 1 },
-        ],
-      })
+      .send({})
       .expect(201);
     expect(replayOrderRes.body.status).toBe('replayed');
     expect(replayOrderRes.body.order.id).toBe(orderId);

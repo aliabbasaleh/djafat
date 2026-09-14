@@ -103,15 +103,23 @@ describe("scenario 2 — ownership: own resource allowed, another customer's res
   it('customer A can read their own order; customer B cannot', async () => {
     const customerA = await loginViaOtp(CUSTOMER_A_PHONE);
     const restaurant = await prisma.restaurant.findFirstOrThrow({ where: { slug: 'chez-fatime' } });
+    // "Jus de bissap" has no option groups (docs/20 seed) — keeps this
+    // ownership scenario independent of the Bloc 4 option-validation rules,
+    // which are their own dedicated coverage (docs/22, catalog.int.spec.ts-style).
     const product = await prisma.product.findFirstOrThrow({
-      where: { restaurantId: restaurant.id },
+      where: { restaurantId: restaurant.id, name: 'Jus de bissap' },
     });
 
+    await request(server)
+      .post('/v1/carts/items')
+      .set('Authorization', `Bearer ${customerA.access}`)
+      .send({ productId: product.id, quantity: 1, selectedOptionIds: [] })
+      .expect(201);
     const created = await request(server)
       .post('/v1/orders')
       .set('Authorization', `Bearer ${customerA.access}`)
       .set('idempotency-key', `int-identity-order-${randomUUID()}`)
-      .send({ restaurantId: restaurant.id, items: [{ productId: product.id, quantity: 1 }] })
+      .send({})
       .expect(201);
     const orderId = created.body.order.id as string;
     expect(created.body.order.customerId).toBe(customerA.user.id); // server-derived, never client-supplied
@@ -130,16 +138,14 @@ describe("scenario 2 — ownership: own resource allowed, another customer's res
       .expect(403);
 
     // IDOR probe: a client-supplied `customerId` in the body must never let
-    // customer B create an order impersonating customer A (docs/19 §38).
+    // customer B create an order impersonating customer A (docs/19 §38) — the
+    // order-creation body is `.strict().object({})` (docs/22 §9): ANY field
+    // at all, `customerId` included, is rejected outright.
     const spoofAttempt = await request(server)
       .post('/v1/orders')
       .set('Authorization', `Bearer ${customerB.access}`)
       .set('idempotency-key', `int-identity-spoof-${randomUUID()}`)
-      .send({
-        restaurantId: restaurant.id,
-        items: [{ productId: product.id, quantity: 1 }],
-        customerId: customerA.user.id, // extra field — schema is .strict(), must be rejected
-      })
+      .send({ customerId: customerA.user.id })
       .expect(422);
     expect(spoofAttempt.body.error.code).toBe('VALIDATION_ERROR');
   });
