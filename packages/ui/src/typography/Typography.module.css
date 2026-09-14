@@ -1,0 +1,57 @@
+.heading {
+  margin: 0;
+  color: var(--djafat-color-text-primary);
+  font-weight: var(--djafat-type-weight-bold);
+  line-height: var(--djafat-type-line-height-tight);
+  text-wrap: balance;
+}
+.size-display { font-size: calc(var(--djafat-type-size-display) * 1px); }
+.size-h1 { font-size: calc(var(--djafat-type-size-h1) * 1px); }
+.size-h2 { font-size: calc(var(--djafat-type-size-h2) * 1px); }
+.size-h3 { font-size: calc(var(--djafat-type-size-h3) * 1px); font-weight: var(--djafat-type-weight-semibold); }
+
+.text {
+  margin: 0;
+  color: var(--djafat-color-text-primary);
+  line-height: var(--djafat-type-line-height-normal);
+}
+.text.body { font-size: calc(var(--djafat-type-size-body) * 1px); }
+.text.small { font-size: calc(var(--djafat-type-size-small) * 1px); }
+.text.caption { font-size: calc(var(--djafat-type-size-caption) * 1px); }
+
+.tone-secondary { color: var(--djafat-color-text-secondary); }
+.tone-muted { color: var(--djafat-color-text-muted); }
+.tone-danger { color: var(--djafat-color-state-danger); }
+.tone-success { color: var(--djafat-color-state-success); }
+.tone-brand { color: var(--djafat-color-brand-primary); }
+
+.weight-regular { font-weight: var(--djafat-type-weight-regular); }
+.weight-medium { font-weight: var(--djafat-type-weight-medium); }
+.weight-semibold { font-weight: var(--djafat-type-weight-semibold); }
+.weight-bold { font-weight: var(--djafat-type-weight-bold); }
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.label {
+  display: inline-block;
+  margin: 0 0 calc(var(--djafat-space-1) * 1px);
+  font-size: calc(var(--djafat-type-size-label) * 1px);
+  font-weight: var(--djafat-type-weight-semibold);
+  color: var(--djafat-color-text-primary);
+}
+
+.caption {
+  margin: 0;
+  font-size: calc(var(--djafat-type-size-caption) * 1px);
+  color: var(--djafat-color-text-muted);
+  line-height: var(--djafat-type-line-height-normal);
+}

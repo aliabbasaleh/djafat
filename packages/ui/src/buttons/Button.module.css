@@ -1,0 +1,162 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--djafat-space-2) * 1px);
+  border: 1px solid transparent;
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  font-family: var(--djafat-type-family);
+  font-size: calc(var(--djafat-type-size-button) * 1px);
+  font-weight: var(--djafat-type-weight-semibold);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background-color calc(var(--djafat-motion-duration-fast) * 1ms) var(--djafat-motion-easing-standard),
+    border-color calc(var(--djafat-motion-duration-fast) * 1ms) var(--djafat-motion-easing-standard),
+    color calc(var(--djafat-motion-duration-fast) * 1ms) var(--djafat-motion-easing-standard);
+}
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--djafat-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.button[disabled],
+.button.loading {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+/* ---- sizes ---- */
+.size-sm {
+  min-height: 36px;
+  padding: 0 calc(var(--djafat-space-3) * 1px);
+}
+.size-md {
+  min-height: calc(var(--djafat-touch-target-min) * 1px);
+  padding: 0 calc(var(--djafat-space-4) * 1px);
+}
+.size-lg {
+  min-height: calc(var(--djafat-touch-target-primary) * 1px);
+  padding: 0 calc(var(--djafat-space-5) * 1px);
+}
+
+/* ---- variants ---- */
+.variant-primary {
+  background: var(--djafat-color-brand-primary);
+  color: var(--djafat-color-brand-on-primary);
+}
+.variant-primary:not([disabled]):not(.loading):hover {
+  background: var(--djafat-color-brand-primary-hover);
+}
+.variant-primary:not([disabled]):not(.loading):active {
+  background: var(--djafat-color-brand-primary-strong);
+}
+
+.variant-secondary {
+  background: var(--djafat-color-bg-surface);
+  color: var(--djafat-color-text-primary);
+  border-color: var(--djafat-color-border-strong);
+}
+.variant-secondary:not([disabled]):not(.loading):hover {
+  background: var(--djafat-color-bg-surface-hover);
+  border-color: var(--djafat-color-brand-primary);
+}
+.variant-secondary:not([disabled]):not(.loading):active {
+  background: var(--djafat-color-bg-surface-alt);
+}
+
+.variant-ghost {
+  background: transparent;
+  color: var(--djafat-color-text-primary);
+}
+.variant-ghost:not([disabled]):not(.loading):hover {
+  background: var(--djafat-color-bg-surface-hover);
+}
+.variant-ghost:not([disabled]):not(.loading):active {
+  background: var(--djafat-color-bg-surface-alt);
+}
+
+.variant-danger {
+  background: var(--djafat-color-state-danger);
+  color: #fff;
+}
+.variant-danger:not([disabled]):not(.loading):hover {
+  opacity: 0.92;
+}
+
+.spinnerSlot {
+  display: inline-flex;
+}
+
+/* ---- IconButton ---- */
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  background: transparent;
+  color: var(--djafat-color-text-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.iconButton:focus-visible {
+  outline: 2px solid var(--djafat-color-focus-ring);
+  outline-offset: 2px;
+}
+.iconButton[disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.iconButton:not([disabled]):hover {
+  background: var(--djafat-color-bg-surface-hover);
+}
+.iconButton.size-sm {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+.iconButton.size-md {
+  width: calc(var(--djafat-touch-target-min) * 1px);
+  height: calc(var(--djafat-touch-target-min) * 1px);
+  padding: 0;
+}
+.iconButton.size-lg {
+  width: calc(var(--djafat-touch-target-primary) * 1px);
+  height: calc(var(--djafat-touch-target-primary) * 1px);
+  padding: 0;
+}
+
+/* ---- ButtonGroup ---- */
+/* Targets Button's `data-dj-button` marker (stable across CSS Modules hashing —
+   `:global(.button)` would never match the module-scoped class name). */
+.buttonGroup {
+  display: inline-flex;
+}
+.buttonGroup > [data-dj-button] {
+  border-radius: 0;
+  margin-left: -1px;
+}
+.buttonGroup > [data-dj-button]:first-child {
+  border-top-left-radius: calc(var(--djafat-radius-md) * 1px);
+  border-bottom-left-radius: calc(var(--djafat-radius-md) * 1px);
+  margin-left: 0;
+}
+.buttonGroup > [data-dj-button]:last-child {
+  border-top-right-radius: calc(var(--djafat-radius-md) * 1px);
+  border-bottom-right-radius: calc(var(--djafat-radius-md) * 1px);
+}
+.buttonGroup > [data-dj-button]:focus-visible {
+  z-index: 1;
+  position: relative;
+}

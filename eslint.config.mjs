@@ -11,4 +11,10 @@ import base from './packages/eslint-config/base.js';
  * run lint` actually use — this root config only needs to catch the same
  * language-agnostic correctness rules on a git diff before it lands.
  */
-export default [...base, { ignores: ['**/dist/**', '**/.next/**', '**/coverage/**'] }];
+export default [
+  ...base,
+  // `**/scripts/**`: small standalone Node build utilities (e.g.
+  // packages/ui/scripts/copy-assets.mjs) that no package tsconfig
+  // `include`s — same reasoning as each package's own ignore for this.
+  { ignores: ['**/dist/**', '**/.next/**', '**/coverage/**', '**/scripts/**'] },
+];

@@ -1,0 +1,10 @@
+{
+  "extends": "@djafat/tsconfig/react-library.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node", "react", "react-dom"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "references": [{ "path": "../tokens" }, { "path": "../types" }]
+}
