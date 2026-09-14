@@ -1,5 +1,5 @@
 import type { Money } from '@djafat/types';
-import { addMoney, mulMoneyByInt, sumMoney } from '../money/money.js';
+import { addMoney, assertNonNegative, mulMoneyByInt, sumMoney } from '../money/money.js';
 
 /**
  * "Given a line's live unit price, quantity, and live option deltas, what is
@@ -39,6 +39,10 @@ export function computeCartLine(input: CartLineInput): CartLineResult {
     unitPrice.currency,
   );
   const effectiveUnitPrice = addMoney(unitPrice, optionsTotal);
+  // Option deltas may be negative (a smaller size costing less), but the
+  // PRICE OF A LINE never is — a misconfigured discount option larger than
+  // the base price must never silently produce a negative chargeable amount.
+  assertNonNegative(effectiveUnitPrice);
   const lineTotal = mulMoneyByInt(effectiveUnitPrice, quantity);
   return { unitPrice, optionsTotal, effectiveUnitPrice, quantity, lineTotal };
 }

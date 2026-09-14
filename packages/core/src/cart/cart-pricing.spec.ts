@@ -40,6 +40,57 @@ describe('computeCartLine (docs/22 §6, §8 — deterministic, server-only arith
     // (1000 + 250) * 4, never 1000*4 + 250.
     expect(result.lineTotal).toEqual(money(5000, 'XAF'));
   });
+
+  it('a negative option delta larger than the base price throws rather than producing a negative chargeable amount', () => {
+    expect(() =>
+      computeCartLine({
+        unitPrice: money(1000, 'XAF'),
+        quantity: 1,
+        options: [{ priceDelta: money(-1500, 'XAF') }],
+      }),
+    ).toThrow(/Amount must be >= 0/);
+  });
+
+  it('an effective unit price of EXACTLY zero is allowed (a 100%-off option), never rejected', () => {
+    const result = computeCartLine({
+      unitPrice: money(1000, 'XAF'),
+      quantity: 3,
+      options: [{ priceDelta: money(-1000, 'XAF') }],
+    });
+    expect(result.effectiveUnitPrice).toEqual(money(0, 'XAF'));
+    expect(result.lineTotal).toEqual(money(0, 'XAF'));
+  });
+
+  it('MULTIPLE negative deltas that individually look fine but sum below zero still throw', () => {
+    // -600 alone would be fine (1000 - 600 = 400); combined with a second
+    // -600 the SUM (-1200) exceeds the base price. The bug this guards
+    // against: checking each delta individually instead of the total.
+    expect(() =>
+      computeCartLine({
+        unitPrice: money(1000, 'XAF'),
+        quantity: 1,
+        options: [{ priceDelta: money(-600, 'XAF') }, { priceDelta: money(-600, 'XAF') }],
+      }),
+    ).toThrow(/Amount must be >= 0/);
+  });
+
+  it('multiple negative deltas that sum to exactly the base price land on zero, not a throw', () => {
+    const result = computeCartLine({
+      unitPrice: money(1000, 'XAF'),
+      quantity: 1,
+      options: [{ priceDelta: money(-400, 'XAF') }, { priceDelta: money(-600, 'XAF') }],
+    });
+    expect(result.effectiveUnitPrice).toEqual(money(0, 'XAF'));
+  });
+
+  it('extreme values (max quantity 99 × a large price) stay exact — no float precision loss, no overflow', () => {
+    const result = computeCartLine({
+      unitPrice: money(999_999_999, 'XAF'),
+      quantity: 99,
+      options: [{ priceDelta: money(1, 'XAF') }],
+    });
+    expect(result.lineTotal.minor).toBe(1_000_000_000n * 99n);
+  });
 });
 
 describe('computeCartSubtotal', () => {
