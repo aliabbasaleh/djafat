@@ -20,6 +20,7 @@ class MemoryStore implements IdempotencyStore {
         record: {
           fingerprint: existing.fingerprint,
           response: existing.response,
+          completed: existing.done,
         } as IdempotencyRecord,
       };
     }
@@ -54,6 +55,35 @@ describe('IdempotencyService', () => {
     expect(first).toEqual({ status: 'created', response: { orderId: 'o1' } });
     expect(second).toEqual({ status: 'replayed', response: { orderId: 'o1' } });
     expect(calls).toBe(1);
+  });
+
+  it('a genuinely concurrent request with the SAME key, arriving before the first completes, is rejected — never a fabricated null "replay" (regression)', async () => {
+    const s = svc();
+    let releaseFirst!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let secondHandlerCalls = 0;
+
+    const first = s.run('orders', 'k-concurrent', { a: 1 }, async () => {
+      await gate; // simulates a slow, still-in-flight handler (e.g. order creation)
+      return { orderId: 'o1' };
+    });
+
+    // Let `first` actually reach `reserve()` and start awaiting the gate
+    // before firing the "concurrent" second request.
+    await new Promise((resolve) => setImmediate(resolve));
+
+    await expect(
+      s.run('orders', 'k-concurrent', { a: 1 }, async () => {
+        secondHandlerCalls++;
+        return { orderId: 'should-never-run' };
+      }),
+    ).rejects.toThrow(/already being processed/);
+    expect(secondHandlerCalls).toBe(0);
+
+    releaseFirst();
+    await expect(first).resolves.toEqual({ status: 'created', response: { orderId: 'o1' } });
   });
 
   it('rejects the same key with a different payload (409)', async () => {

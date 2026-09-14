@@ -3,6 +3,15 @@ export const IDEMPOTENCY_STORE = Symbol('IDEMPOTENCY_STORE');
 export interface IdempotencyRecord {
   readonly fingerprint: string;
   readonly response: unknown;
+  /**
+   * `false` while the original request's handler is still running (the row
+   * exists — `status='reserved'` — but `complete()` hasn't written a real
+   * `response` yet). A second, genuinely concurrent request for the SAME key
+   * must never be reconciled as a "replay" of this still-empty row — that
+   * would hand the caller a fabricated success with a null body before the
+   * real work has even finished.
+   */
+  readonly completed: boolean;
 }
 
 /**
@@ -14,7 +23,7 @@ export interface IdempotencyStore {
   /**
    * Atomically reserve `(scope, key)` if free. Returns:
    *  - `{ inserted: true }`                    -> caller proceeds, then calls `complete()`
-   *  - `{ inserted: false, record }`           -> a prior request owns this key
+   *  - `{ inserted: false, record }`           -> a prior request owns this key (`record.completed` says whether it's done yet)
    */
   reserve(
     scope: string,

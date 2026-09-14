@@ -32,6 +32,17 @@ export class IdempotencyService {
     const reservation = await this.store.reserve(scope, key, fp);
 
     if (!reservation.inserted) {
+      if (!reservation.record.completed) {
+        // A genuinely concurrent request for the SAME key is still running
+        // (the row exists but `complete()` hasn't written a response yet).
+        // Reconciling this as a "replay" would hand back a fabricated
+        // success with a null body before the real work has finished —
+        // tell the caller to retry instead, exactly like a fresh conflict.
+        throw new ConflictException({
+          code: 'IDEMPOTENCY_KEY_REUSED',
+          message: 'A request with this Idempotency-Key is already being processed. Retry shortly.',
+        });
+      }
       const outcome = reconcileIdempotency<T>(
         { fingerprint: reservation.record.fingerprint, response: reservation.record.response as T },
         fp,

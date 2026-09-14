@@ -26,10 +26,17 @@ export class PrismaIdempotencyStore implements IdempotencyStore {
     if (inserted === 1) return { inserted: true };
 
     const rows = await this.prisma.$queryRaw<
-      Array<{ fingerprint: string; response: unknown }>
-    >`SELECT fingerprint, response FROM idempotency_keys WHERE scope = ${scope} AND key = ${key}`;
-    const row = rows[0] ?? { fingerprint, response: null };
-    return { inserted: false, record: { fingerprint: row.fingerprint, response: row.response } };
+      Array<{ fingerprint: string; response: unknown; status: string }>
+    >`SELECT fingerprint, response, status FROM idempotency_keys WHERE scope = ${scope} AND key = ${key}`;
+    const row = rows[0] ?? { fingerprint, response: null, status: 'reserved' };
+    return {
+      inserted: false,
+      record: {
+        fingerprint: row.fingerprint,
+        response: row.response,
+        completed: row.status === 'completed',
+      },
+    };
   }
 
   async complete(scope: string, key: string, response: unknown): Promise<void> {
