@@ -1,67 +1,21 @@
 .main {
-  max-width: 860px;
-  margin: 0 auto;
+  padding-bottom: calc(var(--djafat-space-10) * 1px);
 }
 
 .cover {
-  width: 100%;
-  aspect-ratio: 16 / 7;
-  background: var(--djafat-color-bg-surface-alt);
-  animation: pulse 1.4s ease-in-out infinite;
+  margin-top: calc(var(--djafat-space-4) * 1px);
 }
 
 .headerCard {
   display: flex;
   gap: calc(var(--djafat-space-4) * 1px);
-  padding: calc(var(--djafat-space-4) * 1px);
-}
-
-.logo {
-  flex-shrink: 0;
-  width: 72px;
-  height: 72px;
-  border-radius: calc(var(--djafat-radius-md) * 1px);
-  background: var(--djafat-color-bg-surface-alt);
-  animation: pulse 1.4s ease-in-out infinite;
+  padding: calc(var(--djafat-space-4) * 1px) 0;
 }
 
 .text {
   flex: 1;
 }
 
-.name {
-  width: 60%;
-  height: calc(var(--djafat-type-size-display) * 1px);
-  border-radius: calc(var(--djafat-radius-sm) * 1px);
-  background: var(--djafat-color-bg-surface-alt);
-  margin-bottom: calc(var(--djafat-space-2) * 1px);
-  animation: pulse 1.4s ease-in-out infinite;
-}
-
 .line {
-  width: 90%;
-  height: calc(var(--djafat-type-size-small) * 1px);
-  border-radius: calc(var(--djafat-radius-sm) * 1px);
-  background: var(--djafat-color-bg-surface-alt);
   margin-bottom: calc(var(--djafat-space-2) * 1px);
-  animation: pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cover,
-  .logo,
-  .name,
-  .line {
-    animation: none;
-  }
 }

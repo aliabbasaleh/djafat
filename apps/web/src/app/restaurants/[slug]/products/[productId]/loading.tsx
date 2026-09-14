@@ -1,17 +1,20 @@
-import { SiteHeader } from '@/components/SiteHeader';
+import { Container, Skeleton, cx } from '@djafat/ui';
 import styles from './loading.module.css';
 
 export default function Loading() {
   return (
-    <>
-      <SiteHeader />
-      <main className={styles['main']} aria-busy="true" aria-label="Chargement du produit">
-        <div className={styles['image']} />
-        <div className={styles['body']}>
-          <div className={styles['name']} />
-          <div className={styles['line']} />
-        </div>
-      </main>
-    </>
+    <Container
+      as="main"
+      maxWidth={640}
+      className={cx(styles['main'])}
+      aria-busy="true"
+      aria-label="Chargement du produit"
+    >
+      <Skeleton height={280} radius="16px" className={cx(styles['image'])} />
+      <div className={cx(styles['body'])}>
+        <Skeleton width="70%" height={28} className={cx(styles['line'])} />
+        <Skeleton width="40%" height={22} />
+      </div>
+    </Container>
   );
 }

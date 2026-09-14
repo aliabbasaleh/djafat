@@ -4,63 +4,15 @@
   gap: calc(var(--djafat-space-3) * 1px);
 }
 
-.visuallyHidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .searchRow {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: calc(var(--djafat-space-2) * 1px);
-  background: var(--djafat-color-bg-surface);
-  border: 1px solid var(--djafat-color-border-default);
-  border-radius: calc(var(--djafat-radius-lg) * 1px);
-  padding: calc(var(--djafat-space-1) * 1px) calc(var(--djafat-space-1) * 1px)
-    calc(var(--djafat-space-1) * 1px) calc(var(--djafat-space-3) * 1px);
 }
 
-.icon {
-  font-size: calc(var(--djafat-type-size-h2) * 1px);
-  flex-shrink: 0;
-}
-
-.input {
+.searchRow > :first-child {
   flex: 1;
   min-width: 0;
-  border: none;
-  background: transparent;
-  font-size: calc(var(--djafat-type-size-body) * 1px);
-  color: var(--djafat-color-text-primary);
-  min-height: calc(var(--djafat-touch-target-min) * 1px);
-}
-
-.input:focus {
-  outline: none;
-}
-
-.submit {
-  flex-shrink: 0;
-  min-height: calc(var(--djafat-touch-target-primary) * 1px);
-  padding: 0 calc(var(--djafat-space-4) * 1px);
-  border: none;
-  border-radius: calc(var(--djafat-radius-md) * 1px);
-  background: var(--djafat-color-brand-primary);
-  color: var(--djafat-color-brand-on-primary);
-  font-size: calc(var(--djafat-type-size-body) * 1px);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.submit:hover {
-  background: var(--djafat-color-brand-primary-strong);
 }
 
 .filters {
@@ -68,22 +20,4 @@
   flex-wrap: wrap;
   align-items: center;
   gap: calc(var(--djafat-space-4) * 1px);
-  font-size: calc(var(--djafat-type-size-small) * 1px);
-  color: var(--djafat-color-text-secondary);
-}
-
-.filterLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(var(--djafat-space-2) * 1px);
-}
-
-.select {
-  min-height: calc(var(--djafat-touch-target-min) * 1px);
-  padding: 0 calc(var(--djafat-space-2) * 1px);
-  border: 1px solid var(--djafat-color-border-default);
-  border-radius: calc(var(--djafat-radius-sm) * 1px);
-  background: var(--djafat-color-bg-surface);
-  color: var(--djafat-color-text-primary);
-  font-size: calc(var(--djafat-type-size-small) * 1px);
 }

@@ -1,4 +1,6 @@
 import type { ListRestaurantsParams } from '@djafat/sdk';
+import { cx } from '@djafat/ui';
+import { SearchInput, Button, Checkbox, Select } from '@/components/ui-client';
 import styles from './SearchForm.module.css';
 
 type SortKey = NonNullable<ListRestaurantsParams['sort']>;
@@ -12,10 +14,10 @@ const SORT_OPTIONS: ReadonlyArray<{ value: SortKey; label: string }> = [
 
 /**
  * Plain `GET` form — no client JS required to search or filter (docs/20
- * §40: low-bandwidth first). Submitting reloads the target route with the
- * new query string; the server component there reads `searchParams` and
- * re-queries PostgreSQL. `showFilters` keeps the home page's version to a
- * single search box, per the docs/20 §60 mockup.
+ * §40, carried into docs/21 §14: low-bandwidth first). Submitting reloads
+ * the target route with the new query string; the server component there
+ * reads `searchParams` and re-queries PostgreSQL. `showFilters` keeps the
+ * home page's version to a single search box, per the docs/20 §60 mockup.
  */
 export function SearchForm({
   action,
@@ -31,53 +33,33 @@ export function SearchForm({
   readonly showFilters?: boolean;
 }) {
   return (
-    <form action={action} method="get" className={styles['form']} role="search">
-      <label htmlFor="catalog-search" className={styles['visuallyHidden']}>
-        Rechercher un restaurant ou un plat
-      </label>
-      <div className={styles['searchRow']}>
-        <span className={styles['icon']} aria-hidden="true">
-          🔎
-        </span>
-        <input
-          id="catalog-search"
-          type="search"
+    <form action={action} method="get" className={cx(styles['form'])} role="search">
+      <div className={cx(styles['searchRow'])}>
+        <SearchInput
+          label="Rechercher un restaurant ou un plat"
           name="search"
           placeholder="Rechercher un restaurant ou un plat"
           defaultValue={defaultSearch ?? ''}
           maxLength={80}
-          className={styles['input']}
         />
-        <button type="submit" className={styles['submit']}>
-          Rechercher
-        </button>
+        <Button type="submit">Rechercher</Button>
       </div>
 
       {showFilters && (
-        <div className={styles['filters']}>
-          <label className={styles['filterLabel']}>
-            <input
-              type="checkbox"
-              name="openNow"
-              value="true"
-              defaultChecked={defaultOpenNow === true}
-            />
-            Ouvert maintenant
-          </label>
-          <label className={styles['filterLabel']}>
-            Trier par
-            <select
-              name="sort"
-              defaultValue={defaultSort ?? 'recommended'}
-              className={styles['select']}
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className={cx(styles['filters'])}>
+          <Checkbox
+            label="Ouvert maintenant"
+            name="openNow"
+            value="true"
+            defaultChecked={defaultOpenNow === true}
+          />
+          <Select label="Trier par" name="sort" defaultValue={defaultSort ?? 'recommended'}>
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </Select>
         </div>
       )}
     </form>

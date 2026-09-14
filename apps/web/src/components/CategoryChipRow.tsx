@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import type { CategoryOption } from '@djafat/sdk';
+import { CategoryChip, cx } from '@djafat/ui';
 import styles from './CategoryChipRow.module.css';
 
 /**
@@ -12,16 +12,14 @@ export function CategoryChipRow({ categories }: { categories: readonly CategoryO
   if (categories.length === 0) return null;
 
   return (
-    <nav aria-label="Catégories" className={styles['row']}>
-      <ul className={styles['list']}>
+    <nav aria-label="Catégories" className={cx(styles['row'])}>
+      <ul className={cx(styles['list'])}>
         {categories.map((category) => (
           <li key={category.name}>
-            <Link
+            <CategoryChip
+              label={category.name}
               href={`/restaurants?search=${encodeURIComponent(category.name)}`}
-              className={styles['chip']}
-            >
-              {category.name}
-            </Link>
+            />
           </li>
         ))}
       </ul>

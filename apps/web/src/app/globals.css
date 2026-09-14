@@ -1,5 +1,6 @@
-/* Design tokens are generated from @djafat/tokens at build time (see
-   src/app/tokens.css.ts). This file holds the base reset only. Mobile-first. */
+/* Design tokens are generated from @djafat/tokens at build time (injected as
+   CSS custom properties by app/layout.tsx's toCssRootBlock()). This file
+   holds the base reset only. Mobile-first. */
 
 *,
 *::before,
@@ -15,12 +16,28 @@ body {
 
 body {
   font-family: var(--djafat-type-family, system-ui, sans-serif);
-  font-size: var(--djafat-type-size-body, 15px);
-  line-height: 1.5;
+  /* `--djafat-type-size-body` is a UNITLESS numeric token (shared as-is with
+     React Native — packages/ui/src/tokens.ts). A bare `var(...)` here is the
+     exact bug fixed in apps/web/src/app/error.tsx at Bloc 2 (docs/20 §19.1):
+     since the custom property IS set (to "15"), the `15px` fallback is never
+     used — only `calc(... * 1px)` turns the unitless number into a real
+     length. This instance was missed during that fix; caught now (docs/21). */
+  font-size: calc(var(--djafat-type-size-body, 15) * 1px);
+  line-height: var(--djafat-type-line-height-normal, 1.5);
   color: var(--djafat-color-text-primary, #1b1712);
   background: var(--djafat-color-bg-canvas, #fbf7f2);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Reserve room for the fixed mobile bottom tab bar (`MobileNav`,
+     @djafat/ui, hidden at the same `lg` breakpoint) so page content is
+     never hidden behind it. */
+  padding-bottom: calc(var(--djafat-touch-target-primary, 48) * 1px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 905px) {
+  body {
+    padding-bottom: 0;
+  }
 }
 
 img {
@@ -33,6 +50,17 @@ a {
 }
 
 :focus-visible {
-  outline: 2px solid var(--djafat-color-brand-primary, #e8531b);
+  outline: 2px solid var(--djafat-color-focus-ring, var(--djafat-color-brand-primary, #e8531b));
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

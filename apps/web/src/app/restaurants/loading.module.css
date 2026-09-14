@@ -1,24 +1,13 @@
 .main {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: calc(var(--djafat-space-4) * 1px) calc(var(--djafat-space-4) * 1px) calc(var(--djafat-space-10) * 1px);
+  padding: calc(var(--djafat-space-6) * 1px) 0 calc(var(--djafat-space-10) * 1px);
 }
 
 .skeletonTitle {
-  width: 160px;
-  height: calc(var(--djafat-type-size-h1) * 1px);
-  border-radius: calc(var(--djafat-radius-sm) * 1px);
-  background: var(--djafat-color-bg-surface-alt);
   margin-bottom: calc(var(--djafat-space-4) * 1px);
-  animation: pulse 1.4s ease-in-out infinite;
 }
 
 .skeletonSearch {
-  height: 56px;
-  border-radius: calc(var(--djafat-radius-lg) * 1px);
-  background: var(--djafat-color-bg-surface-alt);
   margin-bottom: calc(var(--djafat-space-6) * 1px);
-  animation: pulse 1.4s ease-in-out infinite;
 }
 
 .grid {
@@ -36,30 +25,5 @@
 @media (min-width: 905px) {
   .grid {
     grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-.card {
-  aspect-ratio: 4 / 5;
-  border-radius: calc(var(--djafat-radius-lg) * 1px);
-  background: var(--djafat-color-bg-surface-alt);
-  animation: pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .skeletonTitle,
-  .skeletonSearch,
-  .card {
-    animation: none;
   }
 }

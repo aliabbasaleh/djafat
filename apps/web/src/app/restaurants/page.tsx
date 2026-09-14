@@ -1,10 +1,19 @@
 import type { Metadata } from 'next';
+import {
+  Container,
+  Stack,
+  Heading,
+  Text,
+  EmptyState,
+  ErrorState,
+  RestaurantCard,
+  RestaurantCardGrid,
+  RestaurantCardGridItem,
+  cx,
+} from '@djafat/ui';
 import { api } from '@/lib/api';
-import { SiteHeader } from '@/components/SiteHeader';
 import { SearchForm } from '@/components/SearchForm';
-import { RestaurantGrid } from '@/components/RestaurantGrid';
 import { Pagination } from '@/components/Pagination';
-import { EmptyState } from '@/components/EmptyState';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -64,22 +73,19 @@ export default async function RestaurantsPage({
   }
 
   return (
-    <>
-      <SiteHeader />
-      <main className={styles['main']}>
-        <h1 className={styles['title']}>Restaurants</h1>
-        <div className={styles['searchWrap']}>
-          <SearchForm
-            action="/restaurants"
-            defaultSearch={search}
-            defaultOpenNow={openNow}
-            defaultSort={sort}
-            showFilters
-          />
-        </div>
+    <Container as="main" className={cx(styles['main'])}>
+      <Stack gap="md">
+        <Heading level={1}>Restaurants</Heading>
+        <SearchForm
+          action="/restaurants"
+          defaultSearch={search}
+          defaultOpenNow={openNow}
+          defaultSort={sort}
+          showFilters
+        />
 
         {!result && (
-          <EmptyState
+          <ErrorState
             title="Impossible de charger les restaurants"
             message="Vérifiez votre connexion et réessayez dans un instant."
           />
@@ -91,11 +97,26 @@ export default async function RestaurantsPage({
           />
         )}
         {result && result.items.length > 0 && (
-          <>
-            <p className={styles['count']}>
+          <div>
+            <Text tone="secondary" size="small" className={cx(styles['count'])}>
               {result.total} restaurant{result.total > 1 ? 's' : ''}
-            </p>
-            <RestaurantGrid restaurants={result.items} />
+            </Text>
+            <RestaurantCardGrid>
+              {result.items.map((r) => (
+                <RestaurantCardGridItem key={r.id}>
+                  <RestaurantCard
+                    href={`/restaurants/${r.slug}`}
+                    name={r.name}
+                    imageUrl={r.coverUrl}
+                    status={r.availability}
+                    ratingAvg={r.ratingAvg}
+                    ratingCount={r.ratingCount}
+                    etaMinutes={r.prepTimeMin}
+                    description={r.description}
+                  />
+                </RestaurantCardGridItem>
+              ))}
+            </RestaurantCardGrid>
             <Pagination
               page={result.page}
               totalPages={result.totalPages}
@@ -106,9 +127,9 @@ export default async function RestaurantsPage({
                 sort,
               }}
             />
-          </>
+          </div>
         )}
-      </main>
-    </>
+      </Stack>
+    </Container>
   );
 }

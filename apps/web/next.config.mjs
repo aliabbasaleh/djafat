@@ -3,7 +3,13 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   // Shared workspace packages ship TS/CJS — let Next transpile them.
-  transpilePackages: ['@djafat/sdk', '@djafat/tokens', '@djafat/i18n', '@djafat/types'],
+  transpilePackages: [
+    '@djafat/sdk',
+    '@djafat/tokens',
+    '@djafat/i18n',
+    '@djafat/types',
+    '@djafat/ui',
+  ],
   experimental: {
     typedRoutes: true,
   },

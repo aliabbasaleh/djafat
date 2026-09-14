@@ -1,20 +1,8 @@
 .main {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: calc(var(--djafat-space-4) * 1px) calc(var(--djafat-space-4) * 1px) calc(var(--djafat-space-10) * 1px);
-}
-
-.title {
-  margin: 0 0 calc(var(--djafat-space-4) * 1px);
-  font-size: calc(var(--djafat-type-size-h1) * 1px);
-}
-
-.searchWrap {
-  margin-bottom: calc(var(--djafat-space-4) * 1px);
+  padding: calc(var(--djafat-space-6) * 1px) 0 calc(var(--djafat-space-10) * 1px);
 }
 
 .count {
+  display: block;
   margin: 0 0 calc(var(--djafat-space-3) * 1px);
-  color: var(--djafat-color-text-secondary);
-  font-size: calc(var(--djafat-type-size-small) * 1px);
 }

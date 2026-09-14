@@ -6,29 +6,6 @@
   margin-top: calc(var(--djafat-space-6) * 1px);
 }
 
-.button {
-  display: inline-flex;
-  align-items: center;
-  min-height: calc(var(--djafat-touch-target-min) * 1px);
-  padding: 0 calc(var(--djafat-space-3) * 1px);
-  border-radius: calc(var(--djafat-radius-md) * 1px);
-  border: 1px solid var(--djafat-color-border-default);
-  color: var(--djafat-color-text-primary);
-  text-decoration: none;
-  font-size: calc(var(--djafat-type-size-small) * 1px);
-  font-weight: 600;
-}
-
-.button:hover {
-  border-color: var(--djafat-color-brand-primary);
-  color: var(--djafat-color-brand-primary);
-}
-
-.disabled {
-  opacity: 0.4;
-  pointer-events: none;
-}
-
 .status {
   font-size: calc(var(--djafat-type-size-small) * 1px);
   color: var(--djafat-color-text-secondary);

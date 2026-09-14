@@ -1,11 +1,20 @@
-import Link from 'next/link';
 import type { CategoryOption, PaginatedResponse, RestaurantListItem } from '@djafat/sdk';
+import {
+  Container,
+  Stack,
+  Heading,
+  Text,
+  EmptyState,
+  ErrorState,
+  RestaurantCard,
+  RestaurantCardGrid,
+  RestaurantCardGridItem,
+  cx,
+} from '@djafat/ui';
+import { Button } from '@/components/ui-client';
 import { api } from '@/lib/api';
-import { SiteHeader } from '@/components/SiteHeader';
 import { SearchForm } from '@/components/SearchForm';
 import { CategoryChipRow } from '@/components/CategoryChipRow';
-import { RestaurantGrid } from '@/components/RestaurantGrid';
-import { EmptyState } from '@/components/EmptyState';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -28,57 +37,87 @@ async function loadHomeData(): Promise<HomeData | null> {
 }
 
 /**
- * Home page (docs/20 §41, §60 mockup): header, search bar, category chips,
- * restaurant grid — DJAFAT's first real render. Everything below the header
- * is PostgreSQL data fetched through `@djafat/sdk`; nothing is hardcoded.
+ * Home page (docs/20 §41, §60 mockup; docs/21 §9 — real value proposition +
+ * strong visual hierarchy). Everything below the hero is PostgreSQL data
+ * fetched through `@djafat/sdk`; nothing here is hardcoded.
  */
 export default async function HomePage() {
   const data = await loadHomeData();
 
   return (
-    <>
-      <SiteHeader />
-      <main className={styles['main']}>
-        <section className={styles['searchSection']} aria-label="Recherche">
-          <SearchForm action="/restaurants" />
-        </section>
+    <Container as="main" className={cx(styles['main'])}>
+      <Stack as="section" gap="md" className={cx(styles['hero'])}>
+        <Heading level={1} size="display">
+          Vos restaurants préférés, livrés à N&rsquo;Djamena
+        </Heading>
+        <Text tone="secondary" className={cx(styles['heroSubtitle'])}>
+          Parcourez les restaurants ouverts près de chez vous et commandez en quelques instants.
+        </Text>
+        <SearchForm action="/restaurants" />
+      </Stack>
 
-        {data && data.categories.length > 0 && (
-          <section aria-labelledby="categories-heading" className={styles['section']}>
-            <h2 id="categories-heading" className={styles['sectionTitle']}>
-              Catégories
-            </h2>
-            <CategoryChipRow categories={data.categories} />
-          </section>
+      {data && data.categories.length > 0 && (
+        <Stack
+          as="section"
+          gap="sm"
+          aria-labelledby="categories-heading"
+          className={cx(styles['section'])}
+        >
+          <Heading level={2} id="categories-heading">
+            Catégories
+          </Heading>
+          <CategoryChipRow categories={data.categories} />
+        </Stack>
+      )}
+
+      <Stack
+        as="section"
+        gap="sm"
+        aria-labelledby="restaurants-heading"
+        className={cx(styles['section'])}
+      >
+        <Heading level={2} id="restaurants-heading">
+          Restaurants près de vous
+        </Heading>
+
+        {!data && (
+          <ErrorState
+            title="Impossible de charger les restaurants"
+            message="Vérifiez votre connexion et réessayez dans un instant."
+          />
         )}
-
-        <section aria-labelledby="restaurants-heading" className={styles['section']}>
-          <h2 id="restaurants-heading" className={styles['sectionTitle']}>
-            Restaurants près de vous
-          </h2>
-
-          {!data && (
-            <EmptyState
-              title="Impossible de charger les restaurants"
-              message="Vérifiez votre connexion et réessayez dans un instant."
-            />
-          )}
-          {data && data.restaurants.items.length === 0 && (
-            <EmptyState
-              title="Aucun restaurant pour l'instant"
-              message="Revenez bientôt — de nouveaux restaurants arrivent régulièrement."
-            />
-          )}
-          {data && data.restaurants.items.length > 0 && (
-            <>
-              <RestaurantGrid restaurants={data.restaurants.items} />
-              <p className={styles['seeMore']}>
-                <Link href="/restaurants">Voir tous les restaurants →</Link>
-              </p>
-            </>
-          )}
-        </section>
-      </main>
-    </>
+        {data && data.restaurants.items.length === 0 && (
+          <EmptyState
+            title="Aucun restaurant pour l'instant"
+            message="Revenez bientôt — de nouveaux restaurants arrivent régulièrement."
+          />
+        )}
+        {data && data.restaurants.items.length > 0 && (
+          <>
+            <RestaurantCardGrid>
+              {data.restaurants.items.map((r) => (
+                <RestaurantCardGridItem key={r.id}>
+                  <RestaurantCard
+                    href={`/restaurants/${r.slug}`}
+                    name={r.name}
+                    imageUrl={r.coverUrl}
+                    status={r.availability}
+                    ratingAvg={r.ratingAvg}
+                    ratingCount={r.ratingCount}
+                    etaMinutes={r.prepTimeMin}
+                    description={r.description}
+                  />
+                </RestaurantCardGridItem>
+              ))}
+            </RestaurantCardGrid>
+            <p className={cx(styles['seeMore'])}>
+              <Button href="/restaurants" variant="secondary">
+                Voir tous les restaurants
+              </Button>
+            </p>
+          </>
+        )}
+      </Stack>
+    </Container>
   );
 }

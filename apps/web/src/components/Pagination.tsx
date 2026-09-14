@@ -1,10 +1,12 @@
-import Link from 'next/link';
+import { cx } from '@djafat/ui';
+import { Button } from '@/components/ui-client';
 import styles from './Pagination.module.css';
 
 /**
  * Page/limit pagination (docs/20 §26 — pagination is mandatory). Pure links,
  * no client JS: every page change is a normal navigation carrying the rest
- * of the current query string along.
+ * of the current query string along. Uses the shared `Button` (docs/21 §4)
+ * for a real disabled state at the ends — never a dead link.
  */
 export function Pagination({
   page,
@@ -29,27 +31,27 @@ export function Pagination({
   };
 
   return (
-    <nav aria-label="Pagination" className={styles['nav']}>
+    <nav aria-label="Pagination" className={cx(styles['nav'])}>
       {page > 1 ? (
-        <Link href={hrefFor(page - 1)} className={styles['button']}>
+        <Button href={hrefFor(page - 1)} variant="ghost" size="sm">
           ← Précédent
-        </Link>
+        </Button>
       ) : (
-        <span className={`${styles['button']} ${styles['disabled']}`} aria-disabled="true">
+        <Button disabled variant="ghost" size="sm">
           ← Précédent
-        </span>
+        </Button>
       )}
-      <span className={styles['status']} aria-current="page">
+      <span className={cx(styles['status'])} aria-current="page">
         Page {page} / {totalPages}
       </span>
       {page < totalPages ? (
-        <Link href={hrefFor(page + 1)} className={styles['button']}>
+        <Button href={hrefFor(page + 1)} variant="ghost" size="sm">
           Suivant →
-        </Link>
+        </Button>
       ) : (
-        <span className={`${styles['button']} ${styles['disabled']}`} aria-disabled="true">
+        <Button disabled variant="ghost" size="sm">
           Suivant →
-        </span>
+        </Button>
       )}
     </nav>
   );

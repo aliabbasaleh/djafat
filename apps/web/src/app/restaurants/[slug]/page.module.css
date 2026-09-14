@@ -1,6 +1,4 @@
 .main {
-  max-width: 860px;
-  margin: 0 auto;
   padding-bottom: calc(var(--djafat-space-10) * 1px);
 }
 
@@ -9,6 +7,8 @@
   width: 100%;
   aspect-ratio: 16 / 7;
   background: var(--djafat-color-bg-surface-alt);
+  border-radius: calc(var(--djafat-radius-lg) * 1px);
+  overflow: hidden;
 }
 
 .coverImage {
@@ -26,7 +26,7 @@
 .headerCard {
   display: flex;
   gap: calc(var(--djafat-space-4) * 1px);
-  padding: calc(var(--djafat-space-4) * 1px);
+  padding: calc(var(--djafat-space-4) * 1px) 0;
   border-bottom: 1px solid var(--djafat-color-border-default);
 }
 
@@ -51,39 +51,25 @@
   gap: calc(var(--djafat-space-2) * 1px);
 }
 
-.name {
-  margin: 0;
-  font-size: calc(var(--djafat-type-size-display) * 1px);
-}
-
 .description {
-  margin: calc(var(--djafat-space-2) * 1px) 0 0;
-  color: var(--djafat-color-text-secondary);
-  font-size: calc(var(--djafat-type-size-body) * 1px);
+  margin-top: calc(var(--djafat-space-2) * 1px);
 }
 
 .meta {
-  margin: calc(var(--djafat-space-2) * 1px) 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: calc(var(--djafat-space-2) * 1px);
-  color: var(--djafat-color-text-secondary);
-  font-size: calc(var(--djafat-type-size-small) * 1px);
+  margin-top: calc(var(--djafat-space-2) * 1px);
 }
 
 .dot {
   color: var(--djafat-color-text-muted);
+  margin: 0 calc(var(--djafat-space-1) * 1px);
 }
 
 .address {
-  margin: calc(var(--djafat-space-2) * 1px) 0 0;
-  color: var(--djafat-color-text-secondary);
-  font-size: calc(var(--djafat-type-size-small) * 1px);
+  margin-top: calc(var(--djafat-space-2) * 1px);
 }
 
 .menu {
-  padding: 0 calc(var(--djafat-space-4) * 1px);
+  margin-top: calc(var(--djafat-space-2) * 1px);
 }
 
 .category {
@@ -91,22 +77,11 @@
 }
 
 .categoryTitle {
-  margin: 0 0 calc(var(--djafat-space-1) * 1px);
-  font-size: calc(var(--djafat-type-size-h1) * 1px);
+  margin-bottom: calc(var(--djafat-space-1) * 1px);
 }
 
 .productList {
   list-style: none;
   margin: 0;
   padding: 0;
-}
-
-@media (min-width: 600px) {
-  .headerCard {
-    padding: calc(var(--djafat-space-6) * 1px);
-  }
-
-  .menu {
-    padding: 0 calc(var(--djafat-space-6) * 1px);
-  }
 }

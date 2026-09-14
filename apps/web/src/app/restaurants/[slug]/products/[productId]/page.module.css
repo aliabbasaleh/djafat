@@ -1,18 +1,9 @@
 .main {
-  max-width: 640px;
-  margin: 0 auto;
   padding-bottom: calc(var(--djafat-space-10) * 1px);
 }
 
 .breadcrumb {
-  padding: calc(var(--djafat-space-3) * 1px) calc(var(--djafat-space-4) * 1px) 0;
-  margin: 0;
-}
-
-.breadcrumb a {
-  font-size: calc(var(--djafat-type-size-small) * 1px);
-  font-weight: 600;
-  text-decoration: none;
+  margin: calc(var(--djafat-space-3) * 1px) 0 0;
 }
 
 .imageWrap {
@@ -21,6 +12,8 @@
   aspect-ratio: 4 / 3;
   margin-top: calc(var(--djafat-space-3) * 1px);
   background: var(--djafat-color-bg-surface-alt);
+  border-radius: calc(var(--djafat-radius-lg) * 1px);
+  overflow: hidden;
 }
 
 .image {
@@ -36,33 +29,21 @@
 }
 
 .body {
-  padding: calc(var(--djafat-space-4) * 1px);
-}
-
-.name {
-  margin: 0 0 calc(var(--djafat-space-2) * 1px);
-  font-size: calc(var(--djafat-type-size-display) * 1px);
+  padding-top: calc(var(--djafat-space-4) * 1px);
 }
 
 .description {
-  margin: 0 0 calc(var(--djafat-space-3) * 1px);
-  color: var(--djafat-color-text-secondary);
+  margin-top: calc(var(--djafat-space-2) * 1px);
 }
 
 .price {
-  margin: 0 0 calc(var(--djafat-space-4) * 1px);
+  display: block;
+  margin: calc(var(--djafat-space-2) * 1px) 0 calc(var(--djafat-space-4) * 1px);
   font-size: calc(var(--djafat-type-size-h1) * 1px);
-  font-weight: 700;
-  color: var(--djafat-color-brand-primary);
 }
 
 .unavailable {
   margin: 0 0 calc(var(--djafat-space-4) * 1px);
-  padding: calc(var(--djafat-space-2) * 1px) calc(var(--djafat-space-3) * 1px);
-  border-radius: calc(var(--djafat-radius-md) * 1px);
-  background: var(--djafat-color-bg-surface-alt);
-  color: var(--djafat-color-state-danger);
-  font-size: calc(var(--djafat-type-size-small) * 1px);
 }
 
 .optionGroups {
@@ -80,12 +61,12 @@
 }
 
 .groupLegend {
-  font-weight: 700;
+  font-weight: var(--djafat-type-weight-bold);
   padding: 0 calc(var(--djafat-space-1) * 1px);
 }
 
 .groupHint {
-  font-weight: 400;
+  font-weight: var(--djafat-type-weight-regular);
   color: var(--djafat-color-text-secondary);
   font-size: calc(var(--djafat-type-size-caption) * 1px);
 }
@@ -123,13 +104,5 @@
 }
 
 .addToCart {
-  width: 100%;
-  min-height: calc(var(--djafat-touch-target-primary) * 1px);
-  border: none;
-  border-radius: calc(var(--djafat-radius-md) * 1px);
-  background: var(--djafat-color-border-default);
-  color: var(--djafat-color-text-muted);
-  font-size: calc(var(--djafat-type-size-body) * 1px);
-  font-weight: 700;
   cursor: not-allowed;
 }

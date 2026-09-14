@@ -1,6 +1,5 @@
-import Link from 'next/link';
-import { SiteHeader } from '@/components/SiteHeader';
-import styles from './not-found.module.css';
+import { Container, EmptyState } from '@djafat/ui';
+import { Button } from '@/components/ui-client';
 
 /**
  * Global 404 (docs/03 §3.7) — also what `notFound()` renders for an unknown
@@ -9,22 +8,13 @@ import styles from './not-found.module.css';
  */
 export default function NotFound() {
   return (
-    <>
-      <SiteHeader />
-      <main className={styles['main']}>
-        <div className={styles['content']}>
-          <p className={styles['icon']} aria-hidden="true">
-            🍽️
-          </p>
-          <h1 className={styles['title']}>Page introuvable</h1>
-          <p className={styles['message']}>
-            Ce restaurant ou ce plat n&rsquo;existe pas, ou n&rsquo;est plus disponible.
-          </p>
-          <Link href="/" className={styles['link']}>
-            Retour à l&rsquo;accueil
-          </Link>
-        </div>
-      </main>
-    </>
+    <Container as="main">
+      <EmptyState
+        icon="🍽️"
+        title="Page introuvable"
+        message="Ce restaurant ou ce plat n’existe pas, ou n’est plus disponible."
+        action={<Button href="/">Retour à l’accueil</Button>}
+      />
+    </Container>
   );
 }
