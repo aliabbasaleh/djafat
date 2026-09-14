@@ -86,4 +86,8 @@ describe('constants', () => {
       window_seconds: 3600,
     });
   });
+
+  it('exposes the Bloc 4 cart default', () => {
+    expect(PLATFORM_SETTINGS_DEFAULTS.cart_max_item_quantity).toBe(99);
+  });
 });

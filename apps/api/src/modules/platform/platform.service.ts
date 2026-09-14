@@ -118,4 +118,14 @@ export class PlatformService {
       PLATFORM_SETTINGS_DEFAULTS.otp_rate_limit_per_ip,
     );
   }
+
+  // ── Bloc 4 — Cart + Core Order (docs/22 §5) ───────────────────────────────
+
+  /** `platform_settings['cart_max_item_quantity']` — the configurable BUSINESS ceiling; the Zod schema also enforces a hard wire-level cap. */
+  async getCartMaxItemQuantity(): Promise<number> {
+    return this.getNumberSetting(
+      'cart_max_item_quantity',
+      PLATFORM_SETTINGS_DEFAULTS.cart_max_item_quantity,
+    );
+  }
 }
