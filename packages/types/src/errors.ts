@@ -20,6 +20,10 @@ export const API_ERROR_CODES = [
   'MFA_INVALID',
   'MFA_REQUIRED',
   'ACCOUNT_INACTIVE',
+  'CART_RESTAURANT_MISMATCH',
+  'CART_ITEM_UNAVAILABLE',
+  'CART_EMPTY',
+  'CART_ITEM_INVALID_OPTIONS',
   'INTERNAL',
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

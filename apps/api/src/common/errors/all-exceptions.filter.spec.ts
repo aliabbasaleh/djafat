@@ -38,6 +38,17 @@ describe('AllExceptionsFilter', () => {
     expect(getBody().error.message).toBe('bad transition');
   });
 
+  it('a Bloc-4 cart code (CART_RESTAURANT_MISMATCH) survives the filter instead of falling back to IDEMPOTENCY_KEY_REUSED (regression)', () => {
+    const filter = new AllExceptionsFilter();
+    const { host, getBody, getStatus } = makeHost();
+    filter.catch(
+      new ConflictException({ code: 'CART_RESTAURANT_MISMATCH', message: 'restaurant mismatch' }),
+      host,
+    );
+    expect(getStatus()).toBe(409);
+    expect(getBody().error.code).toBe('CART_RESTAURANT_MISMATCH');
+  });
+
   it('a 409 ConflictException with NO explicit code falls back to IDEMPOTENCY_KEY_REUSED (existing behaviour preserved)', () => {
     const filter = new AllExceptionsFilter();
     const { host, getBody, getStatus } = makeHost();
