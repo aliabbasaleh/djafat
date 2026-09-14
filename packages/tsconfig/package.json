@@ -8,6 +8,7 @@
     "library.json",
     "nest.json",
     "next.json",
-    "react-native.json"
+    "react-native.json",
+    "react-library.json"
   ]
 }
