@@ -1,0 +1,5 @@
+.actions {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--djafat-space-2) * 1px);
+}

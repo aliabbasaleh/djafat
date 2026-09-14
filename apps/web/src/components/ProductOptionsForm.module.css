@@ -1,0 +1,56 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-4) * 1px);
+  margin-bottom: calc(var(--djafat-space-6) * 1px);
+}
+
+.group {
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  padding: calc(var(--djafat-space-3) * 1px);
+  margin: 0;
+}
+
+.groupLegend {
+  font-weight: var(--djafat-type-weight-bold);
+  padding: 0 calc(var(--djafat-space-1) * 1px);
+}
+
+.groupHint {
+  font-weight: var(--djafat-type-weight-regular);
+  color: var(--djafat-color-text-secondary);
+  font-size: calc(var(--djafat-type-size-caption) * 1px);
+}
+
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-1) * 1px);
+  margin-top: calc(var(--djafat-space-2) * 1px);
+}
+
+.quantityRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--djafat-space-3) * 1px);
+}
+
+.quantityValue {
+  min-width: 2ch;
+  text-align: center;
+  font-weight: var(--djafat-type-weight-bold);
+}
+
+.mismatchBody {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(var(--djafat-space-2) * 1px);
+}

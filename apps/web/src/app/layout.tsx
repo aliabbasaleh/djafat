@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { toCssRootBlock } from '@djafat/tokens';
 import { Header, Footer } from '@djafat/ui';
 import { MobileNav } from '@/components/ui-client';
+import { CartIndicator } from '@/components/CartIndicator';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -31,7 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <style dangerouslySetInnerHTML={{ __html: toCssRootBlock() }} />
       </head>
       <body>
-        <Header wordmark="DJAFAT" locationLabel="📍 N’Djamena" />
+        <Header wordmark="DJAFAT" locationLabel="📍 N’Djamena" actions={<CartIndicator />} />
         {children}
         <Footer
           wordmark="DJAFAT"
@@ -67,7 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           items={[
             { label: 'Accueil', icon: '🏠', href: '/' },
             { label: 'Restaurants', icon: '🍽️', href: '/restaurants' },
-            { label: 'Panier', icon: '🛒', soon: true },
+            { label: 'Panier', icon: '🛒', href: '/panier' },
             { label: 'Compte', icon: '👤', soon: true },
           ]}
         />

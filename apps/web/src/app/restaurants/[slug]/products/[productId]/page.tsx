@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ApiClientError } from '@djafat/sdk';
 import { Container, Breadcrumb, Heading, Text, Badge, cx } from '@djafat/ui';
-import { Button } from '@/components/ui-client';
+import { ProductOptionsForm } from '@/components/ProductOptionsForm';
 import { api } from '@/lib/api';
-import { formatMoney, formatMoneyDelta } from '@/lib/format';
+import { formatMoney } from '@/lib/format';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -53,10 +53,9 @@ export async function generateMetadata({
 
 /**
  * `/restaurants/[slug]/products/[productId]` — product detail (docs/20 §33,
- * §35, §41; docs/21 §9). The "Ajouter au panier" button is a deliberate,
- * clearly documented non-operational shell: cart/checkout logic is out of
- * scope through Bloc 3 and lands in Bloc 4. It is never wired to a fake
- * temporary cart.
+ * §35, §41; docs/21 §9; docs/22 §17.5). Option/quantity selection and
+ * "Ajouter au panier" live in `ProductOptionsForm`, a Client Component —
+ * the page itself stays a Server Component for the initial fetch/SEO.
  */
 export default async function ProductDetailPage({ params }: { params: Promise<RouteParams> }) {
   const { slug, productId } = await params;
@@ -123,49 +122,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<Ro
           </div>
         )}
 
-        {product.optionGroups.length > 0 && (
-          <div className={cx(styles['optionGroups'])}>
-            {product.optionGroups.map((group) => (
-              <fieldset key={group.id} className={cx(styles['group'])}>
-                <legend className={cx(styles['groupLegend'])}>
-                  {group.name}
-                  <span className={cx(styles['groupHint'])}>
-                    {group.isRequired ? ' · Obligatoire' : ' · Facultatif'}
-                    {group.selectionType === 'multiple' &&
-                      ` · jusqu'à ${group.maxSelections} choix`}
-                  </span>
-                </legend>
-                <ul className={cx(styles['optionList'])}>
-                  {group.options.map((option) => (
-                    <li
-                      key={option.id}
-                      className={`${styles['option']} ${!option.isAvailable ? styles['optionUnavailable'] : ''}`}
-                    >
-                      <span>
-                        {option.name}
-                        {!option.isAvailable && (
-                          <span className={cx(styles['optionBadge'])}> (indisponible)</span>
-                        )}
-                      </span>
-                      <span className={cx(styles['optionPrice'])}>
-                        {formatMoneyDelta(option.priceDelta)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </fieldset>
-            ))}
-          </div>
-        )}
-
-        <Button
-          disabled
-          fullWidth
-          title="Disponible au Bloc 4 (Panier)"
-          className={cx(styles['addToCart'])}
-        >
-          Ajouter au panier — bientôt disponible
-        </Button>
+        <ProductOptionsForm product={product} />
       </div>
     </Container>
   );

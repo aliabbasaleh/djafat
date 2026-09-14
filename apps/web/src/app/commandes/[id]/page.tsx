@@ -1,0 +1,177 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import type { Route } from 'next';
+import { useParams, useRouter } from 'next/navigation';
+import { ApiClientError, type Order, type OrderStatus } from '@djafat/sdk';
+import { Container, Heading, Text, Stack, Badge, ErrorState, Skeleton, cx } from '@djafat/ui';
+import type { BadgeTone } from '@djafat/ui';
+import { Button } from '@/components/ui-client';
+import { api } from '@/lib/api';
+import { isAuthenticated, clearSession } from '@/lib/auth-storage';
+import { formatMoney } from '@/lib/format';
+import styles from './page.module.css';
+
+const STATUS_LABEL: Record<OrderStatus, string> = {
+  draft: 'Brouillon',
+  awaiting_payment: 'En attente de paiement',
+  placed: 'Commande reçue',
+  confirmed: 'Confirmée par le restaurant',
+  preparing: 'En préparation',
+  ready: 'Prête',
+  courier_assigned: 'Livreur assigné',
+  picked_up: 'Récupérée',
+  on_the_way: 'En route',
+  delivered: 'Livrée',
+  cancelled: 'Annulée',
+  rejected: 'Refusée',
+  expired: 'Expirée',
+};
+
+const STATUS_TONE: Record<OrderStatus, BadgeTone> = {
+  draft: 'neutral',
+  awaiting_payment: 'neutral',
+  placed: 'info',
+  confirmed: 'info',
+  preparing: 'info',
+  ready: 'info',
+  courier_assigned: 'info',
+  picked_up: 'info',
+  on_the_way: 'info',
+  delivered: 'success',
+  cancelled: 'danger',
+  rejected: 'danger',
+  expired: 'danger',
+};
+
+type LoadState = 'loading' | 'ready' | 'error' | 'not-found';
+
+/**
+ * `/commandes/[id]` — order confirmation (docs/22 §9, §17.7). A Client
+ * Component for the same reason as `/panier`: the auth token only exists
+ * in the browser. `useParams()` rather than the `params` prop — the
+ * documented pattern for a Client Component page (docs/22 §17.6).
+ */
+export default function OrderConfirmationPage() {
+  const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const [state, setState] = useState<LoadState>('loading');
+  const [order, setOrder] = useState<Order | null>(null);
+
+  useEffect(() => {
+    const redirectTarget = `/connexion?redirect=${encodeURIComponent(`/commandes/${params.id}`)}`;
+    if (!isAuthenticated()) {
+      router.push(redirectTarget as Route);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const fetched = await api.orders.get(params.id);
+        if (!cancelled) {
+          setOrder(fetched);
+          setState('ready');
+        }
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof ApiClientError && err.status === 401) {
+          clearSession();
+          router.push(redirectTarget as Route);
+          return;
+        }
+        setState(err instanceof ApiClientError && err.status === 404 ? 'not-found' : 'error');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id, router]);
+
+  if (state === 'loading') {
+    return (
+      <Container
+        as="main"
+        maxWidth={640}
+        className={cx(styles['main'])}
+        aria-busy="true"
+        aria-label="Chargement de la commande"
+      >
+        <Skeleton width={220} height={28} />
+        <Skeleton height={120} radius="12px" className={cx(styles['skeletonBlock'])} />
+      </Container>
+    );
+  }
+
+  if (state === 'not-found') {
+    return (
+      <Container as="main" maxWidth={640} className={cx(styles['main'])}>
+        <ErrorState
+          title="Commande introuvable"
+          message="Cette commande n'existe pas ou ne vous appartient pas."
+          action={<Button href="/restaurants">Retour aux restaurants</Button>}
+        />
+      </Container>
+    );
+  }
+
+  if (state === 'error' || !order) {
+    return (
+      <Container as="main" maxWidth={640} className={cx(styles['main'])}>
+        <ErrorState title="Impossible de charger la commande" />
+      </Container>
+    );
+  }
+
+  return (
+    <Container as="main" maxWidth={640} className={cx(styles['main'])}>
+      <Stack gap="lg">
+        <Stack gap="xs">
+          <Text tone="secondary" size="small">
+            Commande {order.code}
+          </Text>
+          <Heading level={1}>Merci pour votre commande !</Heading>
+          <Badge tone={STATUS_TONE[order.status]}>{STATUS_LABEL[order.status]}</Badge>
+        </Stack>
+
+        <ul className={cx(styles['items'])}>
+          {order.items.map((item, index) => (
+            <li key={index} className={cx(styles['item'])}>
+              <div className={cx(styles['itemHeader'])}>
+                <Text weight="bold">
+                  {item.quantity}× {item.name}
+                </Text>
+                <Text weight="bold">{formatMoney(item.lineTotal)}</Text>
+              </div>
+              {item.options.length > 0 && (
+                <Text size="small" tone="secondary">
+                  {item.options.map((o) => o.name).join(', ')}
+                </Text>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        <div className={cx(styles['summary'])}>
+          <div className={cx(styles['summaryRow'])}>
+            <Text>Sous-total</Text>
+            <Text>{formatMoney(order.subtotal)}</Text>
+          </div>
+          <div className={cx(styles['summaryRow'])}>
+            <Text>Frais de livraison</Text>
+            <Text>{formatMoney(order.deliveryFee)}</Text>
+          </div>
+          <div className={cx(styles['summaryRow'], styles['summaryTotal'])}>
+            <Text weight="bold">Total</Text>
+            <Text weight="bold" tone="brand">
+              {formatMoney(order.total)}
+            </Text>
+          </div>
+        </div>
+
+        <Button href="/restaurants" fullWidth variant="secondary">
+          Continuer mes achats
+        </Button>
+      </Stack>
+    </Container>
+  );
+}
