@@ -548,8 +548,74 @@ model OrderItem {
   quantity       Int
   lineTotalMinor BigInt  @map("line_total_minor")
   currency       String  @db.Char(3)
+  options        OrderItemOption[]
 
   @@map("order_items")
+}
+
+/// Immutable per-order-item option snapshot (docs/22 §9) — never re-reads
+/// the catalog for a historical order's price.
+model OrderItemOption {
+  id              String    @id @default(uuid()) @db.Uuid
+  orderItemId     String    @map("order_item_id") @db.Uuid
+  orderItem       OrderItem @relation(fields: [orderItemId], references: [id])
+  optionId        String?   @map("option_id") @db.Uuid
+  nameSnapshot    String    @map("name_snapshot")
+  priceDeltaMinor BigInt    @default(0) @map("price_delta_minor")
+  currency        String    @db.Char(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("order_item_options")
+}
+
+/// Bloc 4 — Cart + Core Order (docs/22 §3). NEVER the pricing authority:
+/// `currency` and `restaurantId` are set once, from the first item added;
+/// every quote/order-creation re-reads live product/option prices instead
+/// of trusting `CartItem.unitPriceMinor` (a display-only snapshot).
+model Cart {
+  id           String     @id @default(uuid()) @db.Uuid
+  userId       String     @map("user_id") @db.Uuid
+  restaurantId String?    @map("restaurant_id") @db.Uuid
+  currency     String?    @db.Char(3)
+  /// open | converted — docs/22 §3.
+  status       String     @default("open")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @default(now()) @map("updated_at") @db.Timestamptz(6)
+  items        CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id             String           @id @default(uuid()) @db.Uuid
+  cartId         String           @map("cart_id") @db.Uuid
+  cart           Cart             @relation(fields: [cartId], references: [id])
+  productId      String           @map("product_id") @db.Uuid
+  /// Display-only snapshot — see the model-level doc comment on `Cart`.
+  nameSnapshot   String           @map("name_snapshot")
+  quantity       Int
+  unitPriceMinor BigInt           @map("unit_price_minor")
+  currency       String           @db.Char(3)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
+  options        CartItemOption[]
+
+  @@map("cart_items")
+}
+
+model CartItemOption {
+  id              String   @id @default(uuid()) @db.Uuid
+  cartItemId      String   @map("cart_item_id") @db.Uuid
+  cartItem        CartItem @relation(fields: [cartItemId], references: [id])
+  optionGroupId   String   @map("option_group_id") @db.Uuid
+  optionId        String   @map("option_id") @db.Uuid
+  nameSnapshot    String   @map("name_snapshot")
+  priceDeltaMinor BigInt   @default(0) @map("price_delta_minor")
+  currency        String   @db.Char(3)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([cartItemId, optionId])
+  @@map("cart_item_options")
 }
 
 model OrderStatusHistory {

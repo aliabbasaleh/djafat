@@ -27,6 +27,7 @@ import { CreateOrderSchema, type CreateOrderInput } from './dto/create-order.sch
 export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
 
+  /** Creates an order FROM the caller's own cart (docs/22 §9) — the body carries nothing. */
   @Post()
   @HttpCode(201)
   @RequireAuth()
@@ -34,7 +35,7 @@ export class OrdersController {
   async create(
     @CurrentActor() actor: AuthenticatedActor,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body(new ZodValidationPipe(CreateOrderSchema)) body: CreateOrderInput,
+    @Body(new ZodValidationPipe(CreateOrderSchema)) _body: CreateOrderInput,
   ) {
     if (!idempotencyKey) {
       throw new BadRequestException({
@@ -42,7 +43,7 @@ export class OrdersController {
         message: 'Idempotency-Key header is required.',
       });
     }
-    const { status, order } = await this.orders.createOrder(actor.userId, body, idempotencyKey);
+    const { status, order } = await this.orders.createOrder(actor.userId, idempotencyKey);
     return { status, order };
   }
 

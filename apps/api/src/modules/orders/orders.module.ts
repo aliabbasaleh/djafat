@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { CatalogModule } from '../catalog/catalog.module';
 import { PricingModule } from '../pricing/pricing.module';
+import { CartsModule } from '../carts/carts.module';
 import { ORDER_AMOUNT_PORT } from '../../common/ports/order-amount.port';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
@@ -17,7 +18,7 @@ import { OrdersController } from './orders.controller';
  */
 @Global()
 @Module({
-  imports: [CatalogModule, PricingModule],
+  imports: [CatalogModule, PricingModule, CartsModule],
   controllers: [OrdersController],
   providers: [OrdersService, { provide: ORDER_AMOUNT_PORT, useExisting: OrdersService }],
   exports: [ORDER_AMOUNT_PORT],

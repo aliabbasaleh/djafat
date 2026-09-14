@@ -30,6 +30,35 @@ export interface ProductRecord {
   readonly isAvailable: boolean;
 }
 
+// ── Bloc 4 — cart-time product+option reads (docs/22 §4) ────────────────────
+
+export interface CartOptionRecord {
+  readonly id: string;
+  readonly optionGroupId: string;
+  readonly name: string;
+  readonly priceDeltaMinor: bigint;
+  readonly currency: string;
+  readonly isAvailable: boolean;
+}
+
+export interface CartOptionGroupRecord {
+  readonly id: string;
+  readonly selectionType: string;
+  readonly minSelections: number;
+  readonly maxSelections: number;
+  readonly isRequired: boolean;
+  readonly options: readonly CartOptionRecord[];
+}
+
+export interface CartProductRecord {
+  readonly id: string;
+  readonly restaurantId: string;
+  readonly name: string;
+  readonly priceMinor: bigint;
+  readonly currency: string;
+  readonly optionGroups: readonly CartOptionGroupRecord[];
+}
+
 // ── Bloc 2 — public catalogue reads (docs/20) ───────────────────────────────
 
 export interface RestaurantListItemDto {
@@ -178,6 +207,50 @@ export class CatalogService {
       priceMinor: p.priceMinor,
       currency: p.currency,
       isAvailable: p.isAvailable,
+    }));
+  }
+
+  /**
+   * Live product + option-group + option data for the cart module (docs/22
+   * §4, §6) — one query for however many product ids `carts`/`orders` needs,
+   * never one query per line (a cart typically has a handful of lines, but
+   * the discipline is the same one already used for the restaurant list,
+   * docs/20 §39). Only products that are still `isActive && isAvailable` are
+   * returned at all — an unavailable product is simply absent from the
+   * result, exactly like `getAvailableProducts` above (same Bloc 0.5
+   * contract, extended with options). The CALLER never trusts a cart's own
+   * stored snapshot — this is always a fresh read.
+   */
+  async getCartEligibleProducts(
+    restaurantId: string,
+    ids: readonly string[],
+  ): Promise<CartProductRecord[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.prisma.product.findMany({
+      where: { id: { in: [...ids] }, restaurantId, isActive: true, isAvailable: true },
+      include: { optionGroups: { include: { options: true } } },
+    });
+    return rows.map((p) => ({
+      id: p.id,
+      restaurantId: p.restaurantId,
+      name: p.name,
+      priceMinor: p.priceMinor,
+      currency: p.currency,
+      optionGroups: p.optionGroups.map((g) => ({
+        id: g.id,
+        selectionType: g.selectionType,
+        minSelections: g.minSelections,
+        maxSelections: g.maxSelections,
+        isRequired: g.isRequired,
+        options: g.options.map((o) => ({
+          id: o.id,
+          optionGroupId: o.optionGroupId,
+          name: o.name,
+          priceDeltaMinor: o.priceDeltaMinor,
+          currency: o.currency,
+          isAvailable: o.isAvailable,
+        })),
+      })),
     }));
   }
 

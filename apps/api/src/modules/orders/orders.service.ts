@@ -9,16 +9,16 @@ import type {
   OrderPaymentContext,
   Role,
 } from '@djafat/types';
-import { addMoney, assertOrderTransition, money, sumMoney } from '@djafat/core';
+import { addMoney, assertOrderTransition, money } from '@djafat/core';
 import { CatalogService } from '../catalog/catalog.service';
 import { PricingService } from '../pricing/pricing.service';
 import { PlatformService } from '../platform/platform.service';
+import { CartsService } from '../carts/carts.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { OutboxService } from '../../infra/outbox/outbox.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { toMoneyJson } from '../../common/money/money.mapper';
 import { generateOrderCode } from './order-code';
-import type { CreateOrderInput } from './dto/create-order.schema';
 
 export type OrderStatusString =
   | 'draft'
@@ -35,12 +35,19 @@ export type OrderStatusString =
   | 'rejected'
   | 'expired';
 
+export interface OrderItemOptionDto {
+  optionId: string | null;
+  name: string;
+  priceDelta: MoneyJson;
+}
+
 export interface OrderItemDto {
   productId: string | null;
   name: string;
   unitPrice: MoneyJson;
   quantity: number;
   lineTotal: MoneyJson;
+  options: OrderItemOptionDto[];
 }
 
 export interface OrderDto {
@@ -85,55 +92,37 @@ export class OrdersService implements OrderAmountPort {
     private readonly catalog: CatalogService,
     private readonly pricing: PricingService,
     private readonly platform: PlatformService,
+    private readonly carts: CartsService,
     private readonly outbox: OutboxService,
     private readonly idempotency: IdempotencyService,
   ) {}
 
-  // ── creation ────────────────────────────────────────────────────────────
+  // ── creation (docs/22 §9 — always FROM the caller's cart) ────────────────
 
   async createOrder(
     customerId: string,
-    input: CreateOrderInput,
     idempotencyKey: string,
   ): Promise<{ status: 'created' | 'replayed'; order: OrderDto }> {
     // Scoped per-customer (not a bare 'orders' scope): an idempotency key is
     // client-generated, so namespacing by actor is what actually prevents
     // one customer's key from ever colliding with another's (docs/19 §2).
-    const run = await this.idempotency.run(`orders:${customerId}`, idempotencyKey, input, () =>
-      this.doCreateOrder(customerId, input, idempotencyKey),
+    // The payload fingerprint is the customer id itself (there is no
+    // client-supplied body any more — docs/22 §9): replaying the same key
+    // for the same customer always replays the same order.
+    const run = await this.idempotency.run(
+      `orders:${customerId}`,
+      idempotencyKey,
+      { customerId },
+      () => this.doCreateOrder(customerId, idempotencyKey),
     );
     return { status: run.status, order: run.response };
   }
 
-  private async doCreateOrder(
-    customerId: string,
-    input: CreateOrderInput,
-    idempotencyKey: string,
-  ): Promise<OrderDto> {
-    const restaurant = await this.catalog.getActiveRestaurant(input.restaurantId);
-    const products = await this.catalog.getAvailableProducts(
-      restaurant.id,
-      input.items.map((i) => i.productId),
-    );
-    const byId = new Map(products.map((p) => [p.id, p]));
-
-    const lines = input.items.map((i) => {
-      const product = byId.get(i.productId);
-      if (!product) {
-        throw new NotFoundException({
-          code: 'NOT_FOUND',
-          message: `Product ${i.productId} is not available at restaurant ${restaurant.id}.`,
-        });
-      }
-      const unitPrice = money(product.priceMinor, product.currency);
-      const lineTotal = money(product.priceMinor * BigInt(i.quantity), product.currency);
-      return { product, quantity: i.quantity, unitPrice, lineTotal };
-    });
-
-    const subtotal = sumMoney(
-      lines.map((l) => l.lineTotal),
-      restaurant.currency,
-    );
+  private async doCreateOrder(customerId: string, idempotencyKey: string): Promise<OrderDto> {
+    // Re-validates against LIVE catalog data and recomputes from scratch —
+    // never trusts anything the cart merely had stored (docs/22 §3, §6, §9).
+    const validated = await this.carts.loadAndValidateCartForCheckout(customerId);
+    const restaurant = await this.catalog.getActiveRestaurant(validated.restaurantId);
 
     // Bloc 0.5 simplification: single seeded test courier, resolved now so the
     // courier leg of `order_accrual` can post at payment.succeeded exactly like
@@ -154,7 +143,7 @@ export class OrdersService implements OrderAmountPort {
       restaurantId: restaurant.id,
       countryId: restaurant.countryId,
       cityId: restaurant.cityId,
-      subtotal,
+      subtotal: validated.subtotal,
     });
     const total = addMoney(price.subtotal, price.deliveryFee);
 
@@ -184,17 +173,34 @@ export class OrdersService implements OrderAmountPort {
         },
       });
 
-      await tx.orderItem.createMany({
-        data: lines.map((l) => ({
-          orderId: order.id,
-          productId: l.product.id,
-          nameSnapshot: l.product.name,
-          unitPriceMinor: l.unitPrice.minor,
-          quantity: l.quantity,
-          lineTotalMinor: l.lineTotal.minor,
-          currency: l.lineTotal.currency,
-        })),
-      });
+      // One `create` per line (not `createMany`): each line's generated id
+      // is needed to attach its `OrderItemOption` snapshot rows — a cart
+      // has a handful of lines, never hundreds, so this is not the N+1
+      // pattern the catalog module had to avoid at list-scale (docs/20 §39).
+      for (const line of validated.lines) {
+        const orderItem = await tx.orderItem.create({
+          data: {
+            orderId: order.id,
+            productId: line.productId,
+            nameSnapshot: line.name,
+            unitPriceMinor: line.unitPrice.minor,
+            quantity: line.quantity,
+            lineTotalMinor: line.lineTotal.minor,
+            currency: line.lineTotal.currency,
+          },
+        });
+        if (line.options.length > 0) {
+          await tx.orderItemOption.createMany({
+            data: line.options.map((o) => ({
+              orderItemId: orderItem.id,
+              optionId: o.optionId,
+              nameSnapshot: o.name,
+              priceDeltaMinor: o.priceDelta.minor,
+              currency: o.priceDelta.currency,
+            })),
+          });
+        }
+      }
 
       await tx.orderStatusHistory.create({
         data: {
@@ -212,10 +218,27 @@ export class OrdersService implements OrderAmountPort {
         payload: { orderId: order.id, code: order.code },
       });
 
+      // The cart that funded this order is now spent — a new `addItem` call
+      // starts a fresh one (docs/22 §3, the `carts_one_open_per_user`
+      // partial unique index allows it once this row leaves `status='open'`).
+      await this.carts.markConverted(tx, validated.cartId);
+
       return order;
     });
 
-    return this.toDto(created, lines);
+    const itemDtos: OrderItemDto[] = validated.lines.map((l) => ({
+      productId: l.productId,
+      name: l.name,
+      unitPrice: toMoneyJson(l.unitPrice.minor, l.unitPrice.currency),
+      quantity: l.quantity,
+      lineTotal: toMoneyJson(l.lineTotal.minor, l.lineTotal.currency),
+      options: l.options.map((o) => ({
+        optionId: o.optionId,
+        name: o.name,
+        priceDelta: toMoneyJson(o.priceDelta.minor, o.priceDelta.currency),
+      })),
+    }));
+    return this.toDto(created, itemDtos);
   }
 
   // ── OrderAmountPort (consumed by `payments` — docs/15 AD-09) ─────────────
@@ -301,18 +324,25 @@ export class OrdersService implements OrderAmountPort {
   }
 
   async getOrder(id: string): Promise<OrderDto> {
-    const order = await this.prisma.order.findUnique({ where: { id }, include: { items: true } });
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { items: { include: { options: true } } },
+    });
     if (!order)
       throw new NotFoundException({ code: 'NOT_FOUND', message: `Order ${id} not found.` });
-    return this.toDto(
-      order,
-      order.items.map((it) => ({
-        product: { id: it.productId ?? '', name: it.nameSnapshot },
-        quantity: it.quantity,
-        unitPrice: money(it.unitPriceMinor, it.currency),
-        lineTotal: money(it.lineTotalMinor, it.currency),
+    const itemDtos: OrderItemDto[] = order.items.map((it) => ({
+      productId: it.productId,
+      name: it.nameSnapshot,
+      unitPrice: toMoneyJson(it.unitPriceMinor, it.currency),
+      quantity: it.quantity,
+      lineTotal: toMoneyJson(it.lineTotalMinor, it.currency),
+      options: it.options.map((o) => ({
+        optionId: o.optionId,
+        name: o.nameSnapshot,
+        priceDelta: toMoneyJson(o.priceDeltaMinor, o.currency),
       })),
-    );
+    }));
+    return this.toDto(order, itemDtos);
   }
 
   // ── restaurant-side transitions (Bloc 0.5: no auth yet — see docs/18 §3) ──
@@ -485,12 +515,7 @@ export class OrdersService implements OrderAmountPort {
       createdAt: Date;
       updatedAt: Date;
     },
-    lines: Array<{
-      product: { id: string; name: string };
-      quantity: number;
-      unitPrice: { minor: bigint; currency: string };
-      lineTotal: { minor: bigint; currency: string };
-    }>,
+    items: OrderItemDto[],
   ): OrderDto {
     return {
       id: order.id,
@@ -511,13 +536,7 @@ export class OrdersService implements OrderAmountPort {
       expiresAt: order.expiresAt ? order.expiresAt.toISOString() : null,
       placedAt: order.placedAt ? order.placedAt.toISOString() : null,
       deliveredAt: order.deliveredAt ? order.deliveredAt.toISOString() : null,
-      items: lines.map((l) => ({
-        productId: l.product.id || null,
-        name: l.product.name,
-        unitPrice: toMoneyJson(l.unitPrice.minor, l.unitPrice.currency),
-        quantity: l.quantity,
-        lineTotal: toMoneyJson(l.lineTotal.minor, l.lineTotal.currency),
-      })),
+      items,
       createdAt: order.createdAt.toISOString(),
       updatedAt: order.updatedAt.toISOString(),
     };
