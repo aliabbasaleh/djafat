@@ -73,6 +73,40 @@ async function orderStatus(orderId: string): Promise<string> {
   return rows[0]!.status;
 }
 
+const METHOD_CODE_BY_PROVIDER: Record<string, string> = {
+  cash: 'cash_on_delivery',
+  mock: 'mobile_money',
+};
+
+async function insertPayment(
+  orderId: string,
+  overrides: { status: string; providerCode: 'cash' | 'mock' },
+): Promise<string> {
+  const id = randomUUID();
+  await pool.query(
+    `INSERT INTO payments (
+       id, order_id, provider_code, method_code, status, amount_minor, currency, idempotency_key
+     ) VALUES ($1, $2, $3, $4, $5, 5500, 'XAF', $6)`,
+    [
+      id,
+      orderId,
+      overrides.providerCode,
+      METHOD_CODE_BY_PROVIDER[overrides.providerCode],
+      overrides.status,
+      `test-idem-${id}`,
+    ],
+  );
+  return id;
+}
+
+async function paymentStatus(paymentId: string): Promise<string> {
+  const { rows } = await pool.query<{ status: string }>(
+    `SELECT status FROM payments WHERE id = $1`,
+    [paymentId],
+  );
+  return rows[0]!.status;
+}
+
 let fx: Fixtures;
 
 beforeAll(async () => {
@@ -113,6 +147,41 @@ describe('orderExpiryProcessor (docs/18 §19)', () => {
       [orderId],
     );
     expect(historyAfterReplay.rows[0]!.n).toBe(1);
+  });
+
+  it('also expires the order’s still-pending payment (docs/08 §8.4 step 7) — a late webhook must never credit an abandoned order', async () => {
+    const past = new Date(Date.now() - 60_000);
+    const orderId = await insertOrder(fx, { status: 'awaiting_payment', expiresAt: past });
+    const pendingPaymentId = await insertPayment(orderId, {
+      status: 'pending',
+      providerCode: 'mock',
+    });
+
+    await orderExpiryProcessor();
+
+    expect(await orderStatus(orderId)).toBe('expired');
+    expect(await paymentStatus(pendingPaymentId)).toBe('expired');
+
+    const outboxRows = await pool.query(
+      `SELECT event_type FROM outbox WHERE aggregate = 'payment' AND aggregate_id = $1`,
+      [pendingPaymentId],
+    );
+    expect(outboxRows.rows).toEqual([{ event_type: 'payment.expired' }]);
+  });
+
+  it('never touches a payment that already resolved (succeeded/failed) before the order expired', async () => {
+    const past = new Date(Date.now() - 60_000);
+    const orderId = await insertOrder(fx, { status: 'awaiting_payment', expiresAt: past });
+    const failedPaymentId = await insertPayment(orderId, {
+      status: 'failed',
+      providerCode: 'mock',
+    });
+
+    await orderExpiryProcessor();
+
+    // Stays 'failed', never regressed to 'expired' — expiry only claims
+    // still-open payments (pending/authorized).
+    expect(await paymentStatus(failedPaymentId)).toBe('failed');
   });
 
   it('NEVER expires an order that already moved past awaiting_payment (race with payment success)', async () => {

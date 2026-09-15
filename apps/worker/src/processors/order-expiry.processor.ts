@@ -9,6 +9,16 @@ import { withTransaction } from '../db';
  * process) wins the race and already flipped the order to `placed`, THIS
  * update simply matches zero rows for that id — no explicit lock needed, and
  * a payment can never be silently expired out from under it.
+ *
+ * Also expires that order's still-open `payments` row (docs/08 §8.4 step 7:
+ * "TTL atteint : job passe order 'awaiting_payment' -> 'expired', annule le
+ * payment 'pending'"). This is NOT cosmetic: without it, a payment stays
+ * `pending` forever, and `PaymentsService.markSucceeded`'s conditional UPDATE
+ * (`WHERE status IN ('pending','authorized')`) would still match a LATE
+ * webhook/poll confirmation arriving after the order was abandoned — crediting
+ * the restaurant/courier/DJAFAT ledger for an order nobody is fulfilling.
+ * Same race-safety shape as the order update: a bare conditional UPDATE, so a
+ * payment that resolved (succeeded/failed) concurrently is untouched.
  */
 export async function orderExpiryProcessor(): Promise<{ expired: number }> {
   return withTransaction(async (client) => {
@@ -29,6 +39,20 @@ export async function orderExpiryProcessor(): Promise<{ expired: number }> {
          VALUES ('order', $1, 'order.expired', $2::jsonb)`,
         [row.id, JSON.stringify({ orderId: row.id })],
       );
+
+      const expiredPayments = await client.query<{ id: string }>(
+        `UPDATE payments SET status = 'expired'
+         WHERE order_id = $1 AND status IN ('pending', 'authorized')
+         RETURNING id`,
+        [row.id],
+      );
+      for (const payment of expiredPayments.rows) {
+        await client.query(
+          `INSERT INTO outbox (aggregate, aggregate_id, event_type, payload)
+           VALUES ('payment', $1, 'payment.expired', $2::jsonb)`,
+          [payment.id, JSON.stringify({ paymentId: payment.id, orderId: row.id })],
+        );
+      }
     }
 
     return { expired: rows.length };
