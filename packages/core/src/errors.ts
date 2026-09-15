@@ -34,3 +34,16 @@ export class OrderTransitionError extends Error {
     this.to = to;
   }
 }
+
+/** Thrown when a payment state transition is not allowed (docs/08 §8.3 — no regression from a final state). */
+export class PaymentTransitionError extends Error {
+  public readonly from: string;
+  public readonly to: string;
+
+  constructor(from: string, to: string) {
+    super(`Illegal payment transition: ${from} -> ${to}`);
+    this.name = 'PaymentTransitionError';
+    this.from = from;
+    this.to = to;
+  }
+}

@@ -110,6 +110,8 @@ model PaymentProviderConfig {
   currency        String?   @db.Char(3)
   minAmountMinor  BigInt?   @map("min_amount_minor")
   maxAmountMinor  BigInt?   @map("max_amount_minor")
+  /// PSP fee rate override at this scope (Bloc 5 — replaces the Bloc 0.5 hardcoded MOCK_PSP_FEE_BPS).
+  feeBps          Int?      @map("fee_bps")
   configRef       String?   @map("config_ref")
   validFrom       DateTime  @default(now()) @map("valid_from") @db.Timestamptz(6)
   validTo         DateTime? @map("valid_to") @db.Timestamptz(6)
@@ -685,4 +687,47 @@ model Delivery {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("deliveries")
+}
+
+/// ────────────────────── Bloc 5 — payment core (docs/24) ──────────────────────
+model Refund {
+  id             String   @id @default(uuid()) @db.Uuid
+  paymentId      String   @map("payment_id") @db.Uuid
+  amountMinor    BigInt   @map("amount_minor")
+  currency       String   @db.Char(3)
+  reason         String
+  status         String   @default("pending")
+  providerRef    String?  @map("provider_ref")
+  idempotencyKey String   @map("idempotency_key")
+  entryGroup     String?  @map("entry_group") @db.Uuid
+  requestedBy    String   @map("requested_by") @db.Uuid
+  attempts       Int      @default(0)
+  lastError      String?  @map("last_error")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([paymentId, idempotencyKey])
+  @@map("refunds")
+}
+
+model Settlement {
+  id                  String    @id @default(uuid()) @db.Uuid
+  providerCode        String    @map("provider_code")
+  periodStart         DateTime  @map("period_start") @db.Timestamptz(6)
+  periodEnd           DateTime  @map("period_end") @db.Timestamptz(6)
+  currency            String    @db.Char(3)
+  grossMinor          BigInt    @map("gross_minor")
+  feesMinor           BigInt    @default(0) @map("fees_minor")
+  netMinor            BigInt    @map("net_minor")
+  expectedNetMinor    BigInt?   @map("expected_net_minor")
+  status              String    @default("pending")
+  providerReference   String?   @map("provider_reference")
+  idempotencyKey      String    @unique @map("idempotency_key")
+  entryGroup          String?   @map("entry_group") @db.Uuid
+  reconciliationNotes String?   @map("reconciliation_notes")
+  createdBy           String    @map("created_by") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  reconciledAt        DateTime? @map("reconciled_at") @db.Timestamptz(6)
+
+  @@map("settlements")
 }

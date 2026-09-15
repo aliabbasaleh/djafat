@@ -17,4 +17,10 @@ export default [
   // packages/ui/scripts/copy-assets.mjs) that no package tsconfig
   // `include`s — same reasoning as each package's own ignore for this.
   { ignores: ['**/dist/**', '**/.next/**', '**/coverage/**', '**/scripts/**'] },
+  // Mirrors apps/api/eslint.config.mjs's own override — this root config is
+  // a separate resolution path (see comment above), so it doesn't inherit it.
+  {
+    files: ['**/prisma/seed.ts', '**/src/main.ts'],
+    rules: { 'no-console': 'off' },
+  },
 ];

@@ -43,6 +43,7 @@ export const PERMISSIONS = [
   'deliveries:read',
   'deliveries:write',
   'payments:read',
+  'payments:write',
   'payments:refund',
   'ledger:read',
   'ledger:write',

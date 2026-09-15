@@ -11,12 +11,20 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
-import type { OrderAmountPort } from '@djafat/types';
+import type { AuthenticatedActor, OrderAmountPort } from '@djafat/types';
 import { ORDER_AMOUNT_PORT } from '../../common/ports/order-amount.port';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
-import { RequireAuth, RequireOwnership, RequireRole } from '../auth/decorators';
+import { CurrentActor } from '../auth/current-actor.decorator';
+import {
+  RequireAuth,
+  RequireOwnership,
+  RequirePermission,
+  RequireRole,
+  RequireStepUp,
+} from '../auth/decorators';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentSchema, type CreatePaymentInput } from './dto/create-payment.schema';
+import { RefundPaymentSchema, type RefundPaymentInput } from './dto/refund-payment.schema';
 
 @ApiTags('payments')
 @Controller('payments')
@@ -47,9 +55,67 @@ export class PaymentsController {
     return { status, payment };
   }
 
+  /** Owner of the payment's order, or staff with `payments:read` (closes docs/19 D-15 — was unauthenticated). */
   @Get(':id')
+  @RequireAuth()
+  @RequireOwnership(
+    PaymentsService,
+    (payments, req) => payments.getOwnerUserId((req.params as { id: string }).id),
+    'payments:read',
+  )
   get(@Param('id') id: string) {
     return this.payments.getPayment(id);
+  }
+
+  /** Owner of the payment's order, or staff with `payments:write` (docs/08 §8.7 — 409 if already succeeded, use refund instead). */
+  @Post(':id/cancel')
+  @HttpCode(200)
+  @RequireAuth()
+  @RequireOwnership(
+    PaymentsService,
+    (payments, req) => payments.getOwnerUserId((req.params as { id: string }).id),
+    'payments:write',
+  )
+  async cancel(
+    @Param('id') id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ) {
+    if (!idempotencyKey) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'Idempotency-Key header is required.',
+      });
+    }
+    const { status, payment } = await this.payments.cancelPayment(id, idempotencyKey);
+    return { status, payment };
+  }
+
+  /** Admin/finance only, with step-up MFA (docs/08 §8.8, docs/19 §23 — sensitive financial action). */
+  @Post(':id/refund')
+  @HttpCode(200)
+  @RequireAuth()
+  @RequireRole('admin', 'super_admin', 'finance')
+  @RequirePermission('payments:refund')
+  @RequireStepUp()
+  async refund(
+    @Param('id') id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body(new ZodValidationPipe(RefundPaymentSchema)) body: RefundPaymentInput,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    if (!idempotencyKey) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'Idempotency-Key header is required.',
+      });
+    }
+    const { status, refund, payment } = await this.payments.refundPayment(
+      id,
+      body,
+      idempotencyKey,
+      actor.userId,
+    );
+    return { status, refund, payment };
   }
 
   /**

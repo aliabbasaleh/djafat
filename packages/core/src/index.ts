@@ -9,6 +9,7 @@ export * from './idempotency/canonical-json.js';
 export * from './idempotency/reconcile.js';
 
 export * from './order/state-machine.js';
+export * from './payment/state-machine.js';
 
 export * from './mfa/totp.js';
 

@@ -4,6 +4,9 @@ import { PaymentProviderRegistry } from './payment-provider.registry';
 import { PAYMENT_PROVIDER } from './payments.tokens';
 import { PaymentsService } from './payments.service';
 import { PaymentsController } from './payments.controller';
+import { PaymentMethodsConfigController } from './payment-methods-config.controller';
+import { SettlementsController } from './settlements.controller';
+import { SettlementsService } from './settlements.service';
 import { CashPaymentProvider } from './providers/cash/cash-payment.provider';
 import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
 
@@ -18,7 +21,7 @@ import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
  */
 @Module({
   imports: [LedgerModule],
-  controllers: [PaymentsController],
+  controllers: [PaymentsController, PaymentMethodsConfigController, SettlementsController],
   providers: [
     CashPaymentProvider,
     MockPaymentProvider,
@@ -31,6 +34,7 @@ import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
       inject: [CashPaymentProvider, MockPaymentProvider],
     },
     PaymentsService,
+    SettlementsService,
   ],
   exports: [PaymentProviderRegistry],
 })

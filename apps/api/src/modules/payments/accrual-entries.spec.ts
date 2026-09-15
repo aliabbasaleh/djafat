@@ -14,8 +14,8 @@ describe('buildOrderAccrualEntries', () => {
       commission: XAF(2400n), // GROSS, not net — see docs/16 fixed bug
       courierFee: XAF(1200n), // === deliveryFee, decision A5
     };
-    const entries = buildOrderAccrualEntries(
-      { amountMinor: 10000n, currency: 'XAF', providerCode: 'mock' },
+    const { entries, pspFee } = buildOrderAccrualEntries(
+      { amountMinor: 10000n, currency: 'XAF', providerCode: 'mock', feeBps: MOCK_PSP_FEE_BPS },
       breakdown,
     );
 
@@ -26,6 +26,7 @@ describe('buildOrderAccrualEntries', () => {
       { accountRef: 'COURIER_PAYABLE:c1', direction: 'credit', amount: XAF(1200n) },
       { accountRef: 'DJAFAT_REVENUE', direction: 'credit', amount: XAF(2400n) },
     ]);
+    expect(pspFee).toEqual(XAF(150n));
     expect(() => assertBalanced(entries, 'XAF')).not.toThrow();
   });
 
@@ -33,7 +34,7 @@ describe('buildOrderAccrualEntries', () => {
     expect(MOCK_PSP_FEE_BPS).toBe(150);
   });
 
-  it('routes the debit leg to CASH_FLOAT:<courierId> and omits the PSP fee leg for cash', () => {
+  it('the caller-supplied feeBps drives the fee, not a hidden constant (Bloc 5 — config-driven)', () => {
     const breakdown: OrderAccrualBreakdown = {
       restaurantId: 'r1',
       courierId: 'c1',
@@ -41,8 +42,45 @@ describe('buildOrderAccrualEntries', () => {
       commission: XAF(2400n),
       courierFee: XAF(1200n),
     };
-    const entries = buildOrderAccrualEntries(
-      { amountMinor: 10000n, currency: 'XAF', providerCode: 'cash' },
+    const { entries, pspFee } = buildOrderAccrualEntries(
+      { amountMinor: 10000n, currency: 'XAF', providerCode: 'mock', feeBps: 300 },
+      breakdown,
+    );
+    expect(pspFee).toEqual(XAF(300n)); // 3% of 10 000, not the 150 constant
+    expect(entries).toContainEqual({
+      accountRef: 'PSP_FEE_EXPENSE',
+      direction: 'debit',
+      amount: XAF(300n),
+    });
+  });
+
+  it('a feeBps of 0 omits the PSP fee leg entirely (zero-amount entries are forbidden)', () => {
+    const breakdown: OrderAccrualBreakdown = {
+      restaurantId: 'r1',
+      courierId: 'c1',
+      subtotal: XAF(8800n),
+      commission: XAF(2400n),
+      courierFee: XAF(1200n),
+    };
+    const { entries, pspFee } = buildOrderAccrualEntries(
+      { amountMinor: 10000n, currency: 'XAF', providerCode: 'mock', feeBps: 0 },
+      breakdown,
+    );
+    expect(pspFee).toEqual(XAF(0n));
+    expect(entries.some((e) => e.accountRef === 'PSP_FEE_EXPENSE')).toBe(false);
+    expect(() => assertBalanced(entries, 'XAF')).not.toThrow();
+  });
+
+  it('routes the debit leg to CASH_FLOAT:<courierId>, omits the PSP fee leg, and ignores feeBps for cash', () => {
+    const breakdown: OrderAccrualBreakdown = {
+      restaurantId: 'r1',
+      courierId: 'c1',
+      subtotal: XAF(8800n),
+      commission: XAF(2400n),
+      courierFee: XAF(1200n),
+    };
+    const { entries } = buildOrderAccrualEntries(
+      { amountMinor: 10000n, currency: 'XAF', providerCode: 'cash', feeBps: MOCK_PSP_FEE_BPS },
       breakdown,
     );
 
@@ -64,8 +102,8 @@ describe('buildOrderAccrualEntries', () => {
       commission: XAF(1800n),
       courierFee: XAF(2000n),
     };
-    const entries = buildOrderAccrualEntries(
-      { amountMinor: 17000n, currency: 'XAF', providerCode: 'mock' },
+    const { entries } = buildOrderAccrualEntries(
+      { amountMinor: 17000n, currency: 'XAF', providerCode: 'mock', feeBps: MOCK_PSP_FEE_BPS },
       breakdown,
     );
     expect(() => assertBalanced(entries, 'XAF')).not.toThrow();
@@ -81,7 +119,7 @@ describe('buildOrderAccrualEntries', () => {
     };
     expect(() =>
       buildOrderAccrualEntries(
-        { amountMinor: 10000n, currency: 'XAF', providerCode: 'mock' },
+        { amountMinor: 10000n, currency: 'XAF', providerCode: 'mock', feeBps: MOCK_PSP_FEE_BPS },
         breakdown,
       ),
     ).toThrow(/resolved courier/);
@@ -105,8 +143,8 @@ describe('buildOrderAccrualEntries', () => {
         commission: XAF(commissionMinor),
         courierFee: XAF(1200n),
       };
-      const entries = buildOrderAccrualEntries(
-        { amountMinor: 10000n, currency: 'XAF', providerCode: 'mock' },
+      const { entries } = buildOrderAccrualEntries(
+        { amountMinor: 10000n, currency: 'XAF', providerCode: 'mock', feeBps: MOCK_PSP_FEE_BPS },
         breakdown,
       );
       expect(() => assertBalanced(entries, 'XAF')).not.toThrow();
