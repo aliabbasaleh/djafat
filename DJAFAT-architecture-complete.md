@@ -6875,13 +6875,424 @@ Aucune.
 
 ## 25. Commits
 
-| Hash      | Message                                                                       |
-| --------- | ----------------------------------------------------------------------------- |
-| `e1be67f` | `feat(delivery): implement delivery and dispatch core`                        |
+| Hash      | Message                                                                                 |
+| --------- | --------------------------------------------------------------------------------------- |
+| `e1be67f` | `feat(delivery): implement delivery and dispatch core`                                  |
 | `d4e3f08` | `fix(orders,payments): remove eager courier resolution, wire delivery lifecycle events` |
-| `3b1636b` | `feat(realtime,worker): authorize every room join and add the dispatch-retry job` |
-| (ce doc)  | `docs(25): rapport bloc 6 — delivery dispatch core`                           |
+| `3b1636b` | `feat(realtime,worker): authorize every room join and add the dispatch-retry job`       |
+| (ce doc)  | `docs(25): rapport bloc 6 — delivery dispatch core`                                     |
 
 ## 26. Git status
 
 `clean` après le dernier commit (vérifié par `git status --porcelain=v1`, sortie vide).
+
+---
+
+# Bloc 6.1 — durcissement CTO
+
+> Passe de durcissement ciblée demandée après la livraison du Bloc 6. Aucun
+> refactoring, aucune fonctionnalité hors périmètre, aucun démarrage du Bloc 7.
+>
+> **Le fait marquant de cette passe :** le Bloc 6 était vert — 518 tests, 10
+> scénarios concurrents, zéro échec — et le parcours nominal était **mort en
+> production**. Trois bugs bloquants se cachaient derrière une suite de tests
+> qui partait d'états que le code ne sait pas atteindre.
+
+---
+
+## B6.1-1. Invariant « un livreur = une livraison active »
+
+### La définition d'« active »
+
+Un livreur est occupé par une livraison si et seulement si :
+
+```
+courier_id IS NOT NULL
+AND status IN ('courier_assigned', 'courier_accepted',
+               'pickup_in_progress', 'picked_up', 'on_the_way')
+```
+
+Avant `courier_assigned` aucun livreur n'est attaché ; `delivered`, `cancelled`
+et `failed` le libèrent tous. Cette liste vit dans
+`DELIVERY_COURIER_HOLDING_STATUSES` (`@djafat/types`) et nulle part ailleurs.
+
+### Ce que le Bloc 6 affirmait, et pourquoi c'était faux
+
+La migration 0023 documentait explicitement :
+
+> L'invariant « un livreur a au plus une livraison ACTIVE » est appliqué au
+> niveau service […], pas par une contrainte DB : « active » recouvre plusieurs
+> valeurs de `deliveries.status`, **ce qu'un simple index unique ne peut pas
+> exprimer**.
+
+C'est faux. Un index **partiel** exprime exactement cela : la clause `WHERE`
+énumère les statuts actifs, et l'unicité ne s'applique qu'aux lignes qui y
+correspondent. Le même raisonnement erroné servait pour « au plus une offre
+active par livraison ».
+
+### Ce que fait la migration 0024
+
+| Index                                         | Garantit                                                   |
+| --------------------------------------------- | ---------------------------------------------------------- |
+| `deliveries_one_active_per_courier_idx`       | Un livreur ne tient jamais deux livraisons actives          |
+| `couriers_one_active_delivery_idx`            | Deux livreurs ne pointent jamais vers la même livraison     |
+| `delivery_offers_one_offered_per_delivery_idx`| Une livraison n'a jamais deux offres `offered` simultanées  |
+
+Le verrouillage transactionnel applicatif **n'est pas remplacé** : il reste le
+mécanisme principal, parce qu'il produit des erreurs métier propres et garde la
+ligne `couriers` cohérente. Les index sont le filet qui rend l'invariant vrai
+même face à un appelant bogué, à un second écrivain (le worker), à une
+correction SQL manuelle, ou à un futur chemin de code que personne n'a relu.
+
+Une violation `23505` remonte en `P2002` chez Prisma et est traduite en
+« personne d'autre n'a pris ce livreur cette vague » — le worker réessaiera.
+**Jamais un 500.**
+
+### Anti-dérive
+
+`deliveries-db-invariant.spec.ts` lit le fichier de migration, extrait les
+littéraux SQL de la clause `WHERE`, et les compare à la constante TypeScript.
+Ajouter un statut à la machine sans toucher 0024 fait échouer le test — vérifié
+en dérivant réellement la migration puis en la restaurant.
+
+---
+
+## B6.1-2. Le job worker, désormais testé
+
+`dispatch.processor.ts` n'avait **aucun test dédié** — la lacune la plus
+risquée du bloc, parce que le worker réimplémente en SQL brut des invariants
+déjà prouvés côté service. Deux copies dont une n'est pas testée, c'est
+exactement là qu'elles divergent. Et elles avaient divergé (voir B6.1-B04).
+
+18 tests couvrent : livreur trouvé / aucun trouvé / devenu occupé en cours
+d'assignation / concurrence entre deux commandes / relance et élargissement du
+rayon / erreur DB transitoire / idempotence / double assignation impossible /
+livreur suspendu ignoré / livreur hors rayon ignoré / position périmée / offre
+expirée / livraison sortie de `searching_courier` entre le scan et le verrou.
+
+Les tests de concurrence tournent en vrai parallèle (`Promise.all` sur des
+verrous par ligne simulant `FOR UPDATE`), pas en appels séquentiels déguisés.
+
+---
+
+## B6.1-3. Le ledger COURIER_FEE_POOL, audité
+
+### Le trajet des 1 200 XAF
+
+| Moment              | Compte crédité             | Pool          |
+| ------------------- | -------------------------- | ------------- |
+| Paiement confirmé   | `COURIER_FEE_POOL`         | +1 200        |
+| Offre acceptée      | `COURIER_PAYABLE:<id>`     | −1 200 (vidé) |
+| Livraison confirmée | `COURIER_AVAILABLE:<id>`   | 0             |
+
+Chaque saut est une reclassification pure. Les tests ne vérifient pas seulement
+chaque constructeur isolément : ils tiennent un **grand livre complet** sur
+lequel, après n'importe quelle séquence d'opérations, `Σ débits = Σ crédits` et
+les trois comptes du livreur totalisent exactement **un** frais — jamais deux,
+jamais zéro.
+
+### Ce qui a été vérifié
+
+Webhook rejoué, acceptation répétée, réassignation, annulation avant et après
+acceptation, livraison échouée, remboursement, relance. Commande en espèces :
+ne touche jamais le pool (le livreur est connu au moment où le paiement est
+marqué réussi), et un accrual espèces sans livreur résolu est refusé net.
+
+### Remboursement
+
+Le remboursement **n'annule pas** l'accrual : DJAFAT l'absorbe sur son revenu
+(`docs/08 §8.8`). Il ne réclame jamais la part du restaurant ni celle du
+livreur. C'est désormais verrouillé par des tests, pour qu'une future
+modification « serviable » qui commencerait à débiter le pool échoue bruyamment.
+
+---
+
+## B6.1-4. Politique de réassignation
+
+> **La réassignation n'est possible qu'AVANT l'acceptation.**
+
+Un livreur qui refuse, ou dont l'offre expire, n'a vu aucun mouvement d'argent
+en son nom. L'acceptation du livreur suivant est donc la **première et unique**
+reclassification.
+
+Après acceptation, la livraison ne peut plus revenir à `searching_courier` — la
+machine à états ne comporte aucune arête de ce type. L'annuler ou la marquer
+échouée est terminal.
+
+C'est précisément ce qui rend sûre la clé d'idempotence portée par la livraison
+(`courier-accrual:<deliveryId>`) : elle ne peut jamais supprimer silencieusement
+le crédit d'un second livreur, puisqu'un second livreur ne peut jamais accepter.
+Un test verrouille cette impossibilité, pour qu'ajouter une arête de retour
+oblige à revoir la clé en même temps.
+
+Annulation après acceptation : le frais **reste** chez le livreur. Il a fourni
+un travail réel ; le reprendre est une décision d'exploitation, jamais un effet
+de bord automatique de l'annulation.
+
+---
+
+## B6.1-5. Machine à états — matrice exhaustive
+
+Le Bloc 6 testait le comportement de chaque fonction sur des exemples choisis.
+Le 6.1 parcourt la **matrice complète 10×10** des couples `(from, to)` × 8
+contextes d'acteur — 800 cellules — et compare chacune à la table déclarée.
+
+Vérifié explicitement :
+
+- les 5 transitions illégales que le mandat nomme
+  (`pending→delivered`, `pending→picked_up`, `delivered→on_the_way`,
+  `cancelled→courier_assigned`, `failed→delivered`) sont refusées pour **tous**
+  les acteurs, admin et système compris ;
+- un statut terminal est un cul-de-sac ;
+- aucun statut ne transitionne vers lui-même ;
+- seul un livreur pilote les étapes physiques — pas même les jobs système ;
+- un restaurant ne pilote jamais aucune étape du cycle de vie ;
+- `fromStatusesFor` est un inverse fidèle de la matrice (c'est la fonction dont
+  le service dérive ses gardes SQL — si elle diverge, le garde en base et la
+  vérification en mémoire divergent, et c'est exactement ainsi que le bug de
+  pickup du Bloc 6 est passé inaperçu).
+
+Les transitions concurrentes sont testées côté service : accept + cancel,
+double cancel, cancel + fail. Une seule réussit toujours, la perdante reçoit
+une erreur métier propre.
+
+---
+
+## B6.1-6. Snapshot d'adresse — autonomie réelle
+
+Le point non négociable n°1 du CTO pour le Bloc 6 était : « le delivery address
+snapshot est immutable après création de l'Order ». Le Bloc 6 gelait la plupart
+des champs, mais laissait deux trous.
+
+**Trou 1 — champs manquants.** `label` et la ville n'étaient jamais copiés, donc
+l'historique devait les résoudre à travers `addresses`, une ligne mutable.
+Migration 0025 ajoute `dropoff_label` et `dropoff_city`. La ville est stockée en
+**texte**, pas en clé étrangère : une FK ferait dépendre le snapshot d'une ligne
+qu'il ne possède pas — exactement le couplage que cette migration supprime.
+
+**Trou 2 — suppression impossible.** `orders.dropoff_address_id` portait une FK
+en `NO ACTION`. Conséquence : supprimer une adresse référencée par une commande
+passée échouait, et comme `addresses.user_id` cascade depuis `users`, **un
+client avec un historique de commandes ne pouvait pas être effacé du tout**. Un
+problème de protection des données déguisé en intégrité référentielle. La FK
+passe en `ON DELETE SET NULL` : le lien n'est qu'une commodité pour
+« recommander à la même adresse », jamais la source de vérité.
+
+Les tests vérifient structurellement qu'aucun chemin de lecture ne ressort
+l'adresse de `addresses` : `getDeliveryContext` ne joint jamais cette table,
+`addresses` n'est lue qu'une seule fois dans tout le service (à la création), et
+aucune écriture ne touche une colonne `dropoff_*` après coup.
+
+---
+
+## B6.1-7. Autorisation, IDOR et code de livraison
+
+### L'ordre des vérifications était inversé
+
+Le Bloc 6 vérifiait le code de livraison **avant** de contrôler l'autorisation.
+Deux conséquences : un livreur à qui la course n'a jamais été attribuée pouvait
+sonder des codes dessus et — une fois le compteur d'essais ajouté — **épuiser le
+rate-limit du vrai livreur**, le verrouillant hors de sa propre livraison ; et
+une relecture idempotente d'une livraison terminée courait contre le garde
+d'usage unique, répondant 200 ou 409 selon le timing. Résoudre l'identité et la
+complétion d'abord rend les deux déterministes.
+
+### Le code de livraison est maintenant un vrai secret à usage unique
+
+| Garde                 | Avant 6.1 | Après                                              |
+| --------------------- | --------- | -------------------------------------------------- |
+| Émis par le code prod | ❌ jamais | ✅ au pickup                                       |
+| Haché au repos        | ✅        | ✅ SHA-256                                         |
+| Comparaison           | `===`     | ✅ temps constant (`timingSafeEqual`)              |
+| Usage unique          | ❌        | ✅ `consumed_at`, brûlé dans la même transaction   |
+| Expiration            | ❌        | ✅ 4 h                                             |
+| Limite d'essais       | ❌        | ✅ 5, puis 429 `PROOF_RATE_LIMITED`                |
+| Destinataire          | —         | ✅ le client, par événement in-process uniquement  |
+
+Le code ne parvient **jamais** au livreur : ni dans la réponse HTTP, ni dans le
+payload outbox (qui est persisté), ni dans un log. Un livreur qui le connaîtrait
+pourrait auto-confirmer une livraison jamais effectuée.
+
+### IDOR
+
+Un livreur étranger ne peut ni accepter, ni marquer récupéré, ni confirmer —
+même en détenant le bon code. La réponse est toujours un `404` identique, qui ne
+révèle jamais l'existence de la livraison.
+
+---
+
+## B6.1-8. Offres
+
+Acceptation avant expiration ✅ ; après expiration → `OFFER_EXPIRED` sans
+mouvement au ledger ; offre déjà résolue non réacceptable ; deux livreurs
+acceptant simultanément → un gagne, l'autre reçoit un 409 propre et le pool
+n'est vidé qu'une fois ; livreur suspendu entre l'offre et l'acceptation →
+`COURIER_NOT_ELIGIBLE`.
+
+L'expiration des offres est pilotée par le worker, désormais testée (B6.1-2).
+
+---
+
+## B6.1-9. Position du livreur
+
+### Stockage
+
+`couriers.last_geom` (PostGIS), `last_accuracy_m`, `last_heading`,
+`last_speed_mps`, `last_location_at`. Validation serveur systématique : bornes
+lat/lng, plafond de précision (500 m), vitesse plausible (45 m/s), dérive
+d'horloge (±5 min).
+
+### Rétention
+
+**Un seul point par livreur, écrasé à chaque mise à jour.** Il n'existe aucune
+table d'historique de positions. C'est la politique de rétention la plus forte
+disponible : rien à retenir. Aucune trace n'est jamais assemblée, donc rien ne
+peut fuiter, être réquisitionné, ou nécessiter un job d'expiration. Un test
+l'affirme explicitement, pour qu'ajouter une table d'historique plus tard soit
+une décision délibérée avec revue de confidentialité, pas un commit incident.
+
+Une position périmée (> 120 s) cesse d'être utilisable sans que rien n'ait à la
+supprimer.
+
+### Confidentialité
+
+Le `CourierProfileDto` n'expose **aucune coordonnée** — pas même au livreur
+lui-même sur son propre `GET /couriers/me`. Rien n'en a besoin, donc rien ne les
+retourne.
+
+L'unique canal par lequel une position atteint quelqu'un est une room realtime,
+et chaque `subscribe` passe par une autorisation serveur en **refus par
+défaut**. Testé en pilotant la vraie gateway :
+
+| Tentative                                       | Résultat |
+| ----------------------------------------------- | -------- |
+| Client A → livraison B                          | refusé   |
+| Client A → room du livreur B                    | refusé   |
+| Client propriétaire → room du livreur de SA course | refusé   |
+| Restaurant → livreur sans rapport               | refusé   |
+| Restaurant → room de commande                   | refusé   |
+| Livreur → commande non assignée                 | refusé   |
+| Motif de room non implémenté (`restaurant:{id}`, `*`, casse différente…) | refusé |
+| Socket sans acteur authentifié                  | refusé   |
+
+Navigation avancée : **non implémentée**, conformément à l'exclusion du mandat.
+
+---
+
+## B6.1-10. Bugs trouvés
+
+| #    | Gravité | Défaut                                                                          | Conséquence réelle                                                         |
+| ---- | ------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| B-01 | 🔴      | Rien ne fait passer `courier_accepted` → `pickup_in_progress`                    | `POST /deliveries/:id/pickup` échoue toujours. Le cycle meurt après l'acceptation. |
+| B-02 | 🔴      | `issueDeliveryCode` n'est appelé par aucun code de production                    | Aucune preuve n'existe → `confirmDelivered` renvoie toujours `INVALID_PROOF`. |
+| B-03 | 🔴      | `delivery_proofs.created_by` est `uuid`, le code y écrit `'system'`              | `invalid input syntax for type uuid` → 500 brut sur le premier vrai PostgreSQL. |
+| B-04 | 🟠      | Le worker relâche le livreur sans le garde `status = 'busy'`                     | Une offre expirée **lève la suspension** d'un livreur suspendu par un admin. |
+| B-05 | 🟠      | `reinstate()` laisse `active_delivery_id` en place                               | Livreur réintégré définitivement absent du vivier (la requête candidats exige `IS NULL`). |
+| B-06 | 🟠      | Code de livraison réutilisable, sans expiration ni limite d'essais               | 4 chiffres = 10 000 possibilités, énumérables par le livreur assigné.        |
+| B-07 | 🟡      | Vérification du code **avant** le contrôle d'autorisation                        | Un livreur étranger épuise le rate-limit d'une course qui n'est pas la sienne. |
+
+**Pourquoi les tests du Bloc 6 ne les voyaient pas.** B-01 était masqué parce
+que la suite de concurrence seedait `pickup_in_progress` directement — un statut
+qu'aucune ligne de production n'assigne jamais. B-03 est structurellement
+invisible à un faux DB, qui ne valide pas les types de colonnes. B-02 et B-04
+n'avaient tout simplement aucun test.
+
+Tous corrigés. B-04 vérifié en annulant le correctif et en constatant 3 échecs,
+puis en le restaurant.
+
+---
+
+## B6.1-11. Tests — chiffres précis
+
+| Paquet           | Avant 6.1 | Après 6.1 | Ajoutés |
+| ---------------- | --------- | --------- | ------- |
+| `@djafat/api`    | 272       | **361**   | +89     |
+| `@djafat/core`   | 161       | **181**   | +20     |
+| `@djafat/worker` | 3         | **21**    | +18     |
+| Autres paquets   | 82        | 82        | 0       |
+| **Total**        | **518**   | **645**   | **+127**|
+
+Fichiers ajoutés :
+
+| Fichier                                                          | Tests | Couvre       |
+| ---------------------------------------------------------------- | ----- | ------------ |
+| `deliveries/deliveries-db-invariant.spec.ts`                     | 10    | §1           |
+| `worker/processors/dispatch.processor.spec.ts`                   | 18    | §2           |
+| `deliveries/courier-fee-pool-audit.spec.ts`                      | 21    | §3, §4       |
+| `core/delivery/state-machine-exhaustive.spec.ts`                 | 20    | §5           |
+| `orders/order-snapshot-immutability.spec.ts`                     | 12    | §6           |
+| `deliveries/deliveries-adversarial.spec.ts`                      | 22    | §7, §8, §10  |
+| `realtime/courier-location-privacy.spec.ts`                      | 22    | §9           |
+| (fixtures existantes durcies)                                    | +2    | §7           |
+
+### Scénarios de concurrence réelle
+
+Tous exécutés en `Promise.all` / `Promise.allSettled` contre les vraies classes
+de service, avec verrous par ligne :
+
+1. Deux vagues de dispatch sur la même livraison
+2. Deux livraisons se disputant l'unique livreur (API)
+3. Deux livraisons se disputant l'unique livreur (worker)
+4. Deux livreurs acceptant la même offre
+5. Acceptation + annulation simultanées
+6. Double annulation
+7. Annulation + échec simultanés
+8. Double confirmation de récupération
+9. Double confirmation de livraison
+10. Livreur non assigné acceptant pendant que le bon accepte
+11. Livraison sortie de `searching_courier` entre le scan et le verrou
+12. Livreur réclamé par un autre écrivain en cours de vague
+
+Aucune erreur métier attendue ne remonte en 500 : la passe adversariale
+n'accepte jamais « ça a levé », elle exige un 404 / 409 / 429 précis et vérifie
+que le statut HTTP est `< 500`.
+
+---
+
+## B6.1-12. Vérifications
+
+| Commande           | Résultat                     |
+| ------------------ | ---------------------------- |
+| `pnpm format:check`| ✅                           |
+| `pnpm lint`        | ✅ 23/23 paquets             |
+| `pnpm typecheck`   | ✅ 23/23 paquets             |
+| `pnpm test`        | ✅ 645/645                   |
+| `pnpm build`       | ✅ 15/15 paquets             |
+
+**Docker : indisponible dans cet environnement** (`docker info` échoue). Aucune
+migration n'a donc été appliquée à un vrai PostgreSQL, aucun test d'intégration
+ni de concurrence sur base réelle n'a été exécuté. C'est déclaré explicitement,
+pas contourné.
+
+Conséquence directe : les trois index uniques partiels de 0024 et la
+modification de FK de 0025 sont **vérifiés par lecture et par test structurel du
+SQL**, jamais exécutés. C'est la dette la plus importante de cette passe.
+
+---
+
+## B6.1-13. Migrations
+
+| Migration                      | Nature                                                      |
+| ------------------------------ | ----------------------------------------------------------- |
+| `0024_delivery_invariants`     | 3 index uniques partiels + 3 colonnes sur `delivery_proofs`  |
+| `0025_order_dropoff_autonomy`  | 2 colonnes sur `orders` + 1 action de FK assouplie           |
+
+Les deux sont additives : aucune table ni colonne supprimée, aucune donnée
+détruite, aucune migration passée modifiée. L'unique `DROP CONSTRAINT` de 0025
+est immédiatement suivi du `ADD CONSTRAINT` équivalent avec une action plus sûre
+— vérifié par test.
+
+---
+
+## B6.1-14. Limites restantes
+
+| Sujet                                             | Statut                                                                 |
+| ------------------------------------------------- | ---------------------------------------------------------------------- |
+| Migrations jamais appliquées à un vrai PostgreSQL | **Dette principale.** Docker indisponible. À faire avant production.    |
+| Aucun test d'intégration `*.int.spec.ts`          | Même cause.                                                            |
+| Room `restaurant:{id}`                            | Refusée par défaut — nécessite un port d'appartenance staff.            |
+| Politique commerciale d'annulation post-pickup    | Hors périmètre : qui absorbe le coût est une décision produit.          |
+| Reprise du frais livreur après annulation tardive | Volontairement manuelle — aucun claw-back automatique.                  |
+| Écran livreur (mobile)                            | Squelette Expo, hors périmètre du bloc.                                 |
+| Diffusion temps réel de la position au client     | Room autorisée ; le suivi carte passe encore par polling REST.          |
+| Navigation avancée                                | Explicitement exclue par le mandat.                                     |
