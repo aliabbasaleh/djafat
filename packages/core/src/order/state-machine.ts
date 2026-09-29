@@ -99,6 +99,19 @@ export const ORDER_TRANSITIONS: readonly OrderTransition[] = [
     trigger: 'admin_force_cancel',
     roles: ['admin', 'super_admin'],
   },
+  // Bloc 6: the order follows a cancelled/failed delivery to `cancelled`
+  // (docs/25 §29-30) — `deliveries` never transitions `orders` directly
+  // (DAG), it emits `delivery.cancelled`/`delivery.failed`, which `orders`
+  // reacts to via these two system-flagged transitions. Only from `ready`/
+  // `courier_assigned` (before pickup) — once picked up, a failed delivery
+  // has no defined order-side reaction yet (documented debt, docs/25 §23).
+  { from: 'ready', to: 'cancelled', trigger: 'delivery_cancelled_or_failed', system: true },
+  {
+    from: 'courier_assigned',
+    to: 'cancelled',
+    trigger: 'delivery_cancelled_or_failed',
+    system: true,
+  },
 ];
 
 export function isTerminalOrderStatus(status: OrderStatus): boolean {

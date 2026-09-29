@@ -47,3 +47,16 @@ export class PaymentTransitionError extends Error {
     this.to = to;
   }
 }
+
+/** Thrown when a delivery state transition is not allowed (docs/25 §3). */
+export class DeliveryTransitionError extends Error {
+  public readonly from: string;
+  public readonly to: string;
+
+  constructor(from: string, to: string) {
+    super(`Illegal delivery transition: ${from} -> ${to}`);
+    this.name = 'DeliveryTransitionError';
+    this.from = from;
+    this.to = to;
+  }
+}

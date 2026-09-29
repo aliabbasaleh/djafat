@@ -28,16 +28,28 @@ export interface OrderAmountPort {
   /**
    * The frozen breakdown needed to post `order_accrual` — READ only, never a
    * write. Keeps `payments` fully ignorant of the `orders` table shape
-   * (docs/18 §5).
+   * (docs/18 §5). No `courierId` (Bloc 6, docs/25 §2): a courier is never
+   * known at payment time — the courier's share is credited to the
+   * un-owned `COURIER_FEE_POOL` and reclassified to a specific courier only
+   * once `deliveries` actually assigns one (docs/25 §12).
    */
   getAccrualBreakdown(orderId: string): Promise<OrderAccrualBreakdown>;
   /**
-   * The order's owning customer `userId` — the ONLY way `payments` (or any
-   * other DAG-allowed module) can resolve ownership for `@RequireOwnership`
-   * (docs/19 §21) without importing `orders` directly. Throws `NotFound`
-   * itself if the order doesn't exist.
+   * The order's owning customer `userId` — the ONLY way `payments`/`deliveries`
+   * (or any other DAG-allowed module) can resolve ownership for
+   * `@RequireOwnership` (docs/19 §21) without importing `orders` directly.
+   * Throws `NotFound` itself if the order doesn't exist.
    */
   getOwnerUserId(orderId: string): Promise<string>;
+  /**
+   * Everything `deliveries` needs to create and dispatch a `Delivery` for an
+   * order, resolved once (typically at `order.ready`) — pickup/dropoff
+   * coordinates are computed by `orders` from its own (and, transitively,
+   * `catalog`'s) PostGIS columns and handed over as plain numbers; `deliveries`
+   * never touches the `orders`/`restaurants` tables directly (docs/25 §6, §21).
+   * Throws `NotFound` if the order doesn't exist.
+   */
+  getDeliveryContext(orderId: string): Promise<OrderDeliveryContext>;
 }
 
 export interface OrderPaymentContext {
@@ -51,10 +63,60 @@ export interface OrderPaymentContext {
 
 export interface OrderAccrualBreakdown {
   readonly restaurantId: string;
-  readonly courierId: string | null;
   readonly subtotal: Money;
   readonly commission: Money;
   readonly courierFee: Money;
+}
+
+/** A WGS84 lat/lng pair — the plain-number form PostGIS `geography(Point,4326)` is handed across a port boundary as (docs/25 §6). */
+export interface GeoPoint {
+  readonly lat: number;
+  readonly lng: number;
+}
+
+export interface OrderDeliveryContext {
+  readonly orderId: string;
+  readonly orderCode: string;
+  readonly restaurantId: string;
+  readonly customerId: string;
+  readonly currency: string;
+  readonly courierFee: Money;
+  /**
+   * Whether this order's courier fee was credited to `COURIER_FEE_POOL` at
+   * payment time (prepaid: payment always succeeds before the order can
+   * reach `ready`/dispatch) versus not yet credited anywhere (cash: nothing
+   * posts until the courier collects it at delivery — docs/25 §12, §28).
+   * `deliveries` uses this to decide whether an assignment needs to
+   * reclassify a pool credit — reclassifying for a cash order that never
+   * contributed to the pool would silently debit OTHER orders' money.
+   */
+  readonly courierFeeInPool: boolean;
+  /** Null if the restaurant has no `geom` yet (unusual, but not fatal — docs/25 §6). */
+  readonly pickup: GeoPoint | null;
+  /** Null if the order's dropoff address was never geocoded (`geocode_status='manual'`, docs/09 B.1) — dispatch flags this for manual ops handling rather than crashing. */
+  readonly dropoff: GeoPoint | null;
+}
+
+/**
+ * Implemented by `couriers`. Read-only / non-transactional candidate search
+ * (docs/25 §11) — consumed by `deliveries` for dispatch. The transactional
+ * assignment step (lock delivery, lock courier, mark busy — docs/25 §12) is
+ * NOT on this port: it needs to join `deliveries`' own Prisma transaction,
+ * so `deliveries` injects the concrete `CouriersService` directly for that
+ * one call, exactly like `payments`/`deliveries` already inject the concrete
+ * `LedgerService` (not `LedgerPort`) to reach `postEntryGroupTx`.
+ */
+export interface CourierPort {
+  findEligibleCandidates(
+    pickup: GeoPoint,
+    radiusMeters: number,
+    excludeCourierIds: readonly string[],
+  ): Promise<CourierCandidate[]>;
+}
+
+export interface CourierCandidate {
+  readonly courierId: string;
+  readonly distanceMeters: number;
 }
 
 /** Implemented by `payments`. Consumed by `orders` reactions only via events. */

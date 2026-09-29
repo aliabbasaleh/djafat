@@ -16,7 +16,19 @@ export default [
   // `**/scripts/**`: small standalone Node build utilities (e.g.
   // packages/ui/scripts/copy-assets.mjs) that no package tsconfig
   // `include`s — same reasoning as each package's own ignore for this.
-  { ignores: ['**/dist/**', '**/.next/**', '**/coverage/**', '**/scripts/**'] },
+  // `packages/eslint-config/**`: the shared flat-config presets themselves
+  // (plain `.js`, consumed via import, never compiled/typechecked by any
+  // package's own tsconfig) — same "no project includes this file" class
+  // of gap, hit when `api-boundaries.js` was first staged (Bloc 6).
+  {
+    ignores: [
+      '**/dist/**',
+      '**/.next/**',
+      '**/coverage/**',
+      '**/scripts/**',
+      'packages/eslint-config/**',
+    ],
+  },
   // Mirrors apps/api/eslint.config.mjs's own override — this root config is
   // a separate resolution path (see comment above), so it doesn't inherit it.
   {

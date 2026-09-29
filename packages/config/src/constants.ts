@@ -33,6 +33,12 @@ export const PLATFORM_SETTINGS_DEFAULTS = {
   phone_lock_duration_seconds: 900, // 15 min
   // Bloc 4 — Cart + Core Order (docs/22 §5).
   cart_max_item_quantity: 99, // per line item; the wire-level Zod schema also caps at 99 as a hard ceiling
+  // Bloc 6 — Delivery / Dispatch Core (docs/25 §6, §11, §43).
+  dispatch_initial_radius_m: 3000, // docs/09 A.2 — 3 km first pass
+  dispatch_max_radius_m: 8000,
+  dispatch_radius_expansion_step_m: 2000,
+  dispatch_max_waves: 3, // after this many radius expansions with no acceptance -> ops alert, stays searching_courier
+  courier_location_stale_seconds: 120, // docs/09 A.2 — 2 min; older = not a dispatch candidate
 } as const;
 
 export const API_VERSION_PREFIX = 'v1';

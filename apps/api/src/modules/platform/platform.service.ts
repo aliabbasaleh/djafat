@@ -128,4 +128,48 @@ export class PlatformService {
       PLATFORM_SETTINGS_DEFAULTS.cart_max_item_quantity,
     );
   }
+
+  // ── Bloc 6 — Delivery / Dispatch Core (docs/25 §6, §11, §43) ──────────────
+
+  async getDispatchInitialRadiusMeters(): Promise<number> {
+    return this.getNumberSetting(
+      'dispatch_initial_radius_m',
+      PLATFORM_SETTINGS_DEFAULTS.dispatch_initial_radius_m,
+    );
+  }
+
+  async getDispatchMaxRadiusMeters(): Promise<number> {
+    return this.getNumberSetting(
+      'dispatch_max_radius_m',
+      PLATFORM_SETTINGS_DEFAULTS.dispatch_max_radius_m,
+    );
+  }
+
+  async getDispatchRadiusExpansionStepMeters(): Promise<number> {
+    return this.getNumberSetting(
+      'dispatch_radius_expansion_step_m',
+      PLATFORM_SETTINGS_DEFAULTS.dispatch_radius_expansion_step_m,
+    );
+  }
+
+  async getDispatchMaxWaves(): Promise<number> {
+    return this.getNumberSetting(
+      'dispatch_max_waves',
+      PLATFORM_SETTINGS_DEFAULTS.dispatch_max_waves,
+    );
+  }
+
+  async getCourierLocationStaleSeconds(): Promise<number> {
+    return this.getNumberSetting(
+      'courier_location_stale_seconds',
+      PLATFORM_SETTINGS_DEFAULTS.courier_location_stale_seconds,
+    );
+  }
+
+  async getOfferTimeoutSeconds(): Promise<number> {
+    return this.getNumberSetting(
+      'offer_timeout_seconds',
+      PLATFORM_SETTINGS_DEFAULTS.offer_timeout_seconds,
+    );
+  }
 }

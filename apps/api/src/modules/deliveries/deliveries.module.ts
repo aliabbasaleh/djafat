@@ -1,16 +1,31 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { LedgerModule } from '../ledger/ledger.module';
+import { CouriersModule } from '../couriers/couriers.module';
+import { DELIVERY_TRACKING_PORT } from '../../common/ports/delivery-tracking.port';
 import { DeliveriesService } from './deliveries.service';
 import { DeliveriesController } from './deliveries.controller';
+import { CourierDeliveryController } from './courier-delivery.controller';
 
 /**
- * Bloc 0.5: minimal delivery path (assign / picked-up / delivered), releasing
- * funds via `LedgerPort` at `delivered`. DAG: `deliveries` depends on `ledger`
- * only — never `orders` (docs/05 §5.3). Full dispatch is Bloc 6.
+ * Bloc 6 — real dispatch core (docs/25). DAG: `deliveries` depends on
+ * `ledger` (join `postEntryGroupTx`) and `couriers` (join the assignment
+ * transaction — `lockAndClaim`/`release`, boundaries explicitly widened for
+ * this, see `api-boundaries.js`), plus `auth`/`users`/`platform`/`geo`
+ * (generic). NEVER `orders` directly — reached only via `OrderAmountPort`
+ * (`common/ports`) and `@OnEvent`.
+ *
+ * Global so `DELIVERY_TRACKING_PORT` (token in `common/ports`) can be
+ * injected by `realtime` without a module-level `imports: [DeliveriesModule]`
+ * — mirrors `OrdersModule`/`ORDER_AMOUNT_PORT` exactly.
  */
+@Global()
 @Module({
-  imports: [LedgerModule],
-  controllers: [DeliveriesController],
-  providers: [DeliveriesService],
+  imports: [LedgerModule, CouriersModule],
+  controllers: [DeliveriesController, CourierDeliveryController],
+  providers: [
+    DeliveriesService,
+    { provide: DELIVERY_TRACKING_PORT, useExisting: DeliveriesService },
+  ],
+  exports: [DeliveriesService, DELIVERY_TRACKING_PORT],
 })
 export class DeliveriesModule {}

@@ -10,6 +10,8 @@ export * from './idempotency/reconcile.js';
 
 export * from './order/state-machine.js';
 export * from './payment/state-machine.js';
+export * from './delivery/state-machine.js';
+export * from './geo/distance.js';
 
 export * from './mfa/totp.js';
 

@@ -42,6 +42,8 @@ export const PERMISSIONS = [
   'menus:write',
   'deliveries:read',
   'deliveries:write',
+  'couriers:read',
+  'couriers:write',
   'payments:read',
   'payments:write',
   'payments:refund',
@@ -103,21 +105,39 @@ export const PAYMENT_STATUSES = [
 ] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
-/** Delivery lifecycle. See docs/09 Part A. */
+/**
+ * Delivery lifecycle (Bloc 6, docs/25 §3). Transition rules live in
+ * `@djafat/core` (`delivery/state-machine.ts`), mirroring the order/payment
+ * machines. Supersedes the Bloc-0.5 placeholder list (never referenced
+ * outside this file — no migration debt).
+ */
 export const DELIVERY_STATUSES = [
-  'created',
+  'pending',
   'searching_courier',
-  'offered',
-  'assigned',
-  'arrived_at_restaurant',
+  'courier_assigned',
+  'courier_accepted',
+  'pickup_in_progress',
   'picked_up',
   'on_the_way',
-  'arrived_at_customer',
   'delivered',
-  'failed',
   'cancelled',
+  'failed',
 ] as const;
 export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
+
+export const DELIVERY_TERMINAL_STATUSES: readonly DeliveryStatus[] = [
+  'delivered',
+  'cancelled',
+  'failed',
+];
+
+/** Courier availability (Bloc 6, docs/25 §4). `couriers.status`. */
+export const COURIER_STATUSES = ['offline', 'online', 'busy', 'suspended'] as const;
+export type CourierStatus = (typeof COURIER_STATUSES)[number];
+
+/** A delivery offer's own lifecycle — distinct from the delivery's (docs/25 §5). */
+export const DELIVERY_OFFER_STATUSES = ['offered', 'accepted', 'rejected', 'expired'] as const;
+export type DeliveryOfferStatus = (typeof DELIVERY_OFFER_STATUSES)[number];
 
 /**
  * Restaurant lifecycle (docs/20 §6). Visibility to the public catalogue:
@@ -170,6 +190,11 @@ export const LEDGER_ACCOUNT_CODES = [
   'RESTAURANT_AVAILABLE',
   'COURIER_PAYABLE',
   'COURIER_AVAILABLE',
+  /// Un-owned liability: the courier fee collected at payment.succeeded,
+  /// BEFORE a specific courier is dispatched. Reclassified to
+  /// `COURIER_PAYABLE:<courierId>` once a courier is assigned (Bloc 6,
+  /// docs/25 §12) — never a direct credit, so no money is created twice.
+  'COURIER_FEE_POOL',
   'REFUNDS_PAYABLE',
   'CUSTOMER_CLEARING',
 ] as const;

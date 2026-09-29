@@ -1,10 +1,18 @@
 import { Module } from '@nestjs/common';
+import { CouriersService } from './couriers.service';
+import { CouriersController } from './couriers.controller';
+import { CouriersAdminController } from './couriers-admin.controller';
 
 /**
- * Skeleton (Bloc 0). Bloc 0.5: no dedicated table yet — the walking skeleton's
- * single test courier is a seeded `users` row with role `courier` (docs/18
- * §4), read directly by `orders`/`deliveries`. Bloc 6: real `couriers` table,
- * onboarding, online/offline, throttled location, float.
+ * Bloc 6 — real courier profile: availability, last-known position,
+ * eligibility search for dispatch (docs/25 §4). `deliveries` imports this
+ * module directly (boundaries allow it — see `api-boundaries.js`) to join
+ * its own transaction for the assignment claim (`lockAndClaim`/`release`),
+ * the same reason `payments`/`deliveries` inject `LedgerService` directly.
  */
-@Module({})
+@Module({
+  controllers: [CouriersController, CouriersAdminController],
+  providers: [CouriersService],
+  exports: [CouriersService],
+})
 export class CouriersModule {}

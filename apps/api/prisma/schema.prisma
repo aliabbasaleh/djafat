@@ -180,6 +180,28 @@ model User {
   @@map("users")
 }
 
+/// A customer's saved address (migration 0003 — pre-existing table, modelled
+/// here for the first time in Bloc 6). `geom geography(Point,4326)` exists in
+/// SQL but is intentionally NOT modelled — same PostGIS convention as
+/// `Restaurant.geom` below.
+model Address {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  label          String?
+  recipientPhone String?   @map("recipient_phone")
+  cityId         String?   @map("city_id") @db.Uuid
+  quartier       String?
+  street         String?
+  landmark       String?
+  instructions   String?
+  geocodeStatus  String    @default("pending") @map("geocode_status")
+  isDefault      Boolean   @default(false) @map("is_default")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("addresses")
+}
+
 model Session {
   id               String    @id @default(uuid()) @db.Uuid
   userId           String    @map("user_id") @db.Uuid
@@ -515,7 +537,6 @@ model Order {
   customerId            String      @map("customer_id") @db.Uuid
   restaurantId          String      @map("restaurant_id") @db.Uuid
   restaurant             Restaurant  @relation(fields: [restaurantId], references: [id])
-  courierId             String?     @map("courier_id") @db.Uuid
   status                OrderStatus @default(draft)
   currency              String      @db.Char(3)
   subtotalMinor         BigInt      @default(0) @map("subtotal_minor")
@@ -528,6 +549,17 @@ model Order {
   placedAt              DateTime?   @map("placed_at") @db.Timestamptz(6)
   deliveredAt           DateTime?   @map("delivered_at") @db.Timestamptz(6)
   cancelledReason       String?     @map("cancelled_reason")
+  /// Dropoff snapshot (Bloc 6, docs/25 §8) — frozen at order creation from the
+  /// customer's address book; NEVER re-read live (a later address edit must
+  /// not alter a historical or in-flight order). `dropoffGeom
+  /// geography(Point,4326)` exists in SQL, not modelled (PostGIS convention).
+  dropoffAddressId      String?     @map("dropoff_address_id") @db.Uuid
+  dropoffQuartier       String?     @map("dropoff_quartier")
+  dropoffStreet         String?     @map("dropoff_street")
+  dropoffLandmark       String?     @map("dropoff_landmark")
+  dropoffInstructions   String?     @map("dropoff_instructions")
+  dropoffRecipientPhone String?     @map("dropoff_recipient_phone")
+  dropoffGeocodeStatus  String      @default("pending") @map("dropoff_geocode_status")
   createdAt             DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime    @default(now()) @map("updated_at") @db.Timestamptz(6)
 
@@ -673,20 +705,87 @@ model WebhookEvent {
   @@map("webhook_events")
 }
 
+/// Bloc 6 — real dispatch (docs/25). `pickupGeom`/`dropoffGeom`
+/// `geography(Point,4326)` exist in SQL, not modelled (PostGIS convention,
+/// same as `Restaurant.geom`).
 model Delivery {
-  id              String    @id @default(uuid()) @db.Uuid
-  orderId         String    @unique @map("order_id") @db.Uuid
-  order           Order     @relation(fields: [orderId], references: [id])
-  courierId       String    @map("courier_id") @db.Uuid
-  status          String    @default("created")
-  currency        String    @db.Char(3)
-  courierFeeMinor BigInt    @default(0) @map("courier_fee_minor")
-  assignedAt      DateTime? @map("assigned_at") @db.Timestamptz(6)
-  pickedUpAt      DateTime? @map("picked_up_at") @db.Timestamptz(6)
-  deliveredAt     DateTime? @map("delivered_at") @db.Timestamptz(6)
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                  String    @id @default(uuid()) @db.Uuid
+  orderId             String    @unique @map("order_id") @db.Uuid
+  order               Order     @relation(fields: [orderId], references: [id])
+  /// Null until a courier is assigned — never resolved at order creation
+  /// (the Bloc 0.5 hack this bloc removes; docs/25 §2).
+  courierId           String?   @map("courier_id") @db.Uuid
+  status              String    @default("pending")
+  currency            String    @db.Char(3)
+  courierFeeMinor     BigInt    @default(0) @map("courier_fee_minor")
+  estimatedDistanceM  Decimal?  @map("estimated_distance_m")
+  actualDistanceM     Decimal?  @map("actual_distance_m")
+  dispatchRadiusM     Int?      @map("dispatch_radius_m")
+  dispatchAttempts    Int       @default(0) @map("dispatch_attempts")
+  searchingSince      DateTime? @map("searching_since") @db.Timestamptz(6)
+  assignedAt          DateTime? @map("assigned_at") @db.Timestamptz(6)
+  acceptedAt          DateTime? @map("accepted_at") @db.Timestamptz(6)
+  pickupArrivedAt     DateTime? @map("pickup_arrived_at") @db.Timestamptz(6)
+  pickedUpAt          DateTime? @map("picked_up_at") @db.Timestamptz(6)
+  onTheWayAt          DateTime? @map("on_the_way_at") @db.Timestamptz(6)
+  deliveredAt         DateTime? @map("delivered_at") @db.Timestamptz(6)
+  cancelledAt         DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelledReason     String?   @map("cancelled_reason")
+  cancelledBy         String?   @map("cancelled_by") @db.Uuid
+  failedAt            DateTime? @map("failed_at") @db.Timestamptz(6)
+  failedReason        String?   @map("failed_reason")
+  updatedAt           DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("deliveries")
+}
+
+/// Courier availability + last-known position (docs/25 §4). `lastGeom
+/// geography(Point,4326)` exists in SQL, not modelled (PostGIS convention).
+/// 1:1 with `users` (role='courier') — never courier-specific columns on
+/// `User` itself, which also serves customer/staff/admin.
+model Courier {
+  userId           String    @id @map("user_id") @db.Uuid
+  status           String    @default("offline")
+  activeDeliveryId String?   @map("active_delivery_id") @db.Uuid
+  lastAccuracyM    Decimal?  @map("last_accuracy_m")
+  lastHeading      Decimal?  @map("last_heading")
+  lastSpeedMps     Decimal?  @map("last_speed_mps")
+  lastLocationAt   DateTime? @map("last_location_at") @db.Timestamptz(6)
+  vehicleType      String?   @map("vehicle_type")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("couriers")
+}
+
+/// A dispatch proposal sent to one courier (docs/25 §5) — distinct lifecycle
+/// from the delivery's own. Never durably assumed accepted: the delivery
+/// only moves to `courier_accepted` once the courier actually responds.
+model DeliveryOffer {
+  id           String    @id @default(uuid()) @db.Uuid
+  deliveryId   String    @map("delivery_id") @db.Uuid
+  courierId    String    @map("courier_id") @db.Uuid
+  status       String    @default("offered")
+  offeredAt    DateTime  @default(now()) @map("offered_at") @db.Timestamptz(6)
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
+  respondedAt  DateTime? @map("responded_at") @db.Timestamptz(6)
+
+  @@map("delivery_offers")
+}
+
+/// Extensible proof-of-delivery record (docs/25 §19). MVP = a hashed delivery
+/// code (never the raw code — same discipline as OTP, docs/19).
+model DeliveryProof {
+  id         String   @id @default(uuid()) @db.Uuid
+  deliveryId String   @map("delivery_id") @db.Uuid
+  type       String
+  valueHash  String   @map("value_hash")
+  reference  String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy  String   @map("created_by") @db.Uuid
+
+  @@map("delivery_proofs")
 }
 
 /// ────────────────────── Bloc 5 — payment core (docs/24) ──────────────────────

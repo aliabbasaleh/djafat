@@ -120,6 +120,13 @@ export default [
                 ['api-module', { module: 'ledger' }],
                 ['api-module', { module: 'auth' }],
                 ['api-module', { module: 'users' }],
+                // Bloc 6 (docs/25 §12): assignment locks the delivery row THEN
+                // the courier row in ONE transaction — same reason `ledger` is
+                // allowed here: `deliveries` injects the concrete
+                // `CouriersService` (not just `CourierPort`) to join its own
+                // `$transaction`, exactly like it already does for
+                // `LedgerService`/`postEntryGroupTx`.
+                ['api-module', { module: 'couriers' }],
               ],
             },
             {

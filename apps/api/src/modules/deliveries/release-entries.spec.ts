@@ -8,7 +8,6 @@ const XAF = (n: bigint) => money(n, 'XAF');
 /** The validated reference 10 000 XAF order — restaurant/courier shares (docs/08 §8.9). */
 const REFERENCE_BREAKDOWN: OrderAccrualBreakdown = {
   restaurantId: 'r1',
-  courierId: 'c1',
   subtotal: XAF(8800n), // restaurantShare(6400) + commission(2400)
   commission: XAF(2400n),
   courierFee: XAF(1200n),
@@ -38,7 +37,6 @@ describe('buildFundsAvailableEntries', () => {
   it('balances for arbitrary amounts, not just the reference example', () => {
     const breakdown: OrderAccrualBreakdown = {
       restaurantId: 'r-arb',
-      courierId: 'c-arb',
       subtotal: XAF(15000n),
       commission: XAF(1800n),
       courierFee: XAF(2000n),

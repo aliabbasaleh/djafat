@@ -75,6 +75,8 @@ async function main(): Promise<void> {
     { code: 'menus:write', label: 'Modifier les menus' },
     { code: 'deliveries:read', label: 'Lire les livraisons' },
     { code: 'deliveries:write', label: 'Modifier les livraisons' },
+    { code: 'couriers:read', label: 'Lire les profils livreurs' },
+    { code: 'couriers:write', label: 'Suspendre/réintégrer un livreur' },
     { code: 'payments:read', label: 'Lire les paiements' },
     { code: 'payments:write', label: 'Annuler un paiement' },
     { code: 'payments:refund', label: 'Rembourser un paiement' },
@@ -104,7 +106,14 @@ async function main(): Promise<void> {
     ],
     restaurant_staff: ['restaurants:read', 'menus:read', 'menus:write', 'orders:read'],
     courier: ['deliveries:read', 'deliveries:write', 'orders:read'],
-    support: ['users:read', 'orders:read', 'payments:read', 'deliveries:read'],
+    support: [
+      'users:read',
+      'orders:read',
+      'payments:read',
+      'deliveries:read',
+      'couriers:read',
+      'couriers:write',
+    ],
     finance: [
       'payments:read',
       'payments:write',
@@ -125,6 +134,8 @@ async function main(): Promise<void> {
       'menus:write',
       'deliveries:read',
       'deliveries:write',
+      'couriers:read',
+      'couriers:write',
       'payments:read',
       'payments:write',
       'payments:refund',
@@ -145,6 +156,8 @@ async function main(): Promise<void> {
       'menus:write',
       'deliveries:read',
       'deliveries:write',
+      'couriers:read',
+      'couriers:write',
       'payments:read',
       'payments:write',
       'payments:refund',
@@ -303,8 +316,9 @@ async function main(): Promise<void> {
   }
 
   // --- Bloc 0.5 walking skeleton: test customer, test courier, restaurant, products ---
-  // See docs/18 §4 — a single seeded courier is resolved deterministically by
-  // `orders` at creation time; no real dispatch yet (Bloc 6).
+  // Bloc 6: the courier is a real dispatch candidate (`couriers` row, below),
+  // found by `deliveries`' PostGIS search once an order reaches `ready` —
+  // never resolved eagerly at order creation any more (docs/25 §2).
   async function findOrCreateUser(phone: string, fullName: string): Promise<string> {
     const existing = await prisma.user.findFirst({ where: { phone, deletedAt: null } });
     if (existing) return existing.id;
@@ -330,6 +344,33 @@ async function main(): Promise<void> {
 
   const courierId = await findOrCreateUser('+23566000002', 'Livreur Test');
   await ensureRole(courierId, 'courier');
+
+  // --- Bloc 6 — a default delivery address for the test customer ------------
+  // `orders.create` snapshots the customer's DEFAULT address at order
+  // creation (docs/25 §8) — without one, order creation fails outright, so
+  // this fixture is load-bearing for every manual/dev flow, not cosmetic.
+  const existingDefaultAddress = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id FROM addresses WHERE user_id = ${customerId}::uuid AND is_default = true LIMIT 1
+  `;
+  if (existingDefaultAddress.length === 0) {
+    await prisma.$executeRaw`
+      INSERT INTO addresses (user_id, label, recipient_phone, city_id, quartier, street, landmark, geom, geocode_status, is_default)
+      VALUES (${customerId}::uuid, 'Domicile', '+23566000001', ${city.id}::uuid, 'Klemat', 'Rue 42',
+        'Près du rond-point Kondolé', ST_SetSRID(ST_MakePoint(15.0620, 12.1400), 4326)::geography, 'ok', true)
+    `;
+  }
+
+  // --- Bloc 6 — the test courier is ONLINE with a fresh position near the
+  // seeded restaurants, so the walking-skeleton dispatch flow actually finds
+  // a candidate out of the box (docs/25 §4, §11).
+  await prisma.$executeRaw`
+    INSERT INTO couriers (user_id, status, last_geom, last_accuracy_m, last_location_at)
+    VALUES (${courierId}::uuid, 'online',
+      ST_SetSRID(ST_MakePoint(15.0570, 12.1360), 4326)::geography, 15, now())
+    ON CONFLICT (user_id) DO UPDATE SET
+      status = 'online', last_geom = EXCLUDED.last_geom,
+      last_accuracy_m = EXCLUDED.last_accuracy_m, last_location_at = now()
+  `;
 
   // --- Bloc 1 — Identity & Access: one test user per role (docs/19 §46) -----
   // Dev/test fixtures ONLY. No password/OTP/MFA secret is seeded here — every
@@ -529,6 +570,13 @@ async function main(): Promise<void> {
     prepTimeMin: 25,
     minOrderMinor: 1000n,
   });
+  // Bloc 6 (docs/25 §21): pickup location comes from the restaurant's OWN
+  // geom, never asked of the client. `geom` is PostGIS — set via raw SQL
+  // (docs/17 D-02 convention, same as `orders.dropoff_geom`/`couriers.last_geom`).
+  await prisma.$executeRaw`
+    UPDATE restaurants SET geom = ST_SetSRID(ST_MakePoint(15.0557, 12.1348), 4326)::geography
+    WHERE id = ${restaurantId}::uuid
+  `;
   await ensureHours(restaurantId, dailyHours([11, 0], [22, 0]));
   const fatimePlats = await ensureCategory(restaurantId, 'Plats', 0);
   const fatimeBoissons = await ensureCategory(restaurantId, 'Boissons', 1);
@@ -778,7 +826,9 @@ async function main(): Promise<void> {
       `Identity fixtures: customer ${customerId}, courier ${courierId}, restaurant_owner ${restaurantOwnerId}, ` +
       `restaurant_staff ${restaurantStaffId}, support ${supportId}, finance ${financeId}, admin ${adminId}, ` +
       `super_admin ${superAdminId}. Catalog: ${catalogRestaurantIds.length} restaurants seeded ` +
-      `(active: chez-fatime, le-sahel-grill, pizza-ndjam; paused: snack-rapide; suspended: le-palace-ferme).`,
+      `(active: chez-fatime, le-sahel-grill, pizza-ndjam; paused: snack-rapide; suspended: le-palace-ferme). ` +
+      `Bloc 6: customer has a default geocoded address, courier is online with a fresh position, ` +
+      `chez-fatime has a pickup geom — dispatch is exercisable out of the box.`,
   );
 }
 
