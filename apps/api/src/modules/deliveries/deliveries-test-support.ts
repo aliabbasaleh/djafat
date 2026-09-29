@@ -1,7 +1,14 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { vi } from 'vitest';
+import { Prisma } from '@prisma/client';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
-import type { OrderAccrualBreakdown, OrderAmountPort, OrderDeliveryContext } from '@djafat/types';
+import type {
+  DeliveryStatus,
+  OrderAccrualBreakdown,
+  OrderAmountPort,
+  OrderDeliveryContext,
+} from '@djafat/types';
+import { DELIVERY_COURIER_HOLDING_STATUSES } from '@djafat/types';
 import { assertBalanced, haversineDistanceMeters, money } from '@djafat/core';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import { OutboxService } from '../../infra/outbox/outbox.service';
@@ -61,6 +68,9 @@ export interface ProofRow {
   reference: string | null;
   createdAt: Date;
   createdBy: string;
+  consumedAt: Date | null;
+  expiresAt: Date | null;
+  failedAttempts: number;
 }
 export interface CourierRow {
   userId: string;
@@ -122,6 +132,49 @@ export function makeDeliveriesRaceDb() {
     );
     await previous;
     return release;
+  }
+
+  // ── migration 0024's partial unique indexes, enforced for real ───────────
+  // Same discipline as `carts.service.spec.ts`'s `carts_one_open_per_user`
+  // (Bloc 4): a synchronous check-then-write inside this single-threaded fake
+  // is atomic exactly as a PostgreSQL unique index is atomic, so a genuine
+  // `Promise.all([...])` race hits the constraint truthfully instead of only
+  // via a scripted one-shot P2002.
+
+  /** A real Prisma error instance, so `isUniqueViolation`'s `instanceof` behaves as it would in production. */
+  function uniqueViolation(index: string): Prisma.PrismaClientKnownRequestError {
+    return new Prisma.PrismaClientKnownRequestError(
+      `Unique constraint failed on the constraint: \`${index}\``,
+      { code: 'P2002', clientVersion: '6.2.1' },
+    );
+  }
+
+  /** `couriers_one_active_delivery_idx` — two couriers may never point at one delivery. */
+  function assertNoOtherCourierHolds(deliveryId: string, courierId: string): void {
+    if (couriers.some((c) => c.userId !== courierId && c.activeDeliveryId === deliveryId)) {
+      throw uniqueViolation('couriers_one_active_delivery_idx');
+    }
+  }
+
+  /** `deliveries_one_active_per_courier_idx` — one courier may never hold two active deliveries. */
+  function assertCourierFreeForDelivery(deliveryId: string, courierId: string): void {
+    if (
+      deliveries.some(
+        (d) =>
+          d.id !== deliveryId &&
+          d.courierId === courierId &&
+          DELIVERY_COURIER_HOLDING_STATUSES.includes(d.status as DeliveryStatus),
+      )
+    ) {
+      throw uniqueViolation('deliveries_one_active_per_courier_idx');
+    }
+  }
+
+  /** `delivery_offers_one_offered_per_delivery_idx` — one live offer per delivery. */
+  function assertNoLiveOffer(deliveryId: string): void {
+    if (offers.some((o) => o.deliveryId === deliveryId && o.status === 'offered')) {
+      throw uniqueViolation('delivery_offers_one_offered_per_delivery_idx');
+    }
   }
 
   function findEligible(
@@ -231,6 +284,17 @@ export function makeDeliveriesRaceDb() {
         }),
         update: vi.fn((args: { where: { id: string }; data: Record<string, unknown> }) => {
           const row = deliveries.find((d) => d.id === args.where.id)!;
+          // `deliveries_one_active_per_courier_idx`: check the row AS IT WOULD
+          // BE after the write, since a status change alone can bring an
+          // already-attached courier into the index's WHERE clause.
+          const nextCourierId = (args.data['courierId'] ?? row.courierId) as string | null;
+          const nextStatus = (args.data['status'] ?? row.status) as string;
+          if (
+            nextCourierId !== null &&
+            DELIVERY_COURIER_HOLDING_STATUSES.includes(nextStatus as DeliveryStatus)
+          ) {
+            assertCourierFreeForDelivery(row.id, nextCourierId);
+          }
           Object.assign(row, args.data);
           return Promise.resolve(row);
         }),
@@ -251,6 +315,7 @@ export function makeDeliveriesRaceDb() {
           (args: {
             data: { deliveryId: string; courierId: string; status: string; expiresAt: Date };
           }) => {
+            if (args.data.status === 'offered') assertNoLiveOffer(args.data.deliveryId);
             const row: OfferRow = {
               id: randomUUID(),
               respondedAt: null,
@@ -299,12 +364,21 @@ export function makeDeliveriesRaceDb() {
       deliveryProof: {
         create: vi.fn(
           (args: {
-            data: { deliveryId: string; type: string; valueHash: string; createdBy: string };
+            data: {
+              deliveryId: string;
+              type: string;
+              valueHash: string;
+              createdBy: string;
+              expiresAt?: Date;
+            };
           }) => {
             const row: ProofRow = {
               id: randomUUID(),
               reference: null,
               createdAt: new Date(),
+              consumedAt: null,
+              expiresAt: null,
+              failedAttempts: 0,
               ...args.data,
             };
             proofs.push(row);
@@ -318,6 +392,32 @@ export function makeDeliveriesRaceDb() {
           matches.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
           return Promise.resolve(matches[0] ?? null);
         }),
+        update: vi.fn(
+          (args: {
+            where: { id: string };
+            data: { failedAttempts?: { increment: number }; consumedAt?: Date };
+          }) => {
+            const row = proofs.find((p) => p.id === args.where.id)!;
+            if (args.data.failedAttempts) {
+              row.failedAttempts += args.data.failedAttempts.increment;
+            }
+            if (args.data.consumedAt !== undefined) row.consumedAt = args.data.consumedAt;
+            return Promise.resolve(row);
+          },
+        ),
+        updateMany: vi.fn(
+          (args: {
+            where: { id: string; consumedAt: Date | null };
+            data: { consumedAt: Date };
+          }) => {
+            const row = proofs.find(
+              (p) => p.id === args.where.id && p.consumedAt === args.where.consumedAt,
+            );
+            if (!row) return Promise.resolve({ count: 0 });
+            row.consumedAt = args.data.consumedAt;
+            return Promise.resolve({ count: 1 });
+          },
+        ),
       },
       outbox: {
         create: vi.fn((args: { data: Record<string, unknown> }) => {
@@ -468,15 +568,23 @@ export function makeDeliveriesRaceDb() {
           const [deliveryId, courierId] = values as [string, string];
           const row = couriers.find((c) => c.userId === courierId);
           if (!row || row.status !== 'online' || row.activeDeliveryId !== null) return [];
+          // `couriers_one_active_delivery_idx` (migration 0024) — enforced for
+          // real, not scripted, so a genuine `Promise.all` race exercises the
+          // constraint path exactly as PostgreSQL would.
+          assertNoOtherCourierHolds(deliveryId, courierId);
           row.status = 'busy';
           row.activeDeliveryId = deliveryId;
           return [];
         }
-        if (text.includes("SET status = 'online'")) {
+        // `CouriersService.release` — since Bloc 6.1 a CASE expression, so it
+        // never promotes a SUSPENDED courier to `online`, and it always clears
+        // `active_delivery_id` (docs/25 §B6.1-1). Matched on the CASE text: the
+        // pre-6.1 `SET status = 'online'` literal no longer appears.
+        if (text.includes('active_delivery_id = NULL') && text.includes('CASE WHEN')) {
           const [courierId] = values as [string];
           const row = couriers.find((c) => c.userId === courierId);
-          if (row && row.status === 'busy') {
-            row.status = 'online';
+          if (row) {
+            if (row.status === 'busy') row.status = 'online';
             row.activeDeliveryId = null;
           }
           return [];
@@ -548,6 +656,117 @@ export function makeDeliveriesRaceDb() {
     idempotencyKeys,
     findEligible,
   };
+}
+
+// ── shared seed helpers (Bloc 6.1) ─────────────────────────────────────────
+// Lifted out of `deliveries-assignment-race.spec.ts` so every hardening suite
+// seeds identical fixtures rather than each drifting its own copy.
+
+export function seedSearchingDelivery(
+  deliveries: DeliveryRow[],
+  overrides: Partial<DeliveryRow> = {},
+): DeliveryRow {
+  const row: DeliveryRow = {
+    id: randomUUID(),
+    orderId: ORDER_ID,
+    courierId: null,
+    status: 'searching_courier',
+    currency: 'XAF',
+    courierFeeMinor: 1200n,
+    estimatedDistanceM: null,
+    dispatchAttempts: 0,
+    dispatchRadiusM: null,
+    searchingSince: new Date(),
+    assignedAt: null,
+    acceptedAt: null,
+    pickedUpAt: null,
+    onTheWayAt: null,
+    deliveredAt: null,
+    cancelledAt: null,
+    cancelledReason: null,
+    cancelledBy: null,
+    failedAt: null,
+    failedReason: null,
+    pickupLat: PICKUP.lat,
+    pickupLng: PICKUP.lng,
+    dropoffLat: null,
+    dropoffLng: null,
+    ...overrides,
+  };
+  deliveries.push(row);
+  return row;
+}
+
+/** ~0.001 deg latitude ≈ 111 m — small deterministic offsets, all comfortably inside the 3 km default radius. */
+export function seedOnlineCourier(
+  couriers: CourierRow[],
+  userId: string,
+  offsetMeters = 100,
+): CourierRow {
+  const row: CourierRow = {
+    userId,
+    status: 'online',
+    activeDeliveryId: null,
+    lastLat: PICKUP.lat + offsetMeters / 111_000,
+    lastLng: PICKUP.lng,
+    lastLocationAt: new Date(),
+  };
+  couriers.push(row);
+  return row;
+}
+
+export function seedAssignedOffer(
+  deliveries: DeliveryRow[],
+  offers: OfferRow[],
+  couriers: CourierRow[],
+  courierId: string,
+  overrides: Partial<DeliveryRow> = {},
+): { delivery: DeliveryRow; offer: OfferRow } {
+  const delivery = seedSearchingDelivery(deliveries, {
+    status: 'courier_assigned',
+    courierId,
+    assignedAt: new Date(),
+    ...overrides,
+  });
+  seedOnlineCourier(couriers, courierId);
+  const courierRow = couriers.find((c) => c.userId === courierId)!;
+  courierRow.status = 'busy';
+  courierRow.activeDeliveryId = delivery.id;
+  const offer: OfferRow = {
+    id: randomUUID(),
+    deliveryId: delivery.id,
+    courierId,
+    status: 'offered',
+    offeredAt: new Date(),
+    expiresAt: new Date(Date.now() + 30_000),
+    respondedAt: null,
+  };
+  offers.push(offer);
+  return { delivery, offer };
+}
+
+/** A usable delivery code fixture: stores the hash of `code`, unexpired and unconsumed. */
+export function seedDeliveryCode(
+  proofs: ProofRow[],
+  deliveryId: string,
+  code: string,
+  overrides: Partial<ProofRow> = {},
+): ProofRow {
+  const row: ProofRow = {
+    id: randomUUID(),
+    deliveryId,
+    type: 'delivery_code',
+    valueHash: createHash('sha256').update(code).digest('hex'),
+    reference: null,
+    createdAt: new Date(),
+    createdBy: 'courier-A',
+    consumedAt: null,
+    expiresAt: new Date(Date.now() + 60_000),
+    failedAttempts: 0,
+    ...overrides,
+  };
+  proofs.push(row);
+  return row;
 }
 
 export function fakeLedger(ledgerGroups: LedgerGroupRow[]): LedgerService {
@@ -631,15 +850,31 @@ export function fakeOrderAmountPort(courierFeeInPool = true): OrderAmountPort {
   } as unknown as OrderAmountPort;
 }
 
+export interface EmittedEvent {
+  readonly name: string;
+  readonly payload: Record<string, unknown>;
+}
+
 export function buildDeliveriesServices(
   db: PrismaService,
   ledgerGroups: LedgerGroupRow[],
   opts: { courierFeeInPool?: boolean; platform?: PlatformOverrides } = {},
-): { deliveries: DeliveriesService; couriers: CouriersService } {
+): { deliveries: DeliveriesService; couriers: CouriersService; emitted: EmittedEvent[] } {
   const platform = fakePlatform(opts.platform);
   const couriers = new CouriersService(db, platform);
   const idempotency = new IdempotencyService(new PrismaIdempotencyStore(db));
-  const events = { emit: vi.fn(), emitAsync: vi.fn() } as unknown as EventEmitter2;
+  // Captured rather than discarded: several hardening tests assert on what
+  // leaves the service in-process — most importantly that the raw delivery
+  // code travels on `delivery.code_issued` to the CUSTOMER and appears
+  // nowhere else (docs/25 §B6.1-7).
+  const emitted: EmittedEvent[] = [];
+  const events = {
+    emit: vi.fn((name: string, payload: Record<string, unknown>) => {
+      emitted.push({ name, payload });
+      return true;
+    }),
+    emitAsync: vi.fn(),
+  } as unknown as EventEmitter2;
   const deliveries = new DeliveriesService(
     db,
     idempotency,
@@ -650,5 +885,5 @@ export function buildDeliveriesServices(
     couriers,
     fakeOrderAmountPort(opts.courierFeeInPool ?? true),
   );
-  return { deliveries, couriers };
+  return { deliveries, couriers, emitted };
 }

@@ -4,6 +4,7 @@ import { NotFoundException } from '@nestjs/common';
 import {
   buildDeliveriesServices,
   makeDeliveriesRaceDb,
+  seedDeliveryCode,
   ORDER_ID,
   PICKUP,
   type DeliveryRow,
@@ -213,15 +214,7 @@ describe('DeliveriesService.confirmDelivered — proof of delivery (docs/25 §18
   it('rejects a wrong delivery code cleanly (INVALID_PROOF), never leaking whether it was close', async () => {
     const { db, ledgerGroups, deliveries, proofs } = makeDeliveriesRaceDb();
     const delivery = seedDelivery(deliveries, { status: 'on_the_way', courierId: 'courier-1' });
-    proofs.push({
-      id: randomUUID(),
-      deliveryId: delivery.id,
-      type: 'delivery_code',
-      valueHash: 'not-a-real-hash',
-      reference: null,
-      createdAt: new Date(),
-      createdBy: 'system',
-    });
+    seedDeliveryCode(proofs, delivery.id, '1234');
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
     await expect(
@@ -232,16 +225,7 @@ describe('DeliveriesService.confirmDelivered — proof of delivery (docs/25 §18
   it('a courier who is not the assigned one can never confirm delivery, even with the right code', async () => {
     const { db, ledgerGroups, deliveries, proofs } = makeDeliveriesRaceDb();
     const delivery = seedDelivery(deliveries, { status: 'on_the_way', courierId: 'courier-1' });
-    const { createHash } = await import('node:crypto');
-    proofs.push({
-      id: randomUUID(),
-      deliveryId: delivery.id,
-      type: 'delivery_code',
-      valueHash: createHash('sha256').update('4242').digest('hex'),
-      reference: null,
-      createdAt: new Date(),
-      createdBy: 'system',
-    });
+    seedDeliveryCode(proofs, delivery.id, '4242');
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
     await expect(
@@ -255,9 +239,31 @@ describe('DeliveriesService.issueDeliveryCode (docs/09 A.5)', () => {
     const { db, ledgerGroups, proofs } = makeDeliveriesRaceDb();
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
-    const code = await service.issueDeliveryCode('delivery-1');
+    const code = await service.issueDeliveryCode('delivery-1', 'courier-1');
     expect(code).toMatch(/^\d{4}$/);
     expect(proofs).toHaveLength(1);
     expect(proofs[0]!.valueHash).not.toBe(code); // never the raw value at rest
+  });
+
+  // `created_by` is `uuid NOT NULL REFERENCES users(id)`. Bloc 6 wrote the
+  // literal string 'system' into it, which a real PostgreSQL rejects outright
+  // (`invalid input syntax for type uuid`) — a raw 500 on the delivery path
+  // that no fake-DB test could ever surface (docs/25 §B6.1-7).
+  it('attributes the proof to a real actor, never a non-uuid placeholder', async () => {
+    const { db, ledgerGroups, proofs } = makeDeliveriesRaceDb();
+    const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
+
+    await service.issueDeliveryCode('delivery-1', 'courier-1');
+    expect(proofs[0]!.createdBy).toBe('courier-1');
+    expect(proofs[0]!.createdBy).not.toBe('system');
+  });
+
+  it('stamps an expiry so a code cannot stay valid forever', async () => {
+    const { db, ledgerGroups, proofs } = makeDeliveriesRaceDb();
+    const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
+
+    await service.issueDeliveryCode('delivery-1', 'courier-1');
+    expect(proofs[0]!.expiresAt).toBeInstanceOf(Date);
+    expect(proofs[0]!.expiresAt!.getTime()).toBeGreaterThan(Date.now());
   });
 });

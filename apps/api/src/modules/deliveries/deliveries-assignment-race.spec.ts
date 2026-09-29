@@ -4,91 +4,11 @@ import { ConflictException, NotFoundException, type HttpException } from '@nestj
 import {
   buildDeliveriesServices,
   makeDeliveriesRaceDb,
-  ORDER_ID,
-  PICKUP,
-  type CourierRow,
-  type DeliveryRow,
-  type OfferRow,
+  seedAssignedOffer,
+  seedDeliveryCode,
+  seedOnlineCourier,
+  seedSearchingDelivery,
 } from './deliveries-test-support';
-
-function seedSearchingDelivery(
-  deliveries: DeliveryRow[],
-  overrides: Partial<DeliveryRow> = {},
-): DeliveryRow {
-  const row: DeliveryRow = {
-    id: randomUUID(),
-    orderId: ORDER_ID,
-    courierId: null,
-    status: 'searching_courier',
-    currency: 'XAF',
-    courierFeeMinor: 1200n,
-    estimatedDistanceM: null,
-    dispatchAttempts: 0,
-    dispatchRadiusM: null,
-    searchingSince: new Date(),
-    assignedAt: null,
-    acceptedAt: null,
-    pickedUpAt: null,
-    onTheWayAt: null,
-    deliveredAt: null,
-    cancelledAt: null,
-    cancelledReason: null,
-    cancelledBy: null,
-    failedAt: null,
-    failedReason: null,
-    pickupLat: PICKUP.lat,
-    pickupLng: PICKUP.lng,
-    dropoffLat: null,
-    dropoffLng: null,
-    ...overrides,
-  };
-  deliveries.push(row);
-  return row;
-}
-
-function seedOnlineCourier(couriers: CourierRow[], userId: string, offsetMeters = 100): CourierRow {
-  // ~0.001 deg latitude ≈ 111 m — small deterministic offsets, all comfortably inside the 3 km default radius.
-  const row: CourierRow = {
-    userId,
-    status: 'online',
-    activeDeliveryId: null,
-    lastLat: PICKUP.lat + offsetMeters / 111_000,
-    lastLng: PICKUP.lng,
-    lastLocationAt: new Date(),
-  };
-  couriers.push(row);
-  return row;
-}
-
-function seedAssignedOffer(
-  deliveries: DeliveryRow[],
-  offers: OfferRow[],
-  couriers: CourierRow[],
-  courierId: string,
-  overrides: Partial<DeliveryRow> = {},
-): { delivery: DeliveryRow; offer: OfferRow } {
-  const delivery = seedSearchingDelivery(deliveries, {
-    status: 'courier_assigned',
-    courierId,
-    assignedAt: new Date(),
-    ...overrides,
-  });
-  seedOnlineCourier(couriers, courierId);
-  const courierRow = couriers.find((c) => c.userId === courierId)!;
-  courierRow.status = 'busy';
-  courierRow.activeDeliveryId = delivery.id;
-  const offer: OfferRow = {
-    id: randomUUID(),
-    deliveryId: delivery.id,
-    courierId,
-    status: 'offered',
-    offeredAt: new Date(),
-    expiresAt: new Date(Date.now() + 30_000),
-    respondedAt: null,
-  };
-  offers.push(offer);
-  return { delivery, offer };
-}
 
 describe('DeliveriesService — REAL concurrency against a lock-aware fake DB (docs/25 §12-13, §38)', () => {
   it('dispatch wave: two SIMULTANEOUS runDispatchWave calls for the SAME delivery only ever assign ONE courier', async () => {
@@ -211,16 +131,7 @@ describe('DeliveriesService — REAL concurrency against a lock-aware fake DB (d
       status: 'on_the_way',
       courierId: 'courier-A',
     });
-    proofs.push({
-      id: randomUUID(),
-      deliveryId: delivery.id,
-      type: 'delivery_code',
-      // sha256("1234")
-      valueHash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',
-      reference: null,
-      createdAt: new Date(),
-      createdBy: 'system',
-    });
+    seedDeliveryCode(proofs, delivery.id, '1234');
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
     const [a, b] = await Promise.allSettled([
