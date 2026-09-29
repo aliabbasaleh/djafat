@@ -149,14 +149,18 @@ export class OrdersService implements OrderAmountPort {
           instructions: string | null;
           recipient_phone: string | null;
           geocode_status: string;
+          label: string | null;
+          city: string | null;
           lat: number | null;
           lng: number | null;
         }>
       >`
-        SELECT id, quartier, street, landmark, instructions, recipient_phone, geocode_status,
-               ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng
-        FROM addresses
-        WHERE user_id = ${customerId}::uuid AND is_default = true
+        SELECT a.id, a.quartier, a.street, a.landmark, a.instructions, a.recipient_phone,
+               a.geocode_status, a.label, c.name AS city,
+               ST_Y(a.geom::geometry) AS lat, ST_X(a.geom::geometry) AS lng
+        FROM addresses a
+        LEFT JOIN cities c ON c.id = a.city_id
+        WHERE a.user_id = ${customerId}::uuid AND a.is_default = true
         LIMIT 1
       `;
       const dropoff = defaultAddress[0];
@@ -197,7 +201,14 @@ export class OrdersService implements OrderAmountPort {
           courierFeeMinor: price.courierFee.minor,
           totalMinor: total.minor,
           expiresAt,
+          // Frozen at creation and never re-read from `addresses` afterwards
+          // (docs/25 §B6.1-6). `dropoffAddressId` is a convenience pointer for
+          // "re-order to the same address" only — migration 0025 makes it
+          // ON DELETE SET NULL, so erasing the address book cannot rewrite or
+          // block this order's history.
           dropoffAddressId: dropoff.id,
+          dropoffLabel: dropoff.label,
+          dropoffCity: dropoff.city,
           dropoffQuartier: dropoff.quartier,
           dropoffStreet: dropoff.street,
           dropoffLandmark: dropoff.landmark,
