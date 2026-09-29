@@ -1,7 +1,15 @@
-import { randomBytes, createHash } from 'node:crypto';
-import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
+import {
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import type {
   DeliveryStatus,
   MoneyJson,
@@ -39,6 +47,27 @@ export interface DeliveryDto {
   failedAt: string | null;
   failedReason: string | null;
 }
+
+/**
+ * A concurrent writer lost to one of migration 0024's partial unique indexes
+ * (`deliveries_one_active_per_courier_idx`,
+ * `couriers_one_active_delivery_idx`,
+ * `delivery_offers_one_offered_per_delivery_idx`). Prisma surfaces every
+ * PostgreSQL 23505 as P2002 — a predictable business condition here, never an
+ * internal error (docs/25 §B6.1-1, §B6.1-10).
+ */
+function isUniqueViolation(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+}
+
+/**
+ * A delivery code is only useful between leaving the restaurant and handing the
+ * order over — a couple of hours is generous for N'Djamena. Past that it must
+ * be re-issued by ops rather than stay valid forever (docs/25 §B6.1-7).
+ */
+const DELIVERY_CODE_TTL_MS = 4 * 60 * 60 * 1000;
+/** 4 digits = 10 000 possibilities; five misses ends the guessing game. */
+const MAX_PROOF_ATTEMPTS = 5;
 
 export interface DeliveryOfferDto {
   id: string;
@@ -266,7 +295,58 @@ export class DeliveriesService {
       return; // the worker retries later with a wider radius
     }
 
-    const outcome = await this.prisma.$transaction(async (tx) => {
+    const outcome = await this.runAssignmentTransaction(
+      deliveryId,
+      candidates,
+      radius,
+      offerTimeoutSeconds,
+    );
+
+    if (outcome) {
+      this.events.emit('courier.offer.new', { deliveryId, ...outcome });
+      this.logger.log(`delivery ${deliveryId} offered to courier ${outcome.courierId}`);
+    }
+  }
+
+  /**
+   * The assignment transaction proper. Split out of `runDispatchWave` so the
+   * unique-violation translation below has one obvious home.
+   *
+   * Since Bloc 6.1 the database itself enforces "one courier = at most one
+   * active delivery" and "at most one offered offer per delivery" (migration
+   * 0024's partial unique indexes). The transactional locking above still wins
+   * every race it sees — but a second writer this process does not share locks
+   * with (the worker's dispatch job, an ops SQL fix) can now be rejected by the
+   * index instead. Losing that way is a normal business outcome — "somebody
+   * else got this courier" — so it resolves to "no offer made this wave" and
+   * the worker retries, never a raw 500 (mandate §1, §10).
+   */
+  private async runAssignmentTransaction(
+    deliveryId: string,
+    candidates: readonly { courierId: string }[],
+    radius: number,
+    offerTimeoutSeconds: number,
+  ): Promise<{ courierId: string; offerId: string } | null> {
+    try {
+      return await this.assignInTransaction(deliveryId, candidates, radius, offerTimeoutSeconds);
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        this.logger.warn(
+          `delivery ${deliveryId}: assignment lost to a concurrent writer (DB invariant held)`,
+        );
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  private async assignInTransaction(
+    deliveryId: string,
+    candidates: readonly { courierId: string }[],
+    radius: number,
+    offerTimeoutSeconds: number,
+  ): Promise<{ courierId: string; offerId: string } | null> {
+    return this.prisma.$transaction(async (tx) => {
       // Lock the delivery FIRST (docs/25 §12, §39).
       const locked = await tx.$queryRaw<Array<{ status: string }>>`
         SELECT status FROM deliveries WHERE id = ${deliveryId}::uuid FOR UPDATE
@@ -302,11 +382,6 @@ export class DeliveriesService {
       }
       return null;
     });
-
-    if (outcome) {
-      this.events.emit('courier.offer.new', { deliveryId, ...outcome });
-      this.logger.log(`delivery ${deliveryId} offered to courier ${outcome.courierId}`);
-    }
   }
 
   // ── accept / reject (courier-facing, docs/25 §14-15) ─────────────────────
@@ -528,9 +603,21 @@ export class DeliveriesService {
   }
 
   private async doMarkPickedUp(deliveryId: string, courierId: string): Promise<DeliveryDto> {
-    const fromStatuses = fromStatusesFor('picked_up', { actorRole: 'courier' });
-    // pickup_in_progress -> picked_up in one call (this bloc exposes no separate
-    // "arrived at restaurant" endpoint — docs/25 §45's minimal route list).
+    // `POST /deliveries/:id/pickup` collapses TWO machine hops into one call,
+    // because this bloc exposes no separate "arrived at restaurant" endpoint
+    // (docs/25 §45's minimal route list): `courier_accepted ->
+    // pickup_in_progress -> picked_up`. Bloc 6.1 fixed a real break here
+    // (docs/25 §B6.1-5): only the second hop's `from` set was used, so the
+    // guard was `status = 'pickup_in_progress'` — a status NOTHING in the
+    // codebase ever assigned. Every pickup therefore failed with
+    // DELIVERY_INVALID_STATE and the lifecycle was dead after acceptance.
+    // Both hops are still DERIVED from the machine, never hand-listed.
+    const fromStatuses = [
+      ...new Set([
+        ...fromStatusesFor('pickup_in_progress', { actorRole: 'courier' }),
+        ...fromStatusesFor('picked_up', { actorRole: 'courier' }),
+      ]),
+    ];
     // Verifies ownership (courier_id match) atomically, not via a prior read.
     const affected = await this.prisma.$executeRaw`
       UPDATE deliveries SET status = 'picked_up'::text, picked_up_at = now()
@@ -558,6 +645,25 @@ export class DeliveriesService {
       data: { status: 'on_the_way', onTheWayAt: new Date() },
     });
     const delivery = await this.getByIdOrThrow(deliveryId);
+
+    // Issue the customer's delivery code NOW (docs/25 §B6.1-7). Bloc 6 defined
+    // `issueDeliveryCode` but never called it from ANY production path, so no
+    // `delivery_proofs` row ever existed and `confirmDelivered` could only ever
+    // answer INVALID_PROOF — the lifecycle could not be completed at all.
+    // Pickup is the right moment: the code only has to exist between leaving
+    // the restaurant and handing the order over.
+    const rawCode = await this.issueDeliveryCode(deliveryId, courierId);
+    // The code goes to the CUSTOMER and never to the courier — a courier who
+    // knew it could self-confirm a delivery they never made. So it travels on
+    // an in-process event only (consumed by `notifications`), never in this
+    // method's return value, never in the outbox payload (which is persisted),
+    // and never in a log line.
+    this.events.emit('delivery.code_issued', {
+      orderId: delivery.orderId,
+      customerId: (await this.orderAmount.getDeliveryContext(delivery.orderId)).customerId,
+      code: rawCode,
+    });
+
     await this.outbox.enqueue(this.prisma, {
       aggregate: 'delivery',
       aggregateId: deliveryId,
@@ -571,18 +677,45 @@ export class DeliveriesService {
 
   // ── delivered + proof (docs/25 §18-19, §25-27) ────────────────────────────
 
-  /** Generates a 4-digit delivery code (docs/09 A.5) at pickup time; returns the RAW code once (never stored raw, never logged). */
-  async issueDeliveryCode(deliveryId: string): Promise<string> {
+  /**
+   * Generates a 4-digit delivery code (docs/09 A.5) at pickup time; returns the
+   * RAW code once (never stored raw, never logged, never returned to the
+   * courier). Stored hashed with an expiry, and single-use via `consumedAt`.
+   *
+   * `createdBy` takes the real actor's uuid: the column is
+   * `uuid NOT NULL REFERENCES users(id)` and Bloc 6 wrote the literal string
+   * `'system'` into it — a guaranteed `invalid input syntax for type uuid`
+   * (raw 500) against a real PostgreSQL (docs/25 §B6.1-7).
+   */
+  async issueDeliveryCode(deliveryId: string, issuedByUserId: string): Promise<string> {
     const code = (randomBytes(2).readUInt16BE(0) % 10000).toString().padStart(4, '0');
     const valueHash = this.hashProof(code);
     await this.prisma.deliveryProof.create({
-      data: { deliveryId, type: 'delivery_code', valueHash, createdBy: 'system' },
+      data: {
+        deliveryId,
+        type: 'delivery_code',
+        valueHash,
+        createdBy: issuedByUserId,
+        expiresAt: new Date(Date.now() + DELIVERY_CODE_TTL_MS),
+      },
     });
     return code;
   }
 
   private hashProof(code: string): string {
     return createHash('sha256').update(code).digest('hex');
+  }
+
+  /**
+   * Constant-time comparison (docs/19 discipline): a plain `===` on the hex
+   * digest leaks position-of-first-difference through timing. Both operands are
+   * fixed-length SHA-256 hex, so the length guard never short-circuits in
+   * practice — it only satisfies `timingSafeEqual`'s precondition.
+   */
+  private proofMatches(storedHash: string, candidate: string): boolean {
+    const a = Buffer.from(storedHash, 'utf8');
+    const b = Buffer.from(this.hashProof(candidate), 'utf8');
+    return a.length === b.length && timingSafeEqual(a, b);
   }
 
   async confirmDelivered(
@@ -605,11 +738,79 @@ export class DeliveriesService {
     courierId: string,
     proofCode: string,
   ): Promise<DeliveryDto> {
+    // ── 1. Authorization and replay, BEFORE touching the proof ──────────────
+    // Bloc 6 verified the code first, which had two consequences (docs/25
+    // §B6.1-7): a courier this delivery was never assigned to could probe codes
+    // on it and — once Bloc 6.1 added the attempt counter — burn a stranger's
+    // rate limit, locking the real courier out of their own delivery; and an
+    // idempotent replay of a completed delivery raced the single-use guard,
+    // answering 200 or 409 depending on timing. Resolving identity and
+    // completion first makes both deterministic.
+    const current = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
+    if (!current || current.courierId !== courierId) {
+      // Same 404 either way — never reveal that the delivery exists to a
+      // courier it does not belong to (docs/25 §46 IDOR).
+      throw new NotFoundException({ code: 'DELIVERY_NOT_FOUND', message: 'Delivery not found.' });
+    }
+    if (current.status === 'delivered') {
+      return this.toDto(current); // idempotent replay — never re-presents the code
+    }
+
+    // ── 2. Proof verification, deliberately strict ──────────────────────────
+    // A 4-digit code is only 10 000 possibilities — without a cap, the assigned
+    // courier could simply enumerate it. Bloc 6 had none of the four guards.
     const proof = await this.prisma.deliveryProof.findFirst({
       where: { deliveryId, type: 'delivery_code' },
       orderBy: { createdAt: 'desc' },
     });
-    if (!proof || proof.valueHash !== this.hashProof(proofCode)) {
+    if (!proof) {
+      throw new ConflictException({
+        code: 'INVALID_PROOF',
+        message: 'No delivery code has been issued for this delivery yet.',
+      });
+    }
+    if (proof.failedAttempts >= MAX_PROOF_ATTEMPTS) {
+      throw new HttpException(
+        {
+          code: 'PROOF_RATE_LIMITED',
+          message: 'Too many incorrect delivery codes. Contact support to complete this delivery.',
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    // Truthiness, not `!== null`: a `Date` is always truthy, and this also
+    // treats a legacy row whose column predates migration 0024 as un-consumed
+    // rather than mistaking `undefined` for "already used".
+    if (proof.consumedAt) {
+      // Someone consumed it between the read above and here. If that someone
+      // is this same courier's own confirmation of this same delivery — two
+      // requests in flight at once under distinct idempotency keys — then this
+      // is a replay, not a reuse: the `delivered` check above read the row
+      // before the winner committed. Re-read rather than answer on stale
+      // state, so the outcome never depends on which call read the proof
+      // first (docs/25 §B6.1-10).
+      const fresh = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
+      if (fresh && fresh.courierId === courierId && fresh.status === 'delivered') {
+        return this.toDto(fresh);
+      }
+      throw new ConflictException({
+        code: 'INVALID_PROOF',
+        message: 'This delivery code has already been used.',
+      });
+    }
+    if (proof.expiresAt && proof.expiresAt.getTime() <= Date.now()) {
+      throw new ConflictException({
+        code: 'INVALID_PROOF',
+        message: 'This delivery code has expired.',
+      });
+    }
+    if (!this.proofMatches(proof.valueHash, proofCode)) {
+      // Count the miss BEFORE answering, so a caller that hangs up early still
+      // burns the attempt. Never logs or echoes the submitted code.
+      await this.prisma.deliveryProof.update({
+        where: { id: proof.id },
+        data: { failedAttempts: { increment: 1 } },
+      });
       throw new ConflictException({
         code: 'INVALID_PROOF',
         message: 'Delivery code does not match.',
@@ -626,6 +827,16 @@ export class DeliveriesService {
       `;
       if (!rows[0]) return null; // already delivered / not this courier's — idempotent no-op or clean 404 below
       const delivery = rows[0];
+
+      // Single use (docs/25 §B6.1-7): burn the code in the SAME transaction
+      // that marks the delivery delivered, so a replay can never re-present it.
+      // Guarded on `consumed_at IS NULL` so two concurrent confirmations cannot
+      // both consume it — the delivery-row guard above already serialises them,
+      // this is the belt to that braces.
+      await tx.deliveryProof.updateMany({
+        where: { id: proof.id, consumedAt: null },
+        data: { consumedAt: new Date() },
+      });
 
       const breakdown = await this.orderAmount.getAccrualBreakdown(delivery.order_id);
       const entries = buildFundsAvailableEntries({ courierId }, breakdown);
