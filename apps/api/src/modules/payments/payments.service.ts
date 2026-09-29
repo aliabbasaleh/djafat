@@ -7,7 +7,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import type { Prisma } from '@prisma/client';
 import type { MoneyJson, OrderAmountPort, RawWebhookRequest } from '@djafat/types';
 import { assertPositive, money } from '@djafat/core';
@@ -257,8 +257,15 @@ export class PaymentsService {
    * "payment succeeded" can never be observed without a balanced ledger entry
    * (docs/18 §11). Idempotent: a second call (retry, duplicate webhook, or the
    * synchronous + webhook paths both firing) is a safe no-op.
+   *
+   * `resolvedCourierId` (Bloc 6, docs/25 §12, §28): set ONLY by the
+   * `delivery.delivered` reaction below, for cash — a courier is guaranteed
+   * assigned by then (they physically collected the cash). Every other
+   * caller (synchronous prepaid confirm, webhook) omits it: a courier is
+   * essentially never known that early, so the courier's share is credited
+   * to `COURIER_FEE_POOL` and reclassified once `deliveries` assigns one.
    */
-  async markSucceeded(paymentId: string): Promise<void> {
+  async markSucceeded(paymentId: string, resolvedCourierId?: string): Promise<void> {
     const outcome = await this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
         Array<{
@@ -283,13 +290,6 @@ export class PaymentsService {
 
       const payment = rows[0];
       const breakdown = await this.orderAmount.getAccrualBreakdown(payment.order_id);
-      if (!breakdown.courierId) {
-        throw new ConflictException({
-          code: 'VALIDATION_ERROR',
-          message: `Order ${payment.order_id} has no courier resolved — cannot post order_accrual (docs/18 §4).`,
-        });
-      }
-
       const feeBps = await this.resolveProviderFeeBps(
         payment.provider_code,
         breakdown.restaurantId,
@@ -302,6 +302,7 @@ export class PaymentsService {
           currency: payment.currency,
           providerCode: payment.provider_code,
           feeBps,
+          courierId: resolvedCourierId ?? null,
         },
         breakdown,
       );
@@ -343,6 +344,25 @@ export class PaymentsService {
       status: 'succeeded',
     });
     this.logger.log(`payment ${outcome.paymentId} succeeded (order ${outcome.orderId})`);
+  }
+
+  /**
+   * Cash completion (Bloc 6, docs/25 §18, §28): a cash-on-delivery payment
+   * stays `pending` until the courier actually collects it at delivery —
+   * nothing else in this codebase ever resolves it. `deliveries` never
+   * writes to `payments` directly (DAG); it emits `delivery.delivered` (with
+   * `courierId`) and this reacts, the exact pattern `orders` already uses
+   * for `payment.succeeded`. A no-op for a prepaid order (no matching
+   * pending cash payment) and idempotent on replay (`markSucceeded` itself
+   * is idempotent).
+   */
+  @OnEvent('delivery.delivered')
+  async onDeliveryDelivered(payload: { orderId: string; courierId: string }): Promise<void> {
+    const payment = await this.prisma.payment.findFirst({
+      where: { orderId: payload.orderId, providerCode: 'cash', status: 'pending' },
+    });
+    if (!payment) return;
+    await this.markSucceeded(payment.id, payload.courierId);
   }
 
   /** Idempotent: only transitions FROM pending/authorized — a no-op once the payment already resolved. */

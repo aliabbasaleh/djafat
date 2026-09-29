@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { ConflictException, type HttpException } from '@nestjs/common';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { CartsService } from '../carts/carts.service';
 import type { CatalogService, CartProductRecord } from '../catalog/catalog.service';
 import type { PricingService } from '../pricing/pricing.service';
@@ -257,8 +258,27 @@ function makeRaceDb() {
           const stillOpen = carts.find((c) => c.id === openCart.id && c.status === 'open');
           return stillOpen ? [{ id: stillOpen.id }] : [];
         }
+        if (text.includes('FROM addresses')) {
+          // A seeded default address with no coordinates — the dropoff
+          // snapshot (Bloc 6, docs/25 §8) needs SOME row to exist, but these
+          // race tests don't exercise geo, so lat/lng stay null (the
+          // service correctly skips the geom UPDATE in that case).
+          return [
+            {
+              id: 'addr-1',
+              quartier: 'Quartier Test',
+              street: null,
+              landmark: null,
+              instructions: null,
+              recipient_phone: null,
+              geocode_status: 'manual',
+              lat: null,
+              lng: null,
+            },
+          ];
+        }
         // Anything else raw-queried inside a transaction in this codebase
-        // (the courier lookup) doesn't need real data for these tests.
+        // doesn't need real data for these tests.
         return [];
       });
       const txClient = makeClient(txQueryRaw);
@@ -341,6 +361,7 @@ function buildServices(db: PrismaService) {
     carts,
     outboxStub(),
     idempotency,
+    { emit: vi.fn() } as unknown as EventEmitter2,
   );
   return { carts, orders };
 }

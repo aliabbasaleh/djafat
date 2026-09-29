@@ -1,11 +1,12 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import type {
   DomainEventType,
   Money,
   MoneyJson,
   OrderAccrualBreakdown,
   OrderAmountPort,
+  OrderDeliveryContext,
   OrderPaymentContext,
   Role,
 } from '@djafat/types';
@@ -59,7 +60,6 @@ export interface OrderDto {
   cityId: string;
   customerId: string;
   restaurantId: string;
-  courierId: string | null;
   subtotal: MoneyJson;
   deliveryFee: MoneyJson;
   commissionBps: number;
@@ -95,6 +95,7 @@ export class OrdersService implements OrderAmountPort {
     private readonly carts: CartsService,
     private readonly outbox: OutboxService,
     private readonly idempotency: IdempotencyService,
+    private readonly events: EventEmitter2,
   ) {}
 
   // ── creation (docs/22 §9 — always FROM the caller's cart) ────────────────
@@ -133,19 +134,38 @@ export class OrdersService implements OrderAmountPort {
       const validated = await this.carts.loadAndValidateCartForCheckout(customerId, tx);
       const restaurant = await this.catalog.getActiveRestaurant(validated.restaurantId);
 
-      // Bloc 0.5 simplification: single seeded test courier, resolved now so the
-      // courier leg of `order_accrual` can post at payment.succeeded exactly like
-      // the validated reference model (docs/08 §8.9, docs/18 §4). Real dispatch
-      // is Bloc 6.
-      const courier = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT u.id FROM users u
-        JOIN user_roles ur ON ur.user_id = u.id
-        WHERE ur.role = 'courier' AND u.deleted_at IS NULL
-        ORDER BY u.created_at ASC LIMIT 1
+      // Dropoff snapshot (Bloc 6, docs/25 §8) — frozen from the customer's
+      // default address NOW, at order creation, never re-read live later (a
+      // subsequent address-book edit must not alter this order). No courier
+      // is resolved here — the Bloc 0.5 hack that used to do that is gone
+      // (docs/25 §2): a courier is only known once `deliveries` dispatches
+      // one, well after payment.
+      const defaultAddress = await tx.$queryRaw<
+        Array<{
+          id: string;
+          quartier: string | null;
+          street: string | null;
+          landmark: string | null;
+          instructions: string | null;
+          recipient_phone: string | null;
+          geocode_status: string;
+          lat: number | null;
+          lng: number | null;
+        }>
+      >`
+        SELECT id, quartier, street, landmark, instructions, recipient_phone, geocode_status,
+               ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng
+        FROM addresses
+        WHERE user_id = ${customerId}::uuid AND is_default = true
+        LIMIT 1
       `;
-      const courierId = courier[0]?.id ?? null;
-      if (!courierId) {
-        this.logger.warn('No seeded courier user found — order will have no courier_id.');
+      const dropoff = defaultAddress[0];
+      if (!dropoff) {
+        throw new ConflictException({
+          code: 'VALIDATION_ERROR',
+          message:
+            'No default delivery address on file — add one before placing an order (docs/25 §6, §20).',
+        });
       }
 
       const price = await this.pricing.priceOrder({
@@ -168,7 +188,6 @@ export class OrdersService implements OrderAmountPort {
           cityId: restaurant.cityId,
           customerId,
           restaurantId: restaurant.id,
-          courierId,
           status: 'awaiting_payment',
           currency: restaurant.currency,
           subtotalMinor: price.subtotal.minor,
@@ -178,8 +197,25 @@ export class OrdersService implements OrderAmountPort {
           courierFeeMinor: price.courierFee.minor,
           totalMinor: total.minor,
           expiresAt,
+          dropoffAddressId: dropoff.id,
+          dropoffQuartier: dropoff.quartier,
+          dropoffStreet: dropoff.street,
+          dropoffLandmark: dropoff.landmark,
+          dropoffInstructions: dropoff.instructions,
+          dropoffRecipientPhone: dropoff.recipient_phone,
+          dropoffGeocodeStatus: dropoff.geocode_status,
         },
       });
+      // `dropoff_geom` is PostGIS — not writable through the Prisma client
+      // (docs/17 D-02 convention). Only set when the source address actually
+      // has coordinates (N'Djamena addressing is landmark-first — a manual
+      // address legitimately has none yet, docs/09 B.1).
+      if (dropoff.lat !== null && dropoff.lng !== null) {
+        await tx.$executeRaw`
+          UPDATE orders SET dropoff_geom = ST_SetSRID(ST_MakePoint(${dropoff.lng}, ${dropoff.lat}), 4326)::geography
+          WHERE id = ${order.id}::uuid
+        `;
+      }
 
       // One `create` per line (not `createMany`): each line's generated id
       // is needed to attach its `OrderItemOption` snapshot rows — a cart
@@ -299,7 +335,6 @@ export class OrdersService implements OrderAmountPort {
       where: { id: orderId },
       select: {
         restaurantId: true,
-        courierId: true,
         subtotalMinor: true,
         commissionMinor: true,
         courierFeeMinor: true,
@@ -311,10 +346,71 @@ export class OrdersService implements OrderAmountPort {
     }
     return {
       restaurantId: order.restaurantId,
-      courierId: order.courierId,
       subtotal: money(order.subtotalMinor, order.currency),
       commission: money(order.commissionMinor, order.currency),
       courierFee: money(order.courierFeeMinor, order.currency),
+    };
+  }
+
+  /**
+   * Everything `deliveries` needs to dispatch this order (docs/25 §6, §21) —
+   * pickup coordinates come from the restaurant's own `geom` (never asked of
+   * the customer), dropoff from THIS order's frozen snapshot (never the
+   * customer's live, possibly-since-edited address book).
+   */
+  async getDeliveryContext(orderId: string): Promise<OrderDeliveryContext> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        code: string;
+        restaurant_id: string;
+        customer_id: string;
+        currency: string;
+        courier_fee_minor: bigint;
+        pickup_lat: number | null;
+        pickup_lng: number | null;
+        dropoff_lat: number | null;
+        dropoff_lng: number | null;
+      }>
+    >`
+      SELECT o.id, o.code, o.restaurant_id, o.customer_id, o.currency, o.courier_fee_minor,
+             ST_Y(r.geom::geometry) AS pickup_lat, ST_X(r.geom::geometry) AS pickup_lng,
+             ST_Y(o.dropoff_geom::geometry) AS dropoff_lat, ST_X(o.dropoff_geom::geometry) AS dropoff_lng
+      FROM orders o
+      JOIN restaurants r ON r.id = o.restaurant_id
+      WHERE o.id = ${orderId}::uuid
+    `;
+    const row = rows[0];
+    if (!row) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: `Order ${orderId} not found.` });
+    }
+
+    // Prepaid orders always pass through `awaiting_payment` before `placed`
+    // (only `payment.succeeded` lifts that gate — `markPlacedFromPayment`
+    // above); cash orders go straight to `placed` at creation (docs/08 §8.4).
+    // This history row is the one signal `orders` can answer without
+    // reaching into `payments`' tables (DAG).
+    const prepaidHistory = await this.prisma.orderStatusHistory.findFirst({
+      where: { orderId, fromStatus: 'awaiting_payment' },
+      select: { id: true },
+    });
+
+    return {
+      orderId: row.id,
+      orderCode: row.code,
+      restaurantId: row.restaurant_id,
+      customerId: row.customer_id,
+      currency: row.currency,
+      courierFee: money(row.courier_fee_minor, row.currency),
+      courierFeeInPool: prepaidHistory !== null,
+      pickup:
+        row.pickup_lat !== null && row.pickup_lng !== null
+          ? { lat: row.pickup_lat, lng: row.pickup_lng }
+          : null,
+      dropoff:
+        row.dropoff_lat !== null && row.dropoff_lng !== null
+          ? { lat: row.dropoff_lat, lng: row.dropoff_lng }
+          : null,
     };
   }
 
@@ -406,6 +502,13 @@ export class OrdersService implements OrderAmountPort {
         payload: { orderId, status: to },
       });
     });
+
+    // Fast, same-process reaction — fired AFTER commit (docs/05 §5.4), by
+    // the transition's own specific name (not just generic 'order.updated'
+    // realtime forwarding below). Bloc 6: `deliveries` reacts to
+    // `order.ready` to start dispatch — same mechanism `orders` itself
+    // already uses to react to `payment.succeeded`/`delivery.*`.
+    this.events.emit(this.eventNameFor(to), { orderId, status: to });
   }
 
   /**
@@ -445,12 +548,40 @@ export class OrdersService implements OrderAmountPort {
     this.logger.log(`order ${payload.orderId} placed (payment ${payload.paymentId} succeeded)`);
   }
 
-  /** Reaction to `delivery.assigned` — the one `system` transition in the table. */
-  @OnEvent('delivery.assigned')
-  async onDeliveryAssigned(payload: { orderId: string; courierId: string }): Promise<void> {
+  /**
+   * Reaction to `delivery.accepted` — a courier has actually COMMITTED, not
+   * merely been offered the delivery (`delivery.assigned` fires earlier, at
+   * offer time, and does not move the order — docs/25 §5). The one `system`
+   * transition in the table.
+   */
+  @OnEvent('delivery.accepted')
+  async onDeliveryAccepted(payload: { orderId: string; courierId: string }): Promise<void> {
     await this.transitionOrder(payload.orderId, 'courier_assigned', {
       system: true,
-      reason: 'delivery.assigned',
+      reason: 'delivery.accepted',
+    });
+  }
+
+  /** Reaction to `delivery.cancelled`/`delivery.failed` — the order follows the delivery to `cancelled` (docs/25 §29-30). */
+  @OnEvent('delivery.cancelled')
+  async onDeliveryCancelled(payload: { orderId: string }): Promise<void> {
+    await this.transitionOrder(payload.orderId, 'cancelled', {
+      system: true,
+      reason: 'delivery.cancelled',
+    }).catch((err: unknown) => {
+      // Idempotent by design: the order may already be terminal via another
+      // path (e.g. a customer-cancel that raced the delivery cancellation).
+      this.logger.debug(`onDeliveryCancelled: order ${payload.orderId} no-op (${String(err)})`);
+    });
+  }
+
+  @OnEvent('delivery.failed')
+  async onDeliveryFailed(payload: { orderId: string }): Promise<void> {
+    await this.transitionOrder(payload.orderId, 'cancelled', {
+      system: true,
+      reason: 'delivery.failed',
+    }).catch((err: unknown) => {
+      this.logger.debug(`onDeliveryFailed: order ${payload.orderId} no-op (${String(err)})`);
     });
   }
 
@@ -510,7 +641,6 @@ export class OrdersService implements OrderAmountPort {
       cityId: string;
       customerId: string;
       restaurantId: string;
-      courierId: string | null;
       subtotalMinor: bigint;
       deliveryFeeMinor: bigint;
       commissionBpsSnapshot: number;
@@ -534,7 +664,6 @@ export class OrdersService implements OrderAmountPort {
       cityId: order.cityId,
       customerId: order.customerId,
       restaurantId: order.restaurantId,
-      courierId: order.courierId,
       subtotal: toMoneyJson(order.subtotalMinor, order.currency),
       deliveryFee: toMoneyJson(order.deliveryFeeMinor, order.currency),
       commissionBps: order.commissionBpsSnapshot,

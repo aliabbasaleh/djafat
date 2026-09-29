@@ -485,7 +485,6 @@ export function fakeOrderAmountPort(): OrderAmountPort {
   };
   const breakdown: OrderAccrualBreakdown = {
     restaurantId: RESTAURANT_ID,
-    courierId: COURIER_ID,
     subtotal: money(8800n, 'XAF'),
     commission: money(2400n, 'XAF'),
     courierFee: money(1200n, 'XAF'),
@@ -495,6 +494,17 @@ export function fakeOrderAmountPort(): OrderAmountPort {
     getPaymentContext: vi.fn().mockResolvedValue(context),
     getAccrualBreakdown: vi.fn().mockResolvedValue(breakdown),
     getOwnerUserId: vi.fn().mockResolvedValue(CUSTOMER_ID),
+    getDeliveryContext: vi.fn().mockResolvedValue({
+      orderId: ORDER_ID,
+      orderCode: 'DJ-0001',
+      restaurantId: RESTAURANT_ID,
+      customerId: CUSTOMER_ID,
+      currency: 'XAF',
+      courierFee: money(1200n, 'XAF'),
+      courierFeeInPool: true,
+      pickup: { lat: 12.1348, lng: 15.0557 },
+      dropoff: { lat: 12.14, lng: 15.06 },
+    }),
   };
 }
 

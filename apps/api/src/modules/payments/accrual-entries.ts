@@ -16,6 +16,21 @@ export interface AccrualPaymentFacts {
   readonly providerCode: string;
   /** Resolved by the caller (config-driven — never a hardcoded constant read in here). */
   readonly feeBps: number;
+  /**
+   * Known only if a courier is ALREADY assigned to this order's delivery at
+   * the moment accrual posts (Bloc 6, docs/25 §12). For cash, this is always
+   * non-null in practice: nothing marks a cash payment succeeded until the
+   * courier has physically collected it at delivery (`payments`'s
+   * `delivery.delivered` reaction) — see the `assertCashHasCourier` guard
+   * below. For a prepaid provider, this is null the vast majority of the
+   * time: payment succeeds well before dispatch even starts. When null, the
+   * courier's share is credited to the un-owned `COURIER_FEE_POOL` instead
+   * of a specific `COURIER_PAYABLE:<id>`, and `deliveries` reclassifies it
+   * to the real courier once one is assigned (docs/25 §12) — a pure
+   * reclassification, exactly like the existing pending->available one
+   * (`release-entries.ts`), so no money is created either way.
+   */
+  readonly courierId: string | null;
 }
 
 export interface OrderAccrualResult {
@@ -36,16 +51,23 @@ export function buildOrderAccrualEntries(
   payment: AccrualPaymentFacts,
   breakdown: OrderAccrualBreakdown,
 ): OrderAccrualResult {
-  if (!breakdown.courierId) {
-    throw new Error(`Cannot build order_accrual without a resolved courier (docs/18 §4).`);
+  const isCash = payment.providerCode === 'cash';
+  if (isCash && !payment.courierId) {
+    // Real physical cash always sits with a specific person — there is no
+    // "un-owned CASH_FLOAT" the way there is an un-owned COURIER_FEE_POOL
+    // for prepaid. If this ever fires, the cash-completion wiring in
+    // `payments` (docs/25 §28) called `markSucceeded` too early.
+    throw new Error('Cannot post a cash order_accrual without a resolved courier (docs/25 §28).');
   }
 
   const total = money(payment.amountMinor, payment.currency);
-  const isCash = payment.providerCode === 'cash';
   const pspFee = applyRateBps(total, isCash ? 0 : payment.feeBps);
   const netReceived = subMoney(total, pspFee);
   const restaurantShare = subMoney(breakdown.subtotal, breakdown.commission);
-  const clearingAccountRef = isCash ? `CASH_FLOAT:${breakdown.courierId}` : 'PSP_CLEARING';
+  const clearingAccountRef = isCash ? `CASH_FLOAT:${payment.courierId}` : 'PSP_CLEARING';
+  const courierCreditRef = payment.courierId
+    ? `COURIER_PAYABLE:${payment.courierId}`
+    : 'COURIER_FEE_POOL';
 
   const entries: LedgerEntryInput[] = [
     { accountRef: clearingAccountRef, direction: 'debit', amount: netReceived },
@@ -62,11 +84,7 @@ export function buildOrderAccrualEntries(
       direction: 'credit',
       amount: restaurantShare,
     },
-    {
-      accountRef: `COURIER_PAYABLE:${breakdown.courierId}`,
-      direction: 'credit',
-      amount: breakdown.courierFee,
-    },
+    { accountRef: courierCreditRef, direction: 'credit', amount: breakdown.courierFee },
     { accountRef: 'DJAFAT_REVENUE', direction: 'credit', amount: breakdown.commission },
   );
   return { entries, pspFee };

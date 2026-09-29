@@ -343,7 +343,8 @@ describe('PaymentsService — PSP fee is config-driven (Bloc 5 — replaces the 
     const payment = seedPayment(rows, { status: 'pending', providerCode: 'cash' });
     const { payments } = buildPaymentsService(db, ledgerGroups);
 
-    await payments.markSucceeded(payment.id);
+    // Cash always has a resolved courier by the time it's collected (Bloc 6, docs/25 §28).
+    await payments.markSucceeded(payment.id, 'courier-1');
 
     expect(payment.pspFeeMinor).toBe(0n);
   });
