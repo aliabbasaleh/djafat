@@ -4,6 +4,7 @@ import { env, logger } from './logger';
 import { pool } from './db';
 import { makeOutboxRelayProcessor } from './processors/outbox-relay.processor';
 import { makeOrderExpiryProcessor } from './processors/order-expiry.processor';
+import { makeDispatchRetryProcessor } from './processors/dispatch.processor';
 import {
   makeLedgerAssertProcessor,
   selfTestPureInvariant,
@@ -21,6 +22,7 @@ async function bootstrap(): Promise<void> {
     new Worker('outbox-relay', makeOutboxRelayProcessor(publish), { connection }),
     new Worker('order-expiry', makeOrderExpiryProcessor(), { connection }),
     new Worker('ledger-assert', makeLedgerAssertProcessor(), { connection }),
+    new Worker('dispatch-retry', makeDispatchRetryProcessor(), { connection }),
   ];
 
   for (const w of workers) {
@@ -40,8 +42,13 @@ async function bootstrap(): Promise<void> {
   const assertQueue = new Queue('ledger-assert', { connection });
   await assertQueue.add('tick', {}, { repeat: { every: 3_600_000 }, removeOnComplete: 10 });
 
+  // Offers expire on a 30s default (platform_settings['offer_timeout_seconds'])
+  // — a 10s tick keeps expiry snappy without hammering the DB (docs/25 §15, §42).
+  const dispatchQueue = new Queue('dispatch-retry', { connection });
+  await dispatchQueue.add('tick', {}, { repeat: { every: 10_000 }, removeOnComplete: 50 });
+
   logger.info(
-    { queues: ['outbox-relay', 'order-expiry', 'ledger-assert'] },
+    { queues: ['outbox-relay', 'order-expiry', 'ledger-assert', 'dispatch-retry'] },
     'DJAFAT worker started',
   );
 
@@ -52,6 +59,7 @@ async function bootstrap(): Promise<void> {
       outboxQueue.close(),
       expiryQueue.close(),
       assertQueue.close(),
+      dispatchQueue.close(),
     ]);
     await Promise.allSettled([connection.quit(), publisherConnection.quit(), pool.end()]);
     process.exit(0);
