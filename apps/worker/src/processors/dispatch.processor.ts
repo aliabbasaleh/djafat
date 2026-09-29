@@ -33,8 +33,14 @@ async function expireStaleOffers(): Promise<number> {
        RETURNING id, delivery_id, courier_id`,
     );
     for (const offer of rows) {
+      // Mirrors `CouriersService.release` EXACTLY (docs/25 §B6.1-1). Bloc 6's
+      // version here set `status = 'online'` unconditionally, so expiring the
+      // offer of a courier an admin had suspended in the meantime silently
+      // lifted the suspension and put them straight back in the candidate pool.
       await client.query(
-        `UPDATE couriers SET status = 'online', active_delivery_id = NULL
+        `UPDATE couriers
+         SET status = CASE WHEN status = 'busy' THEN 'online' ELSE status END,
+             active_delivery_id = NULL
          WHERE user_id = $1 AND active_delivery_id = $2`,
         [offer.courier_id, offer.delivery_id],
       );

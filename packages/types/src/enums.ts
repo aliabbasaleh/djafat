@@ -131,6 +131,24 @@ export const DELIVERY_TERMINAL_STATUSES: readonly DeliveryStatus[] = [
   'failed',
 ];
 
+/**
+ * The statuses in which a delivery HOLDS a courier (Bloc 6.1, docs/25 §B6.1-1).
+ * This is the precise definition of "active" behind the invariant "one courier
+ * = at most one active delivery": before `courier_assigned` no courier is
+ * attached, and every terminal status releases them.
+ *
+ * Single source of truth: migration 0024's partial unique index necessarily
+ * repeats this list as SQL literals, and `deliveries-db-invariant.spec.ts`
+ * asserts the two never drift apart.
+ */
+export const DELIVERY_COURIER_HOLDING_STATUSES: readonly DeliveryStatus[] = [
+  'courier_assigned',
+  'courier_accepted',
+  'pickup_in_progress',
+  'picked_up',
+  'on_the_way',
+];
+
 /** Courier availability (Bloc 6, docs/25 §4). `couriers.status`. */
 export const COURIER_STATUSES = ['offline', 'online', 'busy', 'suspended'] as const;
 export type CourierStatus = (typeof COURIER_STATUSES)[number];

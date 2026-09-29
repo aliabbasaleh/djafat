@@ -41,6 +41,8 @@ export const API_ERROR_CODES = [
   'COURIER_SUSPENDED',
   'COURIER_OFFLINE',
   'INVALID_PROOF',
+  /** Too many wrong delivery codes on one delivery (429) — Bloc 6.1, docs/25 §B6.1-7. */
+  'PROOF_RATE_LIMITED',
   'INTERNAL',
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

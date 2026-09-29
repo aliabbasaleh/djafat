@@ -206,20 +206,42 @@ export class CouriersService implements CourierPort {
     return this.toDto(row);
   }
 
+  /**
+   * Back to `offline` — the courier decides when to go online again. Also
+   * clears any `active_delivery_id` stranded by a suspension that landed
+   * mid-delivery: that delivery has since been reassigned or terminated by ops,
+   * and a lingering back-pointer would keep the reinstated courier permanently
+   * out of the candidate pool (docs/25 §B6.1-1).
+   */
   async reinstate(userId: string): Promise<CourierProfileDto> {
     await this.ensureProfile(userId);
     const row = await this.prisma.courier.update({
       where: { userId },
-      data: { status: 'offline' },
+      data: { status: 'offline', activeDeliveryId: null },
     });
     return this.toDto(row);
   }
 
-  /** Releases a courier back to `online` (delivery completed/cancelled/failed) — idempotent. */
+  /**
+   * Releases a courier from their delivery (completed/cancelled/failed/offer
+   * expired) — idempotent.
+   *
+   * Two things this deliberately does NOT do (docs/25 §B6.1-1):
+   *  - it never promotes a SUSPENDED courier to `online`. An unconditional
+   *    `SET status = 'online'` would silently lift an admin suspension the
+   *    moment one of that courier's deliveries ended — the worker's copy of
+   *    this query had exactly that bug.
+   *  - it never leaves `active_delivery_id` dangling. Bloc 6 cleared it only
+   *    on the `status = 'busy'` path, so a courier suspended mid-delivery kept
+   *    the back-pointer forever and stayed un-dispatchable even after being
+   *    reinstated (the candidate query requires `active_delivery_id IS NULL`).
+   */
   async release(tx: Prisma.TransactionClient, courierId: string): Promise<void> {
     await tx.$executeRaw`
-      UPDATE couriers SET status = 'online', active_delivery_id = NULL
-      WHERE user_id = ${courierId}::uuid AND status = 'busy'
+      UPDATE couriers
+      SET status = CASE WHEN status = 'busy' THEN 'online' ELSE status END,
+          active_delivery_id = NULL
+      WHERE user_id = ${courierId}::uuid
     `;
   }
 

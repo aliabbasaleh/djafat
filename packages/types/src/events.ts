@@ -30,6 +30,12 @@ export const DOMAIN_EVENTS = [
   'delivery.rejected',
   'delivery.pickup_in_progress',
   'delivery.picked_up',
+  /**
+   * In-process ONLY (never an outbox row): carries the raw delivery code to
+   * `notifications` for delivery to the CUSTOMER. The raw code must never be
+   * persisted, logged, or returned to the courier — docs/25 §B6.1-7.
+   */
+  'delivery.code_issued',
   'delivery.on_the_way',
   'delivery.delivered',
   'delivery.cancelled',
