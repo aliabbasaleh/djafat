@@ -103,7 +103,7 @@ Règles : migrations DB toujours **rétro-compatibles** (expand/contract) ; roll
   - _E2E_ : Playwright (parcours J1, J3, J6 web) ; Maestro (parcours J1 mobile, J4 livreur).
   - _Charge_ : k6 sur `GET /home`, `GET /restaurants`, `POST /orders`, dispatch (avant go-live).
 - **Couverture** : cible 80 % global, **100 % sur `@djafat/core`** et sur `payments`/`orders`/`deliveries` services.
-- **ADR** : toute décision d'archi structurante → un fichier `docs/adr/NNNN-titre.md` (contexte, options, décision, conséquences).
+- **ADR** : toute décision d'archi structurante → un fichier `docs/adr/NNNN-titre.md` (contexte, options, décision, conséquences). Premier ADR : [`adr/0001-djafat-logistics-and-vertical-integration.md`](adr/0001-djafat-logistics-and-vertical-integration.md) — réseau logistique multi-restaurants et intégration verticale.
 - **Interdits** (repris du brief) : duplication, logique métier dans les composants UI, secrets dans le frontend, données fictives non signalées (`// TODO: MOCK` + feature flag + jamais en prod), dépendances inutiles, complexité prématurée (pas de microservices/k8s/Kafka au MVP).
 
 ## 13.6 Gestion des versions de packages

@@ -85,7 +85,23 @@ export function buildOrderAccrualEntries(
       amount: restaurantShare,
     },
     { accountRef: courierCreditRef, direction: 'credit', amount: breakdown.courierFee },
-    { accountRef: 'DJAFAT_REVENUE', direction: 'credit', amount: breakdown.commission },
   );
+  // Same reasoning as the PSP-fee leg above: the ledger forbids a zero-amount
+  // entry (`assertBalanced` -> NON_POSITIVE_AMOUNT), so a 0 bps commission must
+  // omit the leg rather than post an empty one. This is not a hypothetical: a
+  // restaurant with no matching `commission_rule` already resolves to 0 bps
+  // (`PricingService.resolveCommissionBps`), and it is exactly the shape of the
+  // "DJAFAT Delivery only" commercial model — DJAFAT carries the order, charges
+  // for logistics, and takes no marketplace cut (ADR-0001, Decision E). Without
+  // this guard, such an order threw a LedgerError on payment success.
+  // The group still balances: the commission simply never left the restaurant's
+  // share.
+  if (breakdown.commission.minor > 0n) {
+    entries.push({
+      accountRef: 'DJAFAT_REVENUE',
+      direction: 'credit',
+      amount: breakdown.commission,
+    });
+  }
   return { entries, pspFee };
 }

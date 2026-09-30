@@ -170,3 +170,67 @@ describe('buildOrderAccrualEntries', () => {
     }
   });
 });
+
+/**
+ * ADR-0001 (Decision E) — the "DJAFAT Delivery only" commercial model: DJAFAT
+ * carries the order and charges for logistics, but takes no marketplace cut.
+ * Its ledger shape is simply a 0 bps commission, which is also what any
+ * restaurant with no matching `commission_rule` already resolves to today.
+ */
+describe('a 0 bps commission (DJAFAT Delivery, no marketplace cut)', () => {
+  const zeroCommission: OrderAccrualBreakdown = {
+    restaurantId: 'r1',
+    subtotal: money(9000n, 'XAF'),
+    commission: money(0n, 'XAF'),
+    courierFee: money(1000n, 'XAF'),
+  };
+
+  it('omits the revenue leg entirely rather than posting a zero-amount entry', () => {
+    const { entries } = buildOrderAccrualEntries(
+      {
+        amountMinor: 10_000n,
+        currency: 'XAF',
+        providerCode: 'mock_psp',
+        feeBps: 150,
+        courierId: null,
+      },
+      zeroCommission,
+    );
+
+    expect(entries.some((e) => e.accountRef === 'DJAFAT_REVENUE')).toBe(false);
+    // The ledger rejects a non-positive amount outright — before this guard,
+    // such an order threw a LedgerError on payment success.
+    expect(() => assertBalanced(entries, 'XAF')).not.toThrow();
+  });
+
+  it('still balances: the commission simply never left the restaurant’s share', () => {
+    const { entries } = buildOrderAccrualEntries(
+      {
+        amountMinor: 10_000n,
+        currency: 'XAF',
+        providerCode: 'mock_psp',
+        feeBps: 150,
+        courierId: null,
+      },
+      zeroCommission,
+    );
+
+    const restaurant = entries.find((e) => e.accountRef === 'RESTAURANT_PAYABLE:r1');
+    expect(restaurant?.amount.minor).toBe(9000n); // the whole subtotal
+    expect(entries.find((e) => e.accountRef === 'COURIER_FEE_POOL')?.amount.minor).toBe(1000n);
+  });
+
+  it('a commission of even 1 minor unit still posts the leg', () => {
+    const { entries } = buildOrderAccrualEntries(
+      {
+        amountMinor: 10_000n,
+        currency: 'XAF',
+        providerCode: 'mock_psp',
+        feeBps: 150,
+        courierId: null,
+      },
+      { ...zeroCommission, commission: money(1n, 'XAF'), subtotal: money(9000n, 'XAF') },
+    );
+    expect(entries.find((e) => e.accountRef === 'DJAFAT_REVENUE')?.amount.minor).toBe(1n);
+  });
+});
