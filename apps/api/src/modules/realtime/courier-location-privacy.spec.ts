@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { AuthenticatedActor, OrderAmountPort, Role } from '@djafat/types';
 import type { ActorResolverService } from '../auth/actor-resolver.service';
+import type { TokenService } from '../auth/token.service';
 import type { DeliveryTrackingPort } from '../../common/ports/delivery-tracking.port';
 import type { RestaurantMembershipPort } from '../../common/ports/restaurant-membership.port';
 import { RealtimeGateway } from './realtime.gateway';
@@ -65,6 +66,7 @@ function makeGateway(
 
   const gateway = new RealtimeGateway(
     {} as unknown as ActorResolverService,
+    { verifyAccessToken: vi.fn() } as unknown as TokenService,
     orderAmount,
     deliveryTracking,
     restaurantMembership,
@@ -79,6 +81,15 @@ function makeGateway(
       userId,
       roles,
     } as AuthenticatedActor);
+    // Bloc 7.1 §2: `handleSubscribe` now also refuses an expired token. These
+    // sockets never went through a real handshake, so this map needs seeding
+    // too — far in the future, since token freshness is not what THIS file
+    // tests (that is `realtime-connection.spec.ts`'s job).
+    (
+      gateway as unknown as {
+        tokenExpiry: Map<string, { client: unknown; exp: number }>;
+      }
+    ).tokenExpiry.set(socketId, { client: {}, exp: Math.floor(Date.now() / 1000) + 3600 });
     return { socketId };
   }
 

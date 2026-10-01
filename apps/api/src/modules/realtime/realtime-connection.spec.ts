@@ -7,12 +7,14 @@ import type {
   Role,
 } from '@djafat/types';
 import type { ActorResolverService } from '../auth/actor-resolver.service';
+import type { TokenService } from '../auth/token.service';
 import type { DeliveryTrackingPort } from '../../common/ports/delivery-tracking.port';
 import type { RestaurantMembershipPort } from '../../common/ports/restaurant-membership.port';
 import { RealtimeGateway } from './realtime.gateway';
 
 /**
- * Bloc 7 §19 (handshake security) and §18 (resynchronisation).
+ * Bloc 7 §19 (handshake security), §18 (resynchronisation), and Bloc 7.1 §2
+ * (JWT expiry on an open WebSocket connection, docs/28).
  *
  * Drives the REAL gateway's real `handleConnection` / `handleDisconnect` /
  * `handleSubscribe` methods. What matters is observable: was the socket
@@ -20,7 +22,10 @@ import { RealtimeGateway } from './realtime.gateway';
  */
 
 const OWNER = 'customer-owner';
+const OTHER_USER = 'customer-other';
 const ORDER_ID = 'order-1';
+const FAR_FUTURE_EXP = () => Math.floor(Date.now() / 1000) + 900;
+const ALREADY_EXPIRED = () => Math.floor(Date.now() / 1000) - 10;
 
 interface FakeSocket {
   id: string;
@@ -42,28 +47,46 @@ function socket(id: string, token?: string, viaHeader = false): FakeSocket {
   };
 }
 
-function makeGateway(
-  opts: {
-    /** Tokens the resolver accepts, mapped to the actor they resolve to. */
-    validTokens?: Record<string, { userId: string; roles: readonly Role[] }>;
-  } = {},
-) {
+interface TokenRecord {
+  userId: string;
+  roles: readonly Role[];
+  /** Defaults to far in the future — only set this to test expiry specifically. */
+  exp?: number;
+}
+
+function makeGateway(opts: { validTokens?: Record<string, TokenRecord> } = {}) {
   const emitted: Array<{ room: string; event: string; payload: unknown }> = [];
+
+  /** Both fakes below check `exp` against `now`, exactly like the real `TokenService.verifyAccessToken` does — an expired record must fail EITHER call, the same way a real expired JWT fails verification no matter who asks. */
+  const isExpired = (match: TokenRecord | undefined): boolean =>
+    !match || (match.exp ?? FAR_FUTURE_EXP()) <= Math.floor(Date.now() / 1000);
 
   const actorResolver = {
     resolve: vi.fn(async (req: { headers: { authorization: string } }) => {
       await Promise.resolve();
       const token = req.headers.authorization.replace(/^Bearer\s+/i, '');
       const match = opts.validTokens?.[token];
-      if (!match) {
+      if (isExpired(match)) {
         // Exactly what the real resolver does for a malformed, forged, revoked
         // or expired token: it throws. The gateway must treat all of those the
         // same way — disconnect.
         throw new Error('invalid or expired token');
       }
-      return { userId: match.userId, roles: match.roles } as AuthenticatedActor;
+      return { userId: match!.userId, roles: match!.roles } as AuthenticatedActor;
     }),
   } as unknown as ActorResolverService;
+
+  // Mirrors production exactly: `TokenService.verifyAccessToken` is the SAME
+  // underlying verification `ActorResolverService.resolve` already performs —
+  // in this fake, driven by the SAME `validTokens` map, so the two can never
+  // disagree the way two independent fakes could.
+  const tokenService = {
+    verifyAccessToken: vi.fn((token: string) => {
+      const match = opts.validTokens?.[token];
+      if (isExpired(match)) throw new Error('invalid or expired token');
+      return { exp: match!.exp ?? FAR_FUTURE_EXP() } as never;
+    }),
+  } as unknown as TokenService;
 
   const orderAmount = {
     getOwnerUserId: vi.fn(async (orderId: string) => {
@@ -89,6 +112,7 @@ function makeGateway(
 
   const gateway = new RealtimeGateway(
     actorResolver,
+    tokenService,
     orderAmount,
     deliveryTracking,
     restaurantMembership,
@@ -104,7 +128,13 @@ function makeGateway(
   } as never;
 
   const actors = (gateway as unknown as { actors: Map<string, AuthenticatedActor> }).actors;
-  return { gateway, emitted, actors, actorResolver };
+  const tokenExpiry = (
+    gateway as unknown as { tokenExpiry: Map<string, { client: unknown; exp: number }> }
+  ).tokenExpiry;
+  const runSweep = (): void =>
+    (gateway as unknown as { disconnectExpiredSockets: () => void }).disconnectExpiredSockets();
+
+  return { gateway, emitted, actors, tokenExpiry, runSweep, actorResolver };
 }
 
 function envelope(eventType: DomainEventType, payload: Record<string, unknown>): OutboxEnvelope {
@@ -141,10 +171,12 @@ describe('the handshake rejects anything it cannot authenticate (Bloc 7 §19)', 
     expect(actors.has('s1')).toBe(false);
   });
 
-  it('an EXPIRED token is disconnected — the resolver throws, and that is enough', async () => {
+  it('a JWT already expired AT HANDSHAKE is refused — the resolver throws, and that is enough', async () => {
     // The resolver is the single authority on token validity (it is the same
-    // one the REST guards use), so "expired" needs no special handling here:
-    // it throws exactly like a forged token, and the gateway disconnects.
+    // one the REST guards use), so "expired at handshake" needs no special
+    // handling here: it throws exactly like a forged token, and the gateway
+    // disconnects. (This is distinct from expiring DURING an open connection,
+    // covered below — Bloc 7.1 §2.)
     const { gateway, actors } = makeGateway({ validTokens: {} });
     const client = socket('s1', 'expired-token');
 
@@ -201,30 +233,177 @@ describe('the handshake rejects anything it cannot authenticate (Bloc 7 §19)', 
     await gateway.handleSubscribe(recycled as never, { room: `order:${ORDER_ID}` });
     expect(recycled.join).not.toHaveBeenCalled();
   });
+});
 
-  // An honest limitation, asserted rather than hidden (docs/27 §13).
-  it('a token that expires DURING an open connection does not drop the socket', async () => {
-    const { gateway, actorResolver, actors } = makeGateway({
+describe('a JWT expiring DURING an open connection is handled (Bloc 7.1 §2, docs/28)', () => {
+  // The limitation Bloc 7 shipped and documented as accepted debt: the actor
+  // was resolved once at handshake and never re-checked, so a 15-minute
+  // access token kept a socket authorized indefinitely. These tests pin the
+  // fix down precisely: periodic disconnection, and immediate refusal of any
+  // NEW room join once the token has expired — closing both the "forever"
+  // case and the race between the expiry instant and the sweep's cadence.
+
+  it('a new subscribe is refused immediately once the stored token is expired — no sweep needed', async () => {
+    const { gateway, tokenExpiry } = makeGateway({
       validTokens: { good: { userId: OWNER, roles: ['customer'] } },
     });
     const client = socket('s1', 'good');
     await gateway.handleConnection(client as never);
 
-    // The token is now revoked/expired server-side.
-    (actorResolver.resolve as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('expired'));
+    // Time has passed past the token's validity window; the periodic sweep
+    // has not run yet (simulated: patch the stored expiry directly, same
+    // technique `courier-location-privacy.spec.ts` already uses for the
+    // adjacent `actors` map).
+    tokenExpiry.set('s1', { client, exp: ALREADY_EXPIRED() });
 
-    // The socket stays connected and the cached actor is still used: the actor
-    // is resolved ONCE at handshake and never re-validated. A long-lived socket
-    // therefore outlives its token's validity until it reconnects.
-    //
-    // Why this is tolerable for now: the socket can only ever RECEIVE
-    // broadcasts for rooms it was already authorized to join, and every
-    // business action goes through REST where the token IS re-validated on each
-    // request. The exposure is "kept receiving updates about an order it could
-    // already see", not "acted with a dead token".
     await gateway.handleSubscribe(client as never, { room: `order:${ORDER_ID}` });
-    expect(actors.has('s1')).toBe(true);
+
+    expect(client.join).not.toHaveBeenCalled();
+    expect(client.disconnect).toHaveBeenCalledWith(true);
+  });
+
+  it('a room already joined before expiry is NOT retroactively revoked by a subscribe elsewhere', async () => {
+    // Refusing NEW joins on an expired token must not be confused with
+    // tearing down rooms already granted — that is the sweep's job (below),
+    // triggered on its own cadence, not smuggled into unrelated subscribe calls.
+    const { gateway, tokenExpiry, emitted } = makeGateway({
+      validTokens: { good: { userId: OWNER, roles: ['customer'] } },
+    });
+    const client = socket('s1', 'good');
+    await gateway.handleConnection(client as never);
+    await gateway.handleSubscribe(client as never, { room: `order:${ORDER_ID}` });
     expect(client.join).toHaveBeenCalledWith(`order:${ORDER_ID}`);
+
+    tokenExpiry.set('s1', { client, exp: ALREADY_EXPIRED() });
+
+    // A broadcast still reaches the room's subscribers at the Socket.IO level
+    // — expiry is enforced by DISCONNECTING the socket, not by silently
+    // unsubscribing it mid-flight.
+    gateway.onRelayedDomainEvent(envelope('order.ready', { orderId: ORDER_ID, status: 'ready' }));
+    expect(emitted).toHaveLength(1);
+  });
+
+  it('the periodic sweep disconnects a socket whose token has expired', async () => {
+    const { gateway, tokenExpiry, actors, runSweep } = makeGateway({
+      validTokens: { good: { userId: OWNER, roles: ['customer'] } },
+    });
+    const client = socket('s1', 'good');
+    await gateway.handleConnection(client as never);
+    tokenExpiry.set('s1', { client, exp: ALREADY_EXPIRED() });
+
+    runSweep();
+
+    expect(client.disconnect).toHaveBeenCalledWith(true);
+    // `handleDisconnect` is socket.io's own event delivery, not called by the
+    // sweep directly in this fake — assert the gateway's intent (disconnect
+    // was requested), then simulate the event framework delivering it, exactly
+    // as the real `disconnect(true)` call does a tick later in production.
+    gateway.handleDisconnect(client as never);
+    expect(actors.has('s1')).toBe(false);
+    expect(tokenExpiry.has('s1')).toBe(false);
+  });
+
+  it('the sweep leaves a still-valid socket completely alone', () => {
+    const { tokenExpiry, runSweep } = makeGateway();
+    const client = socket('s1');
+    tokenExpiry.set('s1', { client, exp: FAR_FUTURE_EXP() });
+
+    runSweep();
+
+    expect(client.disconnect).not.toHaveBeenCalled();
+    expect(tokenExpiry.has('s1')).toBe(true);
+  });
+
+  it('the sweep never throws on an empty registry', () => {
+    const { runSweep } = makeGateway();
+    expect(() => runSweep()).not.toThrow();
+  });
+
+  it('multiple devices: one token expiring never disconnects the user’s OTHER device', async () => {
+    const { gateway, tokenExpiry, runSweep } = makeGateway({
+      validTokens: {
+        'phone-token': { userId: OWNER, roles: ['customer'] },
+        'laptop-token': { userId: OWNER, roles: ['customer'] },
+      },
+    });
+    const phone = socket('phone', 'phone-token');
+    const laptop = socket('laptop', 'laptop-token');
+    await gateway.handleConnection(phone as never);
+    await gateway.handleConnection(laptop as never);
+
+    tokenExpiry.set('phone', { client: phone, exp: ALREADY_EXPIRED() });
+    // laptop keeps its far-future expiry untouched.
+
+    runSweep();
+
+    expect(phone.disconnect).toHaveBeenCalledWith(true);
+    expect(laptop.disconnect).not.toHaveBeenCalled();
+    expect(tokenExpiry.has('laptop')).toBe(true);
+  });
+
+  it('after a disconnect for expiry, reconnecting with a FRESH token re-authorizes rooms normally', async () => {
+    const { gateway, actors, tokenExpiry, runSweep } = makeGateway({
+      validTokens: {
+        'stale-token': { userId: OWNER, roles: ['customer'], exp: ALREADY_EXPIRED() },
+        'fresh-token': { userId: OWNER, roles: ['customer'] },
+      },
+    });
+    // The handshake itself refuses an already-expired token outright (this is
+    // the "expired AT handshake" case, not "expired during the connection");
+    // what matters here is the end-to-end recovery path a real client follows
+    // after Bloc 1's REST refresh: reconnect with the newly issued token.
+    const dead = socket('s-old', 'stale-token');
+    await gateway.handleConnection(dead as never);
+    expect(dead.disconnect).toHaveBeenCalledWith(true); // refused up front
+    expect(actors.has('s-old')).toBe(false);
+
+    const revived = socket('s-new', 'fresh-token');
+    await gateway.handleConnection(revived as never);
+    await gateway.handleSubscribe(revived as never, { room: `order:${ORDER_ID}` });
+
+    expect(revived.disconnect).not.toHaveBeenCalled();
+    expect(revived.join).toHaveBeenCalledWith(`order:${ORDER_ID}`);
+    expect(tokenExpiry.has('s-new')).toBe(true);
+    runSweep(); // the fresh connection must survive an ordinary sweep tick
+    expect(revived.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('a different user’s fresh connection never inherits a prior, expired session’s authorization', async () => {
+    // Guards against any state bleeding between sockets keyed only by a
+    // previously-reused connection slot — user B must get exactly their OWN
+    // authorization, never user A's leftover room access.
+    const { gateway, tokenExpiry, runSweep } = makeGateway({
+      validTokens: {
+        'a-token': { userId: OWNER, roles: ['customer'] },
+        'b-token': { userId: OTHER_USER, roles: ['customer'] },
+      },
+    });
+    const clientA = socket('sock', 'a-token');
+    await gateway.handleConnection(clientA as never);
+    tokenExpiry.set('sock', { client: clientA, exp: ALREADY_EXPIRED() });
+    runSweep();
+    gateway.handleDisconnect(clientA as never);
+
+    const clientB = socket('sock', 'b-token'); // same socket id, a different user
+    await gateway.handleConnection(clientB as never);
+    // Order room authorization is scoped to OWNER, not OTHER_USER — B's own
+    // join to an order they do not own must be refused on its own merits,
+    // proving B's authorization is resolved fresh and not inherited from A.
+    await gateway.handleSubscribe(clientB as never, { room: `order:${ORDER_ID}` });
+    expect(clientB.join).not.toHaveBeenCalled();
+    expect(clientB.disconnect).not.toHaveBeenCalled(); // B's own token is valid — just not this room
+  });
+
+  it('an already-expired token cannot be reused to open a brand-new connection', async () => {
+    const { gateway, actors } = makeGateway({
+      validTokens: { reused: { userId: OWNER, roles: ['customer'], exp: ALREADY_EXPIRED() } },
+    });
+    const client = socket('s1', 'reused');
+
+    await gateway.handleConnection(client as never);
+
+    expect(client.disconnect).toHaveBeenCalledWith(true);
+    expect(actors.has('s1')).toBe(false);
   });
 });
 
