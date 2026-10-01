@@ -1,5 +1,7 @@
 import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
+import type { OutboxEnvelope } from '@djafat/types';
+import { DOMAIN_EVENT_STREAM, DOMAIN_EVENT_STREAM_MAXLEN } from '@djafat/types';
 import { env, logger } from './logger';
 import { pool } from './db';
 import { makeOutboxRelayProcessor } from './processors/outbox-relay.processor';
@@ -15,8 +17,33 @@ async function bootstrap(): Promise<void> {
 
   const connection = new IORedis(env.REDIS_URL, { maxRetriesPerRequest: null });
   const publisherConnection = new IORedis(env.REDIS_URL);
-  const publish = (channel: string, message: string): Promise<number> =>
-    publisherConnection.publish(channel, message);
+
+  /**
+   * Appends a domain event to the durable Redis Stream every API instance's
+   * realtime fan-out reads (docs/27 §2). `XADD` persists the entry, so an API
+   * process that was down during a deploy reads what it missed when it returns
+   * — which `PUBLISH` could not do.
+   *
+   * `MAXLEN ~` caps the stream approximately (cheaper than an exact trim, and
+   * the bound only needs to be a bound): a long outage cannot grow Redis
+   * without limit. Resolving with the entry id is what lets the relay mark the
+   * outbox row published; a rejection leaves it for the next tick.
+   */
+  const publish = async (event: OutboxEnvelope): Promise<string> => {
+    const id = await publisherConnection.xadd(
+      DOMAIN_EVENT_STREAM,
+      'MAXLEN',
+      '~',
+      String(DOMAIN_EVENT_STREAM_MAXLEN),
+      '*',
+      'event',
+      JSON.stringify(event),
+    );
+    if (id === null) {
+      throw new Error(`XADD to ${DOMAIN_EVENT_STREAM} returned no id for outbox row ${event.id}`);
+    }
+    return id;
+  };
 
   const workers: Worker[] = [
     new Worker('outbox-relay', makeOutboxRelayProcessor(publish), { connection }),

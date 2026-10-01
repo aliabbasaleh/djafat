@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AuthenticatedActor, OrderAmountPort, Role } from '@djafat/types';
 import type { ActorResolverService } from '../auth/actor-resolver.service';
 import type { DeliveryTrackingPort } from '../../common/ports/delivery-tracking.port';
+import type { RestaurantMembershipPort } from '../../common/ports/restaurant-membership.port';
 import { RealtimeGateway } from './realtime.gateway';
 
 /**
@@ -28,7 +29,14 @@ const ORDER_OWNER = 'customer-owner';
 const ASSIGNED_COURIER = 'courier-assigned';
 const ORDER_ID = 'order-1';
 
-function makeGateway(opts: { orderOwner?: string | null; assignedCourier?: string | null } = {}) {
+function makeGateway(
+  opts: {
+    orderOwner?: string | null;
+    assignedCourier?: string | null;
+    /** userId -> restaurantIds they hold a scoped RBAC grant on. */
+    restaurantMembers?: Record<string, readonly string[]>;
+  } = {},
+) {
   const joined: string[] = [];
 
   const orderAmount = {
@@ -48,10 +56,18 @@ function makeGateway(opts: { orderOwner?: string | null; assignedCourier?: strin
     }),
   } as unknown as DeliveryTrackingPort;
 
+  const restaurantMembership = {
+    isMemberOfRestaurant: vi.fn(async (userId: string, restaurantId: string) => {
+      await Promise.resolve();
+      return (opts.restaurantMembers?.[userId] ?? []).includes(restaurantId);
+    }),
+  } as unknown as RestaurantMembershipPort;
+
   const gateway = new RealtimeGateway(
     {} as unknown as ActorResolverService,
     orderAmount,
     deliveryTracking,
+    restaurantMembership,
   );
 
   function connect(userId: string, roles: readonly Role[]): { socketId: string } {
@@ -150,10 +166,76 @@ describe('who may watch a delivery in flight (mandate §9)', () => {
   });
 });
 
+describe('the restaurant order board (Bloc 7 §4, §19)', () => {
+  const RESTAURANT_A = 'resto-a';
+  const RESTAURANT_B = 'resto-b';
+  const STAFF_A = 'staff-of-a';
+
+  it('a member of restaurant A may join restaurant A’s board', async () => {
+    const allowed = await canJoin(
+      `restaurant:orders:${RESTAURANT_A}`,
+      STAFF_A,
+      ['restaurant_staff'],
+      {
+        restaurantMembers: { [STAFF_A]: [RESTAURANT_A] },
+      },
+    );
+    expect(allowed).toBe(true);
+  });
+
+  // The IDOR the mandate names explicitly: restaurant A must not see B.
+  it('a member of restaurant A may NOT join restaurant B’s board', async () => {
+    const allowed = await canJoin(
+      `restaurant:orders:${RESTAURANT_B}`,
+      STAFF_A,
+      ['restaurant_staff'],
+      {
+        restaurantMembers: { [STAFF_A]: [RESTAURANT_A] },
+      },
+    );
+    expect(allowed).toBe(false);
+  });
+
+  it('holding a restaurant role with no scope grants nothing', async () => {
+    // A bare `restaurant_staff` role must not open every restaurant's board —
+    // membership is the SCOPED grant, not the role name.
+    const allowed = await canJoin(
+      `restaurant:orders:${RESTAURANT_A}`,
+      'unscoped-staff',
+      ['restaurant_staff'],
+      { restaurantMembers: {} },
+    );
+    expect(allowed).toBe(false);
+  });
+
+  it('a customer and a courier are never members of a restaurant board', async () => {
+    for (const roles of [['customer'], ['courier']] as Role[][]) {
+      const allowed = await canJoin(`restaurant:orders:${RESTAURANT_A}`, 'someone', roles, {
+        restaurantMembers: {},
+      });
+      expect(allowed, roles.join()).toBe(false);
+    }
+  });
+
+  it('platform staff reach any board through their admin role', async () => {
+    const allowed = await canJoin(`restaurant:orders:${RESTAURANT_A}`, 'admin-1', ['admin'], {
+      restaurantMembers: {},
+    });
+    expect(allowed).toBe(true);
+  });
+
+  it('the BARE restaurant room stays denied — it has no producer', async () => {
+    const allowed = await canJoin(`restaurant:${RESTAURANT_A}`, STAFF_A, ['restaurant_staff'], {
+      restaurantMembers: { [STAFF_A]: [RESTAURANT_A] },
+    });
+    expect(allowed).toBe(false);
+  });
+});
+
 describe('the join rule is default-deny (mandate §9, §10)', () => {
   it('refuses a room pattern nobody implemented', async () => {
     for (const room of [
-      'restaurant:r1', // documented debt: needs a staff-membership port
+      'restaurant:r1', // the bare room has no producer and no audience
       'everything',
       '*',
       'order',

@@ -142,3 +142,23 @@ export interface OtpDeliveryPort {
   readonly channel: 'sms' | 'whatsapp' | 'email';
   send(input: { to: string; code: string; ttlSeconds: number; locale: string }): Promise<void>;
 }
+
+/**
+ * Push notification delivery (Bloc 7, docs/27 §16) — provider-agnostic, same
+ * shape and reasoning as `OtpDeliveryPort`: a mock implementation is the
+ * permanent dev/CI citizen, a real provider (Expo push / FCM / APNs) is a
+ * separate implementation plugged in later without touching any caller.
+ *
+ * `send` never throws for an individual bad/expired token — it reports per
+ * token so the caller can revoke what a provider says is dead, without one
+ * failed device aborting delivery to the user's other devices.
+ */
+export interface PushPort {
+  send(input: {
+    token: string;
+    platform: 'ios' | 'android' | 'web';
+    titleKey: string;
+    bodyKey: string;
+    data: Record<string, string>;
+  }): Promise<{ delivered: boolean; shouldRevoke: boolean }>;
+}

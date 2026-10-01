@@ -104,6 +104,32 @@ export class UsersService {
     return rows.map((r) => r.role as Role);
   }
 
+  /**
+   * `RestaurantMembershipPort` (Bloc 7, docs/27 §4) — may this user act for
+   * this restaurant? Used by `realtime` to authorize a `restaurant:orders:{id}`
+   * room join, which Bloc 6.1 had to default-deny for want of exactly this
+   * lookup.
+   *
+   * Reads `user_roles.scope_restaurant_id`, the RBAC grant. A role held with NO
+   * scope (`scope_restaurant_id IS NULL`) is a global grant and deliberately
+   * does NOT match: a bare `restaurant_staff` role must not open every
+   * restaurant's board. Platform staff reach these rooms through their admin
+   * role instead, which the gateway checks separately.
+   *
+   * Never throws — an unknown user or restaurant is simply not a member, and a
+   * room join must not be able to tell those two cases apart.
+   */
+  async isMemberOfRestaurant(userId: string, restaurantId: string): Promise<boolean> {
+    const rows = await this.prisma.$queryRaw<Array<{ ok: boolean }>>`
+      SELECT true AS ok FROM user_roles
+      WHERE user_id = ${userId}::uuid
+        AND scope_restaurant_id = ${restaurantId}::uuid
+        AND role IN ('restaurant_owner', 'restaurant_staff')
+      LIMIT 1
+    `;
+    return rows.length > 0;
+  }
+
   /** The union of every permission granted to ANY role this user holds (docs/19 §17-19). */
   async getPermissions(roles: readonly Role[]): Promise<Permission[]> {
     if (roles.length === 0) return [];

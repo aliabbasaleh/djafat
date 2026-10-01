@@ -837,3 +837,42 @@ model Settlement {
 
   @@map("settlements")
 }
+
+/// ────────────────────── Bloc 7 — realtime + notifications (docs/27) ──────────
+/// Persisted in-app notification (docs/27 §15). `type` reuses a `DomainEventType`
+/// name rather than a second vocabulary. `dedupKey` is the outbox row id that
+/// produced this row — the unique constraint with `userId` is what makes
+/// at-least-once delivery produce exactly one notification per recipient.
+model Notification {
+  id                  String    @id @default(uuid()) @db.Uuid
+  userId              String    @map("user_id") @db.Uuid
+  type                String
+  titleKey            String    @map("title_key")
+  bodyKey             String    @map("body_key")
+  data                Json      @default("{}")
+  referenceAggregate  String?   @map("reference_aggregate")
+  referenceId         String?   @map("reference_id") @db.Uuid
+  dedupKey            String    @map("dedup_key")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  readAt              DateTime? @map("read_at") @db.Timestamptz(6)
+
+  @@unique([userId, dedupKey])
+  @@map("notifications")
+}
+
+/// A registered push device (docs/27 §16). `pushToken` is sensitive — never
+/// logged. Unique on its own: a token identifies one installation, and a
+/// reinstall/account-switch legitimately re-points `userId` rather than
+/// erroring (see `NotificationsService.registerDevice`'s upsert).
+model NotificationDevice {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  platform   String
+  pushToken  String    @map("push_token")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  @@unique([pushToken])
+  @@map("notification_devices")
+}

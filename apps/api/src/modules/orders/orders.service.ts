@@ -486,14 +486,19 @@ export class OrdersService implements OrderAmountPort {
     to: OrderStatusString,
     opts: { actorRole?: Role; system?: boolean; reason?: string },
   ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<Array<{ status: OrderStatusString }>>`
-        SELECT status FROM orders WHERE id = ${orderId}::uuid FOR UPDATE
+    const restaurantId = await this.prisma.$transaction(async (tx) => {
+      // `restaurant_id` is read with the lock rather than in a second query:
+      // the realtime fan-out needs it to reach the restaurant's order board
+      // (docs/27 §4), and it must describe the order as it was at THIS
+      // transition, not as a later read might find it.
+      const rows = await tx.$queryRaw<Array<{ status: OrderStatusString; restaurant_id: string }>>`
+        SELECT status, restaurant_id FROM orders WHERE id = ${orderId}::uuid FOR UPDATE
       `;
       if (!rows[0]) {
         throw new NotFoundException({ code: 'NOT_FOUND', message: `Order ${orderId} not found.` });
       }
       const from = rows[0].status;
+      const restaurantId = rows[0].restaurant_id;
       assertOrderTransition(from, to, opts); // throws OrderTransitionError -> 409
 
       await tx.$executeRaw`UPDATE orders SET status = ${to}::order_status WHERE id = ${orderId}::uuid`;
@@ -510,8 +515,9 @@ export class OrdersService implements OrderAmountPort {
         aggregate: 'order',
         aggregateId: orderId,
         eventType: this.eventNameFor(to),
-        payload: { orderId, status: to },
+        payload: { orderId, status: to, restaurantId },
       });
+      return restaurantId;
     });
 
     // Fast, same-process reaction — fired AFTER commit (docs/05 §5.4), by
@@ -519,7 +525,7 @@ export class OrdersService implements OrderAmountPort {
     // realtime forwarding below). Bloc 6: `deliveries` reacts to
     // `order.ready` to start dispatch — same mechanism `orders` itself
     // already uses to react to `payment.succeeded`/`delivery.*`.
-    this.events.emit(this.eventNameFor(to), { orderId, status: to });
+    this.events.emit(this.eventNameFor(to), { orderId, status: to, restaurantId });
   }
 
   /**

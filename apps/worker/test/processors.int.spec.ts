@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import type { OutboxEnvelope } from '@djafat/types';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { pool } from '../src/db';
 import { orderExpiryProcessor } from '../src/processors/order-expiry.processor';
-import { outboxRelayProcessor, type Publisher } from '../src/processors/outbox-relay.processor';
+import {
+  outboxRelayProcessor,
+  type EventPublisher,
+} from '../src/processors/outbox-relay.processor';
 import { ledgerAssertProcessor } from '../src/processors/ledger-assert.processor';
 
 /**
@@ -212,20 +216,26 @@ describe('outboxRelayProcessor (docs/18 §9)', () => {
       [aggregateId, JSON.stringify({ orderId: aggregateId })],
     );
 
-    const published: Array<{ channel: string; message: string }> = [];
-    const publish: Publisher = async (channel, message) => {
-      published.push({ channel, message });
-      return 1;
+    // The transport is injected, so this asserts the ENVELOPE the relay hands
+    // over — not that Redis was called (docs/27 §2: the relay's contract is
+    // "durably handed off", and the entry id is the proof).
+    const published: OutboxEnvelope[] = [];
+    let nextId = 0;
+    const publish: EventPublisher = async (event) => {
+      await Promise.resolve();
+      published.push(event);
+      nextId += 1;
+      return `1700000000000-${nextId}`;
     };
 
     const result = await outboxRelayProcessor(publish);
     expect(result.published).toBeGreaterThanOrEqual(1);
 
-    const match = published.find(
-      (p) => (JSON.parse(p.message) as { aggregateId: string }).aggregateId === aggregateId,
-    );
+    const match = published.find((e) => e.aggregateId === aggregateId);
     expect(match).toBeDefined();
-    expect(match!.channel).toBe('domain-events');
+    expect(match!.eventType).toBe('order.test_event');
+    // `createdAt` must be the business commit time, readable as a real date.
+    expect(Number.isNaN(Date.parse(match!.createdAt))).toBe(false);
 
     const row = await pool.query(`SELECT status FROM outbox WHERE aggregate_id = $1`, [
       aggregateId,
@@ -241,7 +251,7 @@ describe('outboxRelayProcessor (docs/18 §9)', () => {
       [aggregateId, JSON.stringify({})],
     );
 
-    const failingPublish: Publisher = async () => {
+    const failingPublish: EventPublisher = async () => {
       throw new Error('redis unreachable (test)');
     };
     await outboxRelayProcessor(failingPublish);
