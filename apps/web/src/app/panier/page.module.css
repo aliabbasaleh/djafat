@@ -66,3 +66,24 @@
   padding-top: calc(var(--djafat-space-2) * 1px);
   border-top: 1px solid var(--djafat-color-border-default);
 }
+
+.addressSection {
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  padding: calc(var(--djafat-space-3) * 1px);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-2) * 1px);
+}
+
+.addressSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--djafat-space-2) * 1px);
+}
+
+.addressList {
+  display: flex;
+  flex-direction: column;
+}

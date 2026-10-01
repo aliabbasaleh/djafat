@@ -193,6 +193,57 @@ describe('PaymentsService.refundPayment — validation guards (docs/08 §8.8, no
     );
     expect(result.payment.status).toBe('partially_refunded');
   });
+
+  it('a client retry with the SAME Idempotency-Key replays the SAME refund — never a second one, never a double-credit (Bloc 8, docs/29 §finance)', async () => {
+    const { db, payments: rows, ledgerGroups } = makePaymentsRaceDb();
+    const payment = seedPayment(rows, { status: 'succeeded', amountMinor: 10_000n });
+    const { payments } = buildPaymentsService(db, ledgerGroups);
+
+    const original = await payments.refundPayment(
+      payment.id,
+      { amount: { minor: '4000', currency: 'XAF' }, reason: 'partial goodwill' },
+      'retry-refund-key',
+      CUSTOMER_ID,
+    );
+
+    // Simulates the client never seeing the first response (e.g. a network
+    // timeout) and retrying with the identical key — exactly the same
+    // generic `IdempotencyService.run('payments:refund', ...)` wrapper
+    // `cancelPayment` already proves replays safely; this pins the same
+    // guarantee down specifically for a refund.
+    const retry = await payments.refundPayment(
+      payment.id,
+      { amount: { minor: '4000', currency: 'XAF' }, reason: 'partial goodwill' },
+      'retry-refund-key',
+      CUSTOMER_ID,
+    );
+
+    expect(retry.refund.id).toBe(original.refund.id);
+    expect(retry.payment.status).toBe('partially_refunded');
+    expect(ledgerGroups).toHaveLength(1); // one balanced refund group, not two
+  });
+
+  it('a retry with the SAME key but a DIFFERENT amount is an idempotency conflict, never a silently different refund', async () => {
+    const { db, payments: rows, ledgerGroups } = makePaymentsRaceDb();
+    const payment = seedPayment(rows, { status: 'succeeded', amountMinor: 10_000n });
+    const { payments } = buildPaymentsService(db, ledgerGroups);
+
+    await payments.refundPayment(
+      payment.id,
+      { amount: { minor: '4000', currency: 'XAF' }, reason: 'first reason' },
+      'shared-refund-key',
+      CUSTOMER_ID,
+    );
+
+    await expect(
+      payments.refundPayment(
+        payment.id,
+        { amount: { minor: '5000', currency: 'XAF' }, reason: 'different amount' },
+        'shared-refund-key',
+        CUSTOMER_ID,
+      ),
+    ).rejects.toMatchObject({ response: { code: 'IDEMPOTENCY_KEY_REUSED' } });
+  });
 });
 
 describe('PaymentsService.handleWebhook — out-of-order / replay safety (docs/08 §8.3, §8.6)', () => {

@@ -74,3 +74,85 @@ describe('createApiClient', () => {
     expect((err as ApiClientError).code).toBe('NETWORK');
   });
 });
+
+describe('orders.create (Bloc 8, docs/29 §checkout)', () => {
+  it('sends an empty body when no addressId is given — the pre-Bloc-8 default-address fallback', async () => {
+    let seenBody: unknown;
+    const client = createApiClient({
+      baseUrl: 'http://api.test/v1',
+      fetchImpl: mockFetch((_url, init) => {
+        seenBody = init.body ? JSON.parse(String(init.body)) : undefined;
+        return new Response(JSON.stringify({ status: 'created', order: {} }), {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        });
+      }),
+    });
+    await client.orders.create('idem-1');
+    expect(seenBody).toEqual({});
+  });
+
+  it('sends ONLY addressId in the body — never a price/fee/commission/total field', async () => {
+    let seenBody: unknown;
+    const client = createApiClient({
+      baseUrl: 'http://api.test/v1',
+      fetchImpl: mockFetch((_url, init) => {
+        seenBody = init.body ? JSON.parse(String(init.body)) : undefined;
+        return new Response(JSON.stringify({ status: 'created', order: {} }), {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        });
+      }),
+    });
+    await client.orders.create('idem-1', 'addr-1');
+    expect(seenBody).toEqual({ addressId: 'addr-1' });
+  });
+});
+
+describe('addresses client (Bloc 8, docs/29)', () => {
+  it('lists, creates, updates, sets default and removes against the expected routes', async () => {
+    const calls: Array<{ method: string; url: string; body: unknown }> = [];
+    const client = createApiClient({
+      baseUrl: 'http://api.test/v1',
+      fetchImpl: mockFetch((url, init) => {
+        calls.push({
+          method: init.method ?? 'GET',
+          url,
+          body: init.body ? JSON.parse(String(init.body)) : undefined,
+        });
+        return new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }),
+    });
+
+    await client.addresses.list();
+    await client.addresses.get('a1');
+    await client.addresses.create({ label: 'Maison' });
+    await client.addresses.update('a1', { label: 'Bureau' });
+    await client.addresses.setDefault('a1');
+    await client.addresses.remove('a1');
+
+    expect(calls).toEqual([
+      { method: 'GET', url: 'http://api.test/v1/users/me/addresses', body: undefined },
+      { method: 'GET', url: 'http://api.test/v1/users/me/addresses/a1', body: undefined },
+      {
+        method: 'POST',
+        url: 'http://api.test/v1/users/me/addresses',
+        body: { label: 'Maison' },
+      },
+      {
+        method: 'PATCH',
+        url: 'http://api.test/v1/users/me/addresses/a1',
+        body: { label: 'Bureau' },
+      },
+      {
+        method: 'POST',
+        url: 'http://api.test/v1/users/me/addresses/a1/default',
+        body: undefined,
+      },
+      { method: 'DELETE', url: 'http://api.test/v1/users/me/addresses/a1', body: undefined },
+    ]);
+  });
+});

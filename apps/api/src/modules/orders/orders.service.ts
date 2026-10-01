@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { Prisma } from '@prisma/client';
 import type {
   DomainEventType,
   Money,
@@ -15,6 +16,7 @@ import { CatalogService } from '../catalog/catalog.service';
 import { PricingService } from '../pricing/pricing.service';
 import { PlatformService } from '../platform/platform.service';
 import { CartsService } from '../carts/carts.service';
+import { AddressesService, type AddressDto } from '../addresses/addresses.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { OutboxService } from '../../infra/outbox/outbox.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
@@ -49,6 +51,44 @@ export interface OrderItemDto {
   quantity: number;
   lineTotal: MoneyJson;
   options: OrderItemOptionDto[];
+}
+
+/**
+ * The shape `order.create`'s `dropoff*` columns are frozen from — common to
+ * both checkout paths (Bloc 8, docs/29 §checkout): a client-selected address
+ * (`AddressesService.requireOwned`, mapped to this shape) and the legacy
+ * default-address lookup (`loadDefaultDropoff`, raw SQL, unchanged since
+ * Bloc 6) both resolve to exactly this before `doCreateOrder` snapshots it.
+ */
+interface DropoffSnapshot {
+  id: string;
+  label: string | null;
+  city: string | null;
+  quartier: string | null;
+  street: string | null;
+  landmark: string | null;
+  instructions: string | null;
+  recipient_phone: string | null;
+  geocode_status: string;
+  lat: number | null;
+  lng: number | null;
+}
+
+/** Maps a customer's selected `AddressDto` (camelCase, city joined by name) onto the `DropoffSnapshot` shape. */
+function toDropoffSnapshot(address: AddressDto): DropoffSnapshot {
+  return {
+    id: address.id,
+    label: address.label,
+    city: address.cityName,
+    quartier: address.quartier,
+    street: address.street,
+    landmark: address.landmark,
+    instructions: address.instructions,
+    recipient_phone: address.recipientPhone,
+    geocode_status: address.geocodeStatus,
+    lat: address.lat,
+    lng: address.lng,
+  };
 }
 
 export interface OrderDto {
@@ -93,6 +133,7 @@ export class OrdersService implements OrderAmountPort {
     private readonly pricing: PricingService,
     private readonly platform: PlatformService,
     private readonly carts: CartsService,
+    private readonly addresses: AddressesService,
     private readonly outbox: OutboxService,
     private readonly idempotency: IdempotencyService,
     private readonly events: EventEmitter2,
@@ -103,23 +144,29 @@ export class OrdersService implements OrderAmountPort {
   async createOrder(
     customerId: string,
     idempotencyKey: string,
+    addressId?: string,
   ): Promise<{ status: 'created' | 'replayed'; order: OrderDto }> {
     // Scoped per-customer (not a bare 'orders' scope): an idempotency key is
     // client-generated, so namespacing by actor is what actually prevents
     // one customer's key from ever colliding with another's (docs/19 §2).
-    // The payload fingerprint is the customer id itself (there is no
-    // client-supplied body any more — docs/22 §9): replaying the same key
-    // for the same customer always replays the same order.
+    // The payload fingerprint is the customer id itself, with `addressId`
+    // folded in (Bloc 8, docs/29 §checkout): a replay must produce the SAME
+    // order it did the first time, so a key reused with a different address
+    // selection is a fingerprint mismatch, not a silent re-resolution.
     const run = await this.idempotency.run(
       `orders:${customerId}`,
       idempotencyKey,
-      { customerId },
-      () => this.doCreateOrder(customerId, idempotencyKey),
+      { customerId, addressId: addressId ?? null },
+      () => this.doCreateOrder(customerId, idempotencyKey, addressId),
     );
     return { status: run.status, order: run.response };
   }
 
-  private async doCreateOrder(customerId: string, idempotencyKey: string): Promise<OrderDto> {
+  private async doCreateOrder(
+    customerId: string,
+    idempotencyKey: string,
+    addressId?: string,
+  ): Promise<OrderDto> {
     const { order: created, lines } = await this.prisma.$transaction(async (tx) => {
       // Row-locks the caller's open cart for the rest of this transaction
       // (docs/22 §9). Without this, two concurrent POST /orders calls using
@@ -134,43 +181,24 @@ export class OrdersService implements OrderAmountPort {
       const validated = await this.carts.loadAndValidateCartForCheckout(customerId, tx);
       const restaurant = await this.catalog.getActiveRestaurant(validated.restaurantId);
 
-      // Dropoff snapshot (Bloc 6, docs/25 §8) — frozen from the customer's
-      // default address NOW, at order creation, never re-read live later (a
+      // Dropoff snapshot (Bloc 6, docs/25 §8; Bloc 8, docs/29 §checkout) —
+      // frozen NOW, at order creation, never re-read live later (a
       // subsequent address-book edit must not alter this order). No courier
       // is resolved here — the Bloc 0.5 hack that used to do that is gone
       // (docs/25 §2): a courier is only known once `deliveries` dispatches
       // one, well after payment.
-      const defaultAddress = await tx.$queryRaw<
-        Array<{
-          id: string;
-          quartier: string | null;
-          street: string | null;
-          landmark: string | null;
-          instructions: string | null;
-          recipient_phone: string | null;
-          geocode_status: string;
-          label: string | null;
-          city: string | null;
-          lat: number | null;
-          lng: number | null;
-        }>
-      >`
-        SELECT a.id, a.quartier, a.street, a.landmark, a.instructions, a.recipient_phone,
-               a.geocode_status, a.label, c.name AS city,
-               ST_Y(a.geom::geometry) AS lat, ST_X(a.geom::geometry) AS lng
-        FROM addresses a
-        LEFT JOIN cities c ON c.id = a.city_id
-        WHERE a.user_id = ${customerId}::uuid AND a.is_default = true
-        LIMIT 1
-      `;
-      const dropoff = defaultAddress[0];
-      if (!dropoff) {
-        throw new ConflictException({
-          code: 'VALIDATION_ERROR',
-          message:
-            'No default delivery address on file — add one before placing an order (docs/25 §6, §20).',
-        });
-      }
+      //
+      // When the client selects an address, it is resolved here through
+      // `AddressesService.requireOwned`, given THIS SAME `tx` — the ownership
+      // check and the snapshot below commit as one atomic unit, so a
+      // concurrent delete/edit of that address can never land half-applied.
+      // A foreign or unknown id is rejected (404) before any pricing or order
+      // row is touched. With no selection, the pre-Bloc-8 default-address
+      // behaviour is preserved untouched, byte-for-byte, for callers that
+      // still omit it.
+      const dropoff = addressId
+        ? toDropoffSnapshot(await this.addresses.requireOwned(customerId, addressId, tx))
+        : await this.loadDefaultDropoff(tx, customerId);
 
       const price = await this.pricing.priceOrder({
         restaurantId: restaurant.id,
@@ -294,6 +322,36 @@ export class OrdersService implements OrderAmountPort {
       })),
     }));
     return this.toDto(created, itemDtos);
+  }
+
+  /**
+   * The pre-Bloc-8 behaviour (docs/25 §8), unchanged: when the client omits
+   * `addressId`, fall back to the customer's default address. Kept as the
+   * exact original raw query so every existing caller that never selects an
+   * address keeps behaving byte-for-byte as before.
+   */
+  private async loadDefaultDropoff(
+    tx: Prisma.TransactionClient,
+    customerId: string,
+  ): Promise<DropoffSnapshot> {
+    const defaultAddress = await tx.$queryRaw<DropoffSnapshot[]>`
+      SELECT a.id, a.quartier, a.street, a.landmark, a.instructions, a.recipient_phone,
+             a.geocode_status, a.label, c.name AS city,
+             ST_Y(a.geom::geometry) AS lat, ST_X(a.geom::geometry) AS lng
+      FROM addresses a
+      LEFT JOIN cities c ON c.id = a.city_id
+      WHERE a.user_id = ${customerId}::uuid AND a.is_default = true
+      LIMIT 1
+    `;
+    const dropoff = defaultAddress[0];
+    if (!dropoff) {
+      throw new ConflictException({
+        code: 'VALIDATION_ERROR',
+        message:
+          'No default delivery address on file — add one before placing an order (docs/25 §6, §20).',
+      });
+    }
+    return dropoff;
   }
 
   // ── OrderAmountPort (consumed by `payments` — docs/15 AD-09) ─────────────

@@ -27,7 +27,13 @@ import { CreateOrderSchema, type CreateOrderInput } from './dto/create-order.sch
 export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
 
-  /** Creates an order FROM the caller's own cart (docs/22 §9) — the body carries nothing. */
+  /**
+   * Creates an order FROM the caller's own cart (docs/22 §9). The body's
+   * only allowed field is `addressId` (Bloc 8, docs/29 §checkout) — the
+   * client selects WHICH of their own addresses to deliver to; the server
+   * resolves, owns, and prices everything else. Omitting it falls back to
+   * the customer's default address, unchanged from before this bloc.
+   */
   @Post()
   @HttpCode(201)
   @RequireAuth()
@@ -35,7 +41,7 @@ export class OrdersController {
   async create(
     @CurrentActor() actor: AuthenticatedActor,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body(new ZodValidationPipe(CreateOrderSchema)) _body: CreateOrderInput,
+    @Body(new ZodValidationPipe(CreateOrderSchema)) body: CreateOrderInput,
   ) {
     if (!idempotencyKey) {
       throw new BadRequestException({
@@ -43,7 +49,11 @@ export class OrdersController {
         message: 'Idempotency-Key header is required.',
       });
     }
-    const { status, order } = await this.orders.createOrder(actor.userId, idempotencyKey);
+    const { status, order } = await this.orders.createOrder(
+      actor.userId,
+      idempotencyKey,
+      body.addressId,
+    );
     return { status, order };
   }
 

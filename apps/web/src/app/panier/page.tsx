@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { ApiClientError, type Cart, type CartQuote } from '@djafat/sdk';
+import { ApiClientError, type Address, type Cart, type CartQuote } from '@djafat/sdk';
 import { Container, Heading, Text, Stack, EmptyState, ErrorState, Skeleton, cx } from '@djafat/ui';
-import { Button } from '@/components/ui-client';
+import { Button, Radio, Alert } from '@/components/ui-client';
 import { api } from '@/lib/api';
 import { isAuthenticated, clearSession } from '@/lib/auth-storage';
 import { formatMoney } from '@/lib/format';
@@ -30,6 +30,8 @@ export default function PanierPage() {
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [ordering, setOrdering] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!isAuthenticated()) {
@@ -57,6 +59,17 @@ export default function PanierPage() {
         setQuote(null);
         setQuoteError(null);
       }
+
+      // Needed to pick a delivery address at checkout (Bloc 8, docs/29
+      // §checkout) — fetched even when the cart has no quote yet, so the
+      // "no address on file" guidance can show up immediately.
+      const fetchedAddresses = await api.addresses.list();
+      setAddresses(fetchedAddresses);
+      setSelectedAddressId((current) => {
+        if (current && fetchedAddresses.some((a) => a.id === current)) return current;
+        return (fetchedAddresses.find((a) => a.isDefault) ?? fetchedAddresses[0])?.id ?? null;
+      });
+
       setState('ready');
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
@@ -110,15 +123,20 @@ export default function PanierPage() {
     setOrdering(true);
     try {
       const idempotencyKey = crypto.randomUUID();
-      const { order } = await api.orders.create(idempotencyKey);
+      const { order } = await api.orders.create(idempotencyKey, selectedAddressId ?? undefined);
       window.dispatchEvent(new Event('djafat:cart-changed'));
       router.push(`/commandes/${order.id}` as Route);
     } catch (err) {
-      setOrderError(
-        err instanceof ApiClientError && err.code === 'CART_EMPTY'
-          ? 'Votre panier est vide.'
-          : 'Impossible de créer la commande. Vérifiez votre panier et réessayez.',
-      );
+      if (err instanceof ApiClientError && err.code === 'NOT_FOUND') {
+        setOrderError('Cette adresse n’existe plus — choisissez-en une autre.');
+        setAddresses(await api.addresses.list().catch(() => addresses));
+      } else {
+        setOrderError(
+          err instanceof ApiClientError && err.code === 'CART_EMPTY'
+            ? 'Votre panier est vide.'
+            : 'Impossible de créer la commande. Vérifiez votre panier et réessayez.',
+        );
+      }
     } finally {
       setOrdering(false);
     }
@@ -253,9 +271,40 @@ export default function PanierPage() {
           </div>
         )}
 
+        <div className={cx(styles['addressSection'])}>
+          <div className={cx(styles['addressSectionHeader'])}>
+            <Text weight="bold">Adresse de livraison</Text>
+            <Button variant="ghost" size="sm" href="/adresses">
+              Gérer mes adresses
+            </Button>
+          </div>
+          {addresses.length === 0 ? (
+            <Alert tone="warning">Ajoutez une adresse de livraison avant de commander.</Alert>
+          ) : (
+            <Stack gap="xs" className={cx(styles['addressList'])}>
+              {addresses.map((address) => (
+                <Radio
+                  key={address.id}
+                  name="delivery-address"
+                  label={[address.label ?? 'Sans nom', address.quartier]
+                    .filter(Boolean)
+                    .join(' — ')}
+                  checked={selectedAddressId === address.id}
+                  onChange={() => setSelectedAddressId(address.id)}
+                />
+              ))}
+            </Stack>
+          )}
+        </div>
+
         {orderError && <ErrorState title="Commande impossible" message={orderError} />}
 
-        <Button fullWidth loading={ordering} disabled={!quote} onClick={() => void placeOrder()}>
+        <Button
+          fullWidth
+          loading={ordering}
+          disabled={!quote || !selectedAddressId}
+          onClick={() => void placeOrder()}
+        >
           Commander
         </Button>
       </Stack>

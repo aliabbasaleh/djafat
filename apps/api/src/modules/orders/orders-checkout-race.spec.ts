@@ -8,6 +8,7 @@ import type { PricingService } from '../pricing/pricing.service';
 import type { PlatformService } from '../platform/platform.service';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { OutboxService } from '../../infra/outbox/outbox.service';
+import type { AddressesService } from '../addresses/addresses.service';
 import { OrdersService } from './orders.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { PrismaIdempotencyStore } from '../../common/idempotency/prisma-idempotency.store';
@@ -347,6 +348,16 @@ const platformStub = () =>
 const outboxStub = () =>
   ({ enqueue: vi.fn().mockResolvedValue(undefined) }) as unknown as OutboxService;
 
+// Bloc 8 (docs/29): none of these races ever select an `addressId` — every
+// `createOrder()` call here omits it and falls through to the pre-existing
+// default-address path, so `AddressesService` is never actually invoked.
+// `requireOwned` still throws if that assumption ever breaks, rather than
+// silently returning `undefined` into the dropoff snapshot.
+const addressesStub = () =>
+  ({
+    requireOwned: vi.fn().mockRejectedValue(new Error('addressesStub: unexpectedly called')),
+  }) as unknown as AddressesService;
+
 function buildServices(db: PrismaService) {
   const catalog = catalogStub();
   const pricing = pricingStub();
@@ -359,6 +370,7 @@ function buildServices(db: PrismaService) {
     pricing,
     platform,
     carts,
+    addressesStub(),
     outboxStub(),
     idempotency,
     { emit: vi.fn() } as unknown as EventEmitter2,

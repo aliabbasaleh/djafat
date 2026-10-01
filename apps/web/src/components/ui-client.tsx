@@ -10,4 +10,14 @@
  * part of `apps/web` itself, sidesteps it entirely while still reusing the
  * real implementation (docs/21 §17.2).
  */
-export { Button, MobileNav, SearchInput, Checkbox, Select, Input, Alert, Radio } from '@djafat/ui';
+export {
+  Button,
+  MobileNav,
+  SearchInput,
+  Checkbox,
+  Select,
+  Input,
+  Alert,
+  Radio,
+  Textarea,
+} from '@djafat/ui';

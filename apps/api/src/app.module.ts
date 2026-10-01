@@ -20,6 +20,7 @@ import { PlatformModule } from './modules/platform/platform.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { AddressesModule } from './modules/addresses/addresses.module';
 import { GeoModule } from './modules/geo/geo.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { PricingModule } from './modules/pricing/pricing.module';
@@ -51,6 +52,7 @@ import { AdminModule } from './modules/admin/admin.module';
     LedgerModule,
     AuthModule,
     UsersModule,
+    AddressesModule,
     GeoModule,
     CatalogModule,
     PricingModule,

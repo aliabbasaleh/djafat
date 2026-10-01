@@ -32,7 +32,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <style dangerouslySetInnerHTML={{ __html: toCssRootBlock() }} />
       </head>
       <body>
-        <Header wordmark="DJAFAT" locationLabel="📍 N’Djamena" actions={<CartIndicator />} />
+        <Header
+          wordmark="DJAFAT"
+          locationLabel="📍 N’Djamena"
+          navItems={[{ label: 'Mes adresses', href: '/adresses' }]}
+          actions={<CartIndicator />}
+        />
         {children}
         <Footer
           wordmark="DJAFAT"
@@ -69,7 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             { label: 'Accueil', icon: '🏠', href: '/' },
             { label: 'Restaurants', icon: '🍽️', href: '/restaurants' },
             { label: 'Panier', icon: '🛒', href: '/panier' },
-            { label: 'Compte', icon: '👤', soon: true },
+            { label: 'Adresses', icon: '📍', href: '/adresses' },
           ]}
         />
       </body>

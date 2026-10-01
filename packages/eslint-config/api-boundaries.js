@@ -77,6 +77,17 @@ export default [
             },
             // `users` reaches nothing (base layer, same tier as `auth`).
             { from: [['api-module', { module: 'users' }]], allow: [] },
+            // `addresses` (Bloc 8, docs/29) — its own module rather than
+            // folded into `users`, which stays a pure base layer. Reaches
+            // only `auth`/`users` for the `@RequireAuth`/`CurrentActor`
+            // decorators and city lookups, same tier as `couriers`.
+            {
+              from: [['api-module', { module: 'addresses' }]],
+              allow: [
+                ['api-module', { module: 'auth' }],
+                ['api-module', { module: 'users' }],
+              ],
+            },
             {
               from: [['api-module', { module: 'catalog' }]],
               allow: [
@@ -103,6 +114,13 @@ export default [
                 ['api-module', { module: 'catalog' }],
                 ['api-module', { module: 'auth' }],
                 ['api-module', { module: 'users' }],
+                // Bloc 8 (docs/29): checkout resolves and validates a
+                // client-selected `addressId` before snapshotting it — the
+                // same "inject the concrete service, not just a port"
+                // reasoning `deliveries`→`couriers` already uses, since the
+                // address must be read inside `orders`' own creation
+                // transaction (ownership check + snapshot, one atomic unit).
+                ['api-module', { module: 'addresses' }],
               ],
               // NOTE: `payments` is intentionally ABSENT.
             },

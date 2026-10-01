@@ -55,10 +55,15 @@ export interface Order {
 
 export function createOrdersClient(http: ApiHttp) {
   return {
-    /** Creates an order FROM the caller's own cart (docs/22 §9) — never a client-supplied price/restaurant/items. */
-    create: (idempotencyKey: string) =>
+    /**
+     * Creates an order FROM the caller's own cart (docs/22 §9) — never a
+     * client-supplied price/restaurant/items. `addressId` (Bloc 8, docs/29)
+     * selects which of the caller's OWN addresses to deliver to; omitting it
+     * falls back to their default address.
+     */
+    create: (idempotencyKey: string, addressId?: string) =>
       http.post<{ status: 'created' | 'replayed'; order: Order }>('/orders', {
-        body: {},
+        body: addressId ? { addressId } : {},
         idempotencyKey,
       }),
     get: (orderId: string) => http.get<Order>(`/orders/${encodeURIComponent(orderId)}`),
