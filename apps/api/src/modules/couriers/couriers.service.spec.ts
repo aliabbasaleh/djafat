@@ -54,6 +54,18 @@ function fakePrisma() {
         Object.assign(row, args.data);
         return Promise.resolve(row);
       }),
+      findMany: vi.fn((args: { where: { status?: string }; skip: number; take: number }) => {
+        const matches = args.where.status
+          ? couriers.filter((c) => c.status === args.where.status)
+          : couriers;
+        return Promise.resolve(matches.slice(args.skip, args.skip + args.take));
+      }),
+      count: vi.fn((args: { where: { status?: string } }) => {
+        const matches = args.where.status
+          ? couriers.filter((c) => c.status === args.where.status)
+          : couriers;
+        return Promise.resolve(matches.length);
+      }),
     },
     $executeRaw: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
       const text = strings.join('?');
@@ -222,5 +234,46 @@ describe('CouriersService.updateLocation — never trusts the client blindly (do
     const service = new CouriersService(db as never, fakePlatform());
     await expect(service.updateLocation('c1', { lat: 90, lng: 180 })).resolves.toBeUndefined();
     await expect(service.updateLocation('c1', { lat: -90, lng: -180 })).resolves.toBeUndefined();
+  });
+});
+
+describe('CouriersService.listForAdmin (Bloc 9, docs/30 §admin-api)', () => {
+  it('filters by status and paginates', async () => {
+    const { db, couriers } = fakePrisma();
+    couriers.push(
+      {
+        userId: 'c1',
+        status: 'online',
+        activeDeliveryId: null,
+        lastLat: null,
+        lastLng: null,
+        lastLocationAt: null,
+      },
+      {
+        userId: 'c2',
+        status: 'offline',
+        activeDeliveryId: null,
+        lastLat: null,
+        lastLng: null,
+        lastLocationAt: null,
+      },
+      {
+        userId: 'c3',
+        status: 'online',
+        activeDeliveryId: null,
+        lastLat: null,
+        lastLng: null,
+        lastLocationAt: null,
+      },
+    );
+    const service = new CouriersService(db as never, fakePlatform());
+
+    const online = await service.listForAdmin('online', 1, 20);
+    expect(online.total).toBe(2);
+    expect(online.items.every((c) => c.status === 'online')).toBe(true);
+
+    const page1 = await service.listForAdmin(undefined, 1, 2);
+    expect(page1.items).toHaveLength(2);
+    expect(page1.total).toBe(3);
   });
 });

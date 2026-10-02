@@ -2,6 +2,8 @@ import { Global, Module } from '@nestjs/common';
 import { PrismaModule } from '../../infra/prisma/prisma.module';
 import { LedgerService } from './ledger.service';
 import { LedgerRepository } from './ledger.repository';
+import { LedgerReadService } from './ledger-read.service';
+import { LedgerAdminController } from './ledger-admin.controller';
 import { LEDGER_PORT } from './ledger.port';
 
 /**
@@ -14,11 +16,13 @@ import { LEDGER_PORT } from './ledger.port';
 @Global()
 @Module({
   imports: [PrismaModule],
+  controllers: [LedgerAdminController],
   providers: [
     LedgerRepository,
     LedgerService,
+    LedgerReadService,
     { provide: LEDGER_PORT, useExisting: LedgerService },
   ],
-  exports: [LEDGER_PORT, LedgerService],
+  exports: [LEDGER_PORT, LedgerService, LedgerReadService],
 })
 export class LedgerModule {}

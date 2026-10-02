@@ -9,6 +9,7 @@ import type { PlatformService } from '../platform/platform.service';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { OutboxService } from '../../infra/outbox/outbox.service';
 import { AddressesService } from '../addresses/addresses.service';
+import type { UsersService } from '../users/users.service';
 import { OrdersService } from './orders.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { PrismaIdempotencyStore } from '../../common/idempotency/prisma-idempotency.store';
@@ -413,6 +414,11 @@ function buildServices(db: PrismaService) {
   // actually hit on the `createOrder` path (orders always passes its own
   // `tx` explicitly to `requireOwned`); it only needs to exist to construct.
   const addresses = new AddressesService(db);
+  // Bloc 9 (docs/30): none of this file's tests call confirm/ready/reject —
+  // `isMemberOfRestaurant` is never invoked on the `createOrder` path.
+  const users = {
+    isMemberOfRestaurant: vi.fn().mockRejectedValue(new Error('usersStub: unexpectedly called')),
+  } as unknown as UsersService;
   const orders = new OrdersService(
     db,
     catalog,
@@ -420,6 +426,7 @@ function buildServices(db: PrismaService) {
     platform,
     carts,
     addresses,
+    users,
     outboxStub(),
     idempotency,
     { emit: vi.fn() } as unknown as EventEmitter2,

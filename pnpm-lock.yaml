@@ -38,12 +38,21 @@ importers:
 
   apps/admin:
     dependencies:
+      '@djafat/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@djafat/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
       '@djafat/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens
+      '@djafat/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@djafat/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       next:
         specifier: 15.1.3
         version: 15.1.3(react-dom@19.0.0(react@19.0.0))(react@19.0.0)

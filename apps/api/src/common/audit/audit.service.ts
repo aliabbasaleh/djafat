@@ -96,4 +96,42 @@ export class AuditService {
       this.logger.error({ err, action: entry.action }, 'failed to write audit log');
     }
   }
+
+  /**
+   * Read-only — the ONE thing the audit trail is FOR (Bloc 9, docs/30
+   * §admin-api): "who did what, and when" for one entity (e.g. a user's
+   * role grants/revokes, docs/30 §role-assignment-ux "afficher... la date,
+   * l'acteur ayant effectué la mutation"). Never filtered/paginated beyond
+   * a hard cap — this is a detail-page history, not a SIEM query tool.
+   */
+  async listForEntity(
+    entityType: string,
+    entityId: string,
+    limit = 50,
+  ): Promise<
+    Array<{
+      id: string;
+      actorUserId: string | null;
+      action: string;
+      before: unknown;
+      after: unknown;
+      metadata: unknown;
+      createdAt: string;
+    }>
+  > {
+    const rows = await this.prisma.auditLog.findMany({
+      where: { entityType, entityId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      actorUserId: r.actorUserId,
+      action: r.action,
+      before: r.before,
+      after: r.after,
+      metadata: r.metadata,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
 }

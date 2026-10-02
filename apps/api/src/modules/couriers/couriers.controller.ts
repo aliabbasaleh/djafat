@@ -5,6 +5,7 @@ import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { CurrentActor } from '../auth/current-actor.decorator';
 import { RequireAuth, RequireRole } from '../auth/decorators';
 import { CouriersService } from './couriers.service';
+import { LedgerReadService } from '../ledger/ledger-read.service';
 import {
   SetCourierStatusSchema,
   UpdateLocationSchema,
@@ -21,13 +22,24 @@ import {
 @ApiTags('couriers')
 @Controller('couriers/me')
 export class CouriersController {
-  constructor(private readonly couriers: CouriersService) {}
+  constructor(
+    private readonly couriers: CouriersService,
+    private readonly ledgerRead: LedgerReadService,
+  ) {}
 
   @Get()
   @RequireAuth()
   @RequireRole('courier')
   get(@CurrentActor() actor: AuthenticatedActor) {
     return this.couriers.getProfile(actor.userId);
+  }
+
+  /** Read-only — `pending`/`available` straight from the ledger's wallet projection (Bloc 9, docs/30 §ledger-read). */
+  @Get('balance')
+  @RequireAuth()
+  @RequireRole('courier')
+  balance(@CurrentActor() actor: AuthenticatedActor) {
+    return this.ledgerRead.getOwnerBalances('courier', actor.userId);
   }
 
   @Post('status')

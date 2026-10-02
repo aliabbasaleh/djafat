@@ -48,6 +48,25 @@ export class CouriersService implements CourierPort {
     });
   }
 
+  /** Minimal admin listing (Bloc 9, docs/30 §admin-api) — status + last-seen only, never a live-tracking feed. */
+  async listForAdmin(
+    status: string | undefined,
+    page: number,
+    limit: number,
+  ): Promise<{ items: CourierProfileDto[]; page: number; limit: number; total: number }> {
+    const where = status ? { status } : {};
+    const [rows, total] = await Promise.all([
+      this.prisma.courier.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.courier.count({ where }),
+    ]);
+    return { items: rows.map((r) => this.toDto(r)), page, limit, total };
+  }
+
   async getProfile(userId: string): Promise<CourierProfileDto> {
     const row = await this.prisma.courier.findUnique({ where: { userId } });
     if (!row) {

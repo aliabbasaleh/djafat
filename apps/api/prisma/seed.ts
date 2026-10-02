@@ -328,14 +328,40 @@ async function main(): Promise<void> {
     return created.id;
   }
 
-  async function ensureRole(userId: string, role: string): Promise<void> {
-    const existing = await prisma.$queryRaw<Array<{ user_id: string }>>`
-      SELECT user_id FROM user_roles
+  /**
+   * Idempotent on (user_id, role) — NOT on the full (user_id, role, scope)
+   * tuple. A re-run against a database already seeded under the PRE-Bloc-9
+   * seed (which granted `restaurant_owner`/`restaurant_staff` unscoped)
+   * must MIGRATE that row's scope in place rather than insert a second one:
+   * migration 0028's partial unique index allows at most one
+   * (user_id, role) row for those two roles, scope or no scope, and a blind
+   * INSERT here would violate it outright on every `pnpm db:seed` after
+   * upgrading. Safe for every other role too — this seed only ever grants
+   * each of them once per user.
+   */
+  async function ensureRole(
+    userId: string,
+    role: string,
+    scopeRestaurantId: string | null = null,
+  ): Promise<void> {
+    const existing = await prisma.$queryRaw<Array<{ scope_restaurant_id: string | null }>>`
+      SELECT scope_restaurant_id FROM user_roles
       WHERE user_id = ${userId}::uuid AND role = ${role}
-        AND scope_restaurant_id IS NULL AND scope_country_id IS NULL AND scope_city_id IS NULL
+        AND scope_country_id IS NULL AND scope_city_id IS NULL
     `;
     if (existing.length === 0) {
-      await prisma.$executeRaw`INSERT INTO user_roles (user_id, role) VALUES (${userId}::uuid, ${role})`;
+      await prisma.$executeRaw`
+        INSERT INTO user_roles (user_id, role, scope_restaurant_id)
+        VALUES (${userId}::uuid, ${role}, ${scopeRestaurantId}::uuid)
+      `;
+      return;
+    }
+    if (existing[0]!.scope_restaurant_id !== scopeRestaurantId) {
+      await prisma.$executeRaw`
+        UPDATE user_roles SET scope_restaurant_id = ${scopeRestaurantId}::uuid
+        WHERE user_id = ${userId}::uuid AND role = ${role}
+          AND scope_country_id IS NULL AND scope_city_id IS NULL
+      `;
     }
   }
 
@@ -377,11 +403,13 @@ async function main(): Promise<void> {
   // login still goes through the real OTP flow; this just pre-creates the
   // identity + role grant so `pnpm db:seed` alone is enough to exercise RBAC
   // end to end in the integration tests.
+  // `restaurant_owner`/`restaurant_staff` are scoped roles (Bloc 9, docs/30
+  // §restaurant-scope) — their grant is deferred until the first seeded
+  // restaurant exists below (`restaurantId`), so this fixture scopes to a
+  // REAL restaurant rather than a global grant `isMemberOfRestaurant` could
+  // never match.
   const restaurantOwnerId = await findOrCreateUser('+23566000003', 'Restaurateur Test');
-  await ensureRole(restaurantOwnerId, 'restaurant_owner');
-
   const restaurantStaffId = await findOrCreateUser('+23566000004', 'Staff Restaurant Test');
-  await ensureRole(restaurantStaffId, 'restaurant_staff');
 
   const supportId = await findOrCreateUser('+23566000005', 'Support Test');
   await ensureRole(supportId, 'support');
@@ -577,6 +605,12 @@ async function main(): Promise<void> {
     UPDATE restaurants SET geom = ST_SetSRID(ST_MakePoint(15.0557, 12.1348), 4326)::geography
     WHERE id = ${restaurantId}::uuid
   `;
+  // Bloc 9 (docs/30 §restaurant-scope): the owner/staff fixtures are scoped
+  // to THIS restaurant — matches `ownerUserId: restaurantOwnerId` above, and
+  // is what lets the integration tests actually confirm/ready/reject one of
+  // its orders through the real authorization check.
+  await ensureRole(restaurantOwnerId, 'restaurant_owner', restaurantId);
+  await ensureRole(restaurantStaffId, 'restaurant_staff', restaurantId);
   await ensureHours(restaurantId, dailyHours([11, 0], [22, 0]));
   const fatimePlats = await ensureCategory(restaurantId, 'Plats', 0);
   const fatimeBoissons = await ensureCategory(restaurantId, 'Boissons', 1);

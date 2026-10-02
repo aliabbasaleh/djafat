@@ -1,8 +1,24 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import type { Permission, Role, UserStatus } from '@djafat/types';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
+
+/** Roles that carry a `scope_restaurant_id` grant — every other role is global (docs/30 §role-management). */
+const RESTAURANT_SCOPED_ROLES: readonly Role[] = ['restaurant_owner', 'restaurant_staff'];
+
+/** Roles only a `super_admin` may grant or revoke — never an `admin` (Bloc 9 mandate: "un admin ne peut pas créer un super_admin"). */
+const SUPER_ADMIN_ONLY_ROLES: readonly Role[] = ['admin', 'super_admin'];
+
+function isUniqueViolation(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+}
 
 export interface UserRecord {
   readonly id: string;
@@ -14,6 +30,19 @@ export interface UserRecord {
   readonly locale: string;
   readonly status: UserStatus;
   readonly createdAt: Date;
+}
+
+export interface UserRoleGrant {
+  readonly role: Role;
+  readonly scopeRestaurantId: string | null;
+}
+
+export interface UserSearchResult {
+  readonly id: string;
+  readonly phone: string;
+  readonly fullName: string | null;
+  readonly status: UserStatus;
+  readonly createdAt: string;
 }
 
 export interface MeDto {
@@ -128,6 +157,221 @@ export class UsersService {
       LIMIT 1
     `;
     return rows.length > 0;
+  }
+
+  /**
+   * The ONE restaurant this user manages, if any (Bloc 9, docs/30
+   * §ledger-read — `GET /restaurants/me/balance`). `restaurant_owner`/
+   * `restaurant_staff` are single-restaurant by construction (migration
+   * 0028's partial unique index) — "which one" is never ambiguous. `null`
+   * for anyone holding neither role, or holding it unscoped (should not
+   * happen for a grant made through `grantRole`, which always requires a
+   * scope for these roles — but a pre-Bloc-9 seed row could still be global).
+   */
+  async getRestaurantScope(userId: string): Promise<string | null> {
+    const rows = await this.prisma.$queryRaw<Array<{ scope_restaurant_id: string | null }>>`
+      SELECT scope_restaurant_id FROM user_roles
+      WHERE user_id = ${userId}::uuid
+        AND role IN ('restaurant_owner', 'restaurant_staff')
+        AND scope_restaurant_id IS NOT NULL
+      LIMIT 1
+    `;
+    return rows[0]?.scope_restaurant_id ?? null;
+  }
+
+  /** Every (role, restaurant scope) grant this user holds, for an admin detail view (docs/30 §role-management). */
+  async listUserRoleGrants(userId: string): Promise<UserRoleGrant[]> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{ role: string; scope_restaurant_id: string | null }>
+    >`
+      SELECT role, scope_restaurant_id FROM user_roles WHERE user_id = ${userId}::uuid
+      ORDER BY role
+    `;
+    return rows.map((r) => ({ role: r.role as Role, scopeRestaurantId: r.scope_restaurant_id }));
+  }
+
+  /**
+   * Grants one (role, scope) to a user — the ONLY way `user_roles` is ever
+   * written for anything beyond the automatic `'customer'` grant at account
+   * creation (Bloc 9, docs/30 §role-management). Every invariant the mandate
+   * requires lives HERE, not in the controller, so `user_roles` is never a
+   * bare CRUD surface:
+   *
+   *   - deny by default: the caller's own roles decide what they may grant —
+   *     only a `super_admin` may grant `admin`/`super_admin` (an `admin`
+   *     granting either is rejected outright, never silently downgraded).
+   *   - no auto-escalation: an actor may never grant (or revoke) a role on
+   *     THEIR OWN account through this path, full stop — not just the role
+   *     they're trying to grant.
+   *   - restaurant-scoped roles (`restaurant_owner`/`restaurant_staff`)
+   *     REQUIRE an existing restaurant; every other role REJECTS a scope —
+   *     a customer or courier scoped to a restaurant would be a silent,
+   *     meaningless grant, not a flexible one.
+   *   - idempotent: granting an identical (user, role, scope) combination
+   *     that's already held is a no-op success (`granted: false`), never an
+   *     error — and never re-audited, since nothing actually changed.
+   *   - a user already holding a restaurant scope under a DIFFERENT
+   *     restaurant is a genuine conflict (migration 0028's partial unique
+   *     index), translated to a clean `VALIDATION_ERROR` — never a raw 500.
+   */
+  async grantRole(
+    actor: { readonly userId: string; readonly roles: readonly Role[] },
+    targetUserId: string,
+    role: Role,
+    scopeRestaurantId: string | null,
+  ): Promise<{ granted: boolean }> {
+    this.assertCanMutateRole(actor, targetUserId, role);
+    await this.assertScopeShape(role, scopeRestaurantId);
+    await this.getByIdOrThrow(targetUserId);
+
+    let granted: boolean;
+    try {
+      const affected = await this.prisma.$executeRaw`
+        INSERT INTO user_roles (user_id, role, scope_restaurant_id)
+        VALUES (${targetUserId}::uuid, ${role}, ${scopeRestaurantId}::uuid)
+        ON CONFLICT ON CONSTRAINT user_roles_pkey DO NOTHING
+      `;
+      granted = affected > 0;
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        throw new ConflictException({
+          code: 'VALIDATION_ERROR',
+          message: `User ${targetUserId} already holds '${role}' scoped to a different restaurant — revoke it first.`,
+        });
+      }
+      throw err;
+    }
+
+    if (granted) {
+      await this.audit.log({
+        actorUserId: actor.userId,
+        action: 'ROLE_GRANTED',
+        entityType: 'user',
+        entityId: targetUserId,
+        after: { role, scopeRestaurantId },
+        metadata: { role, scopeRestaurantId },
+      });
+    }
+    return { granted };
+  }
+
+  /** The inverse of `grantRole` — same policy, idempotent on an already-absent grant (docs/30 §role-management). */
+  async revokeRole(
+    actor: { readonly userId: string; readonly roles: readonly Role[] },
+    targetUserId: string,
+    role: Role,
+    scopeRestaurantId: string | null,
+  ): Promise<{ revoked: boolean }> {
+    this.assertCanMutateRole(actor, targetUserId, role);
+    await this.getByIdOrThrow(targetUserId);
+
+    const affected = await this.prisma.$executeRaw`
+      DELETE FROM user_roles
+      WHERE user_id = ${targetUserId}::uuid
+        AND role = ${role}
+        AND scope_restaurant_id IS NOT DISTINCT FROM ${scopeRestaurantId}::uuid
+    `;
+    const revoked = affected > 0;
+    if (revoked) {
+      await this.audit.log({
+        actorUserId: actor.userId,
+        action: 'ROLE_REVOKED',
+        entityType: 'user',
+        entityId: targetUserId,
+        before: { role, scopeRestaurantId },
+        metadata: { role, scopeRestaurantId },
+      });
+    }
+    return { revoked };
+  }
+
+  /** Minimal admin search — phone or name, paginated (Bloc 9, docs/30 §admin-api). Never a full-text/analytics engine. */
+  async searchUsers(
+    search: string | undefined,
+    page: number,
+    limit: number,
+  ): Promise<{ items: UserSearchResult[]; page: number; limit: number; total: number }> {
+    const term = search?.trim();
+    const where = {
+      deletedAt: null,
+      ...(term
+        ? {
+            OR: [
+              { phone: { contains: term, mode: 'insensitive' as const } },
+              { fullName: { contains: term, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return {
+      items: rows.map((u) => ({
+        id: u.id,
+        phone: u.phone,
+        fullName: u.fullName,
+        status: u.status as UserStatus,
+        createdAt: u.createdAt.toISOString(),
+      })),
+      page,
+      limit,
+      total,
+    };
+  }
+
+  /** Deny-by-default policy shared by `grantRole`/`revokeRole` — never bypassable from the controller. */
+  private assertCanMutateRole(
+    actor: { readonly userId: string; readonly roles: readonly Role[] },
+    targetUserId: string,
+    role: Role,
+  ): void {
+    if (targetUserId === actor.userId) {
+      throw new ForbiddenException({
+        code: 'FORBIDDEN',
+        message: 'You cannot grant or revoke a role on your own account — ask another admin.',
+      });
+    }
+    if (SUPER_ADMIN_ONLY_ROLES.includes(role) && !actor.roles.includes('super_admin')) {
+      throw new ForbiddenException({
+        code: 'FORBIDDEN',
+        message: `Only a super_admin may grant or revoke '${role}'.`,
+      });
+    }
+  }
+
+  private async assertScopeShape(role: Role, scopeRestaurantId: string | null): Promise<void> {
+    const needsScope = RESTAURANT_SCOPED_ROLES.includes(role);
+    if (needsScope && !scopeRestaurantId) {
+      throw new ConflictException({
+        code: 'VALIDATION_ERROR',
+        message: `Role '${role}' requires a restaurant scope (scopeRestaurantId).`,
+      });
+    }
+    if (!needsScope && scopeRestaurantId) {
+      throw new ConflictException({
+        code: 'VALIDATION_ERROR',
+        message: `Role '${role}' does not accept a restaurant scope.`,
+      });
+    }
+    if (scopeRestaurantId) {
+      const restaurant = await this.prisma.restaurant.findUnique({
+        where: { id: scopeRestaurantId },
+        select: { id: true },
+      });
+      if (!restaurant) {
+        throw new ConflictException({
+          code: 'VALIDATION_ERROR',
+          message: `Unknown restaurant ${scopeRestaurantId}.`,
+        });
+      }
+    }
   }
 
   /** The union of every permission granted to ANY role this user holds (docs/19 §17-19). */

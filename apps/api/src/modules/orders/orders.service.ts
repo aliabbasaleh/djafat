@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import type {
@@ -17,6 +23,7 @@ import { PricingService } from '../pricing/pricing.service';
 import { PlatformService } from '../platform/platform.service';
 import { CartsService } from '../carts/carts.service';
 import { AddressesService, type AddressDto } from '../addresses/addresses.service';
+import { UsersService } from '../users/users.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { OutboxService } from '../../infra/outbox/outbox.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
@@ -134,6 +141,7 @@ export class OrdersService implements OrderAmountPort {
     private readonly platform: PlatformService,
     private readonly carts: CartsService,
     private readonly addresses: AddressesService,
+    private readonly users: UsersService,
     private readonly outbox: OutboxService,
     private readonly idempotency: IdempotencyService,
     private readonly events: EventEmitter2,
@@ -496,6 +504,59 @@ export class OrdersService implements OrderAmountPort {
     return order.customerId;
   }
 
+  /**
+   * Minimal operational listing for admin/support (Bloc 9, docs/30
+   * §admin-api) — a summary row, never the full `OrderDto` with items
+   * (that's `getOrder`, one at a time). Filterable by status/restaurant so
+   * support can actually find what a ticket is about.
+   */
+  async listForAdmin(
+    filters: { status?: OrderStatusString; restaurantId?: string },
+    page: number,
+    limit: number,
+  ): Promise<{
+    items: Array<{
+      id: string;
+      code: string;
+      status: string;
+      restaurantId: string;
+      customerId: string;
+      total: MoneyJson;
+      createdAt: string;
+    }>;
+    page: number;
+    limit: number;
+    total: number;
+  }> {
+    const where = {
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.restaurantId ? { restaurantId: filters.restaurantId } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+    return {
+      items: rows.map((o) => ({
+        id: o.id,
+        code: o.code,
+        status: o.status,
+        restaurantId: o.restaurantId,
+        customerId: o.customerId,
+        total: toMoneyJson(o.totalMinor, o.currency),
+        createdAt: o.createdAt.toISOString(),
+      })),
+      page,
+      limit,
+      total,
+    };
+  }
+
   async getOrder(id: string): Promise<OrderDto> {
     const order = await this.prisma.order.findUnique({
       where: { id },
@@ -518,17 +579,50 @@ export class OrdersService implements OrderAmountPort {
     return this.toDto(order, itemDtos);
   }
 
-  // ── restaurant-side transitions (Bloc 0.5: no auth yet — see docs/18 §3) ──
+  // ── restaurant-side transitions (Bloc 9, docs/30 §order-authorization) ────
+  //
+  // Were an unauthenticated Bloc 0.5 stand-in until this bloc (docs/19 §10
+  // dette D-10): `OrdersController` now requires `@RequireAuth` +
+  // `@RequireRole('restaurant_owner','restaurant_staff')` before any of
+  // these run, and `transitionOrder` itself re-verifies that the caller
+  // actually belongs to THIS order's restaurant — never trusts the role
+  // check alone, since a restaurant_staff member of restaurant A must never
+  // confirm an order for restaurant B.
 
-  async confirmOrder(id: string): Promise<OrderDto> {
-    await this.transitionOrder(id, 'confirmed', { actorRole: 'restaurant_staff' });
+  async confirmOrder(id: string, actor: { userId: string; role: Role }): Promise<OrderDto> {
+    await this.transitionOrder(id, 'confirmed', {
+      actorRole: actor.role,
+      actorUserId: actor.userId,
+    });
     return this.getOrder(id);
   }
 
   /** `confirmed -> preparing -> ready` in one call (docs/18 §6). */
-  async markReady(id: string): Promise<OrderDto> {
-    await this.transitionOrder(id, 'preparing', { actorRole: 'restaurant_staff' });
-    await this.transitionOrder(id, 'ready', { actorRole: 'restaurant_staff' });
+  async markReady(id: string, actor: { userId: string; role: Role }): Promise<OrderDto> {
+    await this.transitionOrder(id, 'preparing', {
+      actorRole: actor.role,
+      actorUserId: actor.userId,
+    });
+    await this.transitionOrder(id, 'ready', { actorRole: actor.role, actorUserId: actor.userId });
+    return this.getOrder(id);
+  }
+
+  /**
+   * `placed -> rejected` — already fully defined in `@djafat/core`'s state
+   * machine (`restaurant_reject`, same roles as `confirmOrder`) since before
+   * this bloc; nothing stopped it from existing except the missing auth this
+   * bloc closes, so there is no new business decision to make here.
+   */
+  async rejectOrder(
+    id: string,
+    actor: { userId: string; role: Role },
+    reason?: string,
+  ): Promise<OrderDto> {
+    await this.transitionOrder(id, 'rejected', {
+      actorRole: actor.role,
+      actorUserId: actor.userId,
+      ...(reason !== undefined ? { reason } : {}),
+    });
     return this.getOrder(id);
   }
 
@@ -538,11 +632,18 @@ export class OrdersService implements OrderAmountPort {
    * Validates via `@djafat/core` and applies the transition atomically. Never
    * called across the `payments`/`deliveries` DAG boundary directly — those
    * modules trigger it indirectly via events (`@OnEvent` handlers below).
+   *
+   * `actorUserId`, when given, is re-verified against the order's OWN
+   * `restaurant_id` — read with the same row lock the transition itself
+   * uses, so the membership check and the state change are one atomic unit
+   * (no window where a staff change mid-flight could slip through). System-
+   * triggered transitions (`opts.system`) never pass `actorUserId` and skip
+   * this check entirely — there is no human actor to verify.
    */
   async transitionOrder(
     orderId: string,
     to: OrderStatusString,
-    opts: { actorRole?: Role; system?: boolean; reason?: string },
+    opts: { actorRole?: Role; actorUserId?: string; system?: boolean; reason?: string },
   ): Promise<void> {
     const restaurantId = await this.prisma.$transaction(async (tx) => {
       // `restaurant_id` is read with the lock rather than in a second query:
@@ -557,6 +658,17 @@ export class OrdersService implements OrderAmountPort {
       }
       const from = rows[0].status;
       const restaurantId = rows[0].restaurant_id;
+
+      if (opts.actorUserId !== undefined) {
+        const isMember = await this.users.isMemberOfRestaurant(opts.actorUserId, restaurantId);
+        if (!isMember) {
+          throw new ForbiddenException({
+            code: 'FORBIDDEN',
+            message: 'You do not belong to this order’s restaurant.',
+          });
+        }
+      }
+
       assertOrderTransition(from, to, opts); // throws OrderTransitionError -> 409
 
       await tx.$executeRaw`UPDATE orders SET status = ${to}::order_status WHERE id = ${orderId}::uuid`;

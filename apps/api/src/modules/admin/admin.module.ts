@@ -1,11 +1,20 @@
 import { Module } from '@nestjs/common';
+import { UsersModule } from '../users/users.module';
 import { AdminController } from './admin.controller';
+import { UsersAdminController } from './users-admin.controller';
 
 /**
  * Skeleton (Bloc 0) + guard-stack proof endpoints (Bloc 1, see
- * `admin.controller.ts`'s doc comment — NOT real features). Bloc 9: the
- * actual back-office composing the SERVICES of other modules (never their
- * repositories), audit logs, ledger view, settlements, payouts, disputes.
+ * `admin.controller.ts`'s doc comment — NOT real features). Bloc 9 starts
+ * the real back-office: role management lives here (not in `users`, which
+ * must stay able to "reach nothing" — docs/19 §43 DAG) composing
+ * `UsersService`. Restaurant/courier/order/finance admin surfaces live in
+ * THEIR OWNING module instead (`catalog`, `couriers`, `orders`, `ledger`),
+ * each route-prefixed `admin/*` — the same split `couriers-admin.controller.ts`
+ * and `settlements.controller.ts` already established before this bloc.
  */
-@Module({ controllers: [AdminController] })
+@Module({
+  imports: [UsersModule],
+  controllers: [AdminController, UsersAdminController],
+})
 export class AdminModule {}

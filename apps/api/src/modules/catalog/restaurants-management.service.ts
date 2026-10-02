@@ -122,6 +122,31 @@ export class RestaurantsManagementService {
     return this.toAdminDto(updated);
   }
 
+  /** Minimal admin listing (Bloc 9, docs/30 §admin-api) — never the customer-facing `listRestaurants` (that one filters to public statuses, computes availability/search-rank; an admin needs to see EVERY status, including `paused`/`suspended`). */
+  async listForAdmin(
+    search: string | undefined,
+    status: RestaurantStatus | undefined,
+    page: number,
+    limit: number,
+  ): Promise<{ items: RestaurantAdminDto[]; page: number; limit: number; total: number }> {
+    const where = {
+      ...(status ? { status } : {}),
+      ...(search?.trim()
+        ? { name: { contains: search.trim(), mode: 'insensitive' as const } }
+        : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.restaurant.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.restaurant.count({ where }),
+    ]);
+    return { items: rows.map((r) => this.toAdminDto(r)), page, limit, total };
+  }
+
   /** For `@RequireOwnership(...)` — throws NotFound itself, never a sentinel (docs/19 §21). */
   async getOwnerUserId(restaurantId: string): Promise<string> {
     const r = await this.getByIdOrThrow(restaurantId);

@@ -93,10 +93,21 @@ export default [
               allow: [
                 ['api-module', { module: 'auth' }],
                 ['api-module', { module: 'users' }],
+                // Bloc 9 (docs/30 §ledger-read): `GET restaurants/me/balance`
+                // reads `LedgerReadService` — never `LedgerService`/the
+                // write port, so `catalog` still cannot post an entry group.
+                ['api-module', { module: 'ledger' }],
               ],
             },
             { from: [['api-module', { module: 'pricing' }]], allow: [] },
-            { from: [['api-module', { module: 'ledger' }]], allow: [] },
+            {
+              from: [['api-module', { module: 'ledger' }]],
+              // Bloc 9: `LedgerAdminController` (`admin/finance`) needs
+              // `auth`'s decorators, same as every other module's admin
+              // surface — `ledger` itself still posts/reads nothing it
+              // didn't already own; this is only for the guard stack.
+              allow: [['api-module', { module: 'auth' }]],
+            },
             {
               from: [['api-module', { module: 'carts' }]],
               allow: [

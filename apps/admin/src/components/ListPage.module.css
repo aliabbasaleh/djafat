@@ -1,0 +1,22 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.searchRow {
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--djafat-space-2) * 1px);
+  max-width: 420px;
+}
+
+.searchRow > :first-child {
+  flex: 1;
+}
+
+.filterRow {
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--djafat-space-2) * 1px);
+}

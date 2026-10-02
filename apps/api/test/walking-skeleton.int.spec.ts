@@ -13,6 +13,9 @@ import { mockOtpKey } from '../src/modules/auth/providers/mock-otp-delivery.prov
 import { MockPaymentProvider } from '../src/modules/payments/providers/mock/mock-payment.provider';
 
 const CUSTOMER_PHONE = '+23566000001'; // seeded (apps/api/prisma/seed.ts)
+const COURIER_PHONE = '+23566000002'; // seeded "Livreur Test"
+// "Staff Restaurant Test" — scoped to 'chez-fatime' (Bloc 9, docs/30 §restaurant-scope).
+const RESTAURANT_STAFF_PHONE = '+23566000004';
 
 /** Drives a full OTP login for a seeded phone number via real HTTP calls (same as identity.int.spec.ts). */
 async function loginViaOtp(
@@ -50,6 +53,8 @@ let prisma: PrismaService;
 let redis: RedisService;
 let server: Server;
 let customerAccess: string;
+let courierAccess: string;
+let restaurantStaffAccess: string;
 
 interface Fixtures {
   customerId: string;
@@ -102,6 +107,8 @@ beforeAll(async () => {
   redis = app.get(RedisService);
   fx = await loadFixtures();
   ({ access: customerAccess } = await loginViaOtp(server, redis, CUSTOMER_PHONE));
+  ({ access: courierAccess } = await loginViaOtp(server, redis, COURIER_PHONE));
+  ({ access: restaurantStaffAccess } = await loginViaOtp(server, redis, RESTAURANT_STAFF_PHONE));
 });
 
 afterAll(async () => {
@@ -283,9 +290,33 @@ describe('walking skeleton — full flow', () => {
     });
     expect(courierWalletPending?.pendingMinor).toBe(1000n); // courierFee === deliveryFee (A5)
 
-    // ── 7. restaurant confirms + marks ready (Bloc 10 stand-in) ──
-    await request(server).post(`/v1/orders/${orderId}/confirm`).expect(200);
-    const readyRes = await request(server).post(`/v1/orders/${orderId}/ready`).expect(200);
+    // ── 7. restaurant confirms + marks ready (Bloc 9, docs/30 §order-authorization,
+    //      Phase 5 adversarial matrix) — rejected BEFORE the legitimate call, against
+    //      the SAME real order, still sitting in 'placed': ──
+    await request(server).post(`/v1/orders/${orderId}/confirm`).expect(401); // anonymous
+    await request(server)
+      .post(`/v1/orders/${orderId}/confirm`)
+      .set('Authorization', `Bearer ${customerAccess}`)
+      .expect(403); // the customer who placed it is not restaurant staff
+    await request(server)
+      .post(`/v1/orders/${orderId}/confirm`)
+      .set('Authorization', `Bearer ${courierAccess}`)
+      .expect(403); // a courier role never confirms an order
+
+    await request(server)
+      .post(`/v1/orders/${orderId}/confirm`)
+      .set('Authorization', `Bearer ${restaurantStaffAccess}`)
+      .expect(200);
+
+    await request(server).post(`/v1/orders/${orderId}/ready`).expect(401); // anonymous
+    await request(server)
+      .post(`/v1/orders/${orderId}/ready`)
+      .set('Authorization', `Bearer ${customerAccess}`)
+      .expect(403);
+    const readyRes = await request(server)
+      .post(`/v1/orders/${orderId}/ready`)
+      .set('Authorization', `Bearer ${restaurantStaffAccess}`)
+      .expect(200);
     expect(readyRes.body.status).toBe('ready');
 
     // ── 8. delivery: assign -> picked-up -> delivered ──

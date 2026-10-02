@@ -1,9 +1,11 @@
-import { Body, Controller, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedActor } from '@djafat/types';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { CurrentActor } from '../auth/current-actor.decorator';
-import { RequireAuth, RequireOwnership, RequirePermission } from '../auth/decorators';
+import { RequireAuth, RequireOwnership, RequirePermission, RequireRole } from '../auth/decorators';
+import { UsersService } from '../users/users.service';
+import { LedgerReadService } from '../ledger/ledger-read.service';
 import { RestaurantsManagementService } from './restaurants-management.service';
 import { MenuCategoriesService } from './menu-categories.service';
 import { ProductsManagementService } from './products-management.service';
@@ -47,7 +49,32 @@ export class CatalogManagementController {
     private readonly restaurants: RestaurantsManagementService,
     private readonly categories: MenuCategoriesService,
     private readonly products: ProductsManagementService,
+    private readonly users: UsersService,
+    private readonly ledgerRead: LedgerReadService,
   ) {}
+
+  /**
+   * Read-only balance for the caller's OWN restaurant (Bloc 9, docs/30
+   * §ledger-read) — resolved via `user_roles.scope_restaurant_id`
+   * (`restaurant_owner`/`restaurant_staff` both qualify, matching
+   * `isMemberOfRestaurant`'s semantics), NOT `Restaurant.ownerUserId`
+   * (that field is catalog display metadata only — see
+   * `common/ports/restaurant-membership.port.ts` — so a staff member with
+   * no `ownerUserId` entry still sees their restaurant's balance here).
+   */
+  @Get('restaurants/me/balance')
+  @RequireAuth()
+  @RequireRole('restaurant_owner', 'restaurant_staff')
+  async myRestaurantBalance(@CurrentActor() actor: AuthenticatedActor) {
+    const restaurantId = await this.users.getRestaurantScope(actor.userId);
+    if (!restaurantId) {
+      throw new NotFoundException({
+        code: 'NOT_FOUND',
+        message: 'No restaurant is scoped to this account.',
+      });
+    }
+    return this.ledgerRead.getOwnerBalances('restaurant', restaurantId);
+  }
 
   @Post('restaurants')
   @RequireAuth()

@@ -1,0 +1,51 @@
+.section {
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  padding: calc(var(--djafat-space-4) * 1px);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-2) * 1px);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--djafat-space-2) * 1px);
+}
+
+.roleList,
+.historyList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-2) * 1px);
+}
+
+.roleRow {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--djafat-space-3) * 1px);
+  flex-wrap: wrap;
+}
+
+.historyRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--djafat-space-2) * 1px);
+  border-bottom: 1px solid var(--djafat-color-border-default);
+  padding-bottom: calc(var(--djafat-space-1) * 1px);
+}
+
+.historyRow:last-child {
+  border-bottom: none;
+}
+
+.grantForm {
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--djafat-space-3) * 1px);
+  flex-wrap: wrap;
+}

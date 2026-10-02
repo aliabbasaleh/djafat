@@ -9,6 +9,7 @@ import type { PlatformService } from '../platform/platform.service';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { OutboxService } from '../../infra/outbox/outbox.service';
 import type { AddressesService } from '../addresses/addresses.service';
+import type { UsersService } from '../users/users.service';
 import { OrdersService } from './orders.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { PrismaIdempotencyStore } from '../../common/idempotency/prisma-idempotency.store';
@@ -358,6 +359,13 @@ const addressesStub = () =>
     requireOwned: vi.fn().mockRejectedValue(new Error('addressesStub: unexpectedly called')),
   }) as unknown as AddressesService;
 
+// Bloc 9 (docs/30): none of these races ever call confirm/ready/reject —
+// `isMemberOfRestaurant` is never invoked on this path.
+const usersStub = () =>
+  ({
+    isMemberOfRestaurant: vi.fn().mockRejectedValue(new Error('usersStub: unexpectedly called')),
+  }) as unknown as UsersService;
+
 function buildServices(db: PrismaService) {
   const catalog = catalogStub();
   const pricing = pricingStub();
@@ -371,6 +379,7 @@ function buildServices(db: PrismaService) {
     platform,
     carts,
     addressesStub(),
+    usersStub(),
     outboxStub(),
     idempotency,
     { emit: vi.fn() } as unknown as EventEmitter2,

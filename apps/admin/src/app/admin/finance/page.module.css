@@ -1,0 +1,8 @@
+.section {
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  padding: calc(var(--djafat-space-4) * 1px);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-2) * 1px);
+}

@@ -2,5 +2,11 @@
 export default {
   reactStrictMode: true,
   poweredByHeader: false,
-  transpilePackages: ['@djafat/sdk', '@djafat/tokens'],
+  transpilePackages: [
+    '@djafat/sdk',
+    '@djafat/tokens',
+    '@djafat/i18n',
+    '@djafat/types',
+    '@djafat/ui',
+  ],
 };

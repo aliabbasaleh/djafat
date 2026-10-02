@@ -90,4 +90,86 @@ describe('RestaurantsManagementService', () => {
       );
     });
   });
+
+  describe('listForAdmin (Bloc 9, docs/30 §admin-api)', () => {
+    function listPrismaStub(
+      rows: Array<{
+        id: string;
+        slug: string;
+        name: string;
+        status: string;
+        ownerUserId: string | null;
+      }>,
+    ) {
+      return {
+        restaurant: {
+          findMany: vi.fn(
+            (args: {
+              where: { status?: string; name?: { contains: string } };
+              skip: number;
+              take: number;
+            }) => {
+              let matches = rows;
+              if (args.where.status)
+                matches = matches.filter((r) => r.status === args.where.status);
+              if (args.where.name?.contains) {
+                const term = args.where.name.contains.toLowerCase();
+                matches = matches.filter((r) => r.name.toLowerCase().includes(term));
+              }
+              return Promise.resolve(matches.slice(args.skip, args.skip + args.take));
+            },
+          ),
+          count: vi.fn((args: { where: { status?: string; name?: { contains: string } } }) => {
+            let matches = rows;
+            if (args.where.status) matches = matches.filter((r) => r.status === args.where.status);
+            if (args.where.name?.contains) {
+              const term = args.where.name.contains.toLowerCase();
+              matches = matches.filter((r) => r.name.toLowerCase().includes(term));
+            }
+            return Promise.resolve(matches.length);
+          }),
+        },
+      } as unknown as PrismaService;
+    }
+
+    it('lists every status, not just the public ones — the whole point of an admin view', async () => {
+      const prisma = listPrismaStub([
+        { id: 'r1', slug: 'r1', name: 'Active One', status: 'active', ownerUserId: 'u1' },
+        { id: 'r2', slug: 'r2', name: 'Paused One', status: 'paused', ownerUserId: 'u2' },
+        { id: 'r3', slug: 'r3', name: 'Suspended One', status: 'suspended', ownerUserId: null },
+      ]);
+      const svc = new RestaurantsManagementService(prisma, auditStub());
+      const result = await svc.listForAdmin(undefined, undefined, 1, 20);
+      expect(result.total).toBe(3);
+      expect(result.items.map((r) => r.status)).toEqual(
+        expect.arrayContaining(['active', 'paused', 'suspended']),
+      );
+    });
+
+    it('filters by status', async () => {
+      const prisma = listPrismaStub([
+        { id: 'r1', slug: 'r1', name: 'A', status: 'active', ownerUserId: null },
+        { id: 'r2', slug: 'r2', name: 'B', status: 'suspended', ownerUserId: null },
+      ]);
+      const svc = new RestaurantsManagementService(prisma, auditStub());
+      const result = await svc.listForAdmin(undefined, 'suspended', 1, 20);
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]!.status).toBe('suspended');
+    });
+
+    it('paginates', async () => {
+      const rows = Array.from({ length: 5 }, (_, i) => ({
+        id: `r${i}`,
+        slug: `r${i}`,
+        name: `R${i}`,
+        status: 'active',
+        ownerUserId: null,
+      }));
+      const prisma = listPrismaStub(rows);
+      const svc = new RestaurantsManagementService(prisma, auditStub());
+      const result = await svc.listForAdmin(undefined, undefined, 1, 2);
+      expect(result.items).toHaveLength(2);
+      expect(result.total).toBe(5);
+    });
+  });
 });
