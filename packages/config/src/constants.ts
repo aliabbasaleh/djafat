@@ -31,6 +31,12 @@ export const PLATFORM_SETTINGS_DEFAULTS = {
   otp_rate_limit_per_ip: { limit: 30, window_seconds: 3600 }, // 30 / h / IP
   phone_lock_threshold: 10, // failed OTP verifications before a durable lock
   phone_lock_duration_seconds: 900, // 15 min
+  // Step-up TOTP verification (docs/31 §5.2) — the second factor now gates
+  // privilege escalation (`grantRole`/`revokeRole`), so its brute-force cost
+  // matters: TOTP accepts a ±1-step window, i.e. 3 valid codes out of 10^6 at
+  // any instant. At 5 / 5 min that is ~231 days of sustained attempts for one
+  // expected hit, while still leaving a human room for typos and clock drift.
+  mfa_verify_rate_limit_per_user: { limit: 5, window_seconds: 300 },
   // Bloc 4 — Cart + Core Order (docs/22 §5).
   cart_max_item_quantity: 99, // per line item; the wire-level Zod schema also caps at 99 as a hard ceiling
   // Bloc 6 — Delivery / Dispatch Core (docs/25 §6, §11, §43).

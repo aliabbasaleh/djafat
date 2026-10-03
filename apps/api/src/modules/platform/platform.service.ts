@@ -119,6 +119,14 @@ export class PlatformService {
     );
   }
 
+  /** `platform_settings['mfa_verify_rate_limit_per_user']` — throttles step-up TOTP verification (docs/31 §5.2). */
+  getMfaVerifyRateLimitPerUser(): Promise<{ limit: number; windowSeconds: number }> {
+    return this.getRateLimitSetting(
+      'mfa_verify_rate_limit_per_user',
+      PLATFORM_SETTINGS_DEFAULTS.mfa_verify_rate_limit_per_user,
+    );
+  }
+
   // ── Bloc 4 — Cart + Core Order (docs/22 §5) ───────────────────────────────
 
   /** `platform_settings['cart_max_item_quantity']` — the configurable BUSINESS ceiling; the Zod schema also enforces a hard wire-level cap. */

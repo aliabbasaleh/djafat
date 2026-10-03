@@ -235,7 +235,7 @@ fail CLOSED. **Fichier** : `auth/guards/step-up.guard.ts` (3 lignes). **Tests aj
 2 dans `auth/guards/step-up.guard.spec.ts` (liste vide sans step-up → 428 et session
 réellement consultée ; liste vide avec step-up frais → autorisé).
 
-### 5.2 Constats pré-existants — rapportés, non corrigés
+### 5.2 Constats pré-existants — rapportés (le #1 corrigé depuis, §5.3)
 
 | #   | Constat                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Sévérité                      | Origine |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ------- |
@@ -247,3 +247,44 @@ réellement consultée ; liste vide avec step-up frais → autorisé).
 
 Aucun de ces cinq constats n'est un contournement d'autorisation exploitable en l'état ;
 tous méritent un arbitrage explicite avant la mise en production réelle.
+
+### 5.3 Constat #1 fermé — throttle sur la vérification step-up
+
+`POST /auth/mfa/verify` n'avait **aucune** limite : avec une fenêtre TOTP ±1 pas (3 codes
+valides sur 10⁶), un attaquant détenant une session admin volée pouvait moudre le second
+facteur puis atteindre `grantRole`. C'est devenu le maillon faible précis du durcissement
+de ce bloc, puisque le step-up garde désormais l'escalade de privilège.
+
+**Correction** — réutilisation stricte du précédent OTP, zéro mécanisme nouveau :
+
+- `PLATFORM_SETTINGS_DEFAULTS.mfa_verify_rate_limit_per_user = { limit: 5, window_seconds: 300 }`
+  (`packages/config/src/constants.ts`), au même endroit et dans le même style que
+  `otp_rate_limit_per_phone`/`_per_ip`.
+- `PlatformService.getMfaVerifyRateLimitPerUser()` — calque exact des getters OTP ;
+  `getRateLimitSetting` retombe sur le défaut code si la ligne `platform_settings` est
+  absente, donc **aucune migration ni seed** n'est nécessaire, et le seuil reste ajustable
+  à chaud en base.
+- `MfaService.verify()` appelle `assertNotRateLimited(userId)` **avant** toute lecture du
+  secret : un attaquant throttlé n'apprend rien et ne peut pas sonder l'état d'enrôlement
+  par timing. Dépassement → `429 RATE_LIMITED`, audité en `AUTH_MFA_FAILED` avec
+  `metadata.reason = 'rate_limited'` (réutilise l'action existante — ni `AuditAction` ni le
+  schéma ne changent, et une rafale de ces événements EST le signal de brute-force).
+- Clé par **userId**, pas par IP/téléphone : la route est déjà authentifiée, l'attaquant
+  visé détient une session, et une clé IP serait trivialement rotée.
+
+Arithmétique : 5 / 5 min = 60/h ⇒ ~333 000 tentatives attendues ≈ **231 jours** d'attaque
+soutenue pour un seul succès, tout en laissant à un humain la marge pour les fautes de
+frappe et la dérive d'horloge.
+
+**Risque résiduel assumé** : `RateLimiterService.consume` échoue OUVERT sur panne Redis
+(docs/15 AD-08 — Redis n'est jamais la barrière durable). Pour l'OTP c'est sans danger car
+`phone_auth_locks` (Postgres) est derrière ; ici **il n'y a pas encore de couche durable**,
+donc une panne Redis restaure l'état non-throttlé. L'ajouter exigerait une migration
+additive sur `mfa_totp_secrets` (`failed_count`/`locked_until`) — impossible à vérifier
+dans un environnement sans Postgres, donc délibérément différée plutôt que livrée non
+testée. Ce comportement est **épinglé par un test** pour qu'il reste un choix conscient.
+
+**Fichiers** : `packages/config/src/constants.ts`, `platform/platform.service.ts`,
+`auth/mfa.service.ts`. **Tests ajoutés** : 5 dans `auth/mfa.service.spec.ts` (429 au
+dépassement ; throttle AVANT la lecture du secret ; audit `reason=rate_limited` ; clé et
+paramètres exacts passés au limiteur ; fail-open Redis épinglé). 14/14 sur ce fichier.
