@@ -3,6 +3,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { toMoneyJson } from '../../common/money/money.mapper';
+import { RestaurantsManagementService } from './restaurants-management.service';
 import { slugify } from './slugify';
 import type {
   CreateOptionGroupInput,
@@ -34,15 +35,17 @@ export interface OptionGroupAdminDto {
 
 /**
  * Product + option-group/option management (docs/20 §12, §15-§18, §35).
- * Ownership always resolves up to the owning restaurant (docs/20 §21) — a
- * product's or option group's "owner" IS its restaurant's owner, there is
- * no separate concept.
+ * Authorization always resolves up to the owning restaurant via
+ * `RestaurantsManagementService.assertCanManage` (Bloc 9.1, docs/31
+ * §restaurant-ownership) — a product's or option group's authority IS its
+ * restaurant's, there is no separate concept.
  */
 @Injectable()
 export class ProductsManagementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly restaurants: RestaurantsManagementService,
   ) {}
 
   async create(
@@ -83,8 +86,10 @@ export class ProductsManagementService {
     actorUserId: string,
     productId: string,
     input: UpdateProductInput,
+    isAdminTier: boolean,
   ): Promise<ProductAdminDto> {
-    await this.getProductOrThrow(productId);
+    const product = await this.getProductOrThrow(productId);
+    await this.restaurants.assertCanManage(actorUserId, product.restaurantId, isAdminTier);
     const updated = await this.prisma.product.update({
       where: { id: productId },
       data: {
@@ -116,8 +121,10 @@ export class ProductsManagementService {
     actorUserId: string,
     productId: string,
     isAvailable: boolean,
+    isAdminTier: boolean,
   ): Promise<ProductAdminDto> {
-    await this.getProductOrThrow(productId);
+    const product = await this.getProductOrThrow(productId);
+    await this.restaurants.assertCanManage(actorUserId, product.restaurantId, isAdminTier);
     const updated = await this.prisma.product.update({
       where: { id: productId },
       data: { isAvailable },
@@ -136,8 +143,10 @@ export class ProductsManagementService {
     actorUserId: string,
     productId: string,
     input: CreateOptionGroupInput,
+    isAdminTier: boolean,
   ): Promise<OptionGroupAdminDto> {
     const product = await this.getProductOrThrow(productId);
+    await this.restaurants.assertCanManage(actorUserId, product.restaurantId, isAdminTier);
     const group = await this.prisma.$transaction(async (tx) => {
       const g = await tx.productOptionGroup.create({
         data: {
@@ -176,8 +185,10 @@ export class ProductsManagementService {
     actorUserId: string,
     groupId: string,
     input: UpdateOptionGroupInput,
+    isAdminTier: boolean,
   ): Promise<OptionGroupAdminDto> {
-    await this.getOptionGroupOrThrow(groupId);
+    const group = await this.getOptionGroupOrThrow(groupId);
+    await this.restaurants.assertCanManage(actorUserId, group.product.restaurantId, isAdminTier);
     const updated = await this.prisma.productOptionGroup.update({
       where: { id: groupId },
       data: {
@@ -196,22 +207,10 @@ export class ProductsManagementService {
     return this.toGroupDto(updated);
   }
 
-  /** For `@RequireOwnership(...)` on product-scoped routes. */
-  async getOwnerUserId(productId: string): Promise<string> {
-    const product = await this.getProductOrThrow(productId);
-    return product.restaurant.ownerUserId ?? '00000000-0000-0000-0000-000000000000';
-  }
-
-  /** For `@RequireOwnership(...)` on option-group-scoped routes. */
-  async getOwnerUserIdForGroup(groupId: string): Promise<string> {
-    const group = await this.getOptionGroupOrThrow(groupId);
-    return group.product.restaurant.ownerUserId ?? '00000000-0000-0000-0000-000000000000';
-  }
-
   private async getProductOrThrow(id: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },
-      include: { restaurant: { select: { ownerUserId: true, currency: true } } },
+      include: { restaurant: { select: { currency: true } } },
     });
     if (!product)
       throw new NotFoundException({ code: 'NOT_FOUND', message: `Product ${id} not found.` });
@@ -221,7 +220,7 @@ export class ProductsManagementService {
   private async getOptionGroupOrThrow(id: string) {
     const group = await this.prisma.productOptionGroup.findUnique({
       where: { id },
-      include: { product: { include: { restaurant: { select: { ownerUserId: true } } } } },
+      include: { product: { select: { restaurantId: true } } },
     });
     if (!group) {
       throw new NotFoundException({ code: 'NOT_FOUND', message: `Option group ${id} not found.` });

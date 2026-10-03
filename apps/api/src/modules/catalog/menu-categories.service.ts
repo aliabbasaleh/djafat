@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
+import { RestaurantsManagementService } from './restaurants-management.service';
 import type { CreateMenuCategoryInput, UpdateMenuCategoryInput } from './dto/menu-category.schema';
 
 export interface MenuCategoryAdminDto {
@@ -13,12 +14,17 @@ export interface MenuCategoryAdminDto {
   readonly isActive: boolean;
 }
 
-/** Category CRUD — ownership resolved through the parent restaurant (docs/20 §11, §21). */
+/**
+ * Category CRUD — authorization resolved up to the parent restaurant via
+ * `RestaurantsManagementService.assertCanManage` (Bloc 9.1, docs/31
+ * §restaurant-ownership) — `user_roles` membership, not `ownerUserId`.
+ */
 @Injectable()
 export class MenuCategoriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly restaurants: RestaurantsManagementService,
   ) {}
 
   async create(
@@ -49,8 +55,10 @@ export class MenuCategoriesService {
     actorUserId: string,
     categoryId: string,
     input: UpdateMenuCategoryInput,
+    isAdminTier: boolean,
   ): Promise<MenuCategoryAdminDto> {
-    await this.getByIdOrThrow(categoryId);
+    const category = await this.getByIdOrThrow(categoryId);
+    await this.restaurants.assertCanManage(actorUserId, category.restaurantId, isAdminTier);
     const updated = await this.prisma.menuCategory.update({
       where: { id: categoryId },
       data: {
@@ -70,17 +78,8 @@ export class MenuCategoriesService {
     return this.toDto(updated);
   }
 
-  /** For `@RequireOwnership(...)` — resolves through the parent restaurant (docs/19 §21). */
-  async getOwnerUserId(categoryId: string): Promise<string> {
-    const category = await this.getByIdOrThrow(categoryId);
-    return category.restaurant.ownerUserId ?? '00000000-0000-0000-0000-000000000000';
-  }
-
   private async getByIdOrThrow(id: string) {
-    const category = await this.prisma.menuCategory.findUnique({
-      where: { id },
-      include: { restaurant: { select: { ownerUserId: true } } },
-    });
+    const category = await this.prisma.menuCategory.findUnique({ where: { id } });
     if (!category) {
       throw new NotFoundException({ code: 'NOT_FOUND', message: `Menu category ${id} not found.` });
     }

@@ -54,6 +54,26 @@ async function grantRole(userId: string, role: string): Promise<void> {
   `;
 }
 
+/**
+ * Re-scopes an EXISTING role grant to a specific restaurant (Bloc 9.1,
+ * docs/31 §restaurant-ownership) — needed after restaurant creation:
+ * `user_roles.scope_restaurant_id` is now the sole authorization source for
+ * `restaurants/categories/products`, and a grant cannot be scoped to a
+ * restaurant that doesn't exist yet. Mirrors the real two-step flow (create
+ * the restaurant, THEN an admin scopes a `restaurant_owner` grant to it via
+ * `POST /admin/users/:id/roles`) without going through that HTTP surface.
+ */
+async function scopeRoleToRestaurant(
+  userId: string,
+  role: string,
+  restaurantId: string,
+): Promise<void> {
+  await prisma.$executeRaw`
+    UPDATE user_roles SET scope_restaurant_id = ${restaurantId}::uuid
+    WHERE user_id = ${userId}::uuid AND role = ${role}
+  `;
+}
+
 beforeAll(async () => {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
@@ -225,7 +245,19 @@ describe('security — invalid identifiers (docs/20 §52)', () => {
 
 describe('full flow — owner creates restaurant -> category -> product -> options -> publicly visible (docs/20 §49)', () => {
   it('runs end to end', async () => {
-    const owner = await loginViaOtp(RESTAURANT_OWNER_PHONE);
+    // A FRESH actor, not the pre-scoped seeded RESTAURANT_OWNER_PHONE: that
+    // account is already scoped to 'chez-fatime' (Bloc 9 seed), and
+    // migration 0028 allows at most one restaurant per `restaurant_owner`/
+    // `restaurant_staff` grant — it could never ALSO be scoped to a
+    // brand-new restaurant in the same test.
+    const freshOwnerPhone = `+2356600${Math.floor(1000 + Math.random() * 8999)}`;
+    let owner = await loginViaOtp(freshOwnerPhone);
+    // Unscoped for now — enough to pass `@RequireRole`/`restaurants:write`
+    // for the CREATE call itself; a restaurant-scoped grant cannot exist
+    // before the restaurant does (Bloc 9.1, docs/31 §restaurant-ownership).
+    await grantRole(owner.user.id, 'restaurant_owner');
+    owner = await loginViaOtp(freshOwnerPhone); // refresh JWT role claims
+
     const city = await prisma.city.findFirstOrThrow();
     const suffix = randomUUID().slice(0, 8);
 
@@ -236,6 +268,24 @@ describe('full flow — owner creates restaurant -> category -> product -> optio
       .expect(201);
     const restaurantId = createdRestaurant.body.id as string;
     expect(createdRestaurant.body.status).toBe('draft'); // never auto-published
+    expect(createdRestaurant.body.ownerUserId).toBe(owner.user.id); // catalog metadata only
+
+    // Bloc 9.1 (docs/31 §restaurant-ownership) — the PROOF of the fix: being
+    // `ownerUserId` (just set, above) is NOT sufficient authority on its
+    // own anymore. The actor's ONLY role grant is still unscoped at this
+    // point — `user_roles` is the sole source of truth now, so this 403s
+    // exactly like a total stranger would.
+    const beforeScoping = await request(server)
+      .patch(`/v1/restaurants/${restaurantId}`)
+      .set('Authorization', `Bearer ${owner.access}`)
+      .send({ name: 'Should be rejected' });
+    expect(beforeScoping.status).toBe(403);
+
+    // The realistic second step of onboarding (docs/31): an admin scopes
+    // the owner's grant to the restaurant they just registered. Mirrored
+    // here directly rather than through POST /admin/users/:id/roles — same
+    // raw-SQL shape `scopeRoleToRestaurant` already documents.
+    await scopeRoleToRestaurant(owner.user.id, 'restaurant_owner', restaurantId);
 
     // A freshly-created (draft) restaurant is NOT publicly visible yet.
     await request(server).get(`/v1/restaurants/${createdRestaurant.body.slug}`).expect(404);
@@ -327,6 +377,74 @@ describe('ownership & RBAC (docs/20 §10, §21, §51)', () => {
       where: { id: restaurant.id },
     });
     expect(stillOriginal.name).not.toBe('Hijacked Name');
+  });
+
+  it('restaurant_staff of restaurant A cannot create a category for restaurant B (Bloc 9.1, docs/31 §restaurant-ownership)', async () => {
+    const staffPhone = `+2356600${Math.floor(1000 + Math.random() * 8999)}`;
+    const staff = await loginViaOtp(staffPhone);
+    const otherRestaurant = await prisma.restaurant.findFirstOrThrow({
+      where: { slug: 'le-sahel-grill' },
+    });
+    // Scoped to a DIFFERENT restaurant than the one they're about to target.
+    await grantRole(staff.user.id, 'restaurant_staff');
+    await scopeRoleToRestaurant(staff.user.id, 'restaurant_staff', otherRestaurant.id);
+    const staffReloaded = await loginViaOtp(staffPhone);
+
+    const chezFatime = await prisma.restaurant.findFirstOrThrow({
+      where: { slug: 'chez-fatime' },
+    });
+    const res = await request(server)
+      .post(`/v1/restaurants/${chezFatime.id}/categories`)
+      .set('Authorization', `Bearer ${staffReloaded.access}`)
+      .send({ name: 'Intrusion' });
+    expect(res.status).toBe(403);
+
+    const leaked = await prisma.menuCategory.findFirst({
+      where: { restaurantId: chezFatime.id, name: 'Intrusion' },
+    });
+    expect(leaked).toBeNull();
+  });
+
+  it('restaurant_staff of restaurant A cannot update a product belonging to restaurant B', async () => {
+    const staffPhone = `+2356600${Math.floor(1000 + Math.random() * 8999)}`;
+    const staff = await loginViaOtp(staffPhone);
+    const otherRestaurant = await prisma.restaurant.findFirstOrThrow({
+      where: { slug: 'le-sahel-grill' },
+    });
+    await grantRole(staff.user.id, 'restaurant_staff');
+    await scopeRoleToRestaurant(staff.user.id, 'restaurant_staff', otherRestaurant.id);
+    const staffReloaded = await loginViaOtp(staffPhone);
+
+    const product = await prisma.product.findFirstOrThrow({
+      where: { restaurant: { slug: 'chez-fatime' } },
+    });
+    const res = await request(server)
+      .patch(`/v1/products/${product.id}`)
+      .set('Authorization', `Bearer ${staffReloaded.access}`)
+      .send({ name: 'Hijacked Product Name' });
+    expect(res.status).toBe(403);
+
+    const stillOriginal = await prisma.product.findUniqueOrThrow({ where: { id: product.id } });
+    expect(stillOriginal.name).not.toBe('Hijacked Product Name');
+  });
+
+  it('a restaurant_staff member of THIS restaurant (not just the owner) CAN manage its menu — the whole point of the fix', async () => {
+    const staffPhone = `+2356600${Math.floor(1000 + Math.random() * 8999)}`;
+    const staff = await loginViaOtp(staffPhone);
+    const chezFatime = await prisma.restaurant.findFirstOrThrow({
+      where: { slug: 'chez-fatime' },
+    });
+    await grantRole(staff.user.id, 'restaurant_staff');
+    await scopeRoleToRestaurant(staff.user.id, 'restaurant_staff', chezFatime.id);
+    const staffReloaded = await loginViaOtp(staffPhone);
+
+    // This staff member holds no Restaurant.ownerUserId entry at all — the
+    // pre-Bloc-9.1 ownerUserId-based check would have rejected this.
+    await request(server)
+      .post(`/v1/restaurants/${chezFatime.id}/categories`)
+      .set('Authorization', `Bearer ${staffReloaded.access}`)
+      .send({ name: `Staff Category ${randomUUID().slice(0, 8)}` })
+      .expect(201);
   });
 
   it('a plain customer (no restaurants:write) is forbidden from creating a restaurant', async () => {

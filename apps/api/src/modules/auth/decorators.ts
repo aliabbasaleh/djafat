@@ -84,7 +84,30 @@ export function RequireOwnership<S extends object>(
   );
 }
 
-/** "Did this session recently pass MFA re-authentication?" (docs/19 §23, docs/05 §5.4 — < 10 min). */
-export function RequireStepUp(): MethodDecorator & ClassDecorator {
-  return applyDecorators(SetMetadata(REQUIRE_STEP_UP_KEY, true), UseGuards(StepUpGuard));
+/**
+ * "Did this session recently pass MFA re-authentication?" (docs/19 §23,
+ * docs/05 §5.4 — < 10 min). Two forms (Bloc 9.1 BUG-3, docs/31 §mfa-effective):
+ *
+ * - `@RequireStepUp()` — unconditional: ANY actor who reaches this route (i.e.
+ *   already cleared `@RequireRole`/`@RequirePermission`) must step up. This is
+ *   the original, still-default form — used by `settlements`/`payments`/
+ *   `sensitive-ping`/`mfa.disable`, UNCHANGED by this bloc.
+ * - `@RequireStepUp(mfaRequiredRoles)` — role-filtered: step-up is required
+ *   ONLY for an actor whose role intersects `mfaRequiredRoles`; an actor
+ *   reaching the route with a role OUTSIDE that list skips the step-up check
+ *   entirely (still subject to whatever `@RequireRole`/`@RequirePermission`
+ *   already decided — this decorator never grants or widens authorization,
+ *   it only decides whether the SECOND factor applies). This is what lets a
+ *   policy constant like `MFA_REQUIRED_ROLES` (`@djafat/types`) actually
+ *   drive step-up instead of being a role list nobody reads — pass it here,
+ *   at the one call site that needs it, rather than hardcoding it into this
+ *   framework-level file.
+ */
+export function RequireStepUp(
+  mfaRequiredRoles?: readonly Role[],
+): MethodDecorator & ClassDecorator {
+  return applyDecorators(
+    SetMetadata(REQUIRE_STEP_UP_KEY, mfaRequiredRoles ?? true),
+    UseGuards(StepUpGuard),
+  );
 }

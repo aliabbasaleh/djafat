@@ -8,6 +8,7 @@ import {
 import type { RestaurantStatus } from '@djafat/types';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
+import { UsersService } from '../users/users.service';
 import { slugify } from './slugify';
 import type {
   CreateRestaurantInput,
@@ -26,16 +27,56 @@ export interface RestaurantAdminDto {
 }
 
 /**
- * Restaurant profile CRUD (docs/20 §5, §10, §35) — ownership resolved via
- * `Restaurant.ownerUserId` (the single-owner model the Bloc 1 `@RequireOwnership`
- * guard already supports; multi-staff-per-restaurant is dette, docs/20 §14).
+ * Restaurant profile CRUD (docs/20 §5, §10, §35).
+ *
+ * Authorization — who may manage THIS restaurant — is `assertCanManage`
+ * (Bloc 9.1, docs/31 §restaurant-ownership): the single source of truth is
+ * `user_roles.scope_restaurant_id` (`restaurant_owner`/`restaurant_staff`,
+ * `UsersService.isMemberOfRestaurant`), the SAME mechanism `orders.confirm/
+ * ready/reject` and `restaurants/me/balance` already use (Bloc 9). This
+ * closes the Bloc 9 docs/30 §6 debt: `Restaurant.ownerUserId` used to be a
+ * SECOND, competing authorization source (Bloc 1-era `@RequireOwnership`),
+ * which meant a `restaurant_staff` member could confirm orders and read
+ * their balance but could not touch the menu they're staffing.
+ * `ownerUserId` itself is NOT removed — it stays as catalog metadata (which
+ * account registered the restaurant, shown in the admin listing), a
+ * genuinely different notion from "who currently has RBAC authority",
+ * which is exactly what `user_roles` already models (grantable, revocable,
+ * audited, DB-constrained to one restaurant per staff member).
  */
 @Injectable()
 export class RestaurantsManagementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly users: UsersService,
   ) {}
+
+  /**
+   * The ONE authorization check every restaurant-scoped write in this
+   * module goes through (directly, or via the other two catalog services
+   * below) — admin tier always passes; otherwise the actor must hold
+   * `restaurant_owner`/`restaurant_staff` scoped to THIS restaurant.
+   * Returns the restaurant row so callers that already need it (`update`)
+   * don't pay for a second query.
+   */
+  async assertCanManage(
+    actorUserId: string,
+    restaurantId: string,
+    isAdminTier: boolean,
+  ): Promise<{ status: string; ownerUserId: string | null }> {
+    const restaurant = await this.getByIdOrThrow(restaurantId);
+    if (!isAdminTier) {
+      const isMember = await this.users.isMemberOfRestaurant(actorUserId, restaurantId);
+      if (!isMember) {
+        throw new ForbiddenException({
+          code: 'FORBIDDEN',
+          message: 'You do not belong to this restaurant.',
+        });
+      }
+    }
+    return restaurant;
+  }
 
   async create(actorUserId: string, input: CreateRestaurantInput): Promise<RestaurantAdminDto> {
     const city = await this.prisma.city.findUnique({
@@ -83,7 +124,7 @@ export class RestaurantsManagementService {
     input: UpdateRestaurantInput,
     isAdminTier: boolean,
   ): Promise<RestaurantAdminDto> {
-    const before = await this.getByIdOrThrow(restaurantId);
+    const before = await this.assertCanManage(actorUserId, restaurantId, isAdminTier);
 
     if (
       input.status !== undefined &&
@@ -145,15 +186,6 @@ export class RestaurantsManagementService {
       this.prisma.restaurant.count({ where }),
     ]);
     return { items: rows.map((r) => this.toAdminDto(r)), page, limit, total };
-  }
-
-  /** For `@RequireOwnership(...)` — throws NotFound itself, never a sentinel (docs/19 §21). */
-  async getOwnerUserId(restaurantId: string): Promise<string> {
-    const r = await this.getByIdOrThrow(restaurantId);
-    // A restaurant with no owner (created before Bloc 2, or admin-created)
-    // can only ever be managed via the admin:write override — no plain user
-    // id will ever match `null`.
-    return r.ownerUserId ?? '00000000-0000-0000-0000-000000000000';
   }
 
   private async getByIdOrThrow(

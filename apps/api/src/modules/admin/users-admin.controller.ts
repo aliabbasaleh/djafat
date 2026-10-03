@@ -1,9 +1,9 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import type { AuthenticatedActor, Role } from '@djafat/types';
+import { MFA_REQUIRED_ROLES, type AuthenticatedActor, type Role } from '@djafat/types';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { CurrentActor } from '../auth/current-actor.decorator';
-import { RequireAuth, RequirePermission, RequireRole } from '../auth/decorators';
+import { RequireAuth, RequirePermission, RequireRole, RequireStepUp } from '../auth/decorators';
 import { UsersService } from '../users/users.service';
 import { AuditService } from '../../common/audit/audit.service';
 import {
@@ -30,6 +30,42 @@ import {
  * is enforced INSIDE `UsersService.grantRole`/`revokeRole` — this controller
  * is a thin HTTP adapter, never a second place those rules could drift out
  * of sync.
+ *
+ * `grantRole`/`revokeRole` also carry `@RequireStepUp(MFA_REQUIRED_ROLES)`
+ * (Bloc 9.1 BUG-3, docs/31 §mfa-effective) — closing the one gap that
+ * actually mattered: a hijacked admin/super_admin session could otherwise
+ * mint standing privilege with no second factor at all. Passing
+ * `MFA_REQUIRED_ROLES` (`@djafat/types`) HERE is what makes it a real,
+ * causal input rather than a constant nobody reads (BUG-3's own finding:
+ * the first cut of this fix used the ARGUMENT-LESS `@RequireStepUp()`,
+ * which only coincidentally matched the constant because `@RequireRole`
+ * happened to list the same two roles — changing `MFA_REQUIRED_ROLES`
+ * changed nothing at runtime). `StepUpGuard` now intersects this list with
+ * `actor.roles` itself (see its class doc) — this decorator never grants or
+ * widens authorization, it only decides whether the SECOND factor applies.
+ *
+ * This is the SAME step-up MECHANISM `settlements`/`payments`/
+ * `sensitive-ping` already use (docs/19 D-13 — MFA "at login" deliberately
+ * deferred to step-up-before-every-privileged-action), not a new one; those
+ * other routes keep the argument-less, unconditional `@RequireStepUp()`
+ * form, UNCHANGED. It is placed ABOVE `@RequireRole`/`@RequirePermission`
+ * in source on purpose: Nest applies stacked method decorators
+ * bottom-to-top, so the guard CLOSEST to the method runs FIRST — written
+ * this way, `RolesGuard`/`PermissionsGuard` still reject a wrong-role/
+ * wrong-permission actor with 403 before `StepUpGuard` is ever reached.
+ *
+ * Deliberately NOT applied to `suspend`/`block`/`reactivate` here, nor to
+ * `couriers-admin.controller.ts`'s `suspend`/`reinstate`: those are already
+ * wired into a live Admin UI page (`apps/admin/.../users/[id]/page.tsx`,
+ * `.../couriers/page.tsx`) with no step-up UI of any kind — gating them
+ * would 428 a currently-working admin feature with no way to recover from
+ * the UI, which is a worse outcome than the documented gap (and building
+ * that UI is out of scope for this bloc). Role mutation is the one action
+ * in this controller whose compromise is irreversible/persistent (standing
+ * access for an attacker), unlike suspend/block/reactivate which are
+ * reversible housekeeping — so it is the one worth this trade-off. See
+ * docs/31 §mfa-effective for the full reasoning and the residual debt this
+ * leaves.
  */
 @ApiTags('admin')
 @Controller('admin/users')
@@ -75,6 +111,7 @@ export class UsersAdminController {
   @Post(':id/roles')
   @HttpCode(201)
   @RequireAuth()
+  @RequireStepUp(MFA_REQUIRED_ROLES)
   @RequireRole('admin', 'super_admin')
   @RequirePermission('users:write')
   async grantRole(
@@ -89,6 +126,7 @@ export class UsersAdminController {
   @Delete(':id/roles/:role')
   @HttpCode(200)
   @RequireAuth()
+  @RequireStepUp(MFA_REQUIRED_ROLES)
   @RequireRole('admin', 'super_admin')
   @RequirePermission('users:write')
   async revokeRole(
