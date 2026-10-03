@@ -49,7 +49,13 @@ export class StepUpGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<RequestWithActor>();
     const actor = await this.resolver.resolve(req);
 
-    if (Array.isArray(required) && !required.some((role: Role) => actor.roles.includes(role))) {
+    // An EMPTY policy list must never silently disable the second factor:
+    // `[].some(...)` is always false, which would exempt every actor and skip
+    // the session read entirely. Deny by default (docs/19 §20, §26) — an empty
+    // list falls through to requiring step-up, exactly like the unconditional
+    // `true` form, so a mis-set policy fails CLOSED (post-Bloc 9.1 BUG-4).
+    const roleFiltered = Array.isArray(required) && required.length > 0;
+    if (roleFiltered && !required.some((role: Role) => actor.roles.includes(role))) {
       return true; // this actor's role is not subject to the MFA policy for this route
     }
 

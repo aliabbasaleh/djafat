@@ -212,3 +212,38 @@ la forme reste `true` (non élargie, non rétrécie). Vérifié par réflexion d
 classes de production (pas de mock), confirmé aussi par les tests Bloc 9.1 préexistants
 (aucune régression). Aucune migration, aucun autre fichier touché, Admin UI/RBAC/payouts/
 notifications/Dashboard non touchés.
+
+## 5. Revue de sécurité post-clôture
+
+Revue adversariale conduite après les deux commits de clôture, sur le code réellement
+livré. Six constats, dont **un introduit par ce bloc et corrigé immédiatement** ; les
+cinq autres sont pré-existants (Bloc 1/9), rapportés et non corrigés unilatéralement.
+
+### 5.1 BUG-4 — `StepUpGuard` échouait OUVERT sur une liste de rôles vide (CORRIGÉ)
+
+Le mécanisme filtré par rôle introduit en BUG-3 contenait un fail-open : `[].some(...)`
+vaut toujours `false`, donc avec une liste vide la condition d'exemption était TOUJOURS
+vraie — chaque acteur était exempté et la session n'était même jamais lue. Une politique
+mal réglée (`MFA_REQUIRED_ROLES = []`, ou un `@RequireStepUp([])` par inadvertance) aurait
+silencieusement retiré le second facteur d'une route d'escalade de privilège, sans erreur
+ni log. Violation directe du deny-by-default, contrainte explicite du mandat.
+
+**Prouvé par test avant correction** (liste vide + acteur `super_admin` jamais stepped-up
+→ `canActivate` retournait `true`, `getActiveSession` jamais appelé), puis **corrigé** :
+une liste vide retombe désormais sur le comportement inconditionnel (step-up exigé) —
+fail CLOSED. **Fichier** : `auth/guards/step-up.guard.ts` (3 lignes). **Tests ajoutés** :
+2 dans `auth/guards/step-up.guard.spec.ts` (liste vide sans step-up → 428 et session
+réellement consultée ; liste vide avec step-up frais → autorisé).
+
+### 5.2 Constats pré-existants — rapportés, non corrigés
+
+| #   | Constat                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Sévérité                      | Origine |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ------- |
+| 1   | `POST /auth/mfa/verify` n'a **aucun rate-limit ni verrou** (le rate-limiting n'existe que dans `otp.service.ts`). `verifyTotp` accepte une fenêtre ±1 pas (`DEFAULT_WINDOW = 1`) → 3 codes valides sur 10⁶ à tout instant, soit ~333 000 tentatives attendues pour forcer le second facteur. Les échecs SONT audités (`AUTH_MFA_FAILED`) : détectable, mais non empêché. La valeur de cette attaque a augmenté avec ce bloc, puisque le step-up garde désormais l'escalade de privilège. | **MEDIUM**                    | Bloc 1  |
+| 2   | `suspend`/`block`/`reactivate` ne touchent pas `user_roles` : les grants d'un compte bloqué survivent. Une session admin compromise sans MFA ne peut plus `grantRole` (gaté), mais peut **réactiver un compte dormant qui détient déjà admin/super_admin** — contournement latéral du gate posé sur `grantRole`. L'attaquant aurait encore besoin de l'OTP de ce compte pour s'en servir, donc pas d'escalade autonome ; renforce néanmoins l'argument pour gater ces routes.            | **MEDIUM**                    | Bloc 9  |
+| 3   | Un rejet de step-up (428) sur une route privilégiée **n'émet aucun événement d'audit**. `AUTH_MFA_FAILED` et `AUTH_STEP_UP_VERIFIED` existent, mais « une session admin valide a tenté une escalade sans second facteur » — précisément le signal d'une session volée — ne laisse aucune trace.                                                                                                                                                                                          | **LOW** (lacune de détection) | Bloc 1  |
+| 4   | `setStatus` ne garde que contre la transition no-op : `reactivate` peut ressusciter un compte `deleted` (anonymisé) en `active`. Impact limité (le téléphone a été réécrit, donc pas de login OTP possible avec l'ancien numéro), mais contredit le cycle de vie soft-delete.                                                                                                                                                                                                            | **LOW**                       | Bloc 9  |
+| 5   | `MFA_REQUIRED_ROLES` est `readonly` au sens TypeScript seulement — le tableau n'est pas `Object.freeze`d, donc mutable à l'exécution. `Object.freeze` rendrait la politique inviolable et toute altération évidente.                                                                                                                                                                                                                                                                     | **LOW**                       | Bloc 1  |
+
+Aucun de ces cinq constats n'est un contournement d'autorisation exploitable en l'état ;
+tous méritent un arbitrage explicite avant la mise en production réelle.

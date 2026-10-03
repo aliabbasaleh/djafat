@@ -206,4 +206,26 @@ describe('StepUpGuard — role-filtered form proves MFA_REQUIRED_ROLES-style con
       HttpException,
     );
   });
+
+  /**
+   * BUG-4 (security review of the Bloc 9.1 hardening) — the role-filtered
+   * form introduced in BUG-3 failed OPEN on an empty list: `[].some(...)` is
+   * always false, so EVERY actor was exempted and the session was never even
+   * read. A mis-set policy (`MFA_REQUIRED_ROLES = []`, or a typo'd
+   * `@RequireStepUp([])`) silently removed the second factor from a
+   * privilege-escalation route. Deny by default: an empty list now behaves
+   * exactly like the unconditional form.
+   */
+  it('an EMPTY policy list fails CLOSED — step-up still required, never silently disabled', async () => {
+    const { guard, getActiveSession } = stubbedGuard([], ['super_admin'], null);
+    await expect(guard.canActivate(makeContext({} as RequestWithActor))).rejects.toThrow(
+      HttpException,
+    );
+    expect(getActiveSession).toHaveBeenCalled(); // the session IS consulted, not skipped
+  });
+
+  it('an EMPTY policy list with a fresh step-up is allowed — fail-closed, not fail-shut', async () => {
+    const { guard } = stubbedGuard([], ['support'], new Date());
+    await expect(guard.canActivate(makeContext({} as RequestWithActor))).resolves.toBe(true);
+  });
 });
