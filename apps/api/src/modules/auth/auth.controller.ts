@@ -103,8 +103,8 @@ export class AuthController {
   @Post('mfa/disable')
   @HttpCode(204)
   @RequireAuth()
-  @RequireRole('admin', 'super_admin')
   @RequireStepUp()
+  @RequireRole('admin', 'super_admin')
   async mfaDisable(@CurrentActor() actor: AuthenticatedActor): Promise<void> {
     await this.auth.mfaDisable(actor.userId);
   }

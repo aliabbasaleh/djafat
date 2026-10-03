@@ -36,9 +36,9 @@ export class SettlementsController {
   @Post()
   @HttpCode(201)
   @RequireAuth()
+  @RequireStepUp()
   @RequireRole('admin', 'super_admin', 'finance')
   @RequirePermission('payouts:write')
-  @RequireStepUp()
   async record(
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body(new ZodValidationPipe(RecordSettlementSchema)) body: RecordSettlementInput,

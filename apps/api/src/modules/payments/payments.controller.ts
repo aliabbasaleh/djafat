@@ -94,9 +94,9 @@ export class PaymentsController {
   @Post(':id/refund')
   @HttpCode(200)
   @RequireAuth()
+  @RequireStepUp()
   @RequireRole('admin', 'super_admin', 'finance')
   @RequirePermission('payments:refund')
-  @RequireStepUp()
   async refund(
     @Param('id') id: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,

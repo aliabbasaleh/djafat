@@ -12,8 +12,10 @@ MFA_REQUIRED_ROLES`, via `@RequireStepUp(MFA_REQUIRED_ROLES)`) — pas seulement
 > step-up, parce qu'ils sont déjà câblés dans l'Admin UI livrée sans aucune UI de step-up —
 > les gater aurait cassé une fonctionnalité opérationnelle pour fermer un trou de sévérité
 > moindre, en construisant au passage une UI hors périmètre. Décisions validées
-> explicitement par le donneur d'ordre avant implémentation. Aucune migration. Aucune
-> fonctionnalité Bloc 10 commencée.
+> explicitement par le donneur d'ordre avant implémentation. L'autre dette notée au
+> commit (ordre StepUpGuard/RolesGuard sur `settlements`/`payments`/`sensitive-ping`/
+> `mfa.disable`) a depuis été fermée — §4.1. Aucune migration. Aucune fonctionnalité
+> Bloc 10 commencée.
 
 ---
 
@@ -175,9 +177,38 @@ le détail complet.
 
 - `suspend`/`block`/`reactivate` (users), `suspend`/`reinstate` (couriers), `suspend`
   (restaurants) : toujours sans step-up. Fermer complètement nécessite une UI MFA dans
-  l'Admin frontend (hors périmètre explicite de ce bloc).
-- Ordre d'exécution des guards pré-existant sur `settlements.record`/`payments.refund`/
-  `sensitive-ping` (StepUpGuard avant Role/Permission) : non corrigé, non introduit par ce
-  bloc, non exploitable (dégrade seulement la précision du code d'erreur).
+  l'Admin frontend (hors périmètre explicite de ce bloc) — **non traité, dette
+  maintenue intentionnellement** (décision explicite : traiter uniquement l'ordre des
+  guards ci-dessous, pas celle-ci, pour ne pas risquer l'Admin UI livrée).
 - Aucune infrastructure Docker/PostgreSQL disponible dans cet environnement — tous les
   `.int.spec.ts` (Part A et B) restent écrits, non exécutés.
+
+### 4.1 Fermé après coup — ordre d'exécution des guards
+
+~~Ordre d'exécution des guards pré-existant sur `settlements.record`/`payments.refund`/
+`sensitive-ping` (StepUpGuard avant Role/Permission) : non corrigé, non introduit par ce
+bloc, non exploitable.~~ **Corrigé.** `@RequireStepUp()` était écrit comme dernier
+décorateur (donc le plus proche de la méthode) sur `settlements.record`,
+`payments.refund`, `admin.sensitivePing` et `auth.mfaDisable` — Nest applique les
+décorateurs de méthode empilés de bas en haut, donc `StepUpGuard` s'exécutait AVANT
+`RolesGuard`/`PermissionsGuard` : un acteur au mauvais rôle recevait 428
+("step up requis") au lieu de 403 ("interdit") pour une action qu'il n'aurait de toute
+façon jamais pu effectuer, MFA ou pas. Jamais un contournement d'autorisation (l'action
+ne se produisait jamais), mais une erreur trompeuse, et une incohérence avec
+`grantRole`/`revokeRole` qui avaient déjà le bon ordre depuis BUG-2.
+
+**Correction** : `@RequireStepUp()` déplacé juste après `@RequireAuth()`, avant
+`@RequireRole`/`@RequirePermission`, sur les 4 routes — aucune autre modification,
+aucun fichier de guard/decorator touché cette fois (la logique de `StepUpGuard` et
+`@RequireStepUp(mfaRequiredRoles?)` posée en BUG-3 reste intacte). La forme reste
+inconditionnelle (`true`, pas de liste de rôles) sur ces 4 routes — ce correctif ne
+touche QUE l'ordre, jamais le périmètre de qui doit stepper-up.
+
+**Fichiers modifiés** : `payments/settlements.controller.ts`,
+`payments/payments.controller.ts`, `admin/admin.controller.ts`, `auth/auth.controller.ts`.
+**Test ajouté** : `auth/guards/step-up-route-order.spec.ts` (8 tests, exécutés) — pin
+l'ordre RolesGuard/PermissionsGuard avant StepUpGuard sur les 4 routes, et confirme que
+la forme reste `true` (non élargie, non rétrécie). Vérifié par réflexion directe sur les
+classes de production (pas de mock), confirmé aussi par les tests Bloc 9.1 préexistants
+(aucune régression). Aucune migration, aucun autre fichier touché, Admin UI/RBAC/payouts/
+notifications/Dashboard non touchés.

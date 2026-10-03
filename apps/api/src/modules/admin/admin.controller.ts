@@ -24,9 +24,9 @@ export class AdminController {
   @Post('sensitive-ping')
   @HttpCode(200)
   @RequireAuth()
+  @RequireStepUp()
   @RequireRole('admin', 'super_admin')
   @RequirePermission('admin:write')
-  @RequireStepUp()
   sensitivePing() {
     return { status: 'ok' };
   }
