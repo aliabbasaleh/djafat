@@ -39,7 +39,9 @@ export type AuditAction =
   | 'PRODUCT_UPDATED'
   | 'PRODUCT_AVAILABILITY_CHANGED'
   | 'PRODUCT_OPTION_GROUP_CREATED'
-  | 'PRODUCT_OPTION_GROUP_UPDATED';
+  | 'PRODUCT_OPTION_GROUP_UPDATED'
+  // Bloc 10 — Restaurant app (docs/33 §hours).
+  | 'RESTAURANT_HOURS_REPLACED';
 
 export interface AuditLogEntry {
   readonly actorUserId?: string | null;

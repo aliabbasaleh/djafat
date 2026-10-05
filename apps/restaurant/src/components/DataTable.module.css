@@ -1,0 +1,37 @@
+.scroll {
+  overflow-x: auto;
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: calc(var(--djafat-type-size-body) * 1px);
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: calc(var(--djafat-space-2) * 1px) calc(var(--djafat-space-3) * 1px);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--djafat-color-border-default);
+}
+
+.table th {
+  font-weight: var(--djafat-type-weight-bold);
+  color: var(--djafat-color-text-secondary);
+  background: var(--djafat-color-bg-surface, transparent);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--djafat-space-3) * 1px);
+  margin-top: calc(var(--djafat-space-3) * 1px);
+}

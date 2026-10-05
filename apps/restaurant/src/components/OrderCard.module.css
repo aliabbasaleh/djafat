@@ -1,0 +1,47 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-3) * 1px);
+  padding: calc(var(--djafat-space-4) * 1px);
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: 10px;
+  background: var(--djafat-color-bg-surface);
+}
+
+.itemList {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-1) * 1px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.itemRow {
+  display: flex;
+  justify-content: space-between;
+  gap: calc(var(--djafat-space-2) * 1px);
+}
+
+.optionNote {
+  display: block;
+  padding-left: calc(var(--djafat-space-4) * 1px);
+}
+
+.actions {
+  display: flex;
+  gap: calc(var(--djafat-space-2) * 1px);
+}
+
+.actions > * {
+  flex: 1;
+}
+
+.reasonInput {
+  width: 100%;
+  padding: calc(var(--djafat-space-2) * 1px);
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: 6px;
+  font: inherit;
+  resize: vertical;
+}

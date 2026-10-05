@@ -4,6 +4,7 @@ import { createCartClient } from './cart.js';
 import { createOrdersClient } from './orders.js';
 import { createAddressesClient } from './addresses.js';
 import { createAdminClient } from './admin.js';
+import { createRestaurantClient } from './restaurant.js';
 
 export * from './http.js';
 export * from './catalog.js';
@@ -11,6 +12,7 @@ export * from './cart.js';
 export * from './orders.js';
 export * from './addresses.js';
 export * from './admin.js';
+export * from './restaurant.js';
 
 export interface HealthResponse {
   readonly status: 'ok';
@@ -52,6 +54,7 @@ export function createApiClient(options: ApiClientOptions) {
     orders: createOrdersClient(http),
     addresses: createAddressesClient(http),
     admin: createAdminClient(http),
+    restaurant: createRestaurantClient(http),
   };
 }
 

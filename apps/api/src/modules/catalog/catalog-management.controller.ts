@@ -1,4 +1,4 @@
-import { Body, Controller, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Patch, Post, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedActor } from '@djafat/types';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
@@ -33,6 +33,10 @@ import {
   type UpdateProductAvailabilityInput,
   type UpdateProductInput,
 } from './dto/product-management.schema';
+import {
+  ReplaceRestaurantHoursSchema,
+  type ReplaceRestaurantHoursInput,
+} from './dto/restaurant-hours.schema';
 
 /**
  * Restaurant/menu management (docs/20 §10, §35-§36). Every write here is
@@ -80,6 +84,55 @@ export class CatalogManagementController {
       });
     }
     return this.ledgerRead.getOwnerBalances('restaurant', restaurantId);
+  }
+
+  /** The caller's OWN restaurant profile (Bloc 10, docs/33 §profile) — scope resolved server-side, same pattern as `myRestaurantBalance`. */
+  @Get('restaurants/me')
+  @RequireAuth()
+  @RequireRole('restaurant_owner', 'restaurant_staff')
+  getMine(@CurrentActor() actor: AuthenticatedActor) {
+    return this.restaurants.getMine(actor.userId);
+  }
+
+  /**
+   * The caller's OWN full menu tree, unfiltered by active/availability
+   * status (Bloc 10, docs/33 §menu) — see `MenuCategoriesService.
+   * listForManagement` for why this must NOT reuse the customer-facing
+   * `CatalogService.getMenu`. `restaurants:read` is granted to BOTH
+   * `restaurant_owner` and `restaurant_staff` (seed, docs/19), same tier as
+   * `myRestaurantBalance`.
+   */
+  @Get('restaurants/me/menu')
+  @RequireAuth()
+  @RequireRole('restaurant_owner', 'restaurant_staff')
+  async getMyMenu(@CurrentActor() actor: AuthenticatedActor) {
+    const restaurantId = await this.users.getRestaurantScope(actor.userId);
+    if (!restaurantId) {
+      throw new NotFoundException({
+        code: 'NOT_FOUND',
+        message: 'No restaurant is scoped to this account.',
+      });
+    }
+    return this.categories.listForManagement(restaurantId);
+  }
+
+  /**
+   * Replaces the caller's OWN weekly opening hours (Bloc 10, docs/33
+   * §hours). `restaurants:write` — owner tier only, same boundary already
+   * drawn for every other restaurant-level (as opposed to menu-level)
+   * setting in this controller; `restaurant_staff` holds `menus:write` but
+   * not `restaurants:write` (seed, docs/19), so a staff member can 86 a
+   * product but cannot change when the kitchen opens.
+   */
+  @Put('restaurants/me/hours')
+  @RequireAuth()
+  @RequirePermission('restaurants:write')
+  async replaceMyHours(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Body(new ZodValidationPipe(ReplaceRestaurantHoursSchema)) body: ReplaceRestaurantHoursInput,
+  ) {
+    const hours = await this.restaurants.replaceHours(actor.userId, body);
+    return { hours };
   }
 
   @Post('restaurants')

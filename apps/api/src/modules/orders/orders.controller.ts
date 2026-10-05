@@ -7,6 +7,7 @@ import {
   HttpCode,
   Param,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedActor } from '@djafat/types';
@@ -16,6 +17,10 @@ import { RequireAuth, RequireRole } from '../auth/decorators';
 import { OrdersService } from './orders.service';
 import { CreateOrderSchema, type CreateOrderInput } from './dto/create-order.schema';
 import { RejectOrderSchema, type RejectOrderInput } from './dto/reject-order.schema';
+import {
+  OrdersRestaurantQuerySchema,
+  type OrdersRestaurantQueryInput,
+} from './dto/orders-restaurant-query.schema';
 
 /** The restaurant-tier role this actor holds — `owner` takes precedence, matching `@djafat/core`'s transition table (both are equally allowed). */
 function restaurantRole(actor: AuthenticatedActor): 'restaurant_owner' | 'restaurant_staff' {
@@ -66,6 +71,28 @@ export class OrdersController {
       body.addressId,
     );
     return { status, order };
+  }
+
+  /**
+   * The kitchen's order board (Bloc 10, docs/33 §order-board) — `GET /orders`
+   * with NO `:id`, so it can never collide with the route below (different
+   * segment count). Scope is resolved entirely server-side from the caller's
+   * OWN `user_roles` grant inside `OrdersService.listOrdersForRestaurant` —
+   * there is no `restaurantId` here for a client to supply, forge, or need.
+   */
+  @Get()
+  @RequireAuth()
+  @RequireRole('restaurant_owner', 'restaurant_staff')
+  list(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Query(new ZodValidationPipe(OrdersRestaurantQuerySchema)) query: OrdersRestaurantQueryInput,
+  ) {
+    return this.orders.listOrdersForRestaurant(
+      actor.userId,
+      { ...(query.status !== undefined ? { status: query.status } : {}) },
+      query.page,
+      query.limit,
+    );
   }
 
   /**

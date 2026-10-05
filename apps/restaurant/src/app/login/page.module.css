@@ -1,0 +1,7 @@
+.main {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: calc(var(--djafat-space-6) * 1px) 0;
+}

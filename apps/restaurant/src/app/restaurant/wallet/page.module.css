@@ -1,0 +1,9 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-3) * 1px);
+  padding: calc(var(--djafat-space-4) * 1px);
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: 10px;
+  background: var(--djafat-color-bg-surface);
+}

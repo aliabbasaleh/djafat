@@ -1,0 +1,33 @@
+.board {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: calc(var(--djafat-space-4) * 1px);
+}
+
+/* Bloc 10 spec: "kanban ≥ lg" — below that, columns stack as sections read top to bottom. */
+@media (min-width: 1024px) {
+  .board {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-3) * 1px);
+  min-width: 0;
+}
+
+.columnHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: calc(var(--djafat-space-2) * 1px);
+  border-bottom: 2px solid var(--djafat-color-border-default);
+}
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-3) * 1px);
+}

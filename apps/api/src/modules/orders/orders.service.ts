@@ -128,6 +128,23 @@ export interface OrderDto {
 }
 
 /**
+ * `restaurant_owner`/`restaurant_staff`'s own order board (Bloc 10, docs/33
+ * §order-board) — every status between "the kitchen now owns this" and "it
+ * has left the building". NOT `readonly`: Prisma's generated `{ in: [...] }`
+ * filter wants a plain mutable array — this constant is still never mutated,
+ * `const` alone already prevents reassigning the binding.
+ */
+const RESTAURANT_BOARD_STATUSES: OrderStatusString[] = [
+  'placed',
+  'confirmed',
+  'preparing',
+  'ready',
+  'courier_assigned',
+  'picked_up',
+  'on_the_way',
+];
+
+/**
  * Order lifecycle for the Bloc 0.5 walking skeleton, driving the REAL
  * canonical state machine (`@djafat/core`, 58 tests) end-to-end rather than a
  * simplified shortcut set — see docs/18 §3.
@@ -577,6 +594,91 @@ export class OrdersService implements OrderAmountPort {
     if (!order)
       throw new NotFoundException({ code: 'NOT_FOUND', message: `Order ${orderId} not found.` });
     return order.customerId;
+  }
+
+  /**
+   * Restaurant-scoped order listing — the kitchen's order board (Bloc 10,
+   * docs/33 §order-board). This is the REST counterpart of the realtime room
+   * `restaurant:orders:{id}` (Bloc 7, docs/27 §4, §7 — already wired end to
+   * end: `domain-event-router.ts` pushes every order-lifecycle event there,
+   * `RealtimeGateway.isAuthorizedForRoom` already gates it on the exact same
+   * membership check used below). Same split `apps/web`'s `useRoomRealtime`
+   * documents: a socket event is a hint to refetch, never a payload to apply —
+   * this method is what the refetch calls.
+   *
+   * Restaurant identity is NEVER client-supplied — always resolved from the
+   * caller's OWN scope (`UsersService.getRestaurantScope`, the same
+   * single-restaurant-by-construction grant `restaurants/me/balance` already
+   * relies on, Bloc 9) — unlike `listForAdmin`, there is no `restaurantId`
+   * parameter here for a caller to forge.
+   *
+   * Two modes: no `status` filter returns the live board — every
+   * non-terminal status, OLDEST first (a kitchen works FIFO); an explicit
+   * `status` is history mode — that one status, newest first, paginated.
+   */
+  async listOrdersForRestaurant(
+    actorUserId: string,
+    filters: { status?: OrderStatusString },
+    page: number,
+    limit: number,
+  ): Promise<{
+    items: Array<{
+      id: string;
+      code: string;
+      status: string;
+      total: MoneyJson;
+      items: Array<{ name: string; quantity: number; options: string[] }>;
+      createdAt: string;
+      placedAt: string | null;
+    }>;
+    page: number;
+    limit: number;
+    total: number;
+  }> {
+    const restaurantId = await this.users.getRestaurantScope(actorUserId);
+    if (!restaurantId) {
+      throw new ForbiddenException({
+        code: 'FORBIDDEN',
+        message: 'No restaurant is scoped to this account.',
+      });
+    }
+
+    const where = filters.status
+      ? { restaurantId, status: filters.status }
+      : { restaurantId, status: { in: RESTAURANT_BOARD_STATUSES } };
+    const orderBy = filters.status
+      ? ({ createdAt: 'desc' } as const)
+      : ({ createdAt: 'asc' } as const);
+
+    const [rows, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { items: { include: { options: true } } },
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((o) => ({
+        id: o.id,
+        code: o.code,
+        status: o.status,
+        total: toMoneyJson(o.totalMinor, o.currency),
+        items: o.items.map((it) => ({
+          name: it.nameSnapshot,
+          quantity: it.quantity,
+          options: it.options.map((opt) => opt.nameSnapshot),
+        })),
+        createdAt: o.createdAt.toISOString(),
+        placedAt: o.placedAt ? o.placedAt.toISOString() : null,
+      })),
+      page,
+      limit,
+      total,
+    };
   }
 
   /**

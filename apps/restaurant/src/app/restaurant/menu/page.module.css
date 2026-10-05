@@ -1,0 +1,28 @@
+.category {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-3) * 1px);
+  padding-bottom: calc(var(--djafat-space-4) * 1px);
+  border-bottom: 1px solid var(--djafat-color-border-default);
+}
+
+.productGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: calc(var(--djafat-space-3) * 1px);
+}
+
+.productCard {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-3) * 1px);
+  padding: calc(var(--djafat-space-3) * 1px);
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: 10px;
+  background: var(--djafat-color-bg-surface);
+}
+
+.optionGroups {
+  padding-top: calc(var(--djafat-space-1) * 1px);
+  border-top: 1px dashed var(--djafat-color-border-default);
+}

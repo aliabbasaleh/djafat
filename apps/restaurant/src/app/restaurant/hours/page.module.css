@@ -1,0 +1,17 @@
+.row {
+  padding: calc(var(--djafat-space-2) * 1px) 0;
+  border-bottom: 1px solid var(--djafat-color-border-default);
+  flex-wrap: wrap;
+}
+
+.dayLabel {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.timeInput {
+  padding: calc(var(--djafat-space-1) * 1px) calc(var(--djafat-space-2) * 1px);
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: 6px;
+  font: inherit;
+}
