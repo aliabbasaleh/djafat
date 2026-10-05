@@ -17,6 +17,7 @@ import { PrismaIdempotencyStore } from '../../common/idempotency/prisma-idempote
 import type { LedgerService } from '../ledger/ledger.service';
 import type { PlatformService } from '../platform/platform.service';
 import { CouriersService } from '../couriers/couriers.service';
+import type { UsersService } from '../users/users.service';
 import { DeliveriesService } from './deliveries.service';
 
 export const ORDER_ID = 'order-1';
@@ -607,14 +608,22 @@ export function makeDeliveriesRaceDb() {
           ];
         }
         if (text.includes('UPDATE deliveries SET status') && text.includes("'cancelled'")) {
-          const [reason, actorUserId, deliveryId, fromStatuses] = values as [
-            string,
-            string,
-            string,
-            string[],
-          ];
+          // BUG-10.1.3 added `AND (:isStaff OR order_id = :authorizedOrderId)`.
+          // Honoured here for the same reason as the `'failed'` branch: a fake
+          // that ignores the tenant predicate would let the stale-authorization
+          // test pass without the predicate actually existing.
+          const [reason, actorUserId, deliveryId, fromStatuses, isStaff, authorizedOrderId] =
+            values as [string, string, string, string[], boolean, string | null];
+          // Emulate the SQL AS GIVEN: if the statement carries no tenant
+          // predicate (fewer bound params), do not invent one — otherwise
+          // removing the predicate in production would still look "blocked"
+          // here and the stale-authorization test would guard nothing.
+          const cancelScoped = isStaff !== undefined || authorizedOrderId !== undefined;
           const row = deliveries.find(
-            (d) => d.id === deliveryId && fromStatuses.includes(d.status),
+            (d) =>
+              d.id === deliveryId &&
+              fromStatuses.includes(d.status) &&
+              (!cancelScoped || isStaff === true || d.orderId === authorizedOrderId),
           );
           if (!row) return [];
           row.status = 'cancelled';
@@ -624,9 +633,25 @@ export function makeDeliveriesRaceDb() {
           return [{ status: row.status, courier_id: row.courierId, order_id: row.orderId }];
         }
         if (text.includes('UPDATE deliveries SET status') && text.includes("'failed'")) {
-          const [reason, deliveryId, fromStatuses] = values as [string, string, string[]];
+          // BUG-10.1-AUTH added `AND (:isStaff OR courier_id = :actor)` to this
+          // statement. Honouring it here is not optional politeness: without it
+          // the fake silently ignores the tenant predicate and a test proving
+          // "a stale authorization cannot fail someone else's delivery" would
+          // pass for the wrong reason.
+          const [reason, deliveryId, fromStatuses, isStaff, actorUserId] = values as [
+            string,
+            string,
+            string[],
+            boolean,
+            string,
+          ];
+          // Same faithfulness rule as the `'cancelled'` branch above.
+          const failScoped = isStaff !== undefined || actorUserId !== undefined;
           const row = deliveries.find(
-            (d) => d.id === deliveryId && fromStatuses.includes(d.status),
+            (d) =>
+              d.id === deliveryId &&
+              fromStatuses.includes(d.status) &&
+              (!failScoped || isStaff === true || d.courierId === actorUserId),
           );
           if (!row) return [];
           row.status = 'failed';
@@ -823,6 +848,21 @@ export function fakePlatform(overrides: PlatformOverrides = {}): PlatformService
   } as unknown as PlatformService;
 }
 
+/**
+ * `DeliveriesService` injects `UsersService` only to answer "is this actor a
+ * member of the order's restaurant?" for the tenant-scoped delivery read
+ * (BUG-10.1-AUTH). No existing delivery test exercises that branch, so the
+ * default is "not a member" — the branch is covered explicitly in
+ * `delivery-tenant-isolation.spec.ts`.
+ */
+export function fakeUsersService(members: ReadonlySet<string> = new Set()): UsersService {
+  return {
+    isMemberOfRestaurant: vi.fn((userId: string, restaurantId: string) =>
+      Promise.resolve(members.has(`${userId}:${restaurantId}`)),
+    ),
+  } as unknown as UsersService;
+}
+
 export function fakeOrderAmountPort(courierFeeInPool = true): OrderAmountPort {
   const breakdown: OrderAccrualBreakdown = {
     restaurantId: RESTAURANT_ID,
@@ -883,6 +923,7 @@ export function buildDeliveriesServices(
     events,
     platform,
     couriers,
+    fakeUsersService(),
     fakeOrderAmountPort(opts.courierFeeInPool ?? true),
   );
   return { deliveries, couriers, emitted };

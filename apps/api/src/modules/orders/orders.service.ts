@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { ModuleRef } from '@nestjs/core';
 import { Prisma } from '@prisma/client';
 import type {
   DomainEventType,
@@ -28,6 +29,11 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
 import { OutboxService } from '../../infra/outbox/outbox.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { toMoneyJson } from '../../common/money/money.mapper';
+import { resolveOrderAccess, type AccessActor } from '../../common/authz/order-access';
+import {
+  DELIVERY_TRACKING_PORT,
+  type DeliveryTrackingPort,
+} from '../../common/ports/delivery-tracking.port';
 import { generateOrderCode } from './order-code';
 
 export type OrderStatusString =
@@ -145,6 +151,7 @@ export class OrdersService implements OrderAmountPort {
     private readonly outbox: OutboxService,
     private readonly idempotency: IdempotencyService,
     private readonly events: EventEmitter2,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   // ── creation (docs/22 §9 — always FROM the caller's cart) ────────────────
@@ -492,6 +499,74 @@ export class OrdersService implements OrderAmountPort {
   }
 
   // ── reads ───────────────────────────────────────────────────────────────
+
+  /**
+   * Tenant-scoped read (BUG-10.1-AUTH, `common/authz/order-access.ts`).
+   * Replaces `@RequireOwnership(..., 'orders:read')`: that override was a
+   * TOTAL ownership bypass for anyone holding `orders:read`, which the seed
+   * also grants to `restaurant_owner`/`restaurant_staff`/`courier` — so any
+   * of them could read any order whose UUID they knew.
+   *
+   * `DELIVERY_TRACKING_PORT` is resolved LAZILY, per call, via `ModuleRef`:
+   * `DeliveriesService` constructor-injects `ORDER_AMOUNT_PORT` (bound to
+   * THIS service), so constructor-injecting the delivery port here would
+   * close a DI loop. `OwnershipGuard` resolves its target the same way and
+   * for the same reason. Resolved only when every cheaper branch has already
+   * failed, so the common paths cost nothing.
+   */
+  async getOrderFor(actor: AccessActor, orderId: string): Promise<OrderDto> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { customerId: true, restaurantId: true },
+    });
+    // Same 404 as an unknown id: an unauthorized caller must not be able to
+    // tell "does not exist" from "exists but is not yours" (docs/19 §21).
+    if (!order) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: `Order ${orderId} not found.` });
+    }
+
+    let grant = resolveOrderAccess(
+      actor,
+      {
+        customerId: order.customerId,
+        isMemberOfOrderRestaurant: false,
+        assignedCourierUserId: null,
+      },
+      'orders:read',
+    );
+
+    if (!grant) {
+      const isMember = await this.users.isMemberOfRestaurant(actor.userId, order.restaurantId);
+      grant = resolveOrderAccess(
+        actor,
+        {
+          customerId: order.customerId,
+          isMemberOfOrderRestaurant: isMember,
+          assignedCourierUserId: isMember
+            ? null
+            : await this.resolveAssignedCourierUserId(orderId, actor),
+        },
+        'orders:read',
+      );
+    }
+
+    if (!grant) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: `Order ${orderId} not found.` });
+    }
+    return this.getOrder(orderId);
+  }
+
+  /** Only consulted for an actor who could plausibly be a courier — see `getOrderFor`. */
+  private async resolveAssignedCourierUserId(
+    orderId: string,
+    actor: AccessActor,
+  ): Promise<string | null> {
+    if (!actor.roles.includes('courier')) return null;
+    const tracking = this.moduleRef.get<DeliveryTrackingPort>(DELIVERY_TRACKING_PORT, {
+      strict: false,
+    });
+    return tracking.getAssignedCourierUserIdByOrder(orderId);
+  }
 
   /** For `@RequireOwnership(...)` (docs/19 §21) — throws NotFound itself, never returns a sentinel. */
   async getOwnerUserId(orderId: string): Promise<string> {

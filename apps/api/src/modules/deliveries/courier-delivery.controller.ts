@@ -99,14 +99,19 @@ export class CourierDeliveryController {
     return this.deliveries.confirmDelivered(id, actor.userId, body.proofCode, key);
   }
 
+  /**
+   * Tenant-scoped (BUG-10.1-AUTH): only the courier CURRENTLY assigned to this
+   * delivery, or staff-tier with `deliveries:write`. Was
+   * `@RequireOwnership(..., 'deliveries:write')`, whose override skipped the
+   * assigned-courier resolver for every holder of that permission — `courier`
+   * included — letting any courier fail any other courier's delivery. The
+   * decision now lives in `DeliveriesService.reportFailed`, which also pins
+   * the UPDATE to `courier_id` so a concurrent reassignment cannot slip past
+   * it.
+   */
   @Post('deliveries/:id/fail')
   @HttpCode(200)
   @RequireAuth()
-  @RequireOwnership(
-    DeliveriesService,
-    (deliveries, req) => deliveries.getAssignedCourierUserId((req.params as { id: string }).id),
-    'deliveries:write',
-  )
   async fail(
     @Param('id') id: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
@@ -114,7 +119,7 @@ export class CourierDeliveryController {
     @CurrentActor() actor: AuthenticatedActor,
   ) {
     const key = requireIdempotencyKey(idempotencyKey);
-    return this.deliveries.reportFailed(id, actor.roles, actor.userId, body.reason, key);
+    return this.deliveries.reportFailed(actor, id, body.reason, key);
   }
 
   @Get('couriers/me/offers')

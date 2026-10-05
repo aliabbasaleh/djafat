@@ -12,7 +12,7 @@ import { ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedActor } from '@djafat/types';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { CurrentActor } from '../auth/current-actor.decorator';
-import { RequireAuth, RequireOwnership, RequirePermission, RequireRole } from '../auth/decorators';
+import { RequireAuth, RequirePermission, RequireRole } from '../auth/decorators';
 import { DeliveriesService } from './deliveries.service';
 import { CancelDeliverySchema, type CancelDeliveryInput } from './dto/delivery-action.schema';
 import { CreateDeliverySchema, type CreateDeliveryInput } from './dto/create-delivery.schema';
@@ -39,27 +39,35 @@ function requireIdempotencyKey(idempotencyKey: string | undefined): string {
 export class DeliveriesController {
   constructor(private readonly deliveries: DeliveriesService) {}
 
-  /** Owner (the customer), or staff with `deliveries:read` (docs/19 §21, docs/25 §35). */
+  /**
+   * Tenant-scoped (BUG-10.1-AUTH): the owning customer, the courier currently
+   * assigned, or staff-tier with `deliveries:read`. Was
+   * `@RequireOwnership(..., 'deliveries:read')`, whose override bypassed
+   * ownership for every holder of `deliveries:read` — `courier` included, so
+   * any courier could read any other courier's delivery.
+   */
   @Get(':id')
   @RequireAuth()
-  @RequireOwnership(
-    DeliveriesService,
-    (deliveries, req) => deliveries.getOwnerUserId((req.params as { id: string }).id),
-    'deliveries:read',
-  )
-  get(@Param('id') id: string) {
-    return this.deliveries.getByIdOrThrow(id);
+  get(@CurrentActor() actor: AuthenticatedActor, @Param('id') id: string) {
+    return this.deliveries.getByIdFor(actor, id);
   }
 
-  /** Owner or admin — cancellation rules vary by current state (docs/25 §29, enforced by the state machine). */
+  /**
+   * Tenant-scoped (BUG-10.1.3): the customer who owns the order behind this
+   * delivery, or staff-tier with `deliveries:write`. Cancellation rules per
+   * state still come from the state machine (docs/25 §29).
+   *
+   * Was `@RequireOwnership(..., 'deliveries:write')`, whose override bypassed
+   * ownership for every holder of that permission — `courier` included. A
+   * courier-only actor was stopped downstream (no `courier` role on any
+   * `-> cancelled` transition), but a `courier + customer` actor — i.e. EVERY
+   * real courier, since `customer` is granted at account creation — passed via
+   * the customer branch of the role union and could cancel a stranger's
+   * delivery. The decision now lives in `DeliveriesService.cancel`.
+   */
   @Post(':id/cancel')
   @HttpCode(200)
   @RequireAuth()
-  @RequireOwnership(
-    DeliveriesService,
-    (deliveries, req) => deliveries.getOwnerUserId((req.params as { id: string }).id),
-    'deliveries:write',
-  )
   async cancel(
     @Param('id') id: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
@@ -67,7 +75,7 @@ export class DeliveriesController {
     @CurrentActor() actor: AuthenticatedActor,
   ) {
     const key = requireIdempotencyKey(idempotencyKey);
-    return this.deliveries.cancel(id, actor.roles, actor.userId, body.reason, key);
+    return this.deliveries.cancel(actor, id, body.reason, key);
   }
 
   /** Admin-only manual (re-)dispatch trigger (docs/25 §45 — the primary path is automatic on `order.ready`). */

@@ -378,7 +378,12 @@ describe('concurrent state transitions (mandate §5, §10)', () => {
 
     const results = await Promise.allSettled([
       service.acceptOffer(delivery.id, 'courier-A', 'k-accept'),
-      service.cancel(delivery.id, ['admin'], 'admin-1', 'ops', 'k-cancel'),
+      service.cancel(
+        { userId: 'admin-1', roles: ['admin'], permissions: ['deliveries:write'] },
+        delivery.id,
+        'ops',
+        'k-cancel',
+      ),
     ]);
 
     for (const r of results) {
@@ -400,8 +405,18 @@ describe('concurrent state transitions (mandate §5, §10)', () => {
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
     const results = await Promise.allSettled([
-      service.cancel(delivery.id, ['admin'], 'admin-1', 'a', 'k-1'),
-      service.cancel(delivery.id, ['admin'], 'admin-2', 'b', 'k-2'),
+      service.cancel(
+        { userId: 'admin-1', roles: ['admin'], permissions: ['deliveries:write'] },
+        delivery.id,
+        'a',
+        'k-1',
+      ),
+      service.cancel(
+        { userId: 'admin-2', roles: ['admin'], permissions: ['deliveries:write'] },
+        delivery.id,
+        'b',
+        'k-2',
+      ),
     ]);
 
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
@@ -418,8 +433,18 @@ describe('concurrent state transitions (mandate §5, §10)', () => {
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
     const results = await Promise.allSettled([
-      service.cancel(delivery.id, ['admin'], 'admin-1', 'ops', 'k-c'),
-      service.reportFailed(delivery.id, ['courier'], 'courier-A', 'unreachable', 'k-f'),
+      service.cancel(
+        { userId: 'admin-1', roles: ['admin'], permissions: ['deliveries:write'] },
+        delivery.id,
+        'ops',
+        'k-c',
+      ),
+      service.reportFailed(
+        { userId: 'courier-A', roles: ['courier'], permissions: ['deliveries:write'] },
+        delivery.id,
+        'unreachable',
+        'k-f',
+      ),
     ]);
 
     for (const r of results) {
@@ -435,7 +460,13 @@ describe('concurrent state transitions (mandate §5, §10)', () => {
 
     for (const call of [
       () => service.markPickedUp('00000000-0000-0000-0000-000000000000', 'courier-A', 'k1'),
-      () => service.cancel('00000000-0000-0000-0000-000000000000', ['admin'], 'a', 'r', 'k2'),
+      () =>
+        service.cancel(
+          { userId: 'a', roles: ['admin'], permissions: ['deliveries:write'] },
+          '00000000-0000-0000-0000-000000000000',
+          'r',
+          'k2',
+        ),
       () => service.acceptOffer('00000000-0000-0000-0000-000000000000', 'courier-A', 'k3'),
     ]) {
       await call().then(
@@ -459,15 +490,22 @@ describe('concurrent state transitions (mandate §5, §10)', () => {
       () => expect.unreachable('cannot pick up a delivered delivery'),
       (err: unknown) => expectCleanBusinessError(err),
     );
-    await service.cancel(delivery.id, ['admin'], 'admin-1', 'ops', 'k2').then(
-      () => expect.unreachable('cannot cancel a delivered delivery'),
-      (err: unknown) => {
-        expectCleanBusinessError(err);
-        expect((err as ConflictException).getResponse()).toMatchObject({
-          code: 'DELIVERY_ALREADY_DELIVERED',
-        });
-      },
-    );
+    await service
+      .cancel(
+        { userId: 'admin-1', roles: ['admin'], permissions: ['deliveries:write'] },
+        delivery.id,
+        'ops',
+        'k2',
+      )
+      .then(
+        () => expect.unreachable('cannot cancel a delivered delivery'),
+        (err: unknown) => {
+          expectCleanBusinessError(err);
+          expect((err as ConflictException).getResponse()).toMatchObject({
+            code: 'DELIVERY_ALREADY_DELIVERED',
+          });
+        },
+      );
     expect(delivery.status).toBe('delivered');
   });
 });

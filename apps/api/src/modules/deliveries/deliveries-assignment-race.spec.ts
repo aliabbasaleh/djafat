@@ -89,7 +89,12 @@ describe('DeliveriesService — REAL concurrency against a lock-aware fake DB (d
 
     const [accept, cancel] = await Promise.allSettled([
       service.acceptOffer(delivery.id, 'courier-A', 'accept-key'),
-      service.cancel(delivery.id, ['customer'], 'customer-1', 'changed my mind', 'cancel-key'),
+      service.cancel(
+        { userId: 'customer-1', roles: ['customer'], permissions: [] },
+        delivery.id,
+        'changed my mind',
+        'cancel-key',
+      ),
     ]);
 
     // Whichever committed first wins; the loser sees a clean, typed error

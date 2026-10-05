@@ -379,7 +379,12 @@ describe('reassignment policy (mandate §4)', () => {
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
     await service.acceptOffer(delivery.id, 'courier-A', 'k1');
-    await service.cancel(delivery.id, ['admin'], 'admin-1', 'customer changed mind', 'k2');
+    await service.cancel(
+      { userId: 'admin-1', roles: ['admin'], permissions: ['deliveries:write'] },
+      delivery.id,
+      'customer changed mind',
+      'k2',
+    );
 
     expect(delivery.status).toBe('cancelled');
 
@@ -402,7 +407,12 @@ describe('reassignment policy (mandate §4)', () => {
     });
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
-    await service.reportFailed(delivery.id, ['courier'], 'courier-A', 'customer unreachable', 'k1');
+    await service.reportFailed(
+      { userId: 'courier-A', roles: ['courier'], permissions: ['deliveries:write'] },
+      delivery.id,
+      'customer unreachable',
+      'k1',
+    );
 
     expect(delivery.status).toBe('failed');
     expect(ledgerGroups.filter((g) => g.kind === 'funds_available')).toHaveLength(0);
@@ -415,7 +425,12 @@ describe('reassignment policy (mandate §4)', () => {
     const { delivery } = seedAssignedOffer(deliveries, offers, couriers, 'courier-A');
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
-    await service.cancel(delivery.id, ['customer'], 'customer-1', 'changed mind', 'k1');
+    await service.cancel(
+      { userId: 'customer-1', roles: ['customer'], permissions: [] },
+      delivery.id,
+      'changed mind',
+      'k1',
+    );
 
     expect(ledgerGroups).toHaveLength(0);
     const courier = couriers.find((c) => c.userId === 'courier-A')!;

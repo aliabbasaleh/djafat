@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
+import type { ModuleRef } from '@nestjs/core';
 import { ConflictException, type HttpException } from '@nestjs/common';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { CartsService } from '../carts/carts.service';
@@ -383,6 +384,9 @@ function buildServices(db: PrismaService) {
     outboxStub(),
     idempotency,
     { emit: vi.fn() } as unknown as EventEmitter2,
+    // `ModuleRef` — only used to lazily resolve `DELIVERY_TRACKING_PORT` for the
+    // courier branch of `getOrderFor` (BUG-10.1-AUTH); never reached by these tests.
+    { get: vi.fn() } as unknown as ModuleRef,
   );
   return { carts, orders };
 }

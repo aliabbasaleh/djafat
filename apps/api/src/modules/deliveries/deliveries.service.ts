@@ -1,6 +1,7 @@
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import {
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Inject,
@@ -23,9 +24,17 @@ import { OutboxService } from '../../infra/outbox/outbox.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { toMoneyJson } from '../../common/money/money.mapper';
 import { ORDER_AMOUNT_PORT } from '../../common/ports/order-amount.port';
+import {
+  canCourierActOnDelivery,
+  isStaffTierFor,
+  resolveDeliveryAccess,
+  type AccessActor,
+  type OrderAccessGrant,
+} from '../../common/authz/order-access';
 import { LedgerService } from '../ledger/ledger.service';
 import { PlatformService } from '../platform/platform.service';
 import { CouriersService } from '../couriers/couriers.service';
+import { UsersService } from '../users/users.service';
 import { buildFundsAvailableEntries } from './release-entries';
 import { buildCourierFeeReclassificationEntries } from './courier-fee-reclassification';
 
@@ -123,6 +132,7 @@ export class DeliveriesService {
     private readonly events: EventEmitter2,
     private readonly platform: PlatformService,
     private readonly couriers: CouriersService,
+    private readonly users: UsersService,
     @Inject(ORDER_AMOUNT_PORT) private readonly orderAmount: OrderAmountPort,
   ) {}
 
@@ -889,32 +899,71 @@ export class DeliveriesService {
   }
 
   async cancel(
+    actor: AccessActor,
     deliveryId: string,
-    actorRoles: readonly Role[],
-    actorUserId: string,
     reason: string,
     idempotencyKey: string,
   ): Promise<{ status: 'created' | 'replayed'; delivery: DeliveryDto }> {
     const run = await this.idempotency.run(
       'deliveries:cancel',
       idempotencyKey,
-      { deliveryId, actorRoles, reason },
-      () => this.doCancel(deliveryId, actorRoles, actorUserId, reason),
+      { deliveryId, actorRoles: actor.roles, reason },
+      () => this.doCancel(actor, deliveryId, reason),
     );
     return { status: run.status, delivery: run.response };
   }
 
+  /**
+   * Tenant-scoped cancellation (BUG-10.1.3). This route used
+   * `@RequireOwnership(..., getOwnerUserId, 'deliveries:write')`, and the
+   * override bypassed ownership for every holder of `deliveries:write` —
+   * `courier` included. A courier-only actor was still stopped downstream
+   * because the state machine lists `courier` on NO `-> cancelled` transition,
+   * which is why this looked non-exploitable. It was not: `unionFromStatuses`
+   * UNIONS the from-statuses of ALL the actor's roles, and every real courier
+   * also holds `customer` (granted automatically at account creation,
+   * `users.service.ts`). For a `courier + customer` actor the union therefore
+   * came back non-empty via the customer branch, and the UPDATE filtered on
+   * id+status only — so they could cancel a STRANGER's delivery.
+   *
+   * The authority is now explicit and resolved here: staff-tier with
+   * `deliveries:write`, or the customer who actually owns the order behind this
+   * delivery. The state machine still decides WHICH statuses each role may
+   * cancel from.
+   *
+   * Two layers, exactly like `reportFailed`: the explicit decision below gives
+   * a clear 403, and the UPDATE additionally pins the write to the ORDER the
+   * authorization was granted against (`order_id = <authorized order>`). The
+   * explicit check is read-then-act; binding the write to that same order makes
+   * the authorization and the transition one consistent unit, so a stale or
+   * re-pointed row cannot be cancelled on the strength of an authorization that
+   * no longer describes it.
+   */
   private async doCancel(
+    actor: AccessActor,
     deliveryId: string,
-    actorRoles: readonly Role[],
-    actorUserId: string,
     reason: string,
   ): Promise<DeliveryDto> {
-    const fromStatuses = this.unionFromStatuses('cancelled', actorRoles);
+    const isStaff = isStaffTierFor(actor, 'deliveries:write');
+    let authorizedOrderId: string | null = null;
+
+    if (!isStaff) {
+      // Throws NotFound itself if the delivery (or its order) is unknown.
+      const { orderId, ownerUserId } = await this.resolveCancelOwnership(deliveryId);
+      if (ownerUserId !== actor.userId) {
+        throw new ForbiddenException({
+          code: 'FORBIDDEN',
+          message: 'Only the customer who owns this order may cancel its delivery.',
+        });
+      }
+      authorizedOrderId = orderId;
+    }
+
+    const fromStatuses = this.unionFromStatuses('cancelled', actor.roles);
     if (fromStatuses.length === 0) {
       throw new ConflictException({
         code: 'DELIVERY_INVALID_STATE',
-        message: `Role(s) ${actorRoles.join(',')} cannot cancel a delivery.`,
+        message: `Role(s) ${actor.roles.join(',')} cannot cancel a delivery.`,
       });
     }
 
@@ -923,8 +972,9 @@ export class DeliveriesService {
         Array<{ status: string; courier_id: string | null; order_id: string }>
       >`
         UPDATE deliveries SET status = 'cancelled'::text, cancelled_at = now(),
-          cancelled_reason = ${reason}, cancelled_by = ${actorUserId}::uuid
+          cancelled_reason = ${reason}, cancelled_by = ${actor.userId}::uuid
         WHERE id = ${deliveryId}::uuid AND status = ANY(${fromStatuses}::text[])
+          AND (${isStaff}::boolean OR order_id = ${authorizedOrderId}::uuid)
         RETURNING status, courier_id, order_id
       `;
       if (!rows[0]) return null;
@@ -970,32 +1020,76 @@ export class DeliveriesService {
   }
 
   async reportFailed(
+    actor: AccessActor,
     deliveryId: string,
-    actorRoles: readonly Role[],
-    actorUserId: string,
     reason: string,
     idempotencyKey: string,
   ): Promise<{ status: 'created' | 'replayed'; delivery: DeliveryDto }> {
     const run = await this.idempotency.run(
       'deliveries:failed',
       idempotencyKey,
-      { deliveryId, actorRoles, reason },
-      () => this.doReportFailed(deliveryId, actorRoles, actorUserId, reason),
+      { deliveryId, actorRoles: actor.roles, reason },
+      () => this.doReportFailed(actor, deliveryId, reason),
     );
     return { status: run.status, delivery: run.response };
   }
 
+  /**
+   * Tenant-scoped failure report (BUG-10.1-AUTH). Was
+   * `@RequireOwnership(..., getAssignedCourierUserId, 'deliveries:write')`:
+   * the override bypassed the assigned-courier resolver entirely for every
+   * holder of `deliveries:write`, which the seed grants to `courier` — and the
+   * state machine DOES allow `courier` on `pickup_in_progress|picked_up|
+   * on_the_way -> failed`, while this UPDATE filtered on id+status only. Any
+   * courier could therefore fail any other courier's in-flight delivery.
+   *
+   * Two layers, deliberately: an EXPLICIT service-level decision (so a
+   * non-assigned courier gets a clear 403 instead of a silent no-op), AND the
+   * `courier_id` predicate inside the UPDATE itself — the explicit check is
+   * read-then-act, and assignment can change under it (docs/25 §12 assigns
+   * under `FOR UPDATE`). Only the atomic predicate makes the decision and the
+   * transition consistent.
+   */
   private async doReportFailed(
+    actor: AccessActor,
     deliveryId: string,
-    actorRoles: readonly Role[],
-    actorUserId: string,
     reason: string,
   ): Promise<DeliveryDto> {
+    const actorRoles = actor.roles;
+    const isStaff = isStaffTierFor(actor, 'deliveries:write');
+
+    if (!isStaff) {
+      const assigned = await this.prisma.delivery.findUnique({
+        where: { id: deliveryId },
+        select: { courierId: true },
+      });
+      if (!assigned) {
+        throw new NotFoundException({
+          code: 'DELIVERY_NOT_FOUND',
+          message: `Delivery ${deliveryId} not found.`,
+        });
+      }
+      if (!canCourierActOnDelivery(actor, assigned.courierId)) {
+        throw new ForbiddenException({
+          code: 'FORBIDDEN',
+          message: 'Only the courier currently assigned to this delivery may report it failed.',
+        });
+      }
+    }
+
     const fromStatuses = this.unionFromStatuses('failed', actorRoles);
     const outcome = await this.prisma.$transaction(async (tx) => {
+      // Staff-tier may act regardless of assignment (force-failing a stuck
+      // delivery); a courier is pinned to the row they are assigned to AT
+      // WRITE TIME, so a reassignment racing the check above cannot slip in.
+      // Both predicates are PLAIN bound parameters on purpose: interpolating a
+      // `Prisma.sql` fragment into a tagged `$queryRaw` template is not a
+      // supported composition and would be bound as a value instead of spliced
+      // as SQL.
       const rows = await tx.$queryRaw<Array<{ courier_id: string | null; order_id: string }>>`
         UPDATE deliveries SET status = 'failed'::text, failed_at = now(), failed_reason = ${reason}
         WHERE id = ${deliveryId}::uuid AND status = ANY(${fromStatuses}::text[])
+          AND (${isStaff}::boolean OR courier_id = ${actor.userId}::uuid)
         RETURNING courier_id, order_id
       `;
       if (!rows[0]) return null;
@@ -1005,7 +1099,7 @@ export class DeliveriesService {
           aggregate: 'delivery',
           aggregateId: deliveryId,
           eventType: 'delivery.failed',
-          payload: { deliveryId, orderId: rows[0].order_id, reason, actorUserId },
+          payload: { deliveryId, orderId: rows[0].order_id, reason, actorUserId: actor.userId },
         },
       });
       return { orderId: rows[0].order_id };
@@ -1037,6 +1131,59 @@ export class DeliveriesService {
     return this.toDto(d);
   }
 
+  /**
+   * Tenant-scoped read (BUG-10.1-AUTH, `common/authz/order-access.ts`).
+   * Replaces `@RequireOwnership(..., 'deliveries:read')`, whose override was a
+   * TOTAL ownership bypass for every holder of `deliveries:read` — a
+   * permission the seed grants to `courier`, so any courier could read any
+   * other courier's delivery (fee, status timeline, order linkage) from its
+   * UUID alone.
+   *
+   * The order's customer/restaurant come from `OrderAmountPort` (already
+   * injected) — `deliveries` never reads the `orders` table itself (docs/25 §6).
+   */
+  async getByIdFor(actor: AccessActor, id: string): Promise<DeliveryDto> {
+    const d = await this.prisma.delivery.findUnique({ where: { id } });
+    if (!d) {
+      throw new NotFoundException({
+        code: 'DELIVERY_NOT_FOUND',
+        message: `Delivery ${id} not found.`,
+      });
+    }
+
+    // Cheapest branch first, and expressed as its own predicate rather than
+    // calling the full rule with placeholder facts — a fake `customerId` would
+    // be one typo away from matching a real actor.
+    let grant: OrderAccessGrant | null = canCourierActOnDelivery(actor, d.courierId)
+      ? 'courier'
+      : null;
+
+    if (!grant) {
+      const context = await this.orderAmount.getDeliveryContext(d.orderId);
+      const isMember =
+        actor.permissions.includes('deliveries:read') &&
+        (await this.users.isMemberOfRestaurant(actor.userId, context.restaurantId));
+      grant = resolveDeliveryAccess(
+        actor,
+        {
+          assignedCourierUserId: d.courierId,
+          customerId: context.customerId,
+          isMemberOfOrderRestaurant: isMember,
+        },
+        'deliveries:read',
+      );
+    }
+
+    // Same 404 as an unknown id — never distinguish "not yours" from "absent".
+    if (!grant) {
+      throw new NotFoundException({
+        code: 'DELIVERY_NOT_FOUND',
+        message: `Delivery ${id} not found.`,
+      });
+    }
+    return this.toDto(d);
+  }
+
   async getByOrderIdOrThrow(orderId: string): Promise<DeliveryDto> {
     const d = await this.prisma.delivery.findUnique({ where: { orderId } });
     if (!d)
@@ -1047,8 +1194,26 @@ export class DeliveriesService {
     return this.toDto(d);
   }
 
-  /** For `@RequireOwnership` — the CUSTOMER who owns the order behind this delivery. */
+  /**
+   * The CUSTOMER who owns the order behind this delivery. No longer wired to a
+   * guard (BUG-10.1.3 moved that decision into `cancel`), but kept as the
+   * module's public answer to "whose order is this delivery for?" — it has its
+   * own contract tests, and `doCancel` reads the same fact through
+   * `resolveCancelOwnership`.
+   */
   async getOwnerUserId(deliveryId: string): Promise<string> {
+    const { ownerUserId } = await this.resolveCancelOwnership(deliveryId);
+    return ownerUserId;
+  }
+
+  /**
+   * Resolves BOTH facts in one read (BUG-10.1.3): who owns the order, and WHICH
+   * order it is. `doCancel` needs the order id too, to pin its UPDATE to the
+   * same row the authorization was granted against.
+   */
+  private async resolveCancelOwnership(
+    deliveryId: string,
+  ): Promise<{ orderId: string; ownerUserId: string }> {
     const d = await this.prisma.delivery.findUnique({
       where: { id: deliveryId },
       select: { orderId: true },
@@ -1058,7 +1223,7 @@ export class DeliveriesService {
         code: 'DELIVERY_NOT_FOUND',
         message: `Delivery ${deliveryId} not found.`,
       });
-    return this.orderAmount.getOwnerUserId(d.orderId);
+    return { orderId: d.orderId, ownerUserId: await this.orderAmount.getOwnerUserId(d.orderId) };
   }
 
   /** For `@RequireOwnership` — the COURIER assigned to this delivery (pickup/deliver routes). */

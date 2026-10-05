@@ -12,7 +12,7 @@ import { ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedActor } from '@djafat/types';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { CurrentActor } from '../auth/current-actor.decorator';
-import { RequireAuth, RequireOwnership, RequireRole } from '../auth/decorators';
+import { RequireAuth, RequireRole } from '../auth/decorators';
 import { OrdersService } from './orders.service';
 import { CreateOrderSchema, type CreateOrderInput } from './dto/create-order.schema';
 import { RejectOrderSchema, type RejectOrderInput } from './dto/reject-order.schema';
@@ -68,16 +68,20 @@ export class OrdersController {
     return { status, order };
   }
 
-  /** Owner (the customer) or staff with `orders:read` (support/finance/admin) — never a stranger who just knows the id (docs/19 §21). */
+  /**
+   * Tenant-scoped (BUG-10.1-AUTH): the owning customer, a member of THIS
+   * order's restaurant, the courier currently assigned to its delivery, or
+   * staff-tier with `orders:read`. Was `@RequireOwnership(..., 'orders:read')`,
+   * whose override bypassed ownership entirely for every holder of
+   * `orders:read` — restaurant and courier roles included, so any of them
+   * could read any order whose UUID they knew. The decision now lives in
+   * `OrdersService.getOrderFor` over the single rule in
+   * `common/authz/order-access.ts`.
+   */
   @Get(':id')
   @RequireAuth()
-  @RequireOwnership(
-    OrdersService,
-    (orders, req) => orders.getOwnerUserId((req.params as { id: string }).id),
-    'orders:read',
-  )
-  get(@Param('id') id: string) {
-    return this.orders.getOrder(id);
+  get(@CurrentActor() actor: AuthenticatedActor, @Param('id') id: string) {
+    return this.orders.getOrderFor(actor, id);
   }
 
   /** The restaurant accepts the order — only a staff/owner of THAT restaurant (docs/30 §order-authorization). */

@@ -161,7 +161,12 @@ describe('DB invariant under REAL concurrency (docs/25 §B6.1-1, mandate §1)', 
 
     // Cancelling the delivery releases the back-pointer but must NOT promote a
     // suspended courier to `online` (the worker had exactly that bug).
-    await service.cancel(delivery.id, ['admin'], 'admin-1', 'ops', 'k-cancel');
+    await service.cancel(
+      { userId: 'admin-1', roles: ['admin'], permissions: ['deliveries:write'] },
+      delivery.id,
+      'ops',
+      'k-cancel',
+    );
     expect(courier.status).toBe('suspended');
     expect(courier.activeDeliveryId).toBeNull();
 
@@ -176,9 +181,19 @@ describe('DB invariant under REAL concurrency (docs/25 §B6.1-1, mandate §1)', 
     const { delivery } = seedAssignedOffer(deliveries, offers, couriers, 'courier-X');
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
-    await service.cancel(delivery.id, ['admin'], 'admin-1', 'ops', 'k1');
+    await service.cancel(
+      { userId: 'admin-1', roles: ['admin'], permissions: ['deliveries:write'] },
+      delivery.id,
+      'ops',
+      'k1',
+    );
     await expect(
-      service.cancel(delivery.id, ['admin'], 'admin-1', 'ops', 'k2'),
+      service.cancel(
+        { userId: 'admin-1', roles: ['admin'], permissions: ['deliveries:write'] },
+        delivery.id,
+        'ops',
+        'k2',
+      ),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 });

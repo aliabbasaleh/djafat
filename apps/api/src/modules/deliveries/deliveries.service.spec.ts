@@ -122,9 +122,8 @@ describe('DeliveriesService.cancel — state-machine guarded (docs/25 §29)', ()
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
     const result = await service.cancel(
+      { userId: 'customer-1', roles: ['customer'], permissions: [] },
       delivery.id,
-      ['customer'],
-      'customer-1',
       'changed my mind',
       'key-1',
     );
@@ -137,7 +136,12 @@ describe('DeliveriesService.cancel — state-machine guarded (docs/25 §29)', ()
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
     await expect(
-      service.cancel(delivery.id, ['customer'], 'customer-1', 'too late', 'key-1'),
+      service.cancel(
+        { userId: 'customer-1', roles: ['customer'], permissions: [] },
+        delivery.id,
+        'too late',
+        'key-1',
+      ),
     ).rejects.toMatchObject({ response: { code: 'DELIVERY_INVALID_STATE' } });
   });
 
@@ -155,9 +159,8 @@ describe('DeliveriesService.cancel — state-machine guarded (docs/25 §29)', ()
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
     const result = await service.cancel(
+      { userId: 'admin-1', roles: ['admin'], permissions: ['deliveries:write'] },
       delivery.id,
-      ['admin'],
-      'admin-1',
       'operational incident',
       'key-1',
     );
@@ -171,7 +174,12 @@ describe('DeliveriesService.cancel — state-machine guarded (docs/25 §29)', ()
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
     await expect(
-      service.cancel(delivery.id, ['admin', 'super_admin'], 'admin-1', 'x', 'key-1'),
+      service.cancel(
+        { userId: 'admin-1', roles: ['admin', 'super_admin'], permissions: ['deliveries:write'] },
+        delivery.id,
+        'x',
+        'key-1',
+      ),
     ).rejects.toMatchObject({ response: { code: 'DELIVERY_ALREADY_DELIVERED' } });
   });
 
@@ -181,16 +189,14 @@ describe('DeliveriesService.cancel — state-machine guarded (docs/25 §29)', ()
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
     const first = await service.cancel(
+      { userId: 'customer-1', roles: ['customer'], permissions: [] },
       delivery.id,
-      ['customer'],
-      'customer-1',
       'reason',
       'same-key',
     );
     const second = await service.cancel(
+      { userId: 'customer-1', roles: ['customer'], permissions: [] },
       delivery.id,
-      ['customer'],
-      'customer-1',
       'reason',
       'same-key',
     );
@@ -199,14 +205,28 @@ describe('DeliveriesService.cancel — state-machine guarded (docs/25 §29)', ()
     expect(second.delivery.status).toBe('cancelled');
   });
 
-  it('a role with no cancel permission for the current state gets a clean 409, not a crash', async () => {
+  /**
+   * BUG-10.1.3 changed the expected code here from 409 DELIVERY_INVALID_STATE
+   * to 403 FORBIDDEN, and that is a STRICTLY STRONGER rejection, not a weakened
+   * protection: a `restaurant_staff` who does not own the order is now refused
+   * on tenant grounds BEFORE the state machine is consulted at all, instead of
+   * being told "wrong state" about someone else's delivery. The 409 path for an
+   * actor who IS authorized but whose role cannot cancel from the current state
+   * stays covered by "customer can NOT cancel once picked_up" above.
+   */
+  it('a non-owner role is refused on tenant grounds (403) before the state machine is reached', async () => {
     const { db, ledgerGroups, deliveries } = makeDeliveriesRaceDb();
     const delivery = seedDelivery(deliveries, { status: 'searching_courier' });
     const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
 
     await expect(
-      service.cancel(delivery.id, ['restaurant_staff'], 'staff-1', 'x', 'key-1'),
-    ).rejects.toMatchObject({ response: { code: 'DELIVERY_INVALID_STATE' } });
+      service.cancel(
+        { userId: 'staff-1', roles: ['restaurant_staff'], permissions: [] },
+        delivery.id,
+        'x',
+        'key-1',
+      ),
+    ).rejects.toMatchObject({ response: { code: 'FORBIDDEN' } });
   });
 });
 
