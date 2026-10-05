@@ -7,21 +7,21 @@
 > lecture, support minimal. Le backend manquant pour que ça fonctionne (liste de
 > commandes scopée restaurant, lecture/écriture du profil "moi", lecture du menu complet
 > pour la gestion, écriture des horaires) a été ajouté en réutilisant intégralement les
-> mécanismes d'autorisation déjà fermés par BUG-10.1.x/Bloc 9.1 (`UsersService.
-getRestaurantScope`/`isMemberOfRestaurant`, `isStaffTierFor`) — aucune nouvelle surface
-> de risque tenant-isolation n'a été ouverte. Dette assumée et explicite : §6.
+> mécanismes d'autorisation déjà fermés par BUG-10.1.x/Bloc 9.1
+> (`UsersService.getRestaurantScope`/`isMemberOfRestaurant`, `isStaffTierFor`) — aucune
+> nouvelle surface de risque tenant-isolation n'a été ouverte. Dette assumée et explicite :
+> §6.
 
 ---
 
 ## 1. Contexte et périmètre
 
-`apps/restaurant` existait depuis le Bloc 0 comme coquille Next.js statique (`layout.tsx`
-
-- une page affichant "Shell technique"). Le mandat roadmap (docs/14 §103, item 33) :
-  _"login (scope resto) ; tableau commandes temps réel + son (kanban ≥ lg) ; accept (prépa)
-  / reject (motif) / ready ; historique ; menu (catégories/produits/options, prix `Money`) +
-  dispo rapide ; horaires (tz ville) + « fermer maintenant » ; profil + upload ; relevé
-  wallet (pending/available, lecture) ; support ; responsive."_
+`apps/restaurant` existait depuis le Bloc 0 comme coquille Next.js statique
+(`layout.tsx` et une page affichant "Shell technique"). Le mandat roadmap (docs/14 §103,
+item 33) : _"login (scope resto) ; tableau commandes temps réel et son (kanban ≥ lg) ;
+accept (prépa) / reject (motif) / ready ; historique ; menu (catégories/produits/options,
+prix `Money`) et dispo rapide ; horaires (tz ville) et « fermer maintenant » ; profil et
+upload ; relevé wallet (pending/available, lecture) ; support ; responsive."_
 
 Avant de coder, audit du mandat existant (docs/06 schéma, docs/20 catalogue, docs/27
 realtime) : la quasi-totalité du BACKEND métier existait déjà (créé aux Blocs 2/6/7/9)
@@ -36,9 +36,9 @@ RBAC global, `OwnershipGuard`.
 ## 2. Ce qui manquait réellement côté API
 
 | Besoin fonctionnel                                           | Existant avant ce bloc                                                                                                             | Ajouté                                                                                   |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------- | ------------------------- |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | Voir les commandes de SON restaurant (le tableau)            | `GET /orders/:id` (une à la fois), `GET /admin/orders` (admin uniquement)                                                          | `GET /orders` — scope résolu depuis `user_roles`, jamais un `restaurantId` client (§3.1) |
-| Agir sur une commande (accepter/prêt/refuser)                | `POST /orders/:id/confirm                                                                                                          | ready                                                                                    | reject` (Bloc 9) | rien — réutilisé tel quel |
+| Agir sur une commande (accepter/prêt/refuser)                | `POST /orders/:id/{confirm,ready,reject}` (Bloc 9)                                                                                 | rien — réutilisé tel quel                                                                |
 | Profil "mon restaurant"                                      | `GET /restaurants/me/balance` (Bloc 9) seulement                                                                                   | `GET /restaurants/me` (profil complet + disponibilité calculée)                          |
 | Horaires                                                     | lecture pure (`RestaurantAvailabilityService`, Bloc 2) — **aucune écriture n'existait**                                            | `PUT /restaurants/me/hours`                                                              |
 | "Fermer maintenant"                                          | `status` self-service (`draft/active/paused`) déjà câblé (Bloc 2/9.1)                                                              | rien — réutilisé (`PATCH /restaurants/:id` avec `status: 'paused'`)                      |
