@@ -10,10 +10,11 @@ import type { ActorResolverService, RequestWithActor } from '../actor-resolver.s
 const actor = (
   userId: string,
   permissions: AuthenticatedActor['permissions'] = [],
+  roles: AuthenticatedActor['roles'] = ['customer'],
 ): AuthenticatedActor => ({
   userId,
   sessionId: 's1',
-  roles: ['customer'],
+  roles,
   permissions,
   stepUpVerifiedAt: null,
 });
@@ -90,7 +91,11 @@ describe('OwnershipGuard', () => {
             : undefined,
     } as unknown as Reflector;
     const resolver = {
-      resolve: vi.fn().mockResolvedValue(actor('support-agent', ['orders:read'])),
+      // Was `actor('support-agent', ['orders:read'])` with the helper's default
+      // `roles: ['customer']` — i.e. this test NAMED "staff-tier" was in fact
+      // exercising the bypass that turned out to be BUG-10.1. The fixture now
+      // matches the name.
+      resolve: vi.fn().mockResolvedValue(actor('support-agent', ['orders:read'], ['support'])),
     } as unknown as ActorResolverService;
     const moduleRef = { get: () => fakeOrders } as unknown as ModuleRef;
     const guard = new OwnershipGuard(reflector, resolver, moduleRef);
@@ -143,5 +148,80 @@ describe('OwnershipGuard', () => {
     await expect(guard.canActivate(makeContext({} as RequestWithActor))).rejects.toThrow(
       NotFoundStub,
     );
+  });
+});
+
+/**
+ * Root-cause hardening after the BUG-10.1.x family (pre-Bloc-10). The override
+ * used to be "holds the permission ⇒ skip ownership", which made every
+ * permission the seed shares with a tenant-scoped role into a cross-tenant
+ * key. It now requires a staff-tier ROLE as well.
+ */
+describe('OwnershipGuard — the override can no longer be used by a tenant-scoped role', () => {
+  function build(actorValue: AuthenticatedActor, overridePermission = 'orders:read') {
+    const fakeOrders = new FakeOrdersService();
+    const spec: OwnershipSpec = {
+      token: FakeOrdersService,
+      resolve: (svc, _req) => (svc as FakeOrdersService).getOwnerUserId(),
+    };
+    const reflector = {
+      getAllAndOverride: (key: string) =>
+        key === 'djafat:ownership-spec'
+          ? spec
+          : key === 'djafat:ownership-override-permission'
+            ? overridePermission
+            : undefined,
+    } as unknown as Reflector;
+    const resolver = {
+      resolve: vi.fn().mockResolvedValue(actorValue),
+    } as unknown as ActorResolverService;
+    const moduleRef = { get: () => fakeOrders } as unknown as ModuleRef;
+    return { guard: new OwnershipGuard(reflector, resolver, moduleRef), fakeOrders };
+  }
+
+  it.each([
+    ['restaurant_owner', 'orders:read'],
+    ['restaurant_staff', 'orders:read'],
+    ['courier', 'orders:read'],
+    ['courier', 'deliveries:read'],
+    ['courier', 'deliveries:write'],
+    ['customer', 'orders:read'],
+  ] as const)(
+    'a %s holding %s is still subject to ownership — the permission alone no longer bypasses',
+    async (role, permission) => {
+      const { guard, fakeOrders } = build(actor('intruder', [permission], [role]), permission);
+      await expect(guard.canActivate(makeContext({} as RequestWithActor))).rejects.toThrow(
+        ForbiddenException,
+      );
+      // Ownership was ACTUALLY consulted — proof the override did not fire.
+      expect(fakeOrders.getOwnerUserId).toHaveBeenCalled();
+    },
+  );
+
+  it.each(['admin', 'super_admin', 'support', 'finance'] as const)(
+    '%s with the permission still bypasses ownership — existing staff access preserved',
+    async (role) => {
+      const { guard, fakeOrders } = build(actor('staff-1', ['orders:read'], [role]));
+      await expect(guard.canActivate(makeContext({} as RequestWithActor))).resolves.toBe(true);
+      expect(fakeOrders.getOwnerUserId).not.toHaveBeenCalled();
+    },
+  );
+
+  it('a staff-tier ROLE without the permission does not bypass — both halves required', async () => {
+    const { guard } = build(actor('support-1', [], ['support']));
+    await expect(guard.canActivate(makeContext({} as RequestWithActor))).rejects.toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('the OWNER is still allowed even when no override applies at all', async () => {
+    const { guard } = build(actor('owner-1', [], ['customer']));
+    await expect(guard.canActivate(makeContext({} as RequestWithActor))).resolves.toBe(true);
+  });
+
+  it('a tenant role that IS the owner is allowed through ownership, not through the override', async () => {
+    const { guard, fakeOrders } = build(actor('owner-1', ['orders:read'], ['courier']));
+    await expect(guard.canActivate(makeContext({} as RequestWithActor))).resolves.toBe(true);
+    expect(fakeOrders.getOwnerUserId).toHaveBeenCalled();
   });
 });
