@@ -1,4 +1,5 @@
-import { Heading, Text, Stack, Alert } from '@djafat/ui';
+import { Heading, Text, Stack } from '@djafat/ui';
+import { Alert } from '@/components/ui-client';
 
 /**
  * Support (Bloc 10, docs/33 §support) — a static contact page, deliberately
