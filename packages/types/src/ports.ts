@@ -95,6 +95,20 @@ export interface OrderDeliveryContext {
   readonly pickup: GeoPoint | null;
   /** Null if the order's dropoff address was never geocoded (`geocode_status='manual'`, docs/09 B.1) — dispatch flags this for manual ops handling rather than crashing. */
   readonly dropoff: GeoPoint | null;
+  /**
+   * Human-readable pickup/dropoff for a courier-facing screen (Bloc 11,
+   * docs/34 §offer-context) — added alongside the coordinates `deliveries`
+   * already consumed; nothing here changes dispatch's own logic. Composed
+   * once, here, so `deliveries` never has to touch the `orders`/`restaurants`
+   * tables itself to show a human where to go.
+   */
+  readonly restaurantName: string;
+  readonly restaurantAddress: string | null;
+  readonly restaurantPhone: string | null;
+  readonly dropoffLabel: string | null;
+  /** `quartier, street, landmark` joined, skipping any that are null — never an empty string, `null` when every part is. */
+  readonly dropoffAddress: string | null;
+  readonly dropoffPhone: string | null;
 }
 
 /**

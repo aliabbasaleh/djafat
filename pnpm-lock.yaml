@@ -218,6 +218,97 @@ importers:
         specifier: 2.1.8
         version: 2.1.8(@types/node@22.10.5)(jsdom@30.0.1(@noble/hashes@1.8.0))(lightningcss@1.27.0)(terser@5.51.2)
 
+  apps/courier:
+    dependencies:
+      '@babel/runtime':
+        specifier: ^7.25.2
+        version: 7.29.7
+      '@djafat/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@djafat/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
+      '@djafat/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@djafat/tokens':
+        specifier: workspace:*
+        version: link:../../packages/tokens
+      '@djafat/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@react-navigation/native':
+        specifier: ^7.0.0
+        version: 7.3.18(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0)
+      expo:
+        specifier: ~53.0.9
+        version: 53.0.27(@babel/core@7.26.0)(@expo/metro-runtime@5.0.4(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0)
+      expo-constants:
+        specifier: ~17.1.6
+        version: 17.1.8(expo@53.0.27(@babel/core@7.26.0)(@expo/metro-runtime@5.0.4(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0))(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))
+      expo-linking:
+        specifier: ~7.1.5
+        version: 7.1.7(expo@53.0.27(@babel/core@7.26.0)(@expo/metro-runtime@5.0.4(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0))(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0)
+      expo-location:
+        specifier: ~18.1.4
+        version: 18.1.6(expo@53.0.27(@babel/core@7.26.0)(@expo/metro-runtime@5.0.4(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0))
+      expo-router:
+        specifier: ~5.0.7
+        version: 5.0.7(lzqphrjypjtfxij4siedcfd2ve)
+      expo-secure-store:
+        specifier: ~14.2.3
+        version: 14.2.4(expo@53.0.27(@babel/core@7.26.0)(@expo/metro-runtime@5.0.4(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0))
+      expo-status-bar:
+        specifier: ~2.2.3
+        version: 2.2.3(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0)
+      react:
+        specifier: 19.0.0
+        version: 19.0.0
+      react-native:
+        specifier: 0.79.2
+        version: 0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0)
+      react-native-safe-area-context:
+        specifier: 5.4.0
+        version: 5.4.0(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0)
+      react-native-screens:
+        specifier: ~4.10.0
+        version: 4.10.0(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0)
+      socket.io-client:
+        specifier: 4.8.1
+        version: 4.8.1
+      whatwg-fetch:
+        specifier: ^3.6.20
+        version: 3.6.20
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.25.2
+        version: 7.26.0
+      '@djafat/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
+      '@djafat/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@expo/metro-runtime':
+        specifier: ~5.0.4
+        version: 5.0.4(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))
+      '@types/react':
+        specifier: ~19.0.10
+        version: 19.0.14
+      eslint:
+        specifier: 9.17.0
+        version: 9.17.0(jiti@2.6.1)
+      rimraf:
+        specifier: 6.0.1
+        version: 6.0.1
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@22.20.2)(jsdom@30.0.1(@noble/hashes@1.8.0))(lightningcss@1.27.0)(terser@5.51.2)
+
   apps/mobile:
     dependencies:
       '@djafat/core':
@@ -4111,6 +4202,11 @@ packages:
       react: '*'
       react-native: '*'
 
+  expo-location@18.1.6:
+    resolution: {integrity: sha512-l5dQQ2FYkrBgNzaZN1BvSmdhhcztFOUucu2kEfDBMV4wSIuTIt/CKsho+F3RnAiWgvui1wb1WTTf80E8zq48hA==}
+    peerDependencies:
+      expo: '*'
+
   expo-modules-autolinking@2.1.15:
     resolution: {integrity: sha512-IUITUERdkgooXjr9bXsX0PmhrZUIGTMyP6NtmQpAxN5+qtf/I7ewbwLx1/rX7tgiAOzaYme+PZOp/o6yqIhFsw==}
     hasBin: true
@@ -4136,6 +4232,11 @@ packages:
         optional: true
       react-native-reanimated:
         optional: true
+
+  expo-secure-store@14.2.4:
+    resolution: {integrity: sha512-ePaz4fnTitJJZjAiybaVYGfLWWyaEtepZC+vs9ZBMhQMfG5HUotIcVsDaSo3FnwpHmgwsLVPY2qFeryI6AtULw==}
+    peerDependencies:
+      expo: '*'
 
   expo-status-bar@2.2.3:
     resolution: {integrity: sha512-+c8R3AESBoduunxTJ8353SqKAKpxL6DvcD8VKBuh81zzJyUUbfB4CVjr1GufSJEKsMzNPXZU+HJwXx7Xh7lx8Q==}
@@ -11196,6 +11297,10 @@ snapshots:
       - expo
       - supports-color
 
+  expo-location@18.1.6(expo@53.0.27(@babel/core@7.26.0)(@expo/metro-runtime@5.0.4(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0)):
+    dependencies:
+      expo: 53.0.27(@babel/core@7.26.0)(@expo/metro-runtime@5.0.4(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0)
+
   expo-modules-autolinking@2.1.15:
     dependencies:
       '@expo/spawn-async': 1.8.0
@@ -11237,6 +11342,10 @@ snapshots:
       - react
       - react-native
       - supports-color
+
+  expo-secure-store@14.2.4(expo@53.0.27(@babel/core@7.26.0)(@expo/metro-runtime@5.0.4(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0)):
+    dependencies:
+      expo: 53.0.27(@babel/core@7.26.0)(@expo/metro-runtime@5.0.4(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0)
 
   expo-status-bar@2.2.3(react-native@0.79.2(@babel/core@7.26.0)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0):
     dependencies:

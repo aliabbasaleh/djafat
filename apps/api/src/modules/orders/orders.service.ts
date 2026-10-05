@@ -127,6 +127,12 @@ export interface OrderDto {
   updatedAt: string;
 }
 
+/** Joins the non-null parts with ", " — never an empty string; `null` when every part is (Bloc 11, docs/34 §offer-context). */
+function composeAddress(parts: ReadonlyArray<string | null>): string | null {
+  const present = parts.filter((p): p is string => p !== null && p.trim().length > 0);
+  return present.length > 0 ? present.join(', ') : null;
+}
+
 /**
  * `restaurant_owner`/`restaurant_staff`'s own order board (Bloc 10, docs/33
  * §order-board) — every status between "the kitchen now owns this" and "it
@@ -472,11 +478,22 @@ export class OrdersService implements OrderAmountPort {
         pickup_lng: number | null;
         dropoff_lat: number | null;
         dropoff_lng: number | null;
+        restaurant_name: string;
+        restaurant_address: string | null;
+        restaurant_phone: string | null;
+        dropoff_label: string | null;
+        dropoff_quartier: string | null;
+        dropoff_street: string | null;
+        dropoff_landmark: string | null;
+        dropoff_recipient_phone: string | null;
       }>
     >`
       SELECT o.id, o.code, o.restaurant_id, o.customer_id, o.currency, o.courier_fee_minor,
              ST_Y(r.geom::geometry) AS pickup_lat, ST_X(r.geom::geometry) AS pickup_lng,
-             ST_Y(o.dropoff_geom::geometry) AS dropoff_lat, ST_X(o.dropoff_geom::geometry) AS dropoff_lng
+             ST_Y(o.dropoff_geom::geometry) AS dropoff_lat, ST_X(o.dropoff_geom::geometry) AS dropoff_lng,
+             r.name AS restaurant_name, r.address_text AS restaurant_address, r.phone AS restaurant_phone,
+             o.dropoff_label, o.dropoff_quartier, o.dropoff_street, o.dropoff_landmark,
+             o.dropoff_recipient_phone
       FROM orders o
       JOIN restaurants r ON r.id = o.restaurant_id
       WHERE o.id = ${orderId}::uuid
@@ -512,6 +529,16 @@ export class OrdersService implements OrderAmountPort {
         row.dropoff_lat !== null && row.dropoff_lng !== null
           ? { lat: row.dropoff_lat, lng: row.dropoff_lng }
           : null,
+      restaurantName: row.restaurant_name,
+      restaurantAddress: row.restaurant_address,
+      restaurantPhone: row.restaurant_phone,
+      dropoffLabel: row.dropoff_label,
+      dropoffAddress: composeAddress([
+        row.dropoff_quartier,
+        row.dropoff_street,
+        row.dropoff_landmark,
+      ]),
+      dropoffPhone: row.dropoff_recipient_phone,
     };
   }
 

@@ -880,6 +880,12 @@ export function fakeOrderAmountPort(courierFeeInPool = true): OrderAmountPort {
     courierFeeInPool,
     pickup: PICKUP,
     dropoff: DROPOFF,
+    restaurantName: 'Test Restaurant',
+    restaurantAddress: 'Avenue Test',
+    restaurantPhone: '+23566000099',
+    dropoffLabel: 'Maison',
+    dropoffAddress: 'Quartier Test, Rue Test',
+    dropoffPhone: '+23566000098',
   };
   return {
     getAuthoritativeAmount: vi.fn().mockResolvedValue(money(10000n, 'XAF')),

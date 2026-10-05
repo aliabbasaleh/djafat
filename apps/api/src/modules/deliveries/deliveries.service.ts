@@ -55,6 +55,13 @@ export interface DeliveryDto {
   cancelledReason: string | null;
   failedAt: string | null;
   failedReason: string | null;
+  /**
+   * Human-readable "where to go" (Bloc 11, docs/34 §offer-context) — only
+   * populated by the courier-facing listings below (`listOffersForCourier`/
+   * `listActiveForCourier`); every other caller of `toDto` leaves it
+   * `undefined` rather than pay for a port call nobody reads the result of.
+   */
+  context?: OrderDeliveryContext;
 }
 
 /**
@@ -84,6 +91,7 @@ export interface DeliveryOfferDto {
   status: string;
   offeredAt: string;
   expiresAt: string;
+  context: OrderDeliveryContext;
 }
 
 type DeliveryRow = {
@@ -1266,18 +1274,50 @@ export class DeliveriesService {
     return o.courierId;
   }
 
+  /**
+   * A courier realistically holds at most one open offer at a time (`delivery_
+   * offers_one_offered_per_delivery_idx` is per-delivery, but dispatch only
+   * ever offers one active delivery to one courier at once in practice) — the
+   * per-offer `getDeliveryContext` call below is never a real N+1 at scale,
+   * same reasoning as every other per-row port call in this file (e.g.
+   * `getByIdFor`).
+   */
   async listOffersForCourier(courierId: string): Promise<DeliveryOfferDto[]> {
     const rows = await this.prisma.deliveryOffer.findMany({
       where: { courierId, status: 'offered' },
       orderBy: { offeredAt: 'desc' },
     });
-    return rows.map((o) => ({
-      id: o.id,
-      deliveryId: o.deliveryId,
-      status: o.status,
-      offeredAt: o.offeredAt.toISOString(),
-      expiresAt: o.expiresAt.toISOString(),
-    }));
+    if (rows.length === 0) return [];
+
+    // `DeliveryOffer` has no Prisma relation to `Delivery` (a plain FK
+    // column, never modelled as one) — one extra query resolves the
+    // `orderId`s `getDeliveryContext` needs, never a per-offer N+1 on top of
+    // the per-offer context call already below.
+    const deliveries = await this.prisma.delivery.findMany({
+      where: { id: { in: rows.map((o) => o.deliveryId) } },
+      select: { id: true, orderId: true },
+    });
+    const orderIdByDeliveryId = new Map(deliveries.map((d) => [d.id, d.orderId]));
+
+    return Promise.all(
+      rows.map(async (o) => {
+        const orderId = orderIdByDeliveryId.get(o.deliveryId);
+        if (!orderId) {
+          throw new NotFoundException({
+            code: 'NOT_FOUND',
+            message: `Delivery ${o.deliveryId} not found for offer ${o.id}.`,
+          });
+        }
+        return {
+          id: o.id,
+          deliveryId: o.deliveryId,
+          status: o.status,
+          offeredAt: o.offeredAt.toISOString(),
+          expiresAt: o.expiresAt.toISOString(),
+          context: await this.orderAmount.getDeliveryContext(orderId),
+        };
+      }),
+    );
   }
 
   async listActiveForCourier(courierId: string): Promise<DeliveryDto[]> {
@@ -1296,7 +1336,12 @@ export class DeliveriesService {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return rows.map((d) => this.toDto(d));
+    return Promise.all(
+      rows.map(async (d) => ({
+        ...this.toDto(d),
+        context: await this.orderAmount.getDeliveryContext(d.orderId),
+      })),
+    );
   }
 
   private toDto(d: DeliveryRow): DeliveryDto {
