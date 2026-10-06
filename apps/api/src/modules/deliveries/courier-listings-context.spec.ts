@@ -27,7 +27,7 @@ function fakeContext(orderId: string): OrderDeliveryContext {
     restaurantId: 'r1',
     customerId: 'c1',
     currency: 'XAF',
-    courierFee: { minor: '1000', currency: 'XAF' },
+    courierFee: { minor: 1000n, currency: 'XAF' },
     courierFeeInPool: true,
     pickup: { lat: 12.1, lng: 15.0 },
     dropoff: { lat: 12.2, lng: 15.1 },
