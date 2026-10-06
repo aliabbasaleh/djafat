@@ -1,8 +1,9 @@
 import type { ExpoConfig } from 'expo/config';
 
 /**
- * Expo config (Bloc 0 shell). Permissions (location "Always" for the courier
- * build, notifications, camera) and EAS channels are added in Blocs 9/11/12.
+ * Expo config (Bloc 12, docs/04 §4.9). No new native permissions needed for
+ * this bloc's vertical slice (auth/catalog/cart/checkout/tracking) — no
+ * camera, no location, no push. Those stay explicit debt (docs/35 §dette).
  */
 const config: ExpoConfig = {
   name: 'DJAFAT',

@@ -12,10 +12,12 @@
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "test:unit": "vitest run --passWithNoTests",
-    "build": "echo \"@djafat/mobile: built via EAS — see docs/04\"",
-    "clean": "rimraf .expo .turbo *.tsbuildinfo"
+    "build": "expo export",
+    "clean": "rimraf .expo .turbo dist *.tsbuildinfo"
   },
   "dependencies": {
+    "@babel/runtime": "^7.25.2",
+    "@react-navigation/native": "^7.0.0",
     "@djafat/core": "workspace:*",
     "@djafat/i18n": "workspace:*",
     "@djafat/sdk": "workspace:*",
@@ -25,16 +27,20 @@
     "expo-constants": "~17.1.6",
     "expo-linking": "~7.1.5",
     "expo-router": "~5.0.7",
+    "expo-secure-store": "~14.2.3",
     "expo-status-bar": "~2.2.3",
     "react": "19.0.0",
     "react-native": "0.79.2",
     "react-native-safe-area-context": "5.4.0",
-    "react-native-screens": "~4.10.0"
+    "react-native-screens": "~4.10.0",
+    "socket.io-client": "4.8.1",
+    "whatwg-fetch": "^3.6.20"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@djafat/eslint-config": "workspace:*",
     "@djafat/tsconfig": "workspace:*",
+    "@expo/metro-runtime": "~5.0.4",
     "@types/react": "~19.0.10",
     "eslint": "9.17.0",
     "rimraf": "6.0.1",

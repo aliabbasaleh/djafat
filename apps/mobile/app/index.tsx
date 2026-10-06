@@ -1,49 +1,33 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Constants from 'expo-constants';
-import { createApiClient } from '@djafat/sdk';
+import { Redirect } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
 import { tokens } from '@djafat/tokens';
+import { useAuth } from '../lib/auth-context';
 
-const apiBaseUrl =
-  (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl ??
-  'http://localhost:3001/v1';
+/**
+ * Entry point (Bloc 12). Unlike `apps/courier`/`apps/restaurant`, browsing is
+ * PUBLIC (docs/20 §24 — no account needed to look at restaurants/menus,
+ * exactly `apps/web`'s own behaviour) — both signed-in and signed-out land on
+ * the catalog; auth is only enforced per-screen at cart/addresses/checkout/
+ * order-tracking, same split `apps/web`'s `/panier` and `/commandes/[id]`
+ * already use.
+ */
+export default function Index() {
+  const { state } = useAuth();
 
-const api = createApiClient({ baseUrl: apiBaseUrl });
+  if (state === 'loading') {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: tokens.color.bg.canvas,
+        }}
+      >
+        <ActivityIndicator color={tokens.color.brand.primary} size="large" />
+      </View>
+    );
+  }
 
-export default function Home() {
-  const insets = useSafeAreaInsets();
-  const [apiStatus, setApiStatus] = useState('vérification…');
-
-  useEffect(() => {
-    api
-      .health()
-      .then((h) => setApiStatus(`${h.status} (v${h.version})`))
-      .catch(() => setApiStatus('API injoignable'));
-  }, []);
-
-  return (
-    <View style={[styles.root, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
-      <Text style={styles.title}>DJAFAT</Text>
-      <Text style={styles.subtitle}>Socle mobile — Bloc 0.</Text>
-      <Text style={styles.meta}>API : {apiStatus}</Text>
-    </View>
-  );
+  return <Redirect href="/(app)/restaurants" />;
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: tokens.color.bg.canvas,
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: tokens.type.size.display,
-    fontWeight: '700',
-    color: tokens.color.brand.primary,
-  },
-  subtitle: { marginTop: 8, color: tokens.color.text.secondary },
-  meta: { marginTop: 16, color: tokens.color.text.primary },
-});
