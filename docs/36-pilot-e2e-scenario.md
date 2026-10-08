@@ -7,15 +7,86 @@
 > PostgreSQL/HTTP réel est disponible. Rien ici n'a été exécuté contre une vraie base —
 > voir §0.
 
-## 0. Comment l'exécuter réellement (dès que Docker est disponible)
+## 0. Runbook — comment l'exécuter réellement (dès que Docker est disponible)
+
+Tout ce qui suit réutilise les scripts déjà présents dans le dépôt (`package.json` racine,
+`apps/api/package.json`) — rien de nouveau n'a été écrit pour cette préparation.
+
+### 0.0 Prérequis
+
+Node ≥ 20, pnpm ≥ 9 (`corepack enable`), Docker + Docker Compose v2. Sous Windows sans
+Docker Desktop natif : Docker à l'intérieur de WSL2 fonctionne aussi — mais aucune
+distribution WSL n'était installée au moment de la rédaction (voir rapport).
+
+### 0.1 Variables d'environnement
 
 ```bash
-# 1. Infra (Postgres+PostGIS, PgBouncer, Redis, MinIO, mock-SMS, mock-PSP, Mailhog)
-cd infra && docker compose up -d
-# 2. API (dans un terminal séparé)
-cd apps/api && pnpm prisma migrate deploy && pnpm prisma db seed && pnpm dev
-# 3. Les commandes curl de ce document s'exécutent ensuite telles quelles.
+cp .env.example .env
 ```
+
+Quatre secrets du `.env.example` sont des placeholders littéraux et DOIVENT être
+remplacés avant de démarrer l'API (sinon échec au démarrage ou au premier flux MFA) :
+`JWT_ACCESS_SECRET`, `REFRESH_TOKEN_HASH_SECRET`, `OTP_HASH_SECRET` (chaîne aléatoire,
+32+ caractères) et `MFA_ENCRYPTION_KEY` (doit décoder en **exactement 32 octets** —
+`apps/api/src/modules/auth/crypto.util.ts` lève un `RangeError` sinon, au premier usage
+MFA). Générer chaque valeur avec :
+
+```bash
+openssl rand -base64 32
+```
+
+### 0.2 Infrastructure (Postgres 16+PostGIS 3.5, PgBouncer, Redis 7, MinIO, Mailpit, mock-psp, mock-sms)
+
+```bash
+pnpm install
+pnpm infra:up                                        # = docker compose -f infra/docker-compose.yml up -d
+docker compose -f infra/docker-compose.yml ps        # attendre "healthy" sur postgres/pgbouncer/redis/minio
+```
+
+### 0.3 Migrations + seed
+
+```bash
+pnpm db:migrate     # prisma migrate deploy (passe par DIRECT_DATABASE_URL, port 5432)
+pnpm db:seed        # apps/api/prisma/seed.ts — comptes/fixtures du §1 ci-dessous
+```
+
+### 0.4 API
+
+```bash
+pnpm --filter @djafat/api dev     # nest start --watch — http://localhost:3001
+curl -s http://localhost:3001/v1/ready
+# -> {"status":"ready","checks":{"postgres":{"ok":true},"redis":{"ok":true}}}
+```
+
+Ne pas démarrer les applications ni dérouler le scénario avant que `/v1/ready`
+renvoie `"ready"` pour `postgres` **et** `redis`.
+
+### 0.5 Applications web (web :3000, admin :3002, restaurant :3003)
+
+```bash
+pnpm dev     # turbo run dev --parallel — démarre api+web+admin+restaurant ensemble
+             # (remplace 0.4 si lancé seul ; sinon pnpm --filter @djafat/web dev, etc.)
+```
+
+### 0.6 Courier / Mobile — Expo (optionnel pour ce pilote)
+
+```bash
+pnpm --filter @djafat/courier start
+pnpm --filter @djafat/mobile start
+```
+
+Dette connue, non ré-investiguée (docs/34 §dette, docs/35 §dette) : `expo
+export`/`expo start` échoue sur `expo-modules-core` non résolu dans cet environnement
+pnpm. Non bloquant pour ce pilote : le parcours client (étapes 1-9, 17-19) reste
+entièrement couvert par `apps/web`. Le livreur (étapes 14-16) nécessite `apps/courier`
+réellement démarré — si Expo ne démarre pas sur la machine d'exécution, ces 3 étapes
+précises restent `BLOCKED` même avec Docker up ; le reste du scénario ne l'est pas.
+
+### 0.7 Exécuter le scénario
+
+Une fois `/v1/ready` à `"ready"` et les applications nécessaires démarrées, dérouler
+la §3 ci-dessous **mot pour mot**, dans l'ordre, en vérifiant chaque critère listé —
+jamais en supposant qu'une étape a réussi parce que la requête précédente a réussi.
 
 Base URL API : `http://localhost:3001/v1`. Mock SMS (pour lire l'OTP envoyé) :
 `http://localhost:4020/messages`.
