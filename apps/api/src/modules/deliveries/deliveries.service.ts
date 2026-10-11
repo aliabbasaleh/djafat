@@ -61,7 +61,25 @@ export interface DeliveryDto {
    * `listActiveForCourier`); every other caller of `toDto` leaves it
    * `undefined` rather than pay for a port call nobody reads the result of.
    */
-  context?: OrderDeliveryContext;
+  context?: JsonSafeDeliveryContext;
+}
+
+/**
+ * `OrderDeliveryContext.courierFee` is a raw `Money` (bigint `.minor`) —
+ * correct for the internal ledger math every other caller of
+ * `getDeliveryContext` does with it, but Fastify's JSON serializer throws
+ * ("Do not know how to serialize a BigInt") the moment one reaches an HTTP
+ * response unconverted. The courier-facing listings below are the only
+ * callers that put `context` on the wire, so the fix belongs here, not on
+ * the port's own type.
+ */
+type JsonSafeDeliveryContext = Omit<OrderDeliveryContext, 'courierFee'> & { courierFee: MoneyJson };
+
+function toJsonSafeContext(context: OrderDeliveryContext): JsonSafeDeliveryContext {
+  return {
+    ...context,
+    courierFee: toMoneyJson(context.courierFee.minor, context.courierFee.currency),
+  };
 }
 
 /**
@@ -91,7 +109,7 @@ export interface DeliveryOfferDto {
   status: string;
   offeredAt: string;
   expiresAt: string;
-  context: OrderDeliveryContext;
+  context: JsonSafeDeliveryContext;
 }
 
 type DeliveryRow = {
@@ -281,11 +299,19 @@ export class DeliveriesService {
       return;
     }
 
-    const alreadyOffered = await this.prisma.deliveryOffer.findMany({
+    // Exclude a courier who currently holds a live offer, or who explicitly
+    // rejected this delivery (don't re-ask after a "no") — but NOT one whose
+    // offer merely timed out (`expired`): excluding every courier who was
+    // EVER offered, timeout included, shrinks the candidate pool to zero as
+    // retries accumulate, permanently stalling dispatch once every available
+    // courier has had one offer time out.
+    const allOffers = await this.prisma.deliveryOffer.findMany({
       where: { deliveryId },
-      select: { courierId: true },
+      select: { courierId: true, status: true },
     });
-    const excludeIds = alreadyOffered.map((o) => o.courierId);
+    const excludeIds = allOffers
+      .filter((o) => o.status === 'offered' || o.status === 'rejected')
+      .map((o) => o.courierId);
 
     const radius = Math.min(initialRadius + delivery.dispatchAttempts * step, maxRadius);
     const candidates = await this.couriers.findEligibleCandidates(
@@ -1314,7 +1340,7 @@ export class DeliveriesService {
           status: o.status,
           offeredAt: o.offeredAt.toISOString(),
           expiresAt: o.expiresAt.toISOString(),
-          context: await this.orderAmount.getDeliveryContext(orderId),
+          context: toJsonSafeContext(await this.orderAmount.getDeliveryContext(orderId)),
         };
       }),
     );
@@ -1339,7 +1365,7 @@ export class DeliveriesService {
     return Promise.all(
       rows.map(async (d) => ({
         ...this.toDto(d),
-        context: await this.orderAmount.getDeliveryContext(d.orderId),
+        context: toJsonSafeContext(await this.orderAmount.getDeliveryContext(d.orderId)),
       })),
     );
   }

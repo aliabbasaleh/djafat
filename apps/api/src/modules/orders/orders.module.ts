@@ -4,6 +4,7 @@ import { PricingModule } from '../pricing/pricing.module';
 import { CartsModule } from '../carts/carts.module';
 import { AddressesModule } from '../addresses/addresses.module';
 import { UsersModule } from '../users/users.module';
+import { AuthModule } from '../auth/auth.module';
 import { ORDER_AMOUNT_PORT } from '../../common/ports/order-amount.port';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
@@ -21,7 +22,7 @@ import { OrdersAdminController } from './orders-admin.controller';
  */
 @Global()
 @Module({
-  imports: [CatalogModule, PricingModule, CartsModule, AddressesModule, UsersModule],
+  imports: [CatalogModule, PricingModule, CartsModule, AddressesModule, UsersModule, AuthModule],
   controllers: [OrdersController, OrdersAdminController],
   providers: [OrdersService, { provide: ORDER_AMOUNT_PORT, useExisting: OrdersService }],
   exports: [ORDER_AMOUNT_PORT],

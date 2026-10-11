@@ -226,10 +226,19 @@ export class UsersService {
 
     let granted: boolean;
     try {
+      // Targets `user_roles_pkey_idx` (migrations/0003_identity) by its exact
+      // expression list — Postgres can't promote an expression-based unique
+      // index to a named constraint, so `ON CONFLICT ON CONSTRAINT` isn't an
+      // option here (42809); matching the expressions is.
       const affected = await this.prisma.$executeRaw`
         INSERT INTO user_roles (user_id, role, scope_restaurant_id)
         VALUES (${targetUserId}::uuid, ${role}, ${scopeRestaurantId}::uuid)
-        ON CONFLICT ON CONSTRAINT user_roles_pkey DO NOTHING
+        ON CONFLICT (
+          user_id, role,
+          COALESCE(scope_restaurant_id, '00000000-0000-0000-0000-000000000000'),
+          COALESCE(scope_country_id,    '00000000-0000-0000-0000-000000000000'),
+          COALESCE(scope_city_id,       '00000000-0000-0000-0000-000000000000')
+        ) DO NOTHING
       `;
       granted = affected > 0;
     } catch (err) {

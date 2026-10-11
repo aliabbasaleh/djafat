@@ -90,8 +90,15 @@ async function retrySearching(): Promise<number> {
         );
         if (locked.rows[0]?.status !== 'searching_courier') return;
 
+        // Exclude a courier who currently holds a live offer, or who
+        // explicitly rejected this delivery — but NOT one whose offer merely
+        // timed out (`expired`): excluding every courier ever offered,
+        // timeout included, shrinks the candidate pool to zero as retries
+        // accumulate, permanently stalling dispatch once every available
+        // courier has had one offer time out. Mirrors the same fix in
+        // `DeliveriesService.runDispatchWave` (apps/api).
         const excluded = await tx.query<{ courier_id: string }>(
-          `SELECT courier_id FROM delivery_offers WHERE delivery_id = $1`,
+          `SELECT courier_id FROM delivery_offers WHERE delivery_id = $1 AND status IN ('offered', 'rejected')`,
           [delivery.id],
         );
         const excludeIds = excluded.rows.map((r) => r.courier_id);

@@ -303,6 +303,10 @@ async function main(): Promise<void> {
     { code: 'PSP_CLEARING', type: 'asset', ownerType: 'psp' },
     { code: 'REFUNDS_PAYABLE', type: 'liability', ownerType: 'djafat' },
     { code: 'CUSTOMER_CLEARING', type: 'liability', ownerType: 'djafat' },
+    // Holds a courier's fee between payment success and dispatch assignment
+    // (Bloc 6) — un-owned, same liability nature as COURIER_PAYABLE, which
+    // `courier-fee-reclassification.ts` later debits this to credit.
+    { code: 'COURIER_FEE_POOL', type: 'liability', ownerType: 'djafat' },
   ];
   for (const a of accounts) {
     const existing = await prisma.ledgerAccount.findFirst({

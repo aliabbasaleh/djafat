@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
 import { CouriersService } from './couriers.service';
 import { CouriersController } from './couriers.controller';
 import { CouriersAdminController } from './couriers-admin.controller';
@@ -11,6 +12,7 @@ import { CouriersAdminController } from './couriers-admin.controller';
  * the same reason `payments`/`deliveries` inject `LedgerService` directly.
  */
 @Module({
+  imports: [AuthModule],
   controllers: [CouriersController, CouriersAdminController],
   providers: [CouriersService],
   exports: [CouriersService],

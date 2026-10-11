@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { UsersModule } from '../users/users.module';
+import { AuthModule } from '../auth/auth.module';
 import { AdminController } from './admin.controller';
 import { UsersAdminController } from './users-admin.controller';
 
@@ -14,7 +15,7 @@ import { UsersAdminController } from './users-admin.controller';
  * and `settlements.controller.ts` already established before this bloc.
  */
 @Module({
-  imports: [UsersModule],
+  imports: [UsersModule, AuthModule],
   controllers: [AdminController, UsersAdminController],
 })
 export class AdminModule {}

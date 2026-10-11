@@ -31,11 +31,20 @@ CREATE TABLE user_roles (
   role                text NOT NULL REFERENCES roles(code),
   scope_restaurant_id uuid,
   scope_country_id    uuid REFERENCES countries(id),
-  scope_city_id       uuid REFERENCES cities(id),
-  PRIMARY KEY (user_id, role,
-    COALESCE(scope_restaurant_id, '00000000-0000-0000-0000-000000000000'),
-    COALESCE(scope_country_id,    '00000000-0000-0000-0000-000000000000'),
-    COALESCE(scope_city_id,       '00000000-0000-0000-0000-000000000000'))
+  scope_city_id       uuid REFERENCES cities(id)
+);
+-- PostgreSQL doesn't allow expressions (COALESCE) directly in a PRIMARY KEY
+-- column list, only plain columns — and an expression-based unique index
+-- can't be promoted to a named constraint either (42809). Build the
+-- equivalent uniqueness (NULL scope columns treated as one "global"
+-- sentinel, not as distinct per SQL NULL semantics) as a plain unique
+-- index; users.service.ts targets it by its expression list via
+-- `ON CONFLICT (...)`, not `ON CONFLICT ON CONSTRAINT`.
+CREATE UNIQUE INDEX user_roles_pkey_idx ON user_roles (
+  user_id, role,
+  COALESCE(scope_restaurant_id, '00000000-0000-0000-0000-000000000000'),
+  COALESCE(scope_country_id,    '00000000-0000-0000-0000-000000000000'),
+  COALESCE(scope_city_id,       '00000000-0000-0000-0000-000000000000')
 );
 
 CREATE TABLE sessions (

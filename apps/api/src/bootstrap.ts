@@ -8,27 +8,16 @@ import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
  * function so the two can never drift apart — e.g. the test previously would
  * have silently NOT exercised the raw-body webhook parser or URI versioning
  * if each place reimplemented this by hand (docs/18 §14).
+ *
+ * Raw body preservation (docs/08 §8.6 — webhook signature verification MUST
+ * hash/HMAC the bytes as sent, not a re-serialised object) is handled by
+ * `NestFactory.create`'s `rawBody: true` option (see `main.ts`), not here:
+ * registering a second `application/json` content-type parser directly on
+ * the Fastify instance collides with Nest's own default one at `app.init()`
+ * (`FST_ERR_CTP_ALREADY_PRESENT`) — `rawBody: true` is the one mechanism
+ * Nest's Fastify adapter supports without that collision.
  */
 export function configureApp(app: NestFastifyApplication): void {
-  // Preserve the exact raw body alongside the parsed JSON — webhook signature
-  // verification (docs/08 §8.6) MUST hash/HMAC the bytes as sent, not a
-  // re-serialised object (key order/whitespace would break the signature).
-  app
-    .getHttpAdapter()
-    .getInstance()
-    .addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
-      (req as unknown as { rawBody: Buffer }).rawBody = body as Buffer;
-      if (body.length === 0) {
-        done(null, undefined);
-        return;
-      }
-      try {
-        done(null, JSON.parse(body.toString('utf8')));
-      } catch (err) {
-        done(err as Error, undefined);
-      }
-    });
-
   // /v1 URI versioning (docs/07 §7.1). Deliberately NOT also calling
   // `setGlobalPrefix` — see the comment in `main.ts` (Bloc 0.5 fix, docs/18
   // §14): combining both doubles the prefix to `/v1/v1/...`.

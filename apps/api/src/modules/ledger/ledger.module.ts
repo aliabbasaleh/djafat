@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { PrismaModule } from '../../infra/prisma/prisma.module';
+import { AuthModule } from '../auth/auth.module';
 import { LedgerService } from './ledger.service';
 import { LedgerRepository } from './ledger.repository';
 import { LedgerReadService } from './ledger-read.service';
@@ -15,7 +16,7 @@ import { LEDGER_PORT } from './ledger.port';
  */
 @Global()
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AuthModule],
   controllers: [LedgerAdminController],
   providers: [
     LedgerRepository,

@@ -1,11 +1,12 @@
 # 36 — Scénario pilote E2E (prêt à exécuter, jamais simulé)
 
-> Statut à la date de rédaction : **E2E BLOCKED** — Docker indisponible dans cet
-> environnement (`docker: command not found`, port 5432/6379 refusés). Ce document est
-> la préparation explicitement demandée : un scénario reproductible, câblé sur les
-> fixtures réelles du seed, prêt à être rejoué **mot pour mot** dès qu'un environnement
-> PostgreSQL/HTTP réel est disponible. Rien ici n'a été exécuté contre une vraie base —
-> voir §0.
+> **Mise à jour — pilote réel exécuté.** Docker a été installé et l'environnement
+> complet (Postgres+PostGIS, PgBouncer, Redis, API, worker, web, restaurant) a réellement
+> tourné. Ce scénario a été rejoué mot pour mot ; 8 bugs P0 réels ont été trouvés et
+> corrigés en cours de route (jamais exécuté avant — voir le rapport du pilote pour le
+> détail et le verdict). §0 reste la procédure de démarrage exacte utilisée ; deux
+> lacunes produit réelles (hors bug) ont stoppé le parcours avant la fin — voir le
+> rapport.
 
 ## 0. Runbook — comment l'exécuter réellement (dès que Docker est disponible)
 
@@ -110,9 +111,10 @@ curl -s -X POST http://localhost:3001/v1/auth/otp/request \
   -H 'content-type: application/json' \
   -d '{"phone":"+23566000001","purpose":"login"}'
 
-# Lire le code envoyé (mock-sms conserve les 50 derniers messages)
-curl -s http://localhost:4020/messages | jq '.messages[0]'
-# -> extraire le code à 6 chiffres du corps du message
+# Lire le code — en développement, MockOtpDeliveryProvider le stocke
+# directement dans Redis (il n'appelle JAMAIS mock-sms malgré SMS_MOCK_URL ;
+# découvert en exécution réelle, corrigé ici — voir rapport du pilote).
+docker exec djafat-dev-redis-1 redis-cli GET "otp:mock:+23566000001"
 
 # Vérifier — renvoie {access, refresh, user}
 curl -s -X POST http://localhost:3001/v1/auth/otp/verify \

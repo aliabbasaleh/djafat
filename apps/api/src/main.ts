@@ -20,7 +20,9 @@ async function bootstrap(): Promise<void> {
       bodyLimit: 1_048_576,
       genReqId: () => crypto.randomUUID(),
     }),
-    { bufferLogs: true },
+    // `rawBody: true` attaches `req.rawBody` (webhook signature verification,
+    // docs/08 §8.6) via Nest's own default JSON parser — see bootstrap.ts.
+    { bufferLogs: true, rawBody: true },
   );
 
   app.useLogger(app.get(PinoLogger));

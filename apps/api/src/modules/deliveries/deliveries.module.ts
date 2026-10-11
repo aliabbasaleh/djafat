@@ -1,6 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 import { LedgerModule } from '../ledger/ledger.module';
 import { CouriersModule } from '../couriers/couriers.module';
+import { UsersModule } from '../users/users.module';
+import { AuthModule } from '../auth/auth.module';
 import { DELIVERY_TRACKING_PORT } from '../../common/ports/delivery-tracking.port';
 import { DeliveriesService } from './deliveries.service';
 import { DeliveriesController } from './deliveries.controller';
@@ -20,7 +22,7 @@ import { CourierDeliveryController } from './courier-delivery.controller';
  */
 @Global()
 @Module({
-  imports: [LedgerModule, CouriersModule],
+  imports: [LedgerModule, CouriersModule, UsersModule, AuthModule],
   controllers: [DeliveriesController, CourierDeliveryController],
   providers: [
     DeliveriesService,

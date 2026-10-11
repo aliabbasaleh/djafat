@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { UsersModule } from '../users/users.module';
+import { AuthModule } from '../auth/auth.module';
 import { CatalogService } from './catalog.service';
 import { CatalogController } from './catalog.controller';
 import { CatalogManagementController } from './catalog-management.controller';
@@ -20,7 +21,7 @@ import { ProductsManagementService } from './products-management.service';
  * in this module to need it injected rather than just the guards.
  */
 @Module({
-  imports: [UsersModule],
+  imports: [UsersModule, AuthModule],
   controllers: [CatalogController, CatalogManagementController, RestaurantsAdminController],
   providers: [
     CatalogService,

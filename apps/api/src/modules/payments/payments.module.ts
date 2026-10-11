@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { LedgerModule } from '../ledger/ledger.module';
+import { AuthModule } from '../auth/auth.module';
 import { PaymentProviderRegistry } from './payment-provider.registry';
 import { PAYMENT_PROVIDER } from './payments.tokens';
 import { PaymentsService } from './payments.service';
@@ -20,7 +21,7 @@ import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
  * it consumes `OrderAmountPort` (from `@djafat/types`) via events instead.
  */
 @Module({
-  imports: [LedgerModule],
+  imports: [LedgerModule, AuthModule],
   controllers: [PaymentsController, PaymentMethodsConfigController, SettlementsController],
   providers: [
     CashPaymentProvider,
