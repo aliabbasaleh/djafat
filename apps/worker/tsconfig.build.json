@@ -1,6 +1,17 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "rootDir": "src" },
+  "compilerOptions": {
+    "rootDir": "src",
+    /**
+     * Same reason as `apps/api/tsconfig.build.json` (docs/36 §6): the other
+     * deployable artifact must not depend on `*.tsbuildinfo` surviving
+     * alongside its `dist/`. Here `tsc` does not delete `dist` itself, so the
+     * failure needs a wiped or cache-restored `dist` to appear — latent
+     * rather than reproduced, but the same class of silent empty build, and
+     * the worker is what runs the outbox relay and dispatch.
+     */
+    "incremental": false
+  },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "test", "**/*.spec.ts"]
 }

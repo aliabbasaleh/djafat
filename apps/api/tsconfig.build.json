@@ -1,6 +1,22 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "rootDir": "src" },
+  "compilerOptions": {
+    "rootDir": "src",
+    /**
+     * Deliberately NOT incremental (docs/36 §6). `nest-cli.json` sets
+     * `deleteOutDir: true`, which wipes `dist/` but leaves
+     * `tsconfig.build.tsbuildinfo` behind still asserting that every `.js`
+     * output is up to date. The next `nest build` therefore re-emits the
+     * declarations and SKIPS the JavaScript, exits 0, and leaves a `dist/`
+     * holding nothing but `.d.ts` files — `node dist/main.js` then fails
+     * with MODULE_NOT_FOUND. Hit for real while closing the pilot: the
+     * running API had to be rebuilt, and the "successful" build produced an
+     * unrunnable artifact. A full emit every time costs ~40s and is the only
+     * way this script is reproducible; `incremental` belongs to `typecheck`,
+     * which uses `tsconfig.json` and emits nothing.
+     */
+    "incremental": false
+  },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "test", "**/*.spec.ts", "prisma"]
 }
