@@ -219,6 +219,32 @@ export class OrdersService implements OrderAmountPort {
       const validated = await this.carts.loadAndValidateCartForCheckout(customerId, tx);
       const restaurant = await this.catalog.getActiveRestaurant(validated.restaurantId);
 
+      // Refuse to COMMIT an order to a restaurant that is not taking orders.
+      //
+      // Found by the second real pilot run (docs/36 §6): availability was
+      // enforced on the read paths only. `getActiveRestaurant` checks the
+      // admin `status = 'active'` flag and nothing else, so at 22:01 — one
+      // minute after `chez-fatime` closes — the catalogue said `CLOSED` and
+      // `POST /orders` still accepted the order. The customer then paid, the
+      // order went to `placed`, and it stayed there: `order-expiry` only
+      // reaps `awaiting_payment`, and no job times out an order nobody
+      // confirmed. Money captured, nothing delivered, no automatic way out
+      // (three such rows existed in the pilot database).
+      //
+      // Enforced HERE, at order creation, and deliberately NOT on cart adds:
+      // browsing and building a cart after closing time is harmless, and
+      // this is the boundary where the customer actually commits and where
+      // the payment intent follows. Same source of truth as the catalogue
+      // (`computeRestaurantAvailability`, pure, 17 tests), so the two can no
+      // longer disagree.
+      const availability = await this.catalog.getRestaurantAvailability(restaurant.id);
+      if (availability !== 'OPEN') {
+        throw new ConflictException({
+          code: 'RESTAURANT_CLOSED',
+          message: `${restaurant.name} is not taking orders right now.`,
+        });
+      }
+
       // Dropoff snapshot (Bloc 6, docs/25 §8; Bloc 8, docs/29 §checkout) —
       // frozen NOW, at order creation, never re-read live later (a
       // subsequent address-book edit must not alter this order). No courier

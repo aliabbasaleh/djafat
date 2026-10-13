@@ -326,6 +326,9 @@ function catalogStub() {
       currency: 'XAF',
     }),
     getCartEligibleProducts: vi.fn().mockResolvedValue([burgerProduct()]),
+    // These tests are about the cart LOCK, not opening hours — keep the
+    // restaurant open so the race is what is actually under test.
+    getRestaurantAvailability: vi.fn().mockResolvedValue('OPEN'),
   } as unknown as CatalogService;
 }
 

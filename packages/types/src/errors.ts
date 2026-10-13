@@ -40,6 +40,15 @@ export const API_ERROR_CODES = [
   'COURIER_BUSY',
   'COURIER_SUSPENDED',
   'COURIER_OFFLINE',
+  /**
+   * The restaurant is not taking orders right now — outside its opening
+   * hours, on an exceptional closure, or paused (409). Found by the second
+   * pilot run (docs/36 §6): availability was computed on the READ paths only,
+   * so the catalogue showed `CLOSED` while `POST /orders` still accepted the
+   * order, captured the payment, and left it `placed` forever — `order-expiry`
+   * only reaps `awaiting_payment`, and no job times out an unconfirmed order.
+   */
+  'RESTAURANT_CLOSED',
   'INVALID_PROOF',
   /** Too many wrong delivery codes on one delivery (429) — Bloc 6.1, docs/25 §B6.1-7. */
   'PROOF_RATE_LIMITED',

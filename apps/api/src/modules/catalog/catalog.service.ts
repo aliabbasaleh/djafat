@@ -193,6 +193,23 @@ export class CatalogService {
     };
   }
 
+  /**
+   * "Is this restaurant taking orders right now?" for the WRITE paths.
+   *
+   * `getActiveRestaurant` above only checks the admin-level `status =
+   * 'active'` flag — it says nothing about opening hours or exceptional
+   * closures, which is exactly the hole the second pilot run fell into
+   * (docs/36 §6): the catalogue rendered `CLOSED` from
+   * `RestaurantAvailabilityService` while `POST /orders`, which never
+   * consulted it, happily accepted the order. Exposed here rather than by
+   * exporting `RestaurantAvailabilityService` from `CatalogModule`, so
+   * `CatalogService` stays the single catalog↔orders contract surface
+   * (docs/20 §56) and the DAG edge count does not grow.
+   */
+  async getRestaurantAvailability(restaurantId: string): Promise<RestaurantAvailabilityStatus> {
+    return this.availability.computeForRestaurant(restaurantId);
+  }
+
   async getAvailableProducts(
     restaurantId: string,
     ids: readonly string[],

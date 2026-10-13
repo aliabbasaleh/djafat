@@ -381,6 +381,10 @@ function catalogStub() {
       currency: 'XAF',
     }),
     getCartEligibleProducts: vi.fn().mockResolvedValue([burgerProduct()]),
+    // Open by default: every test below is about the address snapshot, not
+    // about opening hours. The closed case is exercised explicitly in the
+    // `RESTAURANT_CLOSED` describe at the bottom of this file.
+    getRestaurantAvailability: vi.fn().mockResolvedValue('OPEN'),
   } as unknown as CatalogService;
 }
 
@@ -435,7 +439,9 @@ function buildServices(db: PrismaService) {
     // courier branch of `getOrderFor` (BUG-10.1-AUTH); never reached by these tests.
     { get: vi.fn() } as unknown as ModuleRef,
   );
-  return { carts, orders, addresses };
+  // `catalog` is returned so a test can flip the restaurant's availability —
+  // the `RESTAURANT_CLOSED` describe at the bottom of this file needs it.
+  return { carts, orders, addresses, catalog };
 }
 
 function seedAddress(
@@ -618,5 +624,85 @@ describe('checkout — client-selected address (Bloc 8, docs/29 §checkout, CHEC
       expect(row['dropoffLabel']).toBe('Edited mid-flight');
       expect(row['dropoffQuartier']).toBe('New quartier');
     });
+  });
+});
+
+/**
+ * Found by the SECOND real pilot run (docs/36 §6): availability was enforced
+ * on the catalogue READ paths only. At 22:01 — one minute after `chez-fatime`
+ * closes — `GET /restaurants` said `CLOSED` and `POST /orders` accepted the
+ * order anyway. The customer paid, the order reached `placed`, and it stayed
+ * there forever: `order-expiry` only reaps `awaiting_payment`, and no job
+ * times out an unconfirmed order. Money captured, nothing delivered, no
+ * automatic way out — three such rows were sitting in the pilot database.
+ *
+ * Hosted in this file because it already owns the full `createOrder` harness
+ * (`makeCheckoutDb` + `buildServices`); duplicating a ~350-line fake DB to
+ * get a better-matching filename would be the worse trade.
+ */
+describe('checkout — a closed restaurant cannot take an order (pilot 2 fix, docs/36 §6)', () => {
+  async function attemptAgainst(availability: string) {
+    const { db, orders: orderRows, addresses } = makeCheckoutDb();
+    const { carts, orders, catalog } = buildServices(db);
+    (catalog.getRestaurantAvailability as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      availability,
+    );
+    const addr = seedAddress(addresses, { userId: 'u1', isDefault: true });
+    await carts.addItem('u1', { productId: PRODUCT_ID, quantity: 1, selectedOptionIds: [] });
+    return { orderRows, carts, orders, catalog, addressId: addr.id };
+  }
+
+  it('refuses with RESTAURANT_CLOSED (409) instead of creating the order', async () => {
+    const { orders, addressId } = await attemptAgainst('CLOSED');
+    await expect(orders.createOrder('u1', 'key-1', addressId)).rejects.toMatchObject({
+      response: { code: 'RESTAURANT_CLOSED' },
+    });
+  });
+
+  it('creates NO order row — the refusal happens before anything is written', async () => {
+    const { orders, orderRows, addressId } = await attemptAgainst('CLOSED');
+    await expect(orders.createOrder('u1', 'key-1', addressId)).rejects.toThrow();
+    expect(orderRows).toHaveLength(0);
+  });
+
+  it('PAUSED and UNAVAILABLE are refused too — the guard is "is it OPEN", not "is it CLOSED"', async () => {
+    for (const status of ['PAUSED', 'UNAVAILABLE']) {
+      const { orders, orderRows, addressId } = await attemptAgainst(status);
+      await expect(orders.createOrder('u1', 'key-1', addressId)).rejects.toMatchObject({
+        response: { code: 'RESTAURANT_CLOSED' },
+      });
+      expect(orderRows).toHaveLength(0);
+    }
+  });
+
+  it('the customer keeps their cart: the refusal rolls back, it does not consume the cart', async () => {
+    const { orders, carts, addressId } = await attemptAgainst('CLOSED');
+    await expect(orders.createOrder('u1', 'key-1', addressId)).rejects.toThrow();
+    const cart = await carts.getCart('u1');
+    expect(cart?.items).toHaveLength(1);
+  });
+
+  it('does NOT burn the idempotency key: the SAME key succeeds once the restaurant reopens', async () => {
+    // The real recovery path for a customer who tried at 22:01 and retries at
+    // 11:00. `IdempotencyService.run` releases the key when the callback
+    // throws — if it did not, this customer could never use that key again
+    // and a client that stores one key per cart would be permanently stuck.
+    const { orders, orderRows, catalog, addressId } = await attemptAgainst('CLOSED');
+    await expect(orders.createOrder('u1', 'same-key', addressId)).rejects.toThrow();
+    expect(orderRows).toHaveLength(0);
+
+    (catalog.getRestaurantAvailability as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      'OPEN',
+    );
+    const { order } = await orders.createOrder('u1', 'same-key', addressId);
+    expect(order.status).toBe('awaiting_payment');
+    expect(orderRows).toHaveLength(1);
+  });
+
+  it('an OPEN restaurant is unaffected — the guard adds no new failure to the happy path', async () => {
+    const { orders, orderRows, addressId } = await attemptAgainst('OPEN');
+    const { order } = await orders.createOrder('u1', 'key-1', addressId);
+    expect(order.status).toBe('awaiting_payment');
+    expect(orderRows).toHaveLength(1);
   });
 });
