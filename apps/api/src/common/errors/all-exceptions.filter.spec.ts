@@ -131,3 +131,88 @@ describe('AllExceptionsFilter', () => {
     expect(getBody().error.traceId).toBe('trace-123');
   });
 });
+
+describe('AllExceptionsFilter — a malformed identifier is a 400, not a 500 (pilot fix, docs/36)', () => {
+  // The pilot hit this on `GET /v1/payments/:id` with a non-UUID id: no
+  // `@Param('id')` route in the API validates the format, so the string
+  // reached Postgres's `uuid` column and Prisma raised P2023, which this
+  // filter did not recognise — a raw 500 for what is plainly a client error.
+  // Classified centrally so no route can be forgotten.
+  function prismaP2023(): unknown {
+    // Shaped exactly like `PrismaClientKnownRequestError`, matched
+    // structurally by the filter (it must not import `@prisma/client`).
+    const err = new Error(
+      'Inconsistent column data: Error creating UUID, invalid character: expected an optional prefix of `urn:uuid:` followed by [0-9a-fA-F-], found `n` at 1',
+    ) as Error & { code: string; clientVersion: string };
+    err.code = 'P2023';
+    err.clientVersion = '6.2.1';
+    return err;
+  }
+
+  it('maps Prisma P2023 to 400 VALIDATION_ERROR', () => {
+    const filter = new AllExceptionsFilter();
+    const { host, getBody, getStatus } = makeHost();
+    filter.catch(prismaP2023(), host);
+    expect(getStatus()).toBe(400);
+    expect(getBody().error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('never echoes the offending value or the Prisma internals back to the caller', () => {
+    const filter = new AllExceptionsFilter();
+    const { host, getBody } = makeHost();
+    filter.catch(prismaP2023(), host);
+    expect(getBody().error.message).toBe('Malformed identifier.');
+    expect(getBody().error.message).not.toContain('urn:uuid');
+    expect(getBody().error.message).not.toContain('Inconsistent column data');
+  });
+
+  it('a different Prisma error code still falls through to INTERNAL — only P2023 is reclassified', () => {
+    const filter = new AllExceptionsFilter();
+    const { host, getBody, getStatus } = makeHost();
+    const other = new Error('Unique constraint failed') as Error & { code: string };
+    other.code = 'P2002';
+    filter.catch(other, host);
+    expect(getStatus()).toBe(500);
+    expect(getBody().error.code).toBe('INTERNAL');
+  });
+
+  it('a plain object carrying code P2023 is handled too (no instanceof assumption)', () => {
+    const filter = new AllExceptionsFilter();
+    const { host, getStatus } = makeHost();
+    filter.catch({ code: 'P2023', message: 'whatever' }, host);
+    expect(getStatus()).toBe(400);
+  });
+
+  // Found by the pilot's own security review: the P2023 fix covered typed
+  // Prisma queries but NOT the raw ones that cast `::uuid` (e.g. `addresses`),
+  // which fail as P2010 wrapping PostgreSQL 22P02 — still a 500 until now.
+  it('maps a raw-query failure wrapping PostgreSQL 22P02 to 400 as well', () => {
+    const filter = new AllExceptionsFilter();
+    const { host, getBody, getStatus } = makeHost();
+    const err = new Error(
+      'Invalid `prisma.$queryRaw()` invocation:\n\nRaw query failed. Code: `22P02`. Message: `ERROR: invalid input syntax for type uuid: "not-a-uuid"`',
+    ) as Error & { code: string; meta: { code: string } };
+    err.code = 'P2010';
+    err.meta = { code: '22P02' };
+    filter.catch(err, host);
+    expect(getStatus()).toBe(400);
+    expect(getBody().error.code).toBe('VALIDATION_ERROR');
+    expect(getBody().error.message).toBe('Malformed identifier.');
+  });
+
+  it('a raw-query failure for an UNRELATED PostgreSQL error still reports INTERNAL', () => {
+    const filter = new AllExceptionsFilter();
+    const { host, getBody, getStatus } = makeHost();
+    const err = new Error(
+      'Raw query failed. Code: `40P01`. Message: `deadlock detected`',
+    ) as Error & {
+      code: string;
+      meta: { code: string };
+    };
+    err.code = 'P2010';
+    err.meta = { code: '40P01' };
+    filter.catch(err, host);
+    expect(getStatus()).toBe(500);
+    expect(getBody().error.code).toBe('INTERNAL');
+  });
+});

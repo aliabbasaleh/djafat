@@ -90,16 +90,27 @@ async function retrySearching(): Promise<number> {
         );
         if (locked.rows[0]?.status !== 'searching_courier') return;
 
-        // Exclude a courier who currently holds a live offer, or who
-        // explicitly rejected this delivery — but NOT one whose offer merely
-        // timed out (`expired`): excluding every courier ever offered,
-        // timeout included, shrinks the candidate pool to zero as retries
-        // accumulate, permanently stalling dispatch once every available
-        // courier has had one offer time out. Mirrors the same fix in
-        // `DeliveriesService.runDispatchWave` (apps/api).
+        // Who is NOT a candidate for this wave:
+        //   - a live `offered` row — they are deciding right now;
+        //   - `rejected` — they said no, never re-ask for this delivery;
+        //   - `expired` within the last offer window — a timeout is not a
+        //     refusal, so they become eligible again, but only after one
+        //     cooldown, so a courier who ignored an offer is not re-pinged
+        //     within the same tick while someone else could take it.
+        // Listing EVERY offer ever made (what this did before the pilot,
+        // docs/36) shrank the pool to zero as retries accumulated and
+        // permanently stalled dispatch once every courier had timed out
+        // once — with a single online courier, after the very first offer.
+        // Mirrored 1:1 in `DeliveriesService.runDispatchWave` (apps/api).
         const excluded = await tx.query<{ courier_id: string }>(
-          `SELECT courier_id FROM delivery_offers WHERE delivery_id = $1 AND status IN ('offered', 'rejected')`,
-          [delivery.id],
+          `SELECT courier_id FROM delivery_offers
+           WHERE delivery_id = $1
+             AND (status = 'offered'
+                  OR status = 'rejected'
+                  OR (status = 'expired'
+                      AND responded_at IS NOT NULL
+                      AND responded_at > now() - ($2 || ' seconds')::interval))`,
+          [delivery.id, offerTimeoutSeconds],
         );
         const excludeIds = excluded.rows.map((r) => r.courier_id);
         excludeIds.push('00000000-0000-0000-0000-000000000000');

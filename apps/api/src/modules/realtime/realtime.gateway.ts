@@ -3,6 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import {
   type OnGatewayConnection,
   type OnGatewayDisconnect,
+  type OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -48,7 +49,7 @@ const TOKEN_REVALIDATION_INTERVAL_MS = 30_000;
  */
 @WebSocketGateway({ namespace: '/rt', cors: { origin: true } })
 export class RealtimeGateway
-  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit, OnModuleDestroy
+  implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(RealtimeGateway.name);
 
@@ -98,7 +99,43 @@ export class RealtimeGateway
     if (this.revalidationTimer) clearInterval(this.revalidationTimer);
   }
 
+  /**
+   * Authenticates BEFORE `connection` fires (bug found by the real pilot,
+   * docs/36): Socket.IO only blocks message delivery on namespace
+   * middleware (`server.use`), never on an `OnGatewayConnection` listener's
+   * promise — a client that subscribes immediately on `connect` (every
+   * frontend's `useRoomRealtime` hook does exactly this) could have its
+   * `subscribe` processed while `handleConnection`'s `await
+   * actorResolver.resolve(...)` was still in flight, landing on `!actor` in
+   * `handleSubscribe` and silently never joining the room — connected, but
+   * permanently deaf, with no client-visible error to ever retry on.
+   * `handleConnection` below is left fully intact (every existing test
+   * drives it directly, bypassing Socket.IO's own transport) and simply
+   * no-ops if this middleware already authenticated the socket.
+   */
+  afterInit(server: Server): void {
+    server.use((socket, next) => {
+      // `next(err)` is the only correct way to refuse a socket from inside
+      // middleware: the connection is aborted before `connection` ever fires,
+      // the client sees `connect_error`, and no half-established socket has to
+      // be disconnected afterwards.
+      void this.authenticate(socket).then((ok) => (ok ? next() : next(new Error('unauthorized'))));
+    });
+  }
+
   async handleConnection(client: Socket): Promise<void> {
+    if (this.actors.has(client.id)) return; // already authenticated by `afterInit`'s middleware
+    const authenticated = await this.authenticate(client);
+    if (!authenticated) client.disconnect(true);
+  }
+
+  /**
+   * Resolves + registers the socket's actor. Returns whether it succeeded and
+   * NEVER disconnects on its own — each caller refuses the socket the way its
+   * own stage requires (`next(err)` in middleware, `disconnect` once the
+   * connection already exists).
+   */
+  private async authenticate(client: Socket): Promise<boolean> {
     const token =
       (client.handshake.auth as { token?: string } | undefined)?.token ??
       (typeof client.handshake.headers.authorization === 'string'
@@ -106,8 +143,7 @@ export class RealtimeGateway
         : undefined);
     if (!token) {
       this.logger.debug(`ws rejected (no token) ${client.id}`);
-      client.disconnect(true);
-      return;
+      return false;
     }
     try {
       const fakeReq = {
@@ -123,9 +159,10 @@ export class RealtimeGateway
       this.actors.set(client.id, actor);
       this.tokenExpiry.set(client.id, { client, exp });
       this.logger.debug(`ws connected ${client.id} (user ${actor.userId})`);
+      return true;
     } catch (err) {
       this.logger.debug(`ws rejected (invalid token) ${client.id}: ${String(err)}`);
-      client.disconnect(true);
+      return false;
     }
   }
 
@@ -138,7 +175,15 @@ export class RealtimeGateway
   @SubscribeMessage('subscribe')
   async handleSubscribe(client: Socket, data: { room?: string }): Promise<void> {
     const actor = this.actors.get(client.id);
-    if (!data?.room || !actor) return;
+    if (!data?.room || !actor) {
+      // `!actor` here used to be reachable by the race `afterInit` now closes
+      // (see its doc comment) — kept as a loud, non-silent signal in case a
+      // future change reopens a similar window, rather than a bare `return`.
+      this.logger.debug(
+        `ws subscribe no-op: ${client.id} room=${data?.room ?? '<none>'} hasActor=${!!actor}`,
+      );
+      return;
+    }
     // Refuse a NEW room join on an expired token outright, rather than wait
     // for the next periodic sweep (docs/28 §2 — closes the race between the
     // token's actual expiry instant and the sweep's cadence for the specific
@@ -150,6 +195,7 @@ export class RealtimeGateway
     }
     if (await this.isAuthorizedForRoom(actor, data.room)) {
       await client.join(data.room);
+      this.logger.debug(`ws joined ${client.id} (user ${actor.userId}) -> ${data.room}`);
     } else {
       this.logger.debug(`ws room denied: user ${actor.userId} -> ${data.room}`);
     }

@@ -528,3 +528,106 @@ describe('reconnection relies on REST, not on replay (Bloc 7 §18)', () => {
     expect(second!.eventId).toBe(first!.eventId);
   });
 });
+
+describe('authentication happens before a socket can be messaged (pilot fix, docs/36)', () => {
+  // Found by the real pilot: Socket.IO only blocks message delivery on
+  // namespace middleware (`server.use`), never on an `OnGatewayConnection`
+  // listener's promise. A client subscribing immediately on `connect` (every
+  // `useRoomRealtime` hook does this) could have its `subscribe` processed
+  // while `handleConnection`'s actor-resolution was still in flight, landing
+  // on `!actor` and silently never joining — connected, but permanently deaf.
+  // `afterInit` closes this by authenticating inside `server.use` instead,
+  // which Socket.IO guarantees completes (calls `next()`) before the socket
+  // can receive or emit anything else.
+
+  it('registers one namespace middleware via server.use in afterInit', () => {
+    const { gateway } = makeGateway({ validTokens: { t: { userId: OWNER, roles: ['customer'] } } });
+    const use = vi.fn();
+    gateway.afterInit({ use } as never);
+    expect(use).toHaveBeenCalledTimes(1);
+    expect(use.mock.calls[0]![0]).toBeInstanceOf(Function);
+  });
+
+  it('the registered middleware authenticates the socket and registers its actor BEFORE calling next()', async () => {
+    const { gateway, actors } = makeGateway({
+      validTokens: { t: { userId: OWNER, roles: ['customer'] } },
+    });
+    let middleware!: (socket: unknown, next: (err?: Error) => void) => void;
+    gateway.afterInit({ use: (fn: typeof middleware) => (middleware = fn) } as never);
+
+    const s = socket('mw-1', 't');
+    let nextCalledWith: Error | undefined;
+    let actorAtNextTime: AuthenticatedActor | undefined;
+    await new Promise<void>((resolve) => {
+      middleware(s, (err?: Error) => {
+        nextCalledWith = err;
+        actorAtNextTime = actors.get('mw-1');
+        resolve();
+      });
+    });
+
+    expect(nextCalledWith).toBeUndefined();
+    expect(actorAtNextTime).toBeDefined(); // the actor was already registered when next() ran
+    expect(actors.get('mw-1')?.userId).toBe(OWNER);
+  });
+
+  it('the middleware rejects (calls next with an error) a socket with no valid token, never registering it', async () => {
+    const { gateway, actors } = makeGateway({ validTokens: {} });
+    let middleware!: (socket: unknown, next: (err?: Error) => void) => void;
+    gateway.afterInit({ use: (fn: typeof middleware) => (middleware = fn) } as never);
+
+    const s = socket('mw-2', 'garbage-token');
+    const next = vi.fn();
+    await new Promise<void>((resolve) => {
+      middleware(s, (err?: Error) => {
+        next(err);
+        resolve();
+      });
+    });
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+    expect(actors.has('mw-2')).toBe(false);
+    // Refused via `next(err)`, so Socket.IO aborts before `connection` — no
+    // half-established socket to disconnect, unlike the `handleConnection`
+    // path which still disconnects because its socket already exists.
+    expect(s.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('handleConnection no-ops once the middleware already authenticated the socket (no duplicate DB round-trip)', async () => {
+    const { gateway, actors, actorResolver } = makeGateway({
+      validTokens: { t: { userId: OWNER, roles: ['customer'] } },
+    });
+    const s = socket('mw-3', 't');
+    let middleware!: (socket: unknown, next: (err?: Error) => void) => void;
+    gateway.afterInit({ use: (fn: typeof middleware) => (middleware = fn) } as never);
+    await new Promise<void>((resolve) => middleware(s, () => resolve()));
+    expect(actorResolver.resolve).toHaveBeenCalledTimes(1);
+
+    await gateway.handleConnection(s as never); // Socket.IO's real 'connection' event, right after
+
+    expect(actorResolver.resolve).toHaveBeenCalledTimes(1); // not called again
+    expect(actors.get('mw-3')?.userId).toBe(OWNER);
+  });
+
+  it('a subscribe arriving the instant the middleware resolves finds the actor already registered', async () => {
+    // The exact scenario the pilot observed: subscribe sent with no delay
+    // after connect. Simulated here by calling handleSubscribe synchronously
+    // inside the middleware's next() callback — the earliest a real
+    // Socket.IO client's message could possibly be processed.
+    const { gateway, actors } = makeGateway({
+      validTokens: { t: { userId: OWNER, roles: ['customer'] } },
+    });
+    const s = socket('mw-4', 't');
+    let middleware!: (socket: unknown, next: (err?: Error) => void) => void;
+    gateway.afterInit({ use: (fn: typeof middleware) => (middleware = fn) } as never);
+
+    await new Promise<void>((resolve) => {
+      middleware(s, () => {
+        void gateway.handleSubscribe(s as never, { room: `order:${ORDER_ID}` }).then(resolve);
+      });
+    });
+
+    expect(actors.has('mw-4')).toBe(true);
+    expect(s.join).toHaveBeenCalledWith(`order:${ORDER_ID}`);
+  });
+});

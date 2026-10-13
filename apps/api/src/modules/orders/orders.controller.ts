@@ -21,6 +21,10 @@ import {
   OrdersRestaurantQuerySchema,
   type OrdersRestaurantQueryInput,
 } from './dto/orders-restaurant-query.schema';
+import {
+  OrdersCustomerQuerySchema,
+  type OrdersCustomerQueryInput,
+} from './dto/orders-customer-query.schema';
 
 /** The restaurant-tier role this actor holds — `owner` takes precedence, matching `@djafat/core`'s transition table (both are equally allowed). */
 function restaurantRole(actor: AuthenticatedActor): 'restaurant_owner' | 'restaurant_staff' {
@@ -88,6 +92,30 @@ export class OrdersController {
     @Query(new ZodValidationPipe(OrdersRestaurantQuerySchema)) query: OrdersRestaurantQueryInput,
   ) {
     return this.orders.listOrdersForRestaurant(
+      actor.userId,
+      { ...(query.status !== undefined ? { status: query.status } : {}) },
+      query.page,
+      query.limit,
+    );
+  }
+
+  /**
+   * The customer's OWN order history (pilot P0 n°2, docs/36 — there was no
+   * way for a customer to list their orders at all: `GET /orders` above is
+   * the kitchen board, restaurant-only).
+   *
+   * MUST stay declared BEFORE `@Get(':id')`: Nest matches in declaration
+   * order, and a literal `mine` would otherwise be swallowed as an order id.
+   * Scope is `actor.userId` only — see `listOrdersForCustomer`.
+   */
+  @Get('mine')
+  @RequireAuth()
+  @RequireRole('customer')
+  listMine(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Query(new ZodValidationPipe(OrdersCustomerQuerySchema)) query: OrdersCustomerQueryInput,
+  ) {
+    return this.orders.listOrdersForCustomer(
       actor.userId,
       { ...(query.status !== undefined ? { status: query.status } : {}) },
       query.page,

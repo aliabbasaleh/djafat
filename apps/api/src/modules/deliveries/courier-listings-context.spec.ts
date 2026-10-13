@@ -10,6 +10,7 @@ import type { OutboxService } from '../../infra/outbox/outbox.service';
 import type { PlatformService } from '../platform/platform.service';
 import type { CouriersService } from '../couriers/couriers.service';
 import type { UsersService } from '../users/users.service';
+import { fakeConfigService } from './deliveries-test-support';
 
 /**
  * Bloc 11 — `listOffersForCourier`/`listActiveForCourier` now attach a
@@ -85,6 +86,7 @@ function build(opts: {
     {} as unknown as CouriersService,
     {} as unknown as UsersService,
     orderAmount,
+    fakeConfigService(),
   );
   return { service, getDeliveryContext, findManyOffers, findManyDeliveriesByIds };
 }
@@ -173,5 +175,75 @@ describe('listActiveForCourier — context enrichment (Bloc 11, docs/34 §offer-
   it('an empty active list resolves to an empty array', async () => {
     const { service } = build({ activeDeliveries: [] });
     await expect(service.listActiveForCourier('courier-1')).resolves.toEqual([]);
+  });
+});
+
+describe('the embedded context is JSON-serialisable (pilot fix, docs/36)', () => {
+  // The pilot's crash: `GET /couriers/me/offers` and `/couriers/me/deliveries`
+  // embedded the port's raw `OrderDeliveryContext`, whose `courierFee.minor`
+  // is a bigint. Fastify's serialiser throws "Do not know how to serialize a
+  // BigInt" — a 500 on the two endpoints the courier app calls on every
+  // screen, and the whole courier journey was blocked by it.
+  const hasBigInt = (value: unknown): boolean => {
+    if (typeof value === 'bigint') return true;
+    if (Array.isArray(value)) return value.some(hasBigInt);
+    if (value && typeof value === 'object') return Object.values(value).some(hasBigInt);
+    return false;
+  };
+
+  it('an offer survives JSON.stringify — no bigint anywhere in the payload', async () => {
+    const { service } = build({
+      offers: [
+        {
+          id: 'offer-1',
+          deliveryId: 'delivery-1',
+          status: 'offered',
+          offeredAt: new Date('2024-01-01T10:00:00Z'),
+          expiresAt: new Date('2024-01-01T10:01:00Z'),
+        },
+      ],
+      deliveryRows: [{ id: 'delivery-1', orderId: 'order-1' }],
+    });
+
+    const [offer] = await service.listOffersForCourier('courier-1');
+
+    expect(hasBigInt(offer)).toBe(false);
+    expect(() => JSON.stringify(offer)).not.toThrow();
+    // Money crosses the wire as the platform's MoneyJson, minor as a string.
+    expect(offer!.context.courierFee).toEqual({ minor: '1000', currency: 'XAF' });
+  });
+
+  it('an active delivery survives JSON.stringify too', async () => {
+    const now = new Date();
+    const { service } = build({
+      activeDeliveries: [
+        {
+          id: 'd1',
+          orderId: 'order-9',
+          courierId: 'courier-1',
+          status: 'on_the_way',
+          currency: 'XAF',
+          courierFeeMinor: 1000n,
+          estimatedDistanceM: null,
+          dispatchAttempts: 1,
+          assignedAt: now,
+          acceptedAt: now,
+          pickedUpAt: now,
+          onTheWayAt: now,
+          deliveredAt: null,
+          cancelledAt: null,
+          cancelledReason: null,
+          failedAt: null,
+          failedReason: null,
+        },
+      ],
+    });
+
+    const [delivery] = await service.listActiveForCourier('courier-1');
+
+    expect(hasBigInt(delivery)).toBe(false);
+    expect(() => JSON.stringify(delivery)).not.toThrow();
+    expect(delivery!.context!.courierFee).toEqual({ minor: '1000', currency: 'XAF' });
+    expect(delivery!.courierFee).toEqual({ minor: '1000', currency: 'XAF' });
   });
 });

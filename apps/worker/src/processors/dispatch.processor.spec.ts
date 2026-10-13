@@ -65,6 +65,8 @@ interface OfferRow {
   courier_id: string;
   status: string;
   expires_at: Date;
+  /** Set by `expireStaleOffers`/reject, and what the candidate cooldown reads. */
+  responded_at?: Date | null;
 }
 interface OutboxRow {
   aggregate_id: string;
@@ -126,7 +128,10 @@ function makeClient(taken: Array<() => void>) {
         const matched = offers.filter(
           (o) => o.status === 'offered' && o.expires_at.getTime() <= now,
         );
-        for (const o of matched) o.status = 'expired';
+        for (const o of matched) {
+          o.status = 'expired';
+          o.responded_at = new Date(); // the real query sets `responded_at = now()`
+        }
         return {
           rows: matched.map((o) => ({
             id: o.id,
@@ -187,9 +192,25 @@ function makeClient(taken: Array<() => void>) {
       }
       if (text.includes('SELECT courier_id FROM delivery_offers')) {
         const [deliveryId] = params as [string];
+        // Applies the query's real predicate, as Postgres would: live or
+        // rejected offers exclude their courier outright, an expired one only
+        // for a cooldown window. This mock used to ignore the WHERE clause
+        // entirely and return EVERY offer ever made — which is precisely the
+        // behaviour of the bug the pilot found (docs/36), so a mock that
+        // ignores the predicate cannot fail on a wrong predicate.
+        const [, cooldownSeconds] = params as [string, number];
+        const cooldownStart = Date.now() - cooldownSeconds * 1_000;
         return {
           rows: offers
             .filter((o) => o.delivery_id === deliveryId)
+            .filter(
+              (o) =>
+                o.status === 'offered' ||
+                o.status === 'rejected' ||
+                (o.status === 'expired' &&
+                  o.responded_at != null &&
+                  o.responded_at.getTime() > cooldownStart),
+            )
             .map((o) => ({ courier_id: o.courier_id })),
         };
       }
@@ -489,13 +510,66 @@ describe('dispatchRetryProcessor — offer expiry (mandate §2, §8)', () => {
       expires_at: new Date(Date.now() - 1000),
     });
 
-    // One tick: expire A's offer, then immediately offer to B (A is excluded
-    // because they already have an offer row for this delivery).
+    // One tick: expire A's offer, then immediately offer to B — B is nearer
+    // in this fixture, so this asserts the normal "next candidate" path, not
+    // the re-offer path (which the two tests below pin separately).
     const result = await runProcessor();
 
     expect(result.expiredOffers).toBe(1);
     expect(result.newlyOffered).toBe(1);
     expect(delivery.courier_id).toBe('courier-B');
+  });
+
+  // The exact scenario the real pilot got stuck on (docs/36): ONE online
+  // courier, whose offer timed out. The exclusion query used to list every
+  // offer ever made for the delivery regardless of status, so that single
+  // courier was excluded FOREVER — `dispatch_attempts` climbed past 100 while
+  // no offer was ever created again, and the delivery could never complete.
+  it('the ONLY courier available is re-offered a delivery once the cooldown on their expired offer has passed', async () => {
+    const delivery = seedDelivery({ status: 'courier_assigned', courier_id: 'courier-solo' });
+    seedCourier('courier-solo', { status: 'busy', active_delivery_id: delivery.id });
+    const offer: (typeof offers)[number] = {
+      id: randomUUID(),
+      delivery_id: delivery.id,
+      courier_id: 'courier-solo',
+      status: 'offered',
+      expires_at: new Date(Date.now() - 1_000),
+    };
+    offers.push(offer);
+
+    const first = await runProcessor(); // expires the offer, frees the courier
+    expect(first.expiredOffers).toBe(1);
+    expect(first.newlyOffered).toBe(0); // still inside the cooldown — not re-pinged yet
+    expect(delivery.status).toBe('searching_courier');
+
+    // One offer window later (the cooldown is `offer_timeout_seconds`).
+    offer.responded_at = new Date(Date.now() - 60_000);
+
+    const second = await runProcessor();
+
+    expect(second.newlyOffered).toBe(1);
+    expect(delivery.courier_id).toBe('courier-solo');
+    expect(offers.filter((o) => o.status === 'offered')).toHaveLength(1);
+  });
+
+  it('a courier who explicitly REJECTED is not re-offered the same delivery', async () => {
+    // The other half of the rule: a timeout is not a refusal, but a refusal
+    // is. Re-asking someone who just said no would be both pointless and
+    // visible to them as a bug.
+    const delivery = seedDelivery({ status: 'searching_courier', courier_id: null });
+    seedCourier('courier-refuser');
+    offers.push({
+      id: randomUUID(),
+      delivery_id: delivery.id,
+      courier_id: 'courier-refuser',
+      status: 'rejected',
+      expires_at: new Date(Date.now() + 30_000),
+    });
+
+    const result = await runProcessor();
+
+    expect(result.newlyOffered).toBe(0);
+    expect(delivery.courier_id).toBeNull();
   });
 });
 

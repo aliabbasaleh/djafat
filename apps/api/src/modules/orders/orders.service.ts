@@ -709,6 +709,77 @@ export class OrdersService implements OrderAmountPort {
   }
 
   /**
+   * The customer's OWN order history (pilot P0 n°2, docs/36: the pilot found
+   * there was no way at all for a customer to list their orders — `GET
+   * /orders` is the kitchen board, restaurant-only, and nothing else existed,
+   * so "historique" was unreachable on every frontend).
+   *
+   * `customerId` comes from the authenticated actor and NOTHING else: there
+   * is no filter, body or query parameter through which a caller could name
+   * another customer. That makes this route structurally incapable of the
+   * cross-tenant read `@RequireOwnership`'s permission override allowed on
+   * the single-order route before BUG-10.1-AUTH.
+   */
+  async listOrdersForCustomer(
+    actorUserId: string,
+    filters: { status?: OrderStatusString },
+    page: number,
+    limit: number,
+  ): Promise<{
+    items: Array<{
+      id: string;
+      code: string;
+      status: string;
+      total: MoneyJson;
+      restaurantId: string;
+      items: Array<{ name: string; quantity: number; options: string[] }>;
+      createdAt: string;
+      placedAt: string | null;
+      deliveredAt: string | null;
+    }>;
+    page: number;
+    limit: number;
+    total: number;
+  }> {
+    const where = {
+      customerId: actorUserId,
+      ...(filters.status ? { status: filters.status } : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        orderBy: { createdAt: 'desc' }, // newest first — a history, not a queue
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { items: { include: { options: true } } },
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((o) => ({
+        id: o.id,
+        code: o.code,
+        status: o.status,
+        total: toMoneyJson(o.totalMinor, o.currency),
+        restaurantId: o.restaurantId,
+        items: o.items.map((it) => ({
+          name: it.nameSnapshot,
+          quantity: it.quantity,
+          options: it.options.map((opt) => opt.nameSnapshot),
+        })),
+        createdAt: o.createdAt.toISOString(),
+        placedAt: o.placedAt ? o.placedAt.toISOString() : null,
+        deliveredAt: o.deliveredAt ? o.deliveredAt.toISOString() : null,
+      })),
+      page,
+      limit,
+      total,
+    };
+  }
+
+  /**
    * Minimal operational listing for admin/support (Bloc 9, docs/30
    * §admin-api) — a summary row, never the full `OrderDto` with items
    * (that's `getOrder`, one at a time). Filterable by status/restaurant so

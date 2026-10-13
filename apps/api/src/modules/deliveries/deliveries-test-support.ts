@@ -14,6 +14,7 @@ import type { PrismaService } from '../../infra/prisma/prisma.service';
 import { OutboxService } from '../../infra/outbox/outbox.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { PrismaIdempotencyStore } from '../../common/idempotency/prisma-idempotency.store';
+import type { AppConfigService } from '../../common/config/config.service';
 import type { LedgerService } from '../ledger/ledger.service';
 import type { PlatformService } from '../platform/platform.service';
 import { CouriersService } from '../couriers/couriers.service';
@@ -863,6 +864,21 @@ export function fakeUsersService(members: ReadonlySet<string> = new Set()): User
   } as unknown as UsersService;
 }
 
+/**
+ * Only `DELIVERY_CODE_ENCRYPTION_KEY` is read by `DeliveriesService` (the
+ * at-rest encryption of the customer's delivery code, docs/36). A REAL
+ * 32-byte base64 key so the encrypt/decrypt round-trip the tests exercise is
+ * the production one, not a stub that would hide a key-length bug.
+ */
+export function fakeConfigService(): AppConfigService {
+  const values: Record<string, string> = {
+    DELIVERY_CODE_ENCRYPTION_KEY: Buffer.from('test-delivery-code-key-32bytes!!').toString(
+      'base64',
+    ),
+  };
+  return { get: vi.fn((key: string) => values[key]) } as unknown as AppConfigService;
+}
+
 export function fakeOrderAmountPort(courierFeeInPool = true): OrderAmountPort {
   const breakdown: OrderAccrualBreakdown = {
     restaurantId: RESTAURANT_ID,
@@ -931,6 +947,7 @@ export function buildDeliveriesServices(
     couriers,
     fakeUsersService(),
     fakeOrderAmountPort(opts.courierFeeInPool ?? true),
+    fakeConfigService(),
   );
   return { deliveries, couriers, emitted };
 }

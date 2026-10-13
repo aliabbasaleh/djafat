@@ -95,6 +95,14 @@ const AuthSchema = z.object({
   REFRESH_TOKEN_HASH_SECRET: nonEmpty,
   MFA_ENCRYPTION_KEY: nonEmpty,
   STEP_UP_WINDOW_SECONDS: intFromString(600), // 10 min — docs/05 §5.4
+  /**
+   * Encrypts the delivery proof code at rest (AES-256-GCM, 32 raw bytes
+   * base64) so the owning customer can read their own code back while it
+   * never sits in plaintext in `delivery_proofs` — see docs/36's pilot fix.
+   * A key of its own, never `MFA_ENCRYPTION_KEY`: one leak must not span two
+   * unrelated secret domains.
+   */
+  DELIVERY_CODE_ENCRYPTION_KEY: nonEmpty,
 });
 
 const PaymentsSchema = z.object({

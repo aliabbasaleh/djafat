@@ -22,6 +22,8 @@ import { DeliveryTransitionError, assertDeliveryTransition, fromStatusesFor } fr
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { OutboxService } from '../../infra/outbox/outbox.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
+import { AppConfigService } from '../../common/config/config.service';
+import { decryptAtRest, encryptAtRest } from '../../common/crypto/at-rest';
 import { toMoneyJson } from '../../common/money/money.mapper';
 import { ORDER_AMOUNT_PORT } from '../../common/ports/order-amount.port';
 import {
@@ -160,6 +162,7 @@ export class DeliveriesService {
     private readonly couriers: CouriersService,
     private readonly users: UsersService,
     @Inject(ORDER_AMOUNT_PORT) private readonly orderAmount: OrderAmountPort,
+    private readonly config: AppConfigService,
   ) {}
 
   // ── creation + dispatch trigger (docs/25 §11) ────────────────────────────
@@ -299,18 +302,32 @@ export class DeliveriesService {
       return;
     }
 
-    // Exclude a courier who currently holds a live offer, or who explicitly
-    // rejected this delivery (don't re-ask after a "no") — but NOT one whose
-    // offer merely timed out (`expired`): excluding every courier who was
-    // EVER offered, timeout included, shrinks the candidate pool to zero as
-    // retries accumulate, permanently stalling dispatch once every available
-    // courier has had one offer time out.
+    // Who is NOT a candidate for this wave:
+    //   - a live `offered` row — they are deciding right now;
+    //   - `rejected` — they said no, never re-ask for this delivery;
+    //   - `expired` within the last offer window — a timeout is not a
+    //     refusal, so they become eligible again, but only after one
+    //     cooldown, so a courier who ignored an offer is not re-pinged
+    //     immediately while someone else could take it.
+    // Excluding EVERY courier ever offered (what this did before the pilot,
+    // docs/36) shrank the pool to zero as retries accumulated and
+    // permanently stalled dispatch once every courier had timed out once —
+    // with a single online courier, after the very first offer.
+    // Mirrored 1:1 in `apps/worker`'s `dispatch.processor.ts`.
+    const cooldownSince = new Date(Date.now() - offerTimeoutSeconds * 1_000);
     const allOffers = await this.prisma.deliveryOffer.findMany({
       where: { deliveryId },
-      select: { courierId: true, status: true },
+      select: { courierId: true, status: true, respondedAt: true },
     });
     const excludeIds = allOffers
-      .filter((o) => o.status === 'offered' || o.status === 'rejected')
+      .filter(
+        (o) =>
+          o.status === 'offered' ||
+          o.status === 'rejected' ||
+          (o.status === 'expired' &&
+            o.respondedAt !== null &&
+            o.respondedAt.getTime() > cooldownSince.getTime()),
+      )
       .map((o) => o.courierId);
 
     const radius = Math.min(initialRadius + delivery.dispatchAttempts * step, maxRadius);
@@ -741,9 +758,73 @@ export class DeliveriesService {
         valueHash,
         createdBy: issuedByUserId,
         expiresAt: new Date(Date.now() + DELIVERY_CODE_TTL_MS),
+        // Encrypted (AES-256-GCM), never plaintext: `value_hash` stays the ONE
+        // verification truth, this is only so the owning CUSTOMER can read
+        // their own code back (`getDeliveryCodeFor`). The pilot found that
+        // without it the code reached nobody — it was emitted on an
+        // in-process event with zero listeners, so a real customer could
+        // never learn the code a real courier has to ask them for, and the
+        // delivery lifecycle could not be completed at all (docs/36).
+        reference: encryptAtRest(code, this.deliveryCodeKey(), 'DELIVERY_CODE_ENCRYPTION_KEY'),
       },
     });
     return code;
+  }
+
+  private deliveryCodeKey(): string {
+    return this.config.get('DELIVERY_CODE_ENCRYPTION_KEY');
+  }
+
+  /**
+   * The owning CUSTOMER reads their own live delivery code (pilot fix,
+   * docs/36). Deliberately NOT available to:
+   *   - the assigned courier — one who knew the code could self-confirm a
+   *     delivery they never made, which is the entire point of the code;
+   *   - the restaurant;
+   *   - staff-tier — no ops flow asks for it today, and a compromised
+   *     support account that could read codes is a fraud path that costs
+   *     nothing to keep closed (least privilege; revisit only with a real
+   *     requirement).
+   * Every refusal is the SAME 404 as an absent delivery — never distinguish
+   * "not yours" from "does not exist" (BUG-10.1.x discipline).
+   */
+  async getDeliveryCodeFor(
+    actor: AccessActor,
+    deliveryId: string,
+  ): Promise<{ code: string; expiresAt: string }> {
+    const notFound = new NotFoundException({
+      code: 'DELIVERY_NOT_FOUND',
+      message: `Delivery ${deliveryId} not found.`,
+    });
+
+    const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
+    if (!delivery) throw notFound;
+
+    const context = await this.orderAmount.getDeliveryContext(delivery.orderId);
+    if (context.customerId !== actor.userId) throw notFound;
+
+    const proof = await this.prisma.deliveryProof.findFirst({
+      where: { deliveryId, type: 'delivery_code' },
+      orderBy: { createdAt: 'desc' },
+    });
+    // No code yet (the courier has not picked up), already consumed, or past
+    // its TTL — all "there is nothing for you to show", same 404.
+    if (!proof || proof.consumedAt !== null) throw notFound;
+    if (proof.expiresAt && proof.expiresAt.getTime() <= Date.now()) throw notFound;
+    if (!proof.reference) {
+      // Issued before this column was written (or by a path that skipped it):
+      // the raw code is unrecoverable by design, so say so honestly instead
+      // of inventing one — ops re-issues via a fresh pickup/`/code` cycle.
+      throw new ConflictException({
+        code: 'VALIDATION_ERROR',
+        message: 'This delivery code predates code retrieval and must be re-issued.',
+      });
+    }
+
+    return {
+      code: decryptAtRest(proof.reference, this.deliveryCodeKey(), 'DELIVERY_CODE_ENCRYPTION_KEY'),
+      expiresAt: (proof.expiresAt ?? new Date(Date.now() + DELIVERY_CODE_TTL_MS)).toISOString(),
+    };
   }
 
   private hashProof(code: string): string {

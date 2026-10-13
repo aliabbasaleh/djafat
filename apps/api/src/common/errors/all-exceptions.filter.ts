@@ -72,6 +72,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message: exception.message,
       };
     }
+    // A malformed identifier is a CLIENT error, not an internal one. Prisma
+    // reports "Inconsistent column data: Error creating UUID" as P2023 when a
+    // non-UUID string reaches a `uuid` column — which happens on every
+    // `@Param('id')` route, none of which validates the format (the pilot hit
+    // it on `GET /v1/payments/:id`, docs/36). Classified centrally rather
+    // than by adding a pipe to ~40 route signatures: one place to be right,
+    // and no route can be forgotten. The message stays generic — it must not
+    // echo the offending value back.
+    if (isPrismaMalformedIdError(exception)) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        code: 'VALIDATION_ERROR',
+        message: 'Malformed identifier.',
+      };
+    }
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
       const resp = exception.getResponse();
@@ -128,4 +143,31 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
 function isApiErrorCode(value: unknown): value is ApiErrorCode {
   return typeof value === 'string' && (API_ERROR_CODES as readonly string[]).includes(value);
+}
+
+/**
+ * A malformed identifier reaches PostgreSQL in two shapes, and BOTH used to
+ * surface as a raw 500 (the pilot found the first, its security review the
+ * second — docs/36):
+ *
+ *   - `P2023` "Inconsistent column data" — a non-UUID string passed to a
+ *     typed Prisma query against a `uuid` column (`findUnique({ where: { id }})`);
+ *   - `P2010` wrapping PostgreSQL `22P02` "invalid input syntax for type
+ *     uuid" — the same mistake through a raw query that casts `::uuid`,
+ *     which several services use (e.g. `addresses`).
+ *
+ * Matched structurally rather than with `instanceof
+ * Prisma.PrismaClientKnownRequestError`, so this filter keeps no import of
+ * `@prisma/client`: `common/errors` is reachable from every module and must
+ * stay free of infrastructure dependencies (docs/05 §5.3). Narrow on purpose:
+ * only these two, so an unrelated database fault still reports INTERNAL.
+ */
+function isPrismaMalformedIdError(exception: unknown): boolean {
+  if (typeof exception !== 'object' || exception === null) return false;
+  const err = exception as { code?: unknown; meta?: { code?: unknown }; message?: unknown };
+  if (err.code === 'P2023') return true;
+  if (err.code !== 'P2010') return false;
+  return (
+    err.meta?.code === '22P02' || (typeof err.message === 'string' && err.message.includes('22P02'))
+  );
 }

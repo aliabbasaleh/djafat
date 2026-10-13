@@ -67,7 +67,44 @@ export function createOrdersClient(http: ApiHttp) {
         idempotencyKey,
       }),
     get: (orderId: string) => http.get<Order>(`/orders/${encodeURIComponent(orderId)}`),
+    /**
+     * The caller's OWN order history (docs/36 pilot fix). No customer id to
+     * pass — the server scopes it to the authenticated token, which is why
+     * there is no parameter here through which another customer's orders
+     * could be requested.
+     */
+    listMine: (params: { status?: OrderStatus; page?: number; limit?: number } = {}) => {
+      const query = new URLSearchParams();
+      if (params.status) query.set('status', params.status);
+      if (params.page !== undefined) query.set('page', String(params.page));
+      if (params.limit !== undefined) query.set('limit', String(params.limit));
+      const suffix = query.toString();
+      return http.get<CustomerOrdersPage>(`/orders/mine${suffix ? `?${suffix}` : ''}`);
+    },
   };
+}
+
+export interface CustomerOrderSummary {
+  readonly id: string;
+  readonly code: string;
+  readonly status: OrderStatus;
+  readonly total: MoneyJson;
+  readonly restaurantId: string;
+  readonly items: ReadonlyArray<{
+    readonly name: string;
+    readonly quantity: number;
+    readonly options: readonly string[];
+  }>;
+  readonly createdAt: string;
+  readonly placedAt: string | null;
+  readonly deliveredAt: string | null;
+}
+
+export interface CustomerOrdersPage {
+  readonly items: readonly CustomerOrderSummary[];
+  readonly page: number;
+  readonly limit: number;
+  readonly total: number;
 }
 
 export type OrdersClient = ReturnType<typeof createOrdersClient>;

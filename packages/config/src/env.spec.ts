@@ -18,6 +18,7 @@ const baseEnv = {
   JWT_ACCESS_SECRET: 'test-jwt-access-secret',
   REFRESH_TOKEN_HASH_SECRET: 'test-refresh-hash-secret',
   MFA_ENCRYPTION_KEY: 'dGVzdC1tZmEtZW5jcnlwdGlvbi1rZXktMzJieXRlcyEh', // base64, 32 bytes (test-only)
+  DELIVERY_CODE_ENCRYPTION_KEY: 'dGVzdC1kZWxpdmVyeS1jb2RlLWtleS0zMmJ5dGVzISE=', // base64, 32 bytes (test-only)
 };
 
 describe('loadApiEnv', () => {

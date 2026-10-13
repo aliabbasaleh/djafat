@@ -53,6 +53,22 @@ export class DeliveriesController {
   }
 
   /**
+   * The owning CUSTOMER's own live delivery code — the one the courier asks
+   * them for at handover (pilot fix, docs/36: the code was generated and
+   * hashed but reached nobody, so the lifecycle could never be completed).
+   *
+   * `@RequireRole('customer')` is the coarse gate; the real decision is
+   * ownership, enforced in the service, which refuses the assigned courier,
+   * the restaurant and staff-tier alike with the SAME 404 as an unknown id.
+   */
+  @Get(':id/code')
+  @RequireAuth()
+  @RequireRole('customer')
+  getCode(@CurrentActor() actor: AuthenticatedActor, @Param('id') id: string) {
+    return this.deliveries.getDeliveryCodeFor(actor, id);
+  }
+
+  /**
    * Tenant-scoped (BUG-10.1.3): the customer who owns the order behind this
    * delivery, or staff-tier with `deliveries:write`. Cancellation rules per
    * state still come from the state machine (docs/25 §29).

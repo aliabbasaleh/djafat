@@ -35,9 +35,11 @@ const STALE_PENDING_MS = 60_000;
  * Redis hands each entry to exactly one instance. That instance owns the entry
  * until it `XACK`s it. Sockets, however, live on ONE instance — so an event
  * delivered to instance A cannot reach a socket held by instance B without a
- * Socket.IO Redis adapter. That adapter is NOT configured yet (documented debt,
- * docs/27 §13): with a single API instance the fan-out is complete, and with
- * several it would be partial. Recorded rather than papered over.
+ * Socket.IO Redis adapter. That adapter IS configured since Bloc 7.1
+ * (`attachSocketIoRedisAdapter` in `main.ts`, docs/28 §1) — this comment said
+ * otherwise until the pilot's debt review (docs/36) caught the drift. What
+ * remains unproven is only its behaviour under SEVERAL live API instances:
+ * the pilot ran one (docs/36 §risques restants).
  *
  * ── What is guaranteed ────────────────────────────────────────────────────
  * At-least-once. An entry is acknowledged only after every handler resolved, so
