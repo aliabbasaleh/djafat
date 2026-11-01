@@ -98,7 +98,63 @@ export function makePaymentsRaceDb() {
     eventType: string;
     payload: unknown;
   }> = [];
-  const providerConfigs: PaymentProviderConfigRow[] = [];
+  // A correctly-configured environment is the BASELINE here: `cash` and `mock`
+  // each have an enabled, global, currently-valid config row, an active
+  // `payment_providers` row and an active `payment_methods` row — exactly what
+  // the seed creates. `fee_bps` is left null so `resolveProviderFeeBps` still
+  // falls back to `MOCK_PSP_FEE_BPS` and the pre-existing fee tests are
+  // unaffected. Adversarial tests disable/remove these rows to prove the
+  // enablement check actually bites (BUG-PAY-2).
+  const providerConfigs: PaymentProviderConfigRow[] = [
+    {
+      id: 'cfg-default-mock',
+      providerCode: 'mock',
+      countryId: null,
+      cityId: null,
+      restaurantId: null,
+      currency: null,
+      minAmountMinor: null,
+      maxAmountMinor: null,
+      feeBps: null,
+      enabled: true,
+      priority: 0,
+      validFrom: new Date('2020-01-01T00:00:00Z'),
+      validTo: null,
+    },
+    {
+      id: 'cfg-default-cash',
+      providerCode: 'cash',
+      countryId: null,
+      cityId: null,
+      restaurantId: null,
+      currency: null,
+      minAmountMinor: null,
+      maxAmountMinor: null,
+      feeBps: null,
+      enabled: true,
+      priority: 0,
+      validFrom: new Date('2020-01-01T00:00:00Z'),
+      validTo: null,
+    },
+  ];
+  const providerRows: Array<{
+    code: string;
+    methodCode: string;
+    displayName: string;
+    active: boolean;
+  }> = [
+    { code: 'mock', methodCode: 'mobile_money', displayName: 'Mock PSP', active: true },
+    {
+      code: 'cash',
+      methodCode: 'cash_on_delivery',
+      displayName: 'Paiement à la livraison',
+      active: true,
+    },
+  ];
+  const paymentMethods: Array<{ code: string; active: boolean }> = [
+    { code: 'mobile_money', active: true },
+    { code: 'cash_on_delivery', active: true },
+  ];
   const idempotencyKeys = new Map<
     string,
     { fingerprint: string; response: unknown; status: 'reserved' | 'completed' }
@@ -308,23 +364,73 @@ export function makePaymentsRaceDb() {
       },
       paymentProviderConfig: {
         findMany: vi.fn((args: { where: Record<string, unknown> }) => {
-          // Minimal, deliberately permissive matcher — good enough for the fee-bps
-          // resolution tests; the exhaustive geo-scoping logic is exercised by
-          // reading `PaymentsService.resolveProviderFeeBps`'s own JS filter, not
-          // re-implemented here.
-          const where = args.where as { providerCode?: string; enabled?: boolean };
+          // Faithful matcher (BUG-PAY-2). The previous one was deliberately
+          // permissive AND applied `feeBps !== null` unconditionally — fine
+          // while only `resolveProviderFeeBps` (which passes
+          // `feeBps: { not: null }`) read this table, but wrong the moment the
+          // creation path also resolves ENABLEMENT, where a null `fee_bps` is
+          // perfectly normal. A mock that quietly returns rows the real query
+          // would have excluded — or hides rows it would have returned — makes
+          // the enablement tests meaningless, so the scope/validity clauses
+          // are honoured here exactly as Prisma would.
+          const where = args.where as {
+            providerCode?: string;
+            enabled?: boolean;
+            feeBps?: { not: null };
+            validFrom?: { lte: Date };
+            OR?: Array<{ validTo: null | { gt: Date } }>;
+            AND?: Array<{ OR?: Array<Record<string, string | null>> } | Record<string, unknown>>;
+          };
+          const now = where.validFrom?.lte ?? new Date();
+
+          /** `{ OR: [{ field: value }, { field: null }] }` / `{ field: null }` as Prisma means it. */
+          const matchesScopeClause = (
+            clause: { OR?: Array<Record<string, string | null>> } | Record<string, unknown>,
+            row: PaymentProviderConfigRow,
+          ): boolean => {
+            const asOr = clause as { OR?: Array<Record<string, string | null>> };
+            const alternatives = asOr.OR ?? [clause as Record<string, string | null>];
+            return alternatives.some((alt) =>
+              Object.entries(alt).every(
+                ([field, expected]) =>
+                  (row as unknown as Record<string, unknown>)[field] === expected,
+              ),
+            );
+          };
+
           return Promise.resolve(
-            providerConfigs.filter(
-              (c) =>
-                (!where.providerCode || c.providerCode === where.providerCode) &&
-                (where.enabled === undefined || c.enabled === where.enabled) &&
-                c.feeBps !== null,
-            ),
+            providerConfigs.filter((c) => {
+              if (where.providerCode && c.providerCode !== where.providerCode) return false;
+              if (where.enabled !== undefined && c.enabled !== where.enabled) return false;
+              // Only when the caller actually asked for it.
+              if (where.feeBps !== undefined && c.feeBps === null) return false;
+              if (where.validFrom && c.validFrom > now) return false;
+              if (where.OR && !(c.validTo === null || c.validTo > now)) return false;
+              if (where.AND && !where.AND.every((clause) => matchesScopeClause(clause, c)))
+                return false;
+              return true;
+            }),
           );
         }),
       },
-      paymentProviderRow: { findMany: vi.fn(() => Promise.resolve([])) },
-      paymentMethod: { findMany: vi.fn(() => Promise.resolve([])) },
+      paymentProviderRow: {
+        findMany: vi.fn((args?: { where?: { active?: boolean } }) =>
+          Promise.resolve(
+            providerRows.filter(
+              (p) => args?.where?.active === undefined || p.active === args.where.active,
+            ),
+          ),
+        ),
+      },
+      paymentMethod: {
+        findMany: vi.fn((args?: { where?: { active?: boolean } }) =>
+          Promise.resolve(
+            paymentMethods.filter(
+              (m) => args?.where?.active === undefined || m.active === args.where.active,
+            ),
+          ),
+        ),
+      },
       outbox: {
         create: vi.fn((args: { data: Record<string, unknown> }) => {
           outboxEvents.push(args.data as never);
@@ -435,6 +541,8 @@ export function makePaymentsRaceDb() {
     ledgerGroups,
     outboxEvents,
     providerConfigs,
+    providerRows,
+    paymentMethods,
     idempotencyKeys,
   };
 }

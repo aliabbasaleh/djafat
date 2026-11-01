@@ -350,6 +350,105 @@ describe('PaymentsService.handleWebhook — out-of-order / replay safety (docs/0
     ).rejects.toMatchObject({ response: { code: 'UNAUTHENTICATED' } });
     expect(payment.status).toBe('pending');
   });
+
+  // ── BUG-PAY-1 ───────────────────────────────────────────────────────────
+  // The idempotency row used to be claimed BEFORE the signature was checked,
+  // so an unauthenticated caller could burn a genuine event id: its forged
+  // event was inserted, flipped to 'ignored' and KEPT, and the real webhook
+  // that followed hit `ON CONFLICT DO NOTHING`, returned 'duplicate' and left
+  // the payment pending forever — customer debited at the PSP, no ledger
+  // entry, no alert. An unauthenticated caller must never be able to reserve
+  // the identity of an authentic event.
+  it('BUG-PAY-1: a forged webhook never consumes the event id of the genuine one', async () => {
+    const { db, payments: rows, ledgerGroups } = makePaymentsRaceDb();
+    const payment = seedPayment(rows, {
+      status: 'pending',
+      providerCode: 'mock',
+      providerRef: 'mock-ref-5',
+    });
+    const { payments } = buildPaymentsService(db, ledgerGroups);
+
+    // Same event id the real provider will use — the attacker controls it
+    // because it is read straight out of the request body.
+    const body = JSON.stringify({
+      eventId: 'EVT-123',
+      providerRef: 'mock-ref-5',
+      status: 'succeeded',
+    });
+
+    // 1. attacker: correct body, INVALID signature
+    await expect(
+      payments.handleWebhook('mock', {
+        headers: { 'x-mock-signature': 'not-a-real-signature' },
+        rawBody: Buffer.from(body),
+      }),
+    ).rejects.toMatchObject({ response: { code: 'UNAUTHENTICATED' } });
+
+    // 2. the real provider: same event id, VALID signature
+    const { MockPaymentProvider } = await import('./providers/mock/mock-payment.provider');
+    const genuine = await payments.handleWebhook('mock', {
+      headers: { 'x-mock-signature': MockPaymentProvider.sign(body) },
+      rawBody: Buffer.from(body),
+    });
+
+    expect(genuine.status).toBe('ok'); // NOT 'duplicate'
+    expect(payment.status).toBe('succeeded');
+    expect(ledgerGroups).toHaveLength(1); // the financial event actually happened
+  });
+
+  it('BUG-PAY-1: a forged webhook leaves no idempotency row behind', async () => {
+    const { db, payments: rows, ledgerGroups, webhookEvents } = makePaymentsRaceDb();
+    seedPayment(rows, { status: 'pending', providerCode: 'mock', providerRef: 'mock-ref-6' });
+    const { payments } = buildPaymentsService(db, ledgerGroups);
+
+    const body = JSON.stringify({
+      eventId: 'EVT-456',
+      providerRef: 'mock-ref-6',
+      status: 'succeeded',
+    });
+    await expect(
+      payments.handleWebhook('mock', {
+        headers: { 'x-mock-signature': 'forged' },
+        rawBody: Buffer.from(body),
+      }),
+    ).rejects.toMatchObject({ response: { code: 'UNAUTHENTICATED' } });
+
+    expect(webhookEvents.filter((w) => w.eventId === 'EVT-456')).toHaveLength(0);
+  });
+
+  it('BUG-PAY-1: repeated forgeries still never block the genuine event', async () => {
+    const { db, payments: rows, ledgerGroups } = makePaymentsRaceDb();
+    const payment = seedPayment(rows, {
+      status: 'pending',
+      providerCode: 'mock',
+      providerRef: 'mock-ref-7',
+    });
+    const { payments } = buildPaymentsService(db, ledgerGroups);
+
+    const body = JSON.stringify({
+      eventId: 'EVT-789',
+      providerRef: 'mock-ref-7',
+      status: 'succeeded',
+    });
+    for (let i = 0; i < 5; i++) {
+      await expect(
+        payments.handleWebhook('mock', {
+          headers: { 'x-mock-signature': `forged-${i}` },
+          rawBody: Buffer.from(body),
+        }),
+      ).rejects.toMatchObject({ response: { code: 'UNAUTHENTICATED' } });
+    }
+
+    const { MockPaymentProvider } = await import('./providers/mock/mock-payment.provider');
+    const genuine = await payments.handleWebhook('mock', {
+      headers: { 'x-mock-signature': MockPaymentProvider.sign(body) },
+      rawBody: Buffer.from(body),
+    });
+
+    expect(genuine.status).toBe('ok');
+    expect(payment.status).toBe('succeeded');
+    expect(ledgerGroups).toHaveLength(1);
+  });
 });
 
 describe('PaymentsService — PSP fee is config-driven (Bloc 5 — replaces the Bloc 0.5 hardcoded constant)', () => {

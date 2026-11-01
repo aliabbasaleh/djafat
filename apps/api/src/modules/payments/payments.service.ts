@@ -90,6 +90,42 @@ export class PaymentsService {
       });
     }
 
+    // BUG-PAY-2 — BEING REGISTERED IS NOT BEING ENABLED.
+    //
+    // `registry.has()` above only answers rule (a) of docs/15 AD-03: "is the
+    // class wired up?". Rule (b) — "does a `payment_provider_configs` row
+    // enable it for THIS country/city/restaurant/currency/amount?" — was
+    // enforced nowhere on the write path; only `GET /v1/config/payment-methods`
+    // read that table. Since `MockPaymentProvider` is registered
+    // unconditionally and defaults to `succeed`, any customer could post
+    // `{"providerCode":"mock"}` on their own order and get a `succeeded`
+    // payment with a full `order_accrual` posted and the order placed —
+    // a free order. Disabling `mock` in config changed nothing.
+    //
+    // The policy is NOT restated here: this calls the very function the
+    // discovery endpoint uses, with the order's own frozen context, so the
+    // two paths cannot drift apart again. The cost is two extra reads on a
+    // path that is already doing several, and in exchange a deactivated
+    // `payment_providers` row or an expired config row now blocks payment
+    // exactly as it already hid the method from the client.
+    //
+    // Placed AFTER the registry/amount checks so their existing 404/409
+    // contracts are untouched, and BEFORE the `payments` row, the outbox
+    // event, `provider.initiate()` and any ledger write — a refusal must
+    // leave no trace at all.
+    const enabled = await this.listAvailablePaymentMethods({
+      cityId: context.cityId,
+      restaurantId: context.restaurantId,
+      currency: amount.currency,
+      amountMinor: amount.minor,
+    });
+    if (!enabled.some((m) => m.providerCode === input.providerCode)) {
+      throw new ConflictException({
+        code: 'PAYMENT_METHOD_UNAVAILABLE',
+        message: `Provider "${input.providerCode}" is not enabled for this order.`,
+      });
+    }
+
     const payment = await this.prisma.$transaction(async (tx) => {
       const created = await tx.payment.create({
         data: {
@@ -169,13 +205,42 @@ export class PaymentsService {
     const provider = this.registry.get(providerCode);
     const parsed = await provider.verifyAndParseWebhook(rawReq);
 
+    // BUG-PAY-1 — AUTHENTICATE BEFORE RESERVING THE IDEMPOTENCY ROW.
+    //
+    // `parsed.eventId` is read straight out of a body posted to a public,
+    // unauthenticated endpoint. This check used to sit AFTER the INSERT
+    // below, so a forged event was written, flipped to 'ignored' and KEPT —
+    // and the genuine webhook carrying that same event id then hit
+    // `ON CONFLICT DO NOTHING`, returned 'duplicate', and never reached
+    // `markSucceeded()`. The customer was debited at the PSP while the
+    // payment stayed `pending`, with no ledger entry and no alert.
+    //
+    // The invariant this ordering enforces: an unauthenticated caller can
+    // never consume or reserve the identity of an authentic event. Nothing
+    // about the signature mechanism itself changes — same HMAC, same secret,
+    // same raw bytes, same `verifyAndParseWebhook` contract; only the moment
+    // at which its verdict is enforced.
+    //
+    // A rejected attempt is deliberately NOT persisted in `webhook_events`:
+    // that table's `(provider_code, event_id)` uniqueness IS the idempotency
+    // namespace, so writing attacker-chosen ids into it is precisely the
+    // vulnerability. Rejections are logged instead.
+    if (!parsed.signatureValid) {
+      this.logger.warn(`Invalid webhook signature (${providerCode}/${parsed.eventId})`);
+      throw new UnauthorizedException({
+        code: 'UNAUTHENTICATED',
+        message: 'Invalid webhook signature.',
+      });
+    }
+
     const bodyText =
       typeof rawReq.rawBody === 'string'
         ? rawReq.rawBody
         : Buffer.from(rawReq.rawBody).toString('utf8');
     const payloadHash = createHash('sha256').update(bodyText).digest('hex');
 
-    // Durable idempotency (docs/08 §8.6): a replayed/duplicated webhook is a no-op.
+    // Durable idempotency (docs/08 §8.6): a replayed/duplicated webhook is a
+    // no-op. Only authenticated events ever reach this point.
     const inserted = await this.prisma.$queryRaw<Array<{ id: string }>>`
       INSERT INTO webhook_events (provider_code, event_id, provider_ref, payload_hash, signature_valid, status)
       VALUES (${providerCode}, ${parsed.eventId}, ${parsed.providerRef || null}, ${payloadHash}, ${parsed.signatureValid}, 'received')
@@ -187,18 +252,6 @@ export class PaymentsService {
       return { status: 'duplicate' };
     }
     const webhookEventId = inserted[0].id;
-
-    if (!parsed.signatureValid) {
-      await this.prisma.webhookEvent.update({
-        where: { id: webhookEventId },
-        data: { status: 'ignored' },
-      });
-      this.logger.warn(`Invalid webhook signature (${providerCode}/${parsed.eventId})`);
-      throw new UnauthorizedException({
-        code: 'UNAUTHENTICATED',
-        message: 'Invalid webhook signature.',
-      });
-    }
 
     const payment = await this.prisma.payment.findFirst({
       where: { providerCode, providerRef: parsed.providerRef },
