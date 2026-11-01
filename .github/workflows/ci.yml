@@ -81,6 +81,20 @@ jobs:
       OBJECT_STORAGE_SECRET_ACCESS_KEY: ci
       API_PUBLIC_URL: http://localhost:3001
       PAYMENT_WEBHOOK_BASE_URL: http://localhost:3001/v1/payments/webhook
+      # The five auth/crypto variables `ApiEnvSchema` requires without a
+      # default. They were missing, so this job could not boot the app at all:
+      # every suite died in `beforeAll` with `ConfigValidationError` and its
+      # tests were reported SKIPPED, which vitest does not fail on loudly --
+      # the job went green over 93 tests that never ran. Throwaway CI values,
+      # never reused anywhere: the real secrets live in the secret manager
+      # (docs/12), and `MFA_ENCRYPTION_KEY`/`DELIVERY_CODE_ENCRYPTION_KEY` must
+      # be 32 raw bytes base64-encoded (AES-256-GCM) and must differ from each
+      # other -- one leak must not span two secret domains.
+      JWT_ACCESS_SECRET: ci-jwt-access-secret-not-used-anywhere-else
+      REFRESH_TOKEN_HASH_SECRET: ci-refresh-token-hash-secret-not-used-anywhere-else
+      OTP_HASH_SECRET: ci-otp-hash-secret-not-used-anywhere-else
+      MFA_ENCRYPTION_KEY: Y2ktbWZhLWVuY3J5cHRpb24ta2V5LTMyLWJ5dGVzISE=
+      DELIVERY_CODE_ENCRYPTION_KEY: Y2ktZGVsaXZlcnktY29kZS1rZXktMzItYnl0ZXMhISE=
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

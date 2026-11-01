@@ -10,6 +10,7 @@ import { configureApp } from '../src/bootstrap';
 import { PrismaService } from '../src/infra/prisma/prisma.service';
 import { RedisService } from '../src/common/redis/redis.service';
 import { mockOtpKey } from '../src/modules/auth/providers/mock-otp-delivery.provider';
+import { keepRestaurantOpen } from './open-restaurant.helper';
 
 /**
  * Bloc 4 — Cart + Core Order end-to-end (docs/22): real Postgres + Redis
@@ -23,6 +24,8 @@ let app: NestFastifyApplication;
 let prisma: PrismaService;
 let redis: RedisService;
 let server: Server;
+/** Set by `beforeAll` — see `keepRestaurantOpen` (BUG-PAY-INT-7). */
+let restoreHours: () => Promise<void>;
 
 interface LoginResult {
   access: string;
@@ -51,9 +54,15 @@ beforeAll(async () => {
 
   prisma = app.get(PrismaService);
   redis = app.get(RedisService);
+
+  // This file's full flow COMMITS an order, which the product refuses outside
+  // the restaurant's opening hours (BUG-PAY-INT-7).
+  const restaurant = await prisma.restaurant.findFirstOrThrow({ where: { slug: 'chez-fatime' } });
+  restoreHours = await keepRestaurantOpen(prisma, restaurant.id);
 });
 
 afterAll(async () => {
+  await restoreHours?.();
   await app.close();
 });
 
@@ -108,6 +117,22 @@ describe('full flow — add item with options -> quote -> create order (docs/22 
     expect(quote.body.subtotal).toEqual({ minor: '10000', currency: 'XAF' });
     expect(quote.body.lines[0].effectiveUnitPrice).toEqual({ minor: '5000', currency: 'XAF' });
     expect(quote.body.lines[0].cartItemId).toBe(itemId);
+
+    // BUG-PAY-INT-8 — a FRESH customer has an empty address book, and Bloc 8
+    // (docs/29 §checkout) made a default delivery address a precondition of
+    // order creation: `POST /v1/orders` freezes a dropoff snapshot and
+    // refuses with 409 `VALIDATION_ERROR` when there is none
+    // (orders.service.ts §dropoff). This file predates that rule and was
+    // never executed afterwards, so it still expected 201 from a customer who
+    // could not legally order. The address is created through the REAL
+    // endpoint, not by a direct insert — the first address a user creates
+    // becomes their default automatically (addresses.service.ts §create), so
+    // this one call is the whole precondition.
+    await request(server)
+      .post('/v1/users/me/addresses')
+      .set('Authorization', auth)
+      .send({ label: 'Domicile', quartier: 'Klemat' })
+      .expect(201);
 
     // Order creation — body carries nothing, cart is resolved from the actor.
     const order = await request(server)

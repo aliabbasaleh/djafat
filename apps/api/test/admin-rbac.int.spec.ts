@@ -7,6 +7,7 @@ import request from 'supertest';
 import { totpCodeAt } from '@djafat/core';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
+import { PrismaService } from '../src/infra/prisma/prisma.service';
 import { RedisService } from '../src/common/redis/redis.service';
 import { mockOtpKey } from '../src/modules/auth/providers/mock-otp-delivery.provider';
 
@@ -37,6 +38,7 @@ const PHONES = {
 } as const;
 
 let app: NestFastifyApplication;
+let prisma: PrismaService;
 let redis: RedisService;
 let server: Server;
 const tokens: Record<keyof typeof PHONES, string> = {} as never;
@@ -63,7 +65,16 @@ async function loginViaOtp(
  * needs a real, fresh TOTP step-up first (enroll once, verify opens the
  * window — same flow as `identity.int.spec.ts` scenario 3).
  */
-async function enrollAndStepUp(access: string): Promise<void> {
+async function enrollAndStepUp(access: string, userId: string): Promise<void> {
+  // BUG-PAY-INT-5 — `POST /v1/auth/mfa/setup` answers 409 `MFA_ALREADY_ENABLED`
+  // once a secret is enabled (mfa.service.ts §setup), on purpose: a hijacked
+  // session must not be able to swap an admin's secret. Enrollment is thus a
+  // once-per-account event, while this suite needs it on every run — the
+  // FIRST run left `super_admin` enrolled and every run after it died here in
+  // `beforeAll`, taking all 19 tests of the block with it. The row is dropped
+  // so enrollment can happen again; the rule itself is untouched, and
+  // `identity.int.spec.ts` asserts the 409 contract on its own account.
+  await prisma.mfaTotpSecret.deleteMany({ where: { userId } });
   const setup = await request(server)
     .post('/v1/auth/mfa/setup')
     .set('Authorization', `Bearer ${access}`)
@@ -84,6 +95,7 @@ beforeAll(async () => {
   await app.getHttpAdapter().getInstance().ready();
   server = app.getHttpAdapter().getInstance().server as unknown as Server;
   redis = app.get(RedisService);
+  prisma = app.get(PrismaService);
 
   for (const [key, phone] of Object.entries(PHONES) as Array<[keyof typeof PHONES, string]>) {
     const { access, refresh, userId } = await loginViaOtp(phone);
@@ -154,7 +166,7 @@ describe('POST/DELETE /v1/admin/users/:id/roles — MFA step-up is now actually 
     // this block needs. Enrolling super_admin's own MFA here (rather than
     // reusing the shared `admin` account) keeps this file independent of
     // `identity.int.spec.ts`'s enrollment of the same account.
-    await enrollAndStepUp(tokens.superAdmin);
+    await enrollAndStepUp(tokens.superAdmin, userIds.superAdmin);
     const created = await loginViaOtp(FRESH_ADMIN_PHONE);
     await request(server)
       .post(`/v1/admin/users/${created.userId}/roles`)
@@ -187,7 +199,7 @@ describe('POST/DELETE /v1/admin/users/:id/roles — MFA step-up is now actually 
   });
 
   it('enrolling + completing TOTP opens the step-up window (scenario: MFA-role-with-MFA-configured -> allowed after MFA)', async () => {
-    await enrollAndStepUp(freshAdmin.access);
+    await enrollAndStepUp(freshAdmin.access, freshAdmin.userId);
   });
 
   it('an admin actor cannot grant themselves admin, EVEN once stepped up — step-up is a second factor, not a substitute for the existing business rule', async () => {
