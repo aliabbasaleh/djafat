@@ -7,6 +7,12 @@
 import { PrismaClient } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 import { LAUNCH_MARKET, PLATFORM_SETTINGS_DEFAULTS } from '@djafat/config';
+import { CashPaymentProvider } from '../src/modules/payments/providers/cash/cash-payment.provider';
+import { MockPaymentProvider } from '../src/modules/payments/providers/mock/mock-payment.provider';
+import {
+  sandboxOnlyCodes,
+  seedPaymentProviderPlan,
+} from '../src/modules/payments/payment-provider-selection';
 
 const prisma = new PrismaClient();
 
@@ -187,10 +193,26 @@ async function main(): Promise<void> {
     await prisma.paymentMethod.upsert({ where: { code: m.code }, create: m, update: m });
   }
 
+  // FEAT-002: sandbox-only providers (read from their own capabilities, the
+  // same source the API registry uses) are never activated in production.
+  const providerPlan = seedPaymentProviderPlan({
+    isProduction: process.env['NODE_ENV'] === 'production',
+    sandboxCodes: sandboxOnlyCodes([new CashPaymentProvider(), new MockPaymentProvider()]),
+  });
   const providers = [
-    { code: 'cash', methodCode: 'cash_on_delivery', displayName: 'Espèces', active: true },
-    // Deterministic mock — permanent, dev/CI only. Enabled here for non-prod.
-    { code: 'mock', methodCode: 'mobile_money', displayName: 'Mock Payment (dev)', active: true },
+    {
+      code: 'cash',
+      methodCode: 'cash_on_delivery',
+      displayName: 'Espèces',
+      active: providerPlan.isActive('cash'),
+    },
+    // Deterministic mock — permanent, dev/CI only; inactive in production.
+    {
+      code: 'mock',
+      methodCode: 'mobile_money',
+      displayName: 'Mock Payment (dev)',
+      active: providerPlan.isActive('mock'),
+    },
     // Prepared but INACTIVE until API/contract access is verified (decision A1).
     {
       code: 'airtel_money',
@@ -213,8 +235,8 @@ async function main(): Promise<void> {
     });
   }
 
-  // Availability for the launch market: cash + mock only.
-  for (const providerCode of ['cash', 'mock']) {
+  // Availability for the launch market: cash (+ mock outside production).
+  for (const providerCode of providerPlan.availabilityCodes) {
     const existing = await prisma.paymentProviderConfig.findFirst({
       where: { providerCode, countryId: country.id, cityId: city.id },
     });
@@ -229,6 +251,15 @@ async function main(): Promise<void> {
         },
       });
     }
+  }
+
+  // Re-seeding production over a dev-seeded base: switch off what the dev
+  // seed enabled for sandbox providers (SPEC-002-02 R3, FEAT-002).
+  if (providerPlan.configsToDisable.length > 0) {
+    await prisma.paymentProviderConfig.updateMany({
+      where: { providerCode: { in: [...providerPlan.configsToDisable] } },
+      data: { enabled: false },
+    });
   }
 
   // --- commission (country-level 20%) --------------------------------------
@@ -289,8 +320,15 @@ async function main(): Promise<void> {
   for (const key of ['mock_payment_provider', 'pwa_install_prompt']) {
     await prisma.featureFlag.upsert({
       where: { key },
-      create: { key, enabled: key === 'mock_payment_provider' },
-      update: {},
+      create: {
+        key,
+        enabled: key === 'mock_payment_provider' && providerPlan.mockPaymentFlagEnabled,
+      },
+      // Re-seeding production turns the mock flag off; elsewhere manual toggles are kept.
+      update:
+        key === 'mock_payment_provider' && !providerPlan.mockPaymentFlagEnabled
+          ? { enabled: false }
+          : {},
     });
   }
 
@@ -859,7 +897,10 @@ async function main(): Promise<void> {
 
   console.log(
     `Seed OK — market ${country.isoCode}/${city.slug}, ${currencies.length} currencies, ` +
-      `${providers.length} payment providers (cash+mock active), ${accounts.length} ledger accounts, ` +
+      `${providers.length} payment providers (active: ${providers
+        .filter((p) => p.active)
+        .map((p) => p.code)
+        .join('+')}), ${accounts.length} ledger accounts, ` +
       `${roles.length} roles, ${permissions.length} permissions. ` +
       `Identity fixtures: customer ${customerId}, courier ${courierId}, restaurant_owner ${restaurantOwnerId}, ` +
       `restaurant_staff ${restaurantStaffId}, support ${supportId}, finance ${financeId}, admin ${adminId}, ` +

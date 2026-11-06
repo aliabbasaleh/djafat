@@ -511,11 +511,11 @@ export function fakeOrderAmountPort(): OrderAmountPort {
 export function buildPaymentsService(
   db: PrismaService,
   ledgerGroups: LedgerGroupRow[],
-): { payments: PaymentsService } {
-  const registry = new PaymentProviderRegistry([
+  registry: PaymentProviderRegistry = new PaymentProviderRegistry([
     new CashPaymentProvider(),
     new MockPaymentProvider(),
-  ]);
+  ]),
+): { payments: PaymentsService } {
   const idempotency = new IdempotencyService(new PrismaIdempotencyStore(db));
   const events = { emit: vi.fn(), emitAsync: vi.fn() } as unknown as EventEmitter2;
   const payments = new PaymentsService(

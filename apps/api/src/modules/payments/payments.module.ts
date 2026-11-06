@@ -10,6 +10,8 @@ import { SettlementsController } from './settlements.controller';
 import { SettlementsService } from './settlements.service';
 import { CashPaymentProvider } from './providers/cash/cash-payment.provider';
 import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
+import { selectRegistrableProviders } from './payment-provider-selection';
+import { AppConfigService } from '../../common/config/config.service';
 
 /**
  * At Bloc 0 only `cash` and `mock` providers are registered. Real Mobile Money
@@ -30,9 +32,18 @@ import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
     { provide: PAYMENT_PROVIDER, useExisting: MockPaymentProvider },
     {
       provide: PaymentProviderRegistry,
-      useFactory: (cash: CashPaymentProvider, mock: MockPaymentProvider) =>
-        new PaymentProviderRegistry([cash, mock]),
-      inject: [CashPaymentProvider, MockPaymentProvider],
+      // FEAT-002: in production, sandbox-only providers (mock) are never
+      // registered, so creation, webhooks and the payment-methods list all
+      // refuse them through `registry.has()` — whatever the database says.
+      useFactory: (
+        config: AppConfigService,
+        cash: CashPaymentProvider,
+        mock: MockPaymentProvider,
+      ) =>
+        new PaymentProviderRegistry(
+          selectRegistrableProviders([cash, mock], { isProduction: config.isProduction }),
+        ),
+      inject: [AppConfigService, CashPaymentProvider, MockPaymentProvider],
     },
     PaymentsService,
     SettlementsService,

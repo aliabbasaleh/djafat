@@ -19,6 +19,12 @@ export interface ProviderCapabilities {
   /** `true` = confirmation arrives via webhook/poll; `false` = synchronous (cash, mock). */
   readonly async: boolean;
   readonly currencies: readonly string[];
+  /**
+   * `true` = a test/demo provider that must never be reachable in production
+   * (FEAT-002). The API does not register it when NODE_ENV=production and the
+   * seed does not activate it there. Absent = `false`.
+   */
+  readonly sandboxOnly?: boolean;
   readonly minAmount?: Money;
   readonly maxAmount?: Money;
 }
