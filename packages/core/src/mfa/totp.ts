@@ -80,7 +80,7 @@ export async function totpCodeAt(secretBase32: string, atMs: number): Promise<st
 export async function verifyTotp(
   secretBase32: string,
   code: string,
-
+  // eslint-disable-next-line no-restricted-syntax -- documented default clock (see header); every caller can inject atMs and the RFC 6238 tests do.
   atMs: number = Date.now(),
   window: number = DEFAULT_WINDOW,
 ): Promise<{ valid: boolean; stepOffset: number | null }> {

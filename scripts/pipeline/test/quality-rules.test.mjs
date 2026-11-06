@@ -177,3 +177,17 @@ describe('React overlay', () => {
     assert.equal(await lint(react, code, 'apps/web/src/lib/auth-storage.ts'), '');
   });
 });
+
+describe('root lint-staged config agrees with the package configs', () => {
+  // Regression: the root config (used by lint-staged `eslint --fix` at commit
+  // time) lacked the domain-purity overlay, judged the justified disable in
+  // totp.ts "unused" and DELETED it, breaking `@djafat/core` lint after commit.
+  it('keeps the justified domain-purity directive in packages/core (no unused-directive fix)', async () => {
+    const eslint = new ESLint({ cwd: REPO, fix: false });
+    const [result] = await eslint.lintFiles([join(REPO, 'packages/core/src/mfa/totp.ts')]);
+    assert.deepEqual(
+      result.messages.map((m) => `${m.line}: ${m.ruleId ?? 'directive'}: ${m.message}`),
+      [],
+    );
+  });
+});
