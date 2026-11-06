@@ -309,6 +309,9 @@ if (typeof args.report === 'string') {
   const out = resolve(root, args.report);
   mkdirSync(resolve(out, '..'), { recursive: true });
   writeFileSync(out, md);
+  // The report is a versioned artifact: write it already formatted, so the
+  // repository's own format check never fails on generated output.
+  run('pnpm', ['exec', 'prettier', '--write', '--log-level', 'warn', out], { timeoutMs: 60_000 });
   console.log(`report written to ${args.report}`);
 }
 

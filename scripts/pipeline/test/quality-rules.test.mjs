@@ -45,6 +45,18 @@ describe('check-hygiene', () => {
     assert.deepEqual(checkHygiene({ root: t.root }).report.errors, []);
   });
 
+  it('treats only comments that START with a directive as directives (like ESLint/tsc)', () => {
+    // Regression: prose in eslint.config.mjs mentioning `eslint-disable …`
+    // mid-sentence was reported as an unjustified directive.
+    const t = tree({
+      'src/a.ts':
+        '// without it, --fix sees the `eslint-disable … rule` as unused (prose)\n/* see @ts-ignore in the docs */\nexport const x = 1;\n',
+    });
+    assert.deepEqual(checkHygiene({ root: t.root }).report.errors, []);
+    t.write('src/b.ts', '/*   eslint-disable no-console */\n');
+    assert.match(messages(checkHygiene({ root: t.root }).report), /unjustified-disable/);
+  });
+
   it('never lets a focused test into the baseline, and exits non-zero', () => {
     const t = tree({ 'a.spec.ts': "it.only('x', () => {});\n" });
     const baseline = join(t.root, 'b.json');

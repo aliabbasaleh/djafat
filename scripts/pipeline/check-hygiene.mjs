@@ -53,13 +53,14 @@ const RULES = [
   },
 ];
 
-function isInComment(line, re) {
-  const at = line.search(re);
-  const comment = Math.min(
-    ...['//', '/*'].map((t) => line.indexOf(t)).filter((i) => i >= 0),
-    Infinity,
-  );
-  return at >= 0 && (comment <= at || /^\s*\*/.test(line));
+/**
+ * A directive only counts when the COMMENT STARTS with it — exactly how
+ * ESLint and tsc read them. Prose that merely mentions `eslint-disable`
+ * inside a sentence, or a pattern quoted in a string, is not a directive.
+ */
+function isDirective(line, re) {
+  const source = re.source.replace(/^\\b|\\b$/g, '');
+  return new RegExp(`(?:\\/\\/|\\/\\*+|^\\s*\\*)\\s*(?:${source})`).test(line);
 }
 
 export function findingKey(f) {
@@ -82,7 +83,7 @@ export function checkHygiene({ root, baselinePath }) {
         if (rule.approved && (rule.approved.test(line) || rule.approved.test(lines[i - 1] ?? '')))
           continue;
         // Directives only count inside a comment (not a quoted pattern).
-        if (!rule.test && !isInComment(line, rule.re)) continue;
+        if (!rule.test && !isDirective(line, rule.re)) continue;
         findings.push({
           rule: rule.id,
           file,
