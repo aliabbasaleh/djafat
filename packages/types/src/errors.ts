@@ -20,6 +20,8 @@ export const API_ERROR_CODES = [
   'RATE_LIMITED',
   'OTP_INVALID',
   'OTP_LOCKED',
+  /** The SMS gateway could not deliver the login code (503, retryable) — FEAT-006. */
+  'OTP_DELIVERY_FAILED',
   'MFA_INVALID',
   'MFA_REQUIRED',
   'ACCOUNT_INACTIVE',

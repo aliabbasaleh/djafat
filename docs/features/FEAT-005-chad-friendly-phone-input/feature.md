@@ -38,7 +38,7 @@ quel.
   (toutes les apps passent par là).
 - Hors périmètre : textes et masques de saisie des écrans (changement d'interface) ;
   numéros de téléphone des adresses et des restaurants ; validation par préfixe
-  d'opérateur (Airtel, Moov).
+  d'opérateur (Airtel, Tigo).
 
 ## Critères d'acceptation
 

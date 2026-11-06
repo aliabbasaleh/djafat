@@ -35,3 +35,11 @@ Axes couverts :
 
 **Prêt pour PR**, sans constat bloquant. Un constat majeur reste suivi : la preuve
 de bout en bout, à faire avec la réparation de la suite d'intégration.
+
+## Mise à jour du 2026-11-06 : preuve de bout en bout obtenue
+
+Constat #5 levé **manuellement** : lors de la démonstration de FEAT-006
+(`docs/features/FEAT-006-real-sms-otp-delivery/e2e-demo.md`), sur l'API réelle,
+`POST /auth/logout` → 204, puis `POST /auth/refresh` avec l'ancien jeton → **401**,
+pour deux comptes. La révocation côté serveur est donc prouvée. Un test automatisé
+reste à ajouter avec la réparation de la suite d'intégration.

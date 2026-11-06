@@ -73,8 +73,18 @@ const OtpSchema = z.object({
         .map((s) => s.trim())
         .filter(Boolean),
     ),
-  SMS_PROVIDER: nonEmpty.default('mock'),
+  /** `mock` (dev/CI: code readable in Redis) | `http` (real gateway) — FEAT-006. */
+  SMS_PROVIDER: z.enum(['mock', 'http']).default('mock'),
   SMS_MOCK_URL: url.optional(),
+  /** HTTP SMS gateway: `POST { to, from, body }` (aggregator, operator, Kannel, Android gateway). */
+  SMS_HTTP_URL: url.optional(),
+  /** Bearer key of the gateway — secret, from the environment only. */
+  SMS_HTTP_API_KEY: z.string().optional(),
+  /** Alphanumeric sender id shown on the handset (1–11 chars). */
+  SMS_SENDER_ID: z
+    .string()
+    .regex(/^[A-Za-z0-9]{1,11}$/, 'SMS_SENDER_ID must be 1-11 letters or digits')
+    .default('DJAFAT'),
   /** HMAC pepper for hashing OTP codes at rest (docs/19 §7) — never the same as JWT_ACCESS_SECRET. */
   OTP_HASH_SECRET: nonEmpty,
 });
@@ -157,7 +167,28 @@ export function loadEnv<T extends z.ZodTypeAny>(
   return parsed.data as z.infer<T>;
 }
 
-export const loadApiEnv = (src?: Record<string, string | undefined>): ApiEnv =>
-  loadEnv(ApiEnvSchema, src);
+/**
+ * Cross-field rules a per-field schema cannot express (FEAT-006). Returned as
+ * issues so they surface exactly like any other invalid variable at boot.
+ */
+export function apiEnvConsistencyIssues(env: ApiEnv): string[] {
+  const issues: string[] = [];
+  if (env.NODE_ENV === 'production' && env.SMS_PROVIDER === 'mock') {
+    issues.push(
+      'SMS_PROVIDER: "mock" is not allowed in production — no SMS would be sent and nobody could log in. Configure SMS_PROVIDER=http and SMS_HTTP_URL.',
+    );
+  }
+  if (env.SMS_PROVIDER === 'http' && !env.SMS_HTTP_URL) {
+    issues.push('SMS_HTTP_URL: required when SMS_PROVIDER=http');
+  }
+  return issues;
+}
+
+export const loadApiEnv = (src?: Record<string, string | undefined>): ApiEnv => {
+  const env = loadEnv(ApiEnvSchema, src);
+  const issues = apiEnvConsistencyIssues(env);
+  if (issues.length > 0) throw new ConfigValidationError(issues);
+  return env;
+};
 export const loadWorkerEnv = (src?: Record<string, string | undefined>): WorkerEnv =>
   loadEnv(WorkerEnvSchema, src);

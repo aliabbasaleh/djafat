@@ -92,3 +92,48 @@ describe('constants', () => {
     expect(PLATFORM_SETTINGS_DEFAULTS.cart_max_item_quantity).toBe(99);
   });
 });
+
+// FEAT-006 — docs/features/FEAT-006-real-sms-otp-delivery (SPEC-006-02).
+describe('SPEC-006-02 — SMS provider configuration', () => {
+  // SPEC-006-02-SC01
+  it('SPEC-006-02-SC01 — production with SMS_PROVIDER=mock refuses to start', () => {
+    expect(() =>
+      loadApiEnv({ ...baseEnv, NODE_ENV: 'production', SMS_PROVIDER: 'mock' }),
+    ).toThrowError(/SMS_PROVIDER.*mock.*production/s);
+    expect(() => loadApiEnv({ ...baseEnv, NODE_ENV: 'production' })).toThrowError(
+      ConfigValidationError,
+    );
+  });
+
+  // SPEC-006-02-SC02
+  it('SPEC-006-02-SC02 — SMS_PROVIDER=http without SMS_HTTP_URL is refused in any environment', () => {
+    for (const NODE_ENV of ['production', 'test']) {
+      expect(() => loadApiEnv({ ...baseEnv, NODE_ENV, SMS_PROVIDER: 'http' })).toThrowError(
+        /SMS_HTTP_URL/,
+      );
+    }
+  });
+
+  // SPEC-006-02-SC03
+  it('SPEC-006-02-SC03 — production with an http gateway is accepted, sender defaults to DJAFAT', () => {
+    const env = loadApiEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      SMS_PROVIDER: 'http',
+      SMS_HTTP_URL: 'https://sms.example.test/send',
+    });
+    expect(env.SMS_PROVIDER).toBe('http');
+    expect(env.SMS_SENDER_ID).toBe('DJAFAT');
+  });
+
+  // SPEC-006-02-SC04
+  it('SPEC-006-02-SC04 — mock by default outside production; unknown provider and bad sender id refused', () => {
+    expect(loadApiEnv(baseEnv).SMS_PROVIDER).toBe('mock');
+    expect(() => loadApiEnv({ ...baseEnv, SMS_PROVIDER: 'twilio' })).toThrowError(
+      ConfigValidationError,
+    );
+    expect(() => loadApiEnv({ ...baseEnv, SMS_SENDER_ID: 'DJAFAT-LIVRAISON' })).toThrowError(
+      /SMS_SENDER_ID/,
+    );
+  });
+});

@@ -15,6 +15,9 @@ import { OwnershipGuard } from './guards/ownership.guard';
 import { StepUpGuard } from './guards/step-up.guard';
 import { OTP_DELIVERY_PORT } from './otp-delivery.token';
 import { MockOtpDeliveryProvider } from './providers/mock-otp-delivery.provider';
+import { HttpSmsOtpDeliveryProvider } from './providers/http-sms-otp-delivery.provider';
+import { AppConfigService } from '../../common/config/config.service';
+import { RedisService } from '../../common/redis/redis.service';
 
 /**
  * Identity & Access (Bloc 1, docs/19). Depends only on `users` (docs/19 §43
@@ -39,10 +42,18 @@ import { MockOtpDeliveryProvider } from './providers/mock-otp-delivery.provider'
     PermissionsGuard,
     OwnershipGuard,
     StepUpGuard,
-    // Only `mock` is wired at Bloc 1 (docs/19 §6) — a real `sms` provider is
-    // added the same way `MockPaymentProvider`/`CashPaymentProvider` were:
-    // a second class behind the same port, selected by `SMS_PROVIDER` env.
-    { provide: OTP_DELIVERY_PORT, useClass: MockOtpDeliveryProvider },
+    // FEAT-006: the OTP transport is chosen by `SMS_PROVIDER`. `loadApiEnv`
+    // already refuses `mock` in production and `http` without a URL, so this
+    // map can never wire a provider that silently sends nothing in prod.
+    {
+      provide: OTP_DELIVERY_PORT,
+      useFactory: (config: AppConfigService, redis: RedisService) =>
+        ({
+          mock: () => new MockOtpDeliveryProvider(redis, config),
+          http: () => new HttpSmsOtpDeliveryProvider(config),
+        })[config.get('SMS_PROVIDER')](),
+      inject: [AppConfigService, RedisService],
+    },
   ],
   exports: [ActorResolverService, SessionService, TokenService],
 })

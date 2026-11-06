@@ -45,7 +45,7 @@ attente, continuer l'authentification ») :
 - **Utilisable en production** : `cash` (paiement à la livraison). `mock` est verrouillé (FEAT-002).
 - **En attente de décisions** : recharge par cartes à gratter (FEAT-003, 8 questions
   produit et une validation juridique CEMAC).
-- **En attente d'accès externe** : Airtel Money / Moov Money (contrat et clés d'API),
+- **En attente d'accès externe** : Airtel Money / Tigo Cash (contrat et clés d'API ; le seed historique nomme encore `moov_money`, à confirmer),
   virement bancaire (API ou relevés de la banque), « Konoom mobile » (à identifier).
 - **Dette connue** : confirmation asynchrone des remboursements (D-17), rapprochement
   automatique des relevés PSP (D-18), expiration d'une commande `placed` non confirmée.
