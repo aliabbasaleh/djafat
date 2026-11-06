@@ -11,6 +11,12 @@ jobs:
   gitleaks:
     name: gitleaks (secret scanning)
     runs-on: ubuntu-latest
+    # Least privilege for the per-run token: read the code, and list the
+    # commits of a pull request (GET /pulls/{n}/commits) — the repository's
+    # default token permissions do not include pull-requests (403 otherwise).
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
