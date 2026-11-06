@@ -22,3 +22,5 @@ export * from './catalog/restaurant-availability.js';
 export * from './catalog/product-option-validator.js';
 
 export * from './cart/cart-pricing.js';
+
+export * from './phone/normalize-phone.js';

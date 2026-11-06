@@ -11,6 +11,8 @@ export const LAUNCH_MARKET = {
   defaultLocale: 'fr',
   timezone: 'Africa/Ndjamena',
   dialCode: '+235',
+  /** Digits of a national number ("66 12 34 56"), used to normalise phone input — FEAT-005. */
+  nationalNumberLength: 8,
   citySlug: 'ndjamena',
   cityName: "N'Djamena",
 } as const;
