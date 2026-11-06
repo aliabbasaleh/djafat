@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui-client';
 import { api } from '@/lib/api';
-import { isAuthenticated, clearSession, getStoredUser } from '@/lib/auth-storage';
+import { isAuthenticated, getStoredUser } from '@/lib/auth-storage';
+import { signOut } from '@/lib/session';
 import styles from './CartIndicator.module.css';
 
 /**
@@ -58,7 +59,7 @@ export function CartIndicator() {
       <Button href="/panier" variant="secondary" size="sm">
         {count > 0 ? `Panier (${count})` : 'Panier'}
       </Button>
-      <Button variant="ghost" size="sm" onClick={() => clearSession()}>
+      <Button variant="ghost" size="sm" onClick={() => void signOut()}>
         {user?.fullName ? `Déconnexion — ${user.fullName}` : 'Déconnexion'}
       </Button>
     </div>

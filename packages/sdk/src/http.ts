@@ -38,6 +38,11 @@ export interface RequestOptions {
   readonly body?: unknown;
   readonly idempotencyKey?: string;
   readonly signal?: AbortSignal;
+  /**
+   * Bearer token for THIS request only, instead of `getAccessToken()` — e.g.
+   * revoking a session with the access token a refresh just returned (FEAT-004).
+   */
+  readonly accessToken?: string;
 }
 
 export class ApiHttp {
@@ -77,7 +82,7 @@ export class ApiHttp {
     const url = this.buildUrl(path, options.query);
     const headers = new Headers({ accept: 'application/json', ...this.opts.defaultHeaders });
 
-    const token = (await this.opts.getAccessToken?.()) ?? null;
+    const token = options.accessToken ?? (await this.opts.getAccessToken?.()) ?? null;
     if (token) headers.set('authorization', `Bearer ${token}`);
     if (options.idempotencyKey) headers.set('idempotency-key', options.idempotencyKey);
 

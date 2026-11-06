@@ -32,6 +32,16 @@ export function getAccessToken(): string | null {
   }
 }
 
+/** The stored refresh token, used by `lib/session.ts` to revoke the session (FEAT-004). */
+export function getRefreshToken(): string | null {
+  if (!isBrowser()) return null;
+  try {
+    return window.localStorage.getItem(REFRESH_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export function getStoredUser(): StoredAdminUser | null {
   if (!isBrowser()) return null;
   try {

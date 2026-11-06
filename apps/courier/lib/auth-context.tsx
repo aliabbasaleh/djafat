@@ -8,7 +8,7 @@ import {
   type StoredCourierUser,
   type StoredSession,
 } from './auth-storage';
-import { setApiAccessToken } from './api';
+import { api, setApiAccessToken } from './api';
 
 export type AuthState = 'loading' | 'signed-out' | 'signed-in';
 
@@ -61,8 +61,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState('signed-in');
   }, []);
 
+  // FEAT-004: revoke the session on the server (refreshing once if the access
+  // token expired), then always wipe SecureStore — never throws.
   const signOut = useCallback(async () => {
-    await clearSession();
+    const stored = await loadSession();
+    await api.auth.signOut({ refresh: stored?.refresh ?? null, clearLocal: clearSession });
     setUser(null);
     setAccessToken(null);
     setApiAccessToken(null);

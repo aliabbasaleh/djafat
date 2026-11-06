@@ -1,4 +1,5 @@
 import { ApiHttp, type ApiClientOptions } from './http.js';
+import { createAuthClient } from './auth.js';
 import { createCatalogClient } from './catalog.js';
 import { createCartClient } from './cart.js';
 import { createOrdersClient } from './orders.js';
@@ -8,6 +9,7 @@ import { createRestaurantClient } from './restaurant.js';
 import { createCourierClient } from './courier.js';
 
 export * from './http.js';
+export * from './auth.js';
 export * from './catalog.js';
 export * from './cart.js';
 export * from './orders.js';
@@ -58,6 +60,7 @@ export function createApiClient(options: ApiClientOptions) {
     admin: createAdminClient(http),
     restaurant: createRestaurantClient(http),
     courier: createCourierClient(http),
+    auth: createAuthClient(http),
   };
 }
 

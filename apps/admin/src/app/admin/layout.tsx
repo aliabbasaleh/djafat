@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Header, Container, cx } from '@djafat/ui';
 import { Button } from '@/components/ui-client';
-import { getStoredUser, hasAdminAccess, clearSession } from '@/lib/auth-storage';
+import { getStoredUser, hasAdminAccess } from '@/lib/auth-storage';
+import { signOut } from '@/lib/session';
 import styles from './layout.module.css';
 
 const NAV_ITEMS = [
@@ -38,8 +39,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [router, pathname]);
 
   function logout() {
-    clearSession();
-    router.push('/login');
+    // FEAT-004: revoke server-side, then clear locally, then leave.
+    void signOut().then(() => router.push('/login'));
   }
 
   if (!checked) return null; // avoids a flash of protected chrome before the redirect fires
