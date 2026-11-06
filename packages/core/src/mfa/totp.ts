@@ -80,6 +80,7 @@ export async function totpCodeAt(secretBase32: string, atMs: number): Promise<st
 export async function verifyTotp(
   secretBase32: string,
   code: string,
+
   atMs: number = Date.now(),
   window: number = DEFAULT_WINDOW,
 ): Promise<{ valid: boolean; stepOffset: number | null }> {

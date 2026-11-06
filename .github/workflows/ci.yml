@@ -43,6 +43,21 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # Feature pipeline checks (docs/pipeline/README.md §5): graph-wide
+      # architecture, spec/test traceability, test/suppression hygiene, and the
+      # tests of that tooling. Same install/cache as above, no extra job.
+      - name: Spec & traceability check
+        run: pnpm check:specs
+
+      - name: Test & suppression hygiene
+        run: pnpm check:hygiene
+
+      - name: Architecture check
+        run: pnpm check:arch
+
+      - name: Pipeline tooling tests
+        run: pnpm check:pipeline
+
       - name: Unit tests
         run: pnpm test
 

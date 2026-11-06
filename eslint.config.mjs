@@ -1,4 +1,5 @@
 import base from './packages/eslint-config/base.js';
+import react from './packages/eslint-config/react.js';
 
 /**
  * Root-level flat config — exists ONLY so `lint-staged` (invoked by the
@@ -13,6 +14,9 @@ import base from './packages/eslint-config/base.js';
  */
 export default [
   ...base,
+  // Same React overlay as the Next/Expo/ui package configs, so a staged
+  // file is judged by the rules its own package applies.
+  ...react,
   // `**/scripts/**`: small standalone Node build utilities (e.g.
   // packages/ui/scripts/copy-assets.mjs) that no package tsconfig
   // `include`s — same reasoning as each package's own ignore for this.

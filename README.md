@@ -42,12 +42,17 @@ pnpm dev                             # api + worker + web (mobile : `pnpm --filt
 ## Contrôles
 
 ```bash
+pnpm verify:fast   # pendant le travail : périmètre modifié + contrôles graphe complet
+pnpm verify        # vérification complète, classée (nouveau / préexistant / indisponible)
 pnpm typecheck
 pnpm lint
 pnpm format:check
 pnpm test
 pnpm build
 ```
+
+Pipeline de développement agentique (Claude Code : features → specs → tests →
+revue → PR) et politique d'architecture : [`docs/pipeline/`](docs/pipeline/README.md).
 
 ## Règles non négociables (voir `docs/15` / `docs/16`)
 
