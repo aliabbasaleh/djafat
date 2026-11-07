@@ -1,9 +1,11 @@
-import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 import type { AuthenticatedActor } from '@djafat/types';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
+import { AppConfigService } from '../../common/config/config.service';
 import { AuthService, type RequestMeta } from './auth.service';
+import { listAuthMethods } from './auth-methods';
 import { CurrentActor } from './current-actor.decorator';
 import { RequireAuth, RequireRole, RequireStepUp } from './decorators';
 import {
@@ -11,6 +13,8 @@ import {
   OtpVerifySchema,
   type OtpRequestInput,
   type OtpVerifyInput,
+  WhatsappVerifySchema,
+  type WhatsappVerifyInput,
 } from './dto/otp-request.schema';
 import { RefreshSchema, type RefreshInput } from './dto/refresh.schema';
 import {
@@ -29,7 +33,37 @@ function requestMeta(req: FastifyRequest): RequestMeta {
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly config: AppConfigService,
+  ) {}
+
+  /** Login methods available on this deployment (FEAT-008, SPEC-008-01). */
+  @Get('methods')
+  methods() {
+    return {
+      methods: listAuthMethods({
+        NODE_ENV: this.config.get('NODE_ENV'),
+        SMS_PROVIDER: this.config.get('SMS_PROVIDER'),
+        EMAIL_PROVIDER: this.config.get('EMAIL_PROVIDER'),
+        WHATSAPP_PROVIDER: this.config.get('WHATSAPP_PROVIDER'),
+        WHATSAPP_BUSINESS_NUMBER: this.config.get('WHATSAPP_BUSINESS_NUMBER'),
+      }),
+    };
+  }
+
+  /** WhatsApp login: the code DJAFAT replied in the customer's chat (FEAT-008, SPEC-008-03). */
+  @Post('whatsapp/verify')
+  @HttpCode(200)
+  verifyWhatsapp(
+    @Body(new ZodValidationPipe(WhatsappVerifySchema)) body: WhatsappVerifyInput,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.auth.verifyWhatsappAndLogin(body.phone, body.code, {
+      ...requestMeta(req),
+      countryId: null,
+    });
+  }
 
   @Post('otp/request')
   @HttpCode(202)

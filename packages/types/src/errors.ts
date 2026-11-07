@@ -24,6 +24,10 @@ export const API_ERROR_CODES = [
   'OTP_DELIVERY_FAILED',
   /** Email login/verification is not configured on this deployment (503) — FEAT-007. */
   'EMAIL_UNAVAILABLE',
+  /** SMS login is switched off on this deployment (503) — FEAT-008. */
+  'SMS_UNAVAILABLE',
+  /** WhatsApp login is not configured on this deployment (503) — FEAT-008. */
+  'WHATSAPP_UNAVAILABLE',
   /** The email is already verified on another account (409) — FEAT-007. */
   'EMAIL_ALREADY_USED',
   'MFA_INVALID',

@@ -242,8 +242,9 @@ model MfaTotpSecret {
   @@map("mfa_totp_secrets")
 }
 
-/// FEAT-007 (migration 0030): `target` is an E.164 phone (channel sms) or a
-/// lower-cased email (channel email) — one store, one security logic.
+/// FEAT-007/FEAT-008 (migrations 0030, 0031): `target` is an E.164 phone
+/// (channel sms or whatsapp) or a lower-cased email (channel email) — one
+/// store, one security logic.
 model OtpCode {
   id         String    @id @default(uuid()) @db.Uuid
   target     String

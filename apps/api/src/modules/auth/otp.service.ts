@@ -14,19 +14,30 @@ import { AuditService } from '../../common/audit/audit.service';
 import { RateLimiterService } from '../../common/rate-limit/rate-limiter.service';
 import { PlatformService } from '../platform/platform.service';
 import { generateOtpCode, hashOtpCode, timingSafeEqualHex } from './crypto.util';
-import { OTP_DELIVERY_PORT, OTP_EMAIL_DELIVERY_PORT } from './otp-delivery.token';
+import { smsUnavailable } from './providers/disabled-sms-otp-delivery.provider';
+import {
+  OTP_DELIVERY_PORT,
+  OTP_EMAIL_DELIVERY_PORT,
+  OTP_WHATSAPP_DELIVERY_PORT,
+} from './otp-delivery.token';
 
 export type OtpPurpose = 'login' | 'register' | 'change_phone' | 'verify_email';
 
 /**
- * Where a code goes (FEAT-007). `target` is an E.164 phone for `sms` and a
- * lower-cased email for `email`. One store, one lock table, one security
- * logic for both channels (migration 0030).
+ * Where a code goes (FEAT-007, FEAT-008). `target` is an E.164 phone for
+ * `sms` and `whatsapp`, and a lower-cased email for `email`. One store, one
+ * lock table, one security logic for every channel (migrations 0030, 0031).
+ * A phone's SMS and WhatsApp codes share its lock and request budget, but a
+ * code only verifies on the channel it was sent on.
  */
 export interface OtpTarget {
-  readonly channel: 'sms' | 'email';
+  readonly channel: 'sms' | 'email' | 'whatsapp';
   readonly target: string;
 }
+
+/** Audit entity / rate-limit family: a phone, whatever the channel, or an email. */
+const targetKind = (to: OtpTarget): 'phone' | 'email' =>
+  to.channel === 'email' ? 'email' : 'phone';
 
 interface OtpCodeRow {
   id: string;
@@ -53,6 +64,7 @@ export class OtpService {
     private readonly config: AppConfigService,
     @Inject(OTP_DELIVERY_PORT) private readonly delivery: OtpDeliveryPort,
     @Inject(OTP_EMAIL_DELIVERY_PORT) private readonly emailDelivery: OtpDeliveryPort,
+    @Inject(OTP_WHATSAPP_DELIVERY_PORT) private readonly whatsappDelivery: OtpDeliveryPort,
   ) {}
 
   /** SMS code to a phone (unchanged contract). */
@@ -66,6 +78,12 @@ export class OtpService {
   }
 
   async requestCode(to: OtpTarget, purpose: OtpPurpose, ip: string | null): Promise<void> {
+    // FEAT-008 (SPEC-008-01-SC05): a switched-off SMS channel is refused BEFORE any
+    // budget or write — otherwise SMS requests for someone's number would burn the
+    // per-number budget their WhatsApp codes share.
+    if (to.channel === 'sms' && this.config.get('SMS_PROVIDER') === 'disabled') {
+      throw smsUnavailable();
+    }
     if (ip) {
       const ipLimit = await this.platform.getOtpRateLimitPerIp();
       const r = await this.rateLimiter.consume(
@@ -86,7 +104,7 @@ export class OtpService {
     // Same per-target budget for both channels (setting historically named "per phone").
     const phoneLimit = await this.platform.getOtpRateLimitPerPhone();
     const pr = await this.rateLimiter.consume(
-      `otp:${to.channel === 'sms' ? 'phone' : 'email'}:${to.target}`,
+      `otp:${targetKind(to)}:${to.target}`,
       phoneLimit.limit,
       phoneLimit.windowSeconds,
     );
@@ -95,7 +113,7 @@ export class OtpService {
         {
           code: 'RATE_LIMITED',
           message:
-            to.channel === 'sms'
+            targetKind(to) === 'phone'
               ? 'Too many codes requested for this number. Try again later.'
               : 'Too many codes requested for this address. Try again later.',
         },
@@ -113,12 +131,16 @@ export class OtpService {
     await this.prisma.otpCode.create({
       data: { target: to.target, channel: to.channel, codeHash, purpose, expiresAt },
     });
-    const transport = to.channel === 'sms' ? this.delivery : this.emailDelivery;
+    const transport = {
+      sms: this.delivery,
+      email: this.emailDelivery,
+      whatsapp: this.whatsappDelivery,
+    }[to.channel];
     await transport.send({ to: to.target, code, ttlSeconds, locale: 'fr' });
 
     await this.audit.log({
       action: 'AUTH_OTP_REQUESTED',
-      entityType: to.channel === 'sms' ? 'phone' : 'email',
+      entityType: targetKind(to),
       ip,
       metadata: { purpose }, // phone is the actor here but has no user id yet — kept out of metadata too (not a secret, but unnecessary to duplicate; entityId is reserved for uuids)
     });
@@ -168,7 +190,7 @@ export class OtpService {
       await this.registerFailedAttempt(to.target);
       await this.audit.log({
         action: 'AUTH_OTP_FAILED',
-        entityType: to.channel === 'sms' ? 'phone' : 'email',
+        entityType: targetKind(to),
         ip,
         metadata: { purpose },
       });
@@ -178,7 +200,7 @@ export class OtpService {
     await this.clearLock(to.target);
     await this.audit.log({
       action: 'AUTH_OTP_VERIFIED',
-      entityType: to.channel === 'sms' ? 'phone' : 'email',
+      entityType: targetKind(to),
       ip,
       metadata: { purpose },
     });

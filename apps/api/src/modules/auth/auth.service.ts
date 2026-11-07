@@ -119,7 +119,26 @@ export class AuthService {
     return this.openSession(owner.id, meta);
   }
 
-  /** Shared by SMS and email login: status gate, session, access token, audit. */
+  // ── WhatsApp: the customer writes, DJAFAT replies with the code (FEAT-008) ──
+
+  /**
+   * WhatsApp login: the code was sent as a reply to the customer's own
+   * message (`WhatsappInboundService`). Proof of possession of the number,
+   * exactly like an SMS code: the account is found or created, the phone is
+   * marked verified, and the session opens through the shared path.
+   */
+  async verifyWhatsappAndLogin(
+    phone: string,
+    code: string,
+    meta: RequestMeta & { countryId: string | null },
+  ): Promise<LoginResultDto> {
+    await this.otp.verifyCode({ channel: 'whatsapp', target: phone }, code, 'login', meta.ip); // throws OTP_INVALID / OTP_LOCKED
+    const { userId } = await this.users.findOrCreateByPhone(phone, meta.countryId);
+    await this.users.markPhoneVerified(userId);
+    return this.openSession(userId, meta);
+  }
+
+  /** Shared by SMS, email and WhatsApp login: status gate, session, access token, audit. */
   private async openSession(userId: string, meta: LoginMeta): Promise<LoginResultDto> {
     const user = await this.users.getByIdOrThrow(userId);
 

@@ -73,8 +73,11 @@ const OtpSchema = z.object({
         .map((s) => s.trim())
         .filter(Boolean),
     ),
-  /** `mock` (dev/CI: code readable in Redis) | `http` (real gateway) — FEAT-006. */
-  SMS_PROVIDER: z.enum(['mock', 'http']).default('mock'),
+  /**
+   * `mock` (dev/CI: code readable in Redis) | `http` (real gateway) — FEAT-006 |
+   * `disabled` (no paid SMS at launch, 503 SMS_UNAVAILABLE) — FEAT-008.
+   */
+  SMS_PROVIDER: z.enum(['mock', 'http', 'disabled']).default('mock'),
   SMS_MOCK_URL: url.optional(),
   /** HTTP SMS gateway: `POST { to, from, body }` (aggregator, operator, Kannel, Android gateway). */
   SMS_HTTP_URL: url.optional(),
@@ -94,6 +97,28 @@ const OtpSchema = z.object({
     .optional(),
   /** Sender, e.g. `DJAFAT <no-reply@djafat.td>`. */
   EMAIL_FROM: z.string().min(3).optional(),
+  /** `mock` (dev/CI, Redis) | `cloud` (Meta WhatsApp Cloud API) — FEAT-008. */
+  WHATSAPP_PROVIDER: z.enum(['mock', 'cloud']).default('mock'),
+  /** Graph API base, version included (Meta changes versions regularly). */
+  WHATSAPP_GRAPH_URL: url.default('https://graph.facebook.com/v21.0'),
+  /** System-user access token — secret, environment only. */
+  WHATSAPP_ACCESS_TOKEN: z.string().min(1).optional(),
+  /** Id of DJAFAT's WhatsApp number in Meta (not the number itself). */
+  WHATSAPP_PHONE_NUMBER_ID: z
+    .string()
+    .regex(/^\d+$/, 'WHATSAPP_PHONE_NUMBER_ID must be digits')
+    .optional(),
+  /** App secret: verifies the webhook signature — secret, environment only. */
+  WHATSAPP_APP_SECRET: z.string().min(1).optional(),
+  /** Token Meta echoes during webhook subscription — secret, environment only. */
+  WHATSAPP_VERIFY_TOKEN: z.string().min(1).optional(),
+  /** DJAFAT's WhatsApp number, E.164 — used to build the wa.me link. */
+  WHATSAPP_BUSINESS_NUMBER: z
+    .string()
+    .regex(/^\+\d{8,15}$/, 'WHATSAPP_BUSINESS_NUMBER must be E.164, e.g. +23560000001')
+    .optional(),
+  /** Global cap on WhatsApp codes per hour (protects the bill beyond the free tier). */
+  WHATSAPP_MAX_CODES_PER_HOUR: intFromString(300),
   /** HMAC pepper for hashing OTP codes at rest (docs/19 §7) — never the same as JWT_ACCESS_SECRET. */
   OTP_HASH_SECRET: nonEmpty,
 });
@@ -186,6 +211,26 @@ export function apiEnvConsistencyIssues(env: ApiEnv): string[] {
     issues.push(
       'SMS_PROVIDER: "mock" is not allowed in production — no SMS would be sent and nobody could log in. Configure SMS_PROVIDER=http and SMS_HTTP_URL.',
     );
+  }
+  if (
+    env.NODE_ENV === 'production' &&
+    env.SMS_PROVIDER === 'disabled' &&
+    env.WHATSAPP_PROVIDER !== 'cloud'
+  ) {
+    issues.push(
+      'SMS_PROVIDER: "disabled" in production needs WHATSAPP_PROVIDER=cloud — otherwise nobody could log in with a phone number.',
+    );
+  }
+  if (env.WHATSAPP_PROVIDER === 'cloud') {
+    for (const key of [
+      'WHATSAPP_ACCESS_TOKEN',
+      'WHATSAPP_PHONE_NUMBER_ID',
+      'WHATSAPP_APP_SECRET',
+      'WHATSAPP_VERIFY_TOKEN',
+      'WHATSAPP_BUSINESS_NUMBER',
+    ] as const) {
+      if (!env[key]) issues.push(`${key}: required when WHATSAPP_PROVIDER=cloud`);
+    }
   }
   if (env.SMS_PROVIDER === 'http' && !env.SMS_HTTP_URL) {
     issues.push('SMS_HTTP_URL: required when SMS_PROVIDER=http');

@@ -164,3 +164,31 @@ describe('SPEC-007-01 — email provider configuration', () => {
     expect(smtp.EMAIL_PROVIDER).toBe('smtp');
   });
 });
+
+describe('SPEC-008-01 — WhatsApp and switchable SMS configuration', () => {
+  const cloud = {
+    WHATSAPP_PROVIDER: 'cloud',
+    WHATSAPP_ACCESS_TOKEN: 'tok',
+    WHATSAPP_PHONE_NUMBER_ID: '100000000000001',
+    WHATSAPP_APP_SECRET: 'app-secret',
+    WHATSAPP_VERIFY_TOKEN: 'verify-me',
+    WHATSAPP_BUSINESS_NUMBER: '+23560000001',
+  };
+
+  // SPEC-008-01-SC04
+  it('SPEC-008-01-SC04 — production: SMS disabled needs WhatsApp Cloud; cloud needs all its variables', () => {
+    const prod = { ...baseEnv, NODE_ENV: 'production', SMS_PROVIDER: 'disabled' };
+    expect(() => loadApiEnv(prod)).toThrowError(/SMS_PROVIDER/);
+    const ok = loadApiEnv({ ...prod, ...cloud });
+    expect(ok.SMS_PROVIDER).toBe('disabled');
+    expect(ok.WHATSAPP_PROVIDER).toBe('cloud');
+    expect(ok.WHATSAPP_MAX_CODES_PER_HOUR).toBe(300);
+    expect(ok.WHATSAPP_GRAPH_URL).toBe('https://graph.facebook.com/v21.0');
+    const { WHATSAPP_ACCESS_TOKEN: _omit, ...noToken } = cloud;
+    expect(() => loadApiEnv({ ...prod, ...noToken })).toThrowError(/WHATSAPP_ACCESS_TOKEN/);
+    // defaults outside production: WhatsApp on the mock, SMS unchanged
+    const dev = loadApiEnv(baseEnv);
+    expect(dev.WHATSAPP_PROVIDER).toBe('mock');
+    expect(dev.SMS_PROVIDER).toBe('mock');
+  });
+});
