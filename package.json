@@ -22,6 +22,7 @@
     "check:arch": "node scripts/pipeline/check-arch.mjs",
     "check:specs": "node scripts/pipeline/check-specs.mjs",
     "check:hygiene": "node scripts/pipeline/check-hygiene.mjs",
+    "check:audit": "node scripts/pipeline/check-audit.mjs",
     "check:pipeline": "node --test \"scripts/pipeline/test/*.test.mjs\"",
     "dev": "turbo run dev --parallel",
     "clean": "turbo run clean && rimraf node_modules",

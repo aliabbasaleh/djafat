@@ -53,15 +53,16 @@ de blocage.
 
 ## 3. Commandes (pnpm, depuis la racine)
 
-| Commande                                                                   | Rôle                                                                                                                                                                              | Nouveau ? |
-| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| `pnpm verify:fast`                                                         | format des fichiers modifiés + specs + hygiène + architecture (graphe complet) + lint/typecheck/test:unit des paquets touchés et de leurs dépendants (`turbo --filter=...[HEAD]`) | oui       |
-| `pnpm verify`                                                              | format complet, specs, hygiène, architecture, tests de l'outillage, prisma generate, typecheck, lint, test, build, `test:int` si Postgres/Redis sont joignables                   | oui       |
-| `pnpm check:arch`                                                          | dependency-cruiser + classement des couches, avec référence                                                                                                                       | oui       |
-| `pnpm check:specs`                                                         | features/specs/IDs/captures/brief/liens vers les tests                                                                                                                            | oui       |
-| `pnpm check:hygiene`                                                       | `.only`, skips non approuvés, suppressions non justifiées                                                                                                                         | oui       |
-| `pnpm check:pipeline`                                                      | tests de l'outillage du pipeline (`node --test`, fixtures isolées)                                                                                                                | oui       |
-| `pnpm format:check` · `lint` · `typecheck` · `test` · `build` · `test:int` | inchangés, réutilisés par `verify`                                                                                                                                                | non       |
+| Commande                                                                   | Rôle                                                                                                                                                                                   | Nouveau ? |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| `pnpm verify:fast`                                                         | format des fichiers modifiés + specs + hygiène + architecture (graphe complet) + lint/typecheck/test:unit des paquets touchés et de leurs dépendants (`turbo --filter=...[HEAD]`)      | oui       |
+| `pnpm verify`                                                              | format complet, specs, hygiène, architecture, tests de l'outillage, audit des dépendances, prisma generate, typecheck, lint, test, build, `test:int` si Postgres/Redis sont joignables | oui       |
+| `pnpm check:arch`                                                          | dependency-cruiser + classement des couches, avec référence                                                                                                                            | oui       |
+| `pnpm check:specs`                                                         | features/specs/IDs/captures/brief/liens vers les tests                                                                                                                                 | oui       |
+| `pnpm check:hygiene`                                                       | `.only`, skips non approuvés, suppressions non justifiées                                                                                                                              | oui       |
+| `pnpm check:audit`                                                         | avis de sécurité des dépendances de production comparés à `baselines/audit.json` ; nouvel avis = échec, audit illisible = unavailable                                                  | oui       |
+| `pnpm check:pipeline`                                                      | tests de l'outillage du pipeline (`node --test`, fixtures isolées)                                                                                                                     | oui       |
+| `pnpm format:check` · `lint` · `typecheck` · `test` · `build` · `test:int` | inchangés, réutilisés par `verify`                                                                                                                                                     | non       |
 
 `verify` se contente d'orchestrer ces commandes et classe chaque résultat :
 **pass**, **nouvel échec**, **échec préexistant**
@@ -123,13 +124,14 @@ le pipeline. Cela n'a pas été vérifié sur GitHub Actions depuis cette sessio
 
 ## 6. Dette existante
 
-| Dette                                                | Mécanisme                                     | Réduction                                           |
-| ---------------------------------------------------- | --------------------------------------------- | --------------------------------------------------- |
-| 4 cycles `auth`                                      | `baselines/architecture.json` (nominatif)     | FU-ARCH-01 ; `check:arch` signale l'entrée corrigée |
-| 3 `eslint-disable` sans justification                | `baselines/hygiene.json`                      | ajouter ` -- raison` au prochain passage            |
-| 4 `exhaustive-deps` préexistants                     | disable justifié sur la ligne exacte          | FU-REACT-01 pour les 2 fermetures périmées          |
-| `mobile#build`, `courier#build`                      | `baselines/known-failures.json`               | `verify` signale quand ils repassent                |
-| `test:unit` de l'API cassé (« No test files found ») | **corrigé** (`--dir src` doublait le préfixe) | —                                                   |
+| Dette                                                | Mécanisme                                     | Réduction                                                        |
+| ---------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------- |
+| 4 cycles `auth`                                      | `baselines/architecture.json` (nominatif)     | FU-ARCH-01 ; `check:arch` signale l'entrée corrigée              |
+| 3 `eslint-disable` sans justification                | `baselines/hygiene.json`                      | ajouter ` -- raison` au prochain passage                         |
+| 4 `exhaustive-deps` préexistants                     | disable justifié sur la ligne exacte          | FU-REACT-01 pour les 2 fermetures périmées                       |
+| `mobile#build`, `courier#build`                      | `baselines/known-failures.json`               | `verify` signale quand ils repassent                             |
+| 127 avis `pnpm audit` (surtout via Expo)             | `baselines/audit.json` (nominatif)            | montée de version Expo ; `check:audit` signale les avis corrigés |
+| `test:unit` de l'API cassé (« No test files found ») | **corrigé** (`--dir src` doublait le préfixe) | —                                                                |
 
 Toute nouvelle violation est rejetée. On n'ajoute une entrée de référence qu'avec
 une raison, et jamais pour masquer son propre changement.

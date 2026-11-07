@@ -241,6 +241,26 @@ if (mode === 'fast') {
   turboStep('test', ['test']);
   turboStep('build', ['build']);
 
+  // Network-dependent: new production advisories vs scripts/pipeline/baselines/audit.json.
+  if (wanted('audit')) {
+    const r = run('node', ['scripts/pipeline/check-audit.mjs'], { timeoutMs: 6 * 60_000 });
+    if (r.code === 0)
+      record({ id: 'audit', status: 'pass', detail: 'no advisory beyond the baseline' });
+    else if (r.code === 2)
+      record({
+        id: 'audit',
+        status: 'unavailable',
+        detail: 'registry unreachable — audit not run',
+      });
+    else
+      record({
+        id: 'audit',
+        status: 'fail',
+        detail: 'NEW production advisory',
+        log: tail(r.output),
+      });
+  }
+
   if (wanted('test:int')) {
     const db = process.env.DATABASE_URL;
     const redis = process.env.REDIS_URL;

@@ -54,6 +54,23 @@ directives préexistantes sans justification sur la ligne
 Cliquet : ajouter ` -- <raison>` à la prochaine modification de ces fichiers,
 puis retirer l'entrée (`check:hygiene` le signale).
 
+## Dépendances (`pnpm check:audit`, `scripts/pipeline/check-audit.mjs`)
+
+- Lance `pnpm audit --prod --json` et compare chaque avis (`GHSA|paquet`) à la
+  référence nominative `scripts/pipeline/baselines/audit.json`.
+- **Nouvel avis → échec** (code 1), quelle que soit sa sévérité. Un avis de la
+  référence qui disparaît est signalé : retirer l'entrée.
+- Audit illisible (registre injoignable, réponse sans `advisories`) → code 2,
+  classé « unavailable » par `verify`, **jamais** comme un succès.
+- Pourquoi : `pnpm audit --audit-level high` était déjà rouge à cause d'Expo
+  (127 avis, identiques à `main`). Une nouvelle dépendance vulnérable passait
+  donc inaperçue : nodemailer@8.0.11 (FEAT-007) a ajouté 15 avis sans changer
+  la couleur du job.
+- Mettre à jour la référence uniquement pour une dette acceptée explicitement :
+  `node scripts/pipeline/check-audit.mjs --update-baseline --reason "<pourquoi>"`.
+- Choisir une version de dépendance : l'ancienneté de publication ne suffit pas,
+  lancer `pnpm check:audit` après l'ajout.
+
 ## Ce qui n'a pas été ajouté, et pourquoi
 
 - **Seuils de complexité ou de taille** : aucun seuil n'est justifiable
@@ -68,6 +85,6 @@ puis retirer l'entrée (`check:hygiene` le signale).
 
 `pnpm format:check` (lecture seule) / `pnpm format` (corrige) · `pnpm lint` ·
 `pnpm typecheck` · `pnpm test` · `pnpm check:arch` · `pnpm check:hygiene` ·
-`pnpm check:specs` · `pnpm check:pipeline` · `pnpm verify:fast` · `pnpm verify`.
+`pnpm check:specs` · `pnpm check:pipeline` · `pnpm check:audit` · `pnpm verify:fast` · `pnpm verify`.
 Les vérifications sont en lecture seule. Seuls `pnpm format` et `eslint --fix`
 (lint-staged au commit) corrigent automatiquement.

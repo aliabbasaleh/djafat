@@ -54,7 +54,11 @@ export class SmtpEmailOtpDeliveryProvider implements OtpDeliveryPort {
     if (!this.transporter) {
       const url = this.config.get('SMTP_URL');
       if (!url) throw new Error('SMTP_URL is not configured');
-      this.transporter = createTransport(url, {
+      // Timeouts are TRANSPORT options (connection), so they go with the URL
+      // in the first argument; the second argument of createTransport is
+      // per-message defaults and would silently ignore them.
+      this.transporter = createTransport({
+        url,
         connectionTimeout: 10_000,
         greetingTimeout: 10_000,
         socketTimeout: 15_000,
