@@ -13,7 +13,9 @@ import { RolesGuard } from './guards/roles.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
 import { OwnershipGuard } from './guards/ownership.guard';
 import { StepUpGuard } from './guards/step-up.guard';
-import { OTP_DELIVERY_PORT } from './otp-delivery.token';
+import { OTP_DELIVERY_PORT, OTP_EMAIL_DELIVERY_PORT } from './otp-delivery.token';
+import { SmtpEmailOtpDeliveryProvider } from './providers/smtp-email-otp-delivery.provider';
+import { MockEmailOtpDeliveryProvider } from './providers/mock-email-otp-delivery.provider';
 import { MockOtpDeliveryProvider } from './providers/mock-otp-delivery.provider';
 import { HttpSmsOtpDeliveryProvider } from './providers/http-sms-otp-delivery.provider';
 import { AppConfigService } from '../../common/config/config.service';
@@ -52,6 +54,18 @@ import { RedisService } from '../../common/redis/redis.service';
           mock: () => new MockOtpDeliveryProvider(redis, config),
           http: () => new HttpSmsOtpDeliveryProvider(config),
         })[config.get('SMS_PROVIDER')](),
+      inject: [AppConfigService, RedisService],
+    },
+    // FEAT-007: email channel of the same port, chosen by `EMAIL_PROVIDER`.
+    // Optional feature: in production without SMTP the mock answers 503
+    // EMAIL_UNAVAILABLE instead of blocking boot (SMS login keeps working).
+    {
+      provide: OTP_EMAIL_DELIVERY_PORT,
+      useFactory: (config: AppConfigService, redis: RedisService) =>
+        ({
+          mock: () => new MockEmailOtpDeliveryProvider(redis, config),
+          smtp: () => new SmtpEmailOtpDeliveryProvider(config),
+        })[config.get('EMAIL_PROVIDER')](),
       inject: [AppConfigService, RedisService],
     },
   ],

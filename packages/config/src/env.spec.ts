@@ -137,3 +137,30 @@ describe('SPEC-006-02 — SMS provider configuration', () => {
     );
   });
 });
+
+// FEAT-007 — docs/features/FEAT-007-email-login (SPEC-007-01-SC04).
+describe('SPEC-007-01 — email provider configuration', () => {
+  // SPEC-007-01-SC04
+  it('SPEC-007-01-SC04 — smtp needs SMTP_URL and EMAIL_FROM; production without email config still boots on mock', () => {
+    expect(() =>
+      loadApiEnv({ ...baseEnv, EMAIL_PROVIDER: 'smtp', EMAIL_FROM: 'DJAFAT <a@b.td>' }),
+    ).toThrowError(/SMTP_URL/);
+    expect(() =>
+      loadApiEnv({ ...baseEnv, EMAIL_PROVIDER: 'smtp', SMTP_URL: 'smtp://mail.example.test:587' }),
+    ).toThrowError(/EMAIL_FROM/);
+    const prod = loadApiEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      SMS_PROVIDER: 'http',
+      SMS_HTTP_URL: 'https://sms.example.test/send',
+    });
+    expect(prod.EMAIL_PROVIDER).toBe('mock');
+    const smtp = loadApiEnv({
+      ...baseEnv,
+      EMAIL_PROVIDER: 'smtp',
+      SMTP_URL: 'smtps://user:pass@mail.example.test:465',
+      EMAIL_FROM: 'DJAFAT <no-reply@djafat.td>',
+    });
+    expect(smtp.EMAIL_PROVIDER).toBe('smtp');
+  });
+});

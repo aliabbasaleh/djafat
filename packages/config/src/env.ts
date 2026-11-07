@@ -85,6 +85,15 @@ const OtpSchema = z.object({
     .string()
     .regex(/^[A-Za-z0-9]{1,11}$/, 'SMS_SENDER_ID must be 1-11 letters or digits')
     .default('DJAFAT'),
+  /** `mock` (dev/CI, Redis) | `smtp` (any SMTP provider) — FEAT-007. Optional feature. */
+  EMAIL_PROVIDER: z.enum(['mock', 'smtp']).default('mock'),
+  /** `smtp://` or `smtps://user:pass@host:port` — secret, environment only. */
+  SMTP_URL: z
+    .string()
+    .regex(/^smtps?:\/\//, 'SMTP_URL must start with smtp:// or smtps://')
+    .optional(),
+  /** Sender, e.g. `DJAFAT <no-reply@djafat.td>`. */
+  EMAIL_FROM: z.string().min(3).optional(),
   /** HMAC pepper for hashing OTP codes at rest (docs/19 §7) — never the same as JWT_ACCESS_SECRET. */
   OTP_HASH_SECRET: nonEmpty,
 });
@@ -180,6 +189,12 @@ export function apiEnvConsistencyIssues(env: ApiEnv): string[] {
   }
   if (env.SMS_PROVIDER === 'http' && !env.SMS_HTTP_URL) {
     issues.push('SMS_HTTP_URL: required when SMS_PROVIDER=http');
+  }
+  if (env.EMAIL_PROVIDER === 'smtp' && !env.SMTP_URL) {
+    issues.push('SMTP_URL: required when EMAIL_PROVIDER=smtp');
+  }
+  if (env.EMAIL_PROVIDER === 'smtp' && !env.EMAIL_FROM) {
+    issues.push('EMAIL_FROM: required when EMAIL_PROVIDER=smtp');
   }
   return issues;
 }

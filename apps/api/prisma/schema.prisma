@@ -242,9 +242,12 @@ model MfaTotpSecret {
   @@map("mfa_totp_secrets")
 }
 
+/// FEAT-007 (migration 0030): `target` is an E.164 phone (channel sms) or a
+/// lower-cased email (channel email) — one store, one security logic.
 model OtpCode {
   id         String    @id @default(uuid()) @db.Uuid
-  phone      String
+  target     String
+  channel    String    @default("sms")
   codeHash   String    @map("code_hash")
   purpose    String
   attempts   Int       @default(0)
@@ -255,13 +258,14 @@ model OtpCode {
   @@map("otp_codes")
 }
 
-model PhoneAuthLock {
-  phone       String    @id
+/// Durable brute-force lock per OTP target (phone or email) — migration 0030.
+model AuthTargetLock {
+  target      String    @id
   failedCount Int       @default(0) @map("failed_count")
   lockedUntil DateTime? @map("locked_until") @db.Timestamptz(6)
   updatedAt   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
 
-  @@map("phone_auth_locks")
+  @@map("auth_target_locks")
 }
 
 /// ─────────────────────────────────── system ─────────────────────────────────

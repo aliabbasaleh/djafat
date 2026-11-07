@@ -22,6 +22,10 @@ export const API_ERROR_CODES = [
   'OTP_LOCKED',
   /** The SMS gateway could not deliver the login code (503, retryable) — FEAT-006. */
   'OTP_DELIVERY_FAILED',
+  /** Email login/verification is not configured on this deployment (503) — FEAT-007. */
+  'EMAIL_UNAVAILABLE',
+  /** The email is already verified on another account (409) — FEAT-007. */
+  'EMAIL_ALREADY_USED',
   'MFA_INVALID',
   'MFA_REQUIRED',
   'ACCOUNT_INACTIVE',

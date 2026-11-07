@@ -114,6 +114,38 @@ export class UsersService {
     return u;
   }
 
+  /** Non-deleted account whose email is VERIFIED and equal to `email` (citext) — FEAT-007. */
+  async findByVerifiedEmail(email: string): Promise<UserRecord | null> {
+    const u = await this.prisma.user.findFirst({
+      where: { email, emailVerifiedAt: { not: null }, deletedAt: null },
+      select: { id: true },
+    });
+    return u ? this.getById(u.id) : null;
+  }
+
+  /**
+   * Record `email` as this account's verified address (FEAT-007). The
+   * partial unique index `users_email_active_uk` guarantees one non-deleted
+   * account per address: a clash surfaces as 409 EMAIL_ALREADY_USED.
+   */
+  async setVerifiedEmail(userId: string, email: string): Promise<UserRecord> {
+    try {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { email, emailVerifiedAt: new Date() },
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        throw new ConflictException({
+          code: 'EMAIL_ALREADY_USED',
+          message: 'Cette adresse e-mail est déjà utilisée par un autre compte.',
+        });
+      }
+      throw err;
+    }
+    return this.getByIdOrThrow(userId);
+  }
+
   async markPhoneVerified(userId: string): Promise<void> {
     await this.prisma.user.updateMany({
       where: { id: userId, phoneVerifiedAt: null },

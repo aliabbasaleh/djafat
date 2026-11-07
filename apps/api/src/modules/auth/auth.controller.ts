@@ -13,6 +13,12 @@ import {
   type OtpVerifyInput,
 } from './dto/otp-request.schema';
 import { RefreshSchema, type RefreshInput } from './dto/refresh.schema';
+import {
+  EmailRequestSchema,
+  EmailVerifySchema,
+  type EmailRequestInput,
+  type EmailVerifyInput,
+} from './dto/email.schema';
 import { MfaVerifySchema, type MfaVerifyInput } from './dto/mfa-verify.schema';
 
 function requestMeta(req: FastifyRequest): RequestMeta {
@@ -33,6 +39,29 @@ export class AuthController {
   ) {
     await this.auth.requestOtp(body.phone, body.purpose, requestMeta(req).ip);
     return { status: 'sent' };
+  }
+
+  /**
+   * Email login, secondary channel (FEAT-007). Always 202: whether the
+   * address belongs to an account is never revealed.
+   */
+  @Post('email/request')
+  @HttpCode(202)
+  async requestEmailLogin(
+    @Body(new ZodValidationPipe(EmailRequestSchema)) body: EmailRequestInput,
+    @Req() req: FastifyRequest,
+  ) {
+    await this.auth.requestEmailLogin(body.email, requestMeta(req).ip);
+    return { status: 'sent' };
+  }
+
+  @Post('email/verify')
+  @HttpCode(200)
+  verifyEmailLogin(
+    @Body(new ZodValidationPipe(EmailVerifySchema)) body: EmailVerifyInput,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.auth.verifyEmailAndLogin(body.email, body.code, requestMeta(req));
   }
 
   @Post('otp/verify')
