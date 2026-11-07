@@ -25,6 +25,12 @@ export interface ProviderCapabilities {
    * seed does not activate it there. Absent = `false`.
    */
   readonly sandboxOnly?: boolean;
+  /**
+   * The money is collected when the order is delivered (cash) — FEAT-009.
+   * Such a payment does not gate the order: it is placed as soon as the
+   * payment intent exists, and the payment succeeds at delivery.
+   */
+  readonly collectedOnDelivery?: boolean;
   readonly minAmount?: Money;
   readonly maxAmount?: Money;
 }

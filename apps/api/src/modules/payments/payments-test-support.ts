@@ -515,7 +515,7 @@ export function buildPaymentsService(
     new CashPaymentProvider(),
     new MockPaymentProvider(),
   ]),
-): { payments: PaymentsService } {
+): { payments: PaymentsService; events: EventEmitter2 } {
   const idempotency = new IdempotencyService(new PrismaIdempotencyStore(db));
   const events = { emit: vi.fn(), emitAsync: vi.fn() } as unknown as EventEmitter2;
   const payments = new PaymentsService(
@@ -527,5 +527,5 @@ export function buildPaymentsService(
     events,
     fakeOrderAmountPort(),
   );
-  return { payments };
+  return { payments, events };
 }

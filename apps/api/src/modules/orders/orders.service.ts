@@ -529,13 +529,18 @@ export class OrdersService implements OrderAmountPort {
       throw new NotFoundException({ code: 'NOT_FOUND', message: `Order ${orderId} not found.` });
     }
 
-    // Prepaid orders always pass through `awaiting_payment` before `placed`
-    // (only `payment.succeeded` lifts that gate — `markPlacedFromPayment`
-    // above); cash orders go straight to `placed` at creation (docs/08 §8.4).
-    // This history row is the one signal `orders` can answer without
-    // reaching into `payments`' tables (DAG).
+    // Prepaid orders leave `awaiting_payment` through `payment.succeeded`
+    // (`markPlacedFromPayment`); orders paid on delivery leave it through
+    // `payment.on_delivery` (`markPlacedForDelivery`, FEAT-009). The history
+    // reason tells them apart without reaching into `payments`' tables (DAG).
+    // FEAT-009: an order placed for payment ON DELIVERY also leaves
+    // awaiting_payment, but nothing was pooled — only a succeeded payment counts.
     const prepaidHistory = await this.prisma.orderStatusHistory.findFirst({
-      where: { orderId, fromStatus: 'awaiting_payment' },
+      where: {
+        orderId,
+        fromStatus: 'awaiting_payment',
+        reason: { startsWith: 'payment.succeeded:' },
+      },
       select: { id: true },
     });
 
@@ -1034,6 +1039,42 @@ export class OrdersService implements OrderAmountPort {
       },
     });
     this.logger.log(`order ${payload.orderId} placed (payment ${payload.paymentId} succeeded)`);
+  }
+
+  /**
+   * FEAT-009 (SPEC-009-01): the payment will be collected at delivery (cash),
+   * so the order goes to the restaurant now. Same conditional UPDATE as
+   * `markPlacedFromPayment`: idempotent, and a no-op if the expiry job won.
+   */
+  @OnEvent('payment.on_delivery')
+  async markPlacedForDelivery(payload: { orderId: string; paymentId: string }): Promise<void> {
+    const affected = await this.prisma.$executeRaw`
+      UPDATE orders SET status = 'placed'::order_status, placed_at = now()
+      WHERE id = ${payload.orderId}::uuid AND status = 'awaiting_payment'::order_status
+    `;
+    if (affected === 0) {
+      this.logger.debug(
+        `markPlacedForDelivery: order ${payload.orderId} already left awaiting_payment (idempotent no-op)`,
+      );
+      return;
+    }
+    await this.prisma.orderStatusHistory.create({
+      data: {
+        orderId: payload.orderId,
+        fromStatus: 'awaiting_payment',
+        toStatus: 'placed',
+        reason: `payment.on_delivery:${payload.paymentId}`,
+      },
+    });
+    await this.prisma.outbox.create({
+      data: {
+        aggregate: 'order',
+        aggregateId: payload.orderId,
+        eventType: 'order.placed',
+        payload: { orderId: payload.orderId },
+      },
+    });
+    this.logger.log(`order ${payload.orderId} placed (payment ${payload.paymentId} on delivery)`);
   }
 
   /**

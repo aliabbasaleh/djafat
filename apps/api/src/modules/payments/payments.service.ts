@@ -150,6 +150,13 @@ export class PaymentsService {
       await this.markFailed(payment.id, 'provider rejected at initiate');
     }
 
+    // FEAT-009 (SPEC-009-01): money collected at delivery must not gate the
+    // order — otherwise it never leaves awaiting_payment and expires. `orders`
+    // reacts to this event (DAG: it never imports `payments`).
+    if (result.status === 'pending' && provider.getCapabilities().collectedOnDelivery === true) {
+      this.events.emit('payment.on_delivery', { orderId: payment.orderId, paymentId: payment.id });
+    }
+
     const final = await this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
     return this.toDto(final);
   }

@@ -34,6 +34,7 @@ export class CashPaymentProvider implements PaymentProvider {
       requiresPayerPhone: false,
       async: false,
       currencies: ['XAF'],
+      collectedOnDelivery: true, // FEAT-009: the order is placed now, paid at delivery
     };
   }
 
