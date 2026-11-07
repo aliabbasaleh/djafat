@@ -45,7 +45,7 @@ Validation : `pnpm check:specs`. Matrice de traçabilité :
 État figé à la demande de l'utilisateur (« finir la partie paiement, la mettre en
 attente, continuer l'authentification ») :
 
-- **Utilisable en production** : `cash` (paiement à la livraison). `mock` est verrouillé (FEAT-002).
+- **Utilisable en production** : `cash` (paiement à la livraison, réparé par FEAT-009) ; Airtel Money / Tigo Cash au numéro marchand, vérifiés par numéro de transaction (FEAT-009), dès que les numéros marchands sont configurés. `mock` est verrouillé (FEAT-002).
 - **En attente de décisions** : recharge par cartes à gratter (FEAT-003, 8 questions
   produit et une validation juridique CEMAC).
 - **En attente d'accès externe** : Airtel Money / Tigo Cash (contrat et clés d'API ; le seed historique nomme encore `moov_money`, à confirmer),

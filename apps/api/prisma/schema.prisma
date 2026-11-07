@@ -695,6 +695,29 @@ model Payment {
   @@map("payments")
 }
 
+/// FEAT-009 (migration 0032): transfers received on DJAFAT's merchant phone,
+/// matched to a pending wallet payment. Unique (provider, transaction number)
+/// and unique payment_id are the double-spend guarantees.
+model MobileMoneyReceipt {
+  id             String    @id @default(uuid()) @db.Uuid
+  providerCode   String    @map("provider_code")
+  transactionRef String    @map("transaction_ref")
+  amountMinor    BigInt    @map("amount_minor")
+  currency       String    @db.Char(3)
+  senderPhone    String    @map("sender_phone")
+  receivedAt     DateTime  @map("received_at") @db.Timestamptz(6)
+  source         String    @default("manual")
+  status         String    @default("unmatched")
+  paymentId      String?   @unique @map("payment_id") @db.Uuid
+  matchedAt      DateTime? @map("matched_at") @db.Timestamptz(6)
+  recordedBy     String?   @map("recorded_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([providerCode, transactionRef], map: "mobile_money_receipts_ref_uk")
+  @@index([providerCode, status, receivedAt(sort: Desc)], map: "mobile_money_receipts_lookup_idx")
+  @@map("mobile_money_receipts")
+}
+
 model WebhookEvent {
   id             String    @id @default(uuid()) @db.Uuid
   providerCode   String    @map("provider_code")

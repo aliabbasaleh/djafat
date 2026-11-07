@@ -119,6 +119,32 @@ const OtpSchema = z.object({
     .optional(),
   /** Global cap on WhatsApp codes per hour (protects the bill beyond the free tier). */
   WHATSAPP_MAX_CODES_PER_HOUR: intFromString(300),
+  /**
+   * DJAFAT's merchant wallets (FEAT-009): `airtel_money=+23560000010,tigo_cash=+23560000020`.
+   * A wallet absent here is not registered, so never offered. Not a secret
+   * (the number is shown to customers).
+   */
+  MOBILE_MONEY_WALLETS: z
+    .string()
+    .default('')
+    .transform((raw, ctx) => {
+      const wallets: Array<{ code: string; merchantNumber: string }> = [];
+      for (const part of raw
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean)) {
+        const m = /^([a-z][a-z_]*)=(\+\d{8,15})$/.exec(part);
+        if (!m) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `invalid entry "${part}" — expected code=+E164, e.g. airtel_money=+23560000010`,
+          });
+          return z.NEVER;
+        }
+        wallets.push({ code: m[1]!, merchantNumber: m[2]! });
+      }
+      return wallets;
+    }),
   /** HMAC pepper for hashing OTP codes at rest (docs/19 §7) — never the same as JWT_ACCESS_SECRET. */
   OTP_HASH_SECRET: nonEmpty,
 });

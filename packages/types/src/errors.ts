@@ -11,6 +11,8 @@ export const API_ERROR_CODES = [
   'PAYMENT_ALREADY_COMPLETED',
   'PAYMENT_INVALID_STATE',
   'PAYMENT_PROVIDER_ERROR',
+  /** This transaction number is already recorded for this operator (409) — FEAT-009. */
+  'RECEIPT_ALREADY_RECORDED',
   'OFFER_TAKEN',
   'STEP_UP_REQUIRED',
   'IDEMPOTENCY_KEY_REUSED',

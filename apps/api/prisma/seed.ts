@@ -226,6 +226,15 @@ async function main(): Promise<void> {
       displayName: 'Moov Money (Flooz)',
       active: false,
     },
+    // FEAT-009: paid to DJAFAT's merchant number, matched by transaction
+    // number. Activated by ops once the merchant number is configured
+    // (MOBILE_MONEY_WALLETS) — never by the seed.
+    {
+      code: 'tigo_cash',
+      methodCode: 'mobile_money',
+      displayName: 'Tigo Cash',
+      active: false,
+    },
   ];
   for (const p of providers) {
     await prisma.paymentProviderRow.upsert({
@@ -248,6 +257,27 @@ async function main(): Promise<void> {
           cityId: city.id,
           enabled: true,
           priority: 100,
+        },
+      });
+    }
+  }
+
+  // FEAT-009: launch-market availability for the merchant wallets, DISABLED,
+  // with an explicit 0 fee (unknown until the merchant contracts are signed —
+  // without a row the fee would fall back to the mock default). Ops enable it.
+  for (const providerCode of ['airtel_money', 'tigo_cash']) {
+    const existing = await prisma.paymentProviderConfig.findFirst({
+      where: { providerCode, countryId: country.id, cityId: city.id },
+    });
+    if (!existing) {
+      await prisma.paymentProviderConfig.create({
+        data: {
+          providerCode,
+          countryId: country.id,
+          cityId: city.id,
+          enabled: false,
+          priority: 50,
+          feeBps: 0,
         },
       });
     }

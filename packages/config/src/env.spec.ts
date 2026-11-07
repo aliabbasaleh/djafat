@@ -192,3 +192,25 @@ describe('SPEC-008-01 — WhatsApp and switchable SMS configuration', () => {
     expect(dev.SMS_PROVIDER).toBe('mock');
   });
 });
+
+describe('SPEC-009-02 — merchant wallets configuration', () => {
+  // SPEC-009-02-SC03
+  it('SPEC-009-02-SC03 — MOBILE_MONEY_WALLETS: code=E.164 pairs; invalid entries refused; empty is fine', () => {
+    const env = loadApiEnv({
+      ...baseEnv,
+      MOBILE_MONEY_WALLETS: 'airtel_money=+23560000010, tigo_cash=+23560000020',
+    });
+    expect(env.MOBILE_MONEY_WALLETS).toEqual([
+      { code: 'airtel_money', merchantNumber: '+23560000010' },
+      { code: 'tigo_cash', merchantNumber: '+23560000020' },
+    ]);
+    expect(() =>
+      loadApiEnv({ ...baseEnv, MOBILE_MONEY_WALLETS: 'airtel_money=60000010' }),
+    ).toThrowError(/MOBILE_MONEY_WALLETS/);
+    expect(() =>
+      loadApiEnv({ ...baseEnv, MOBILE_MONEY_WALLETS: 'Airtel=+23560000010' }),
+    ).toThrowError(/MOBILE_MONEY_WALLETS/);
+    expect(loadApiEnv(baseEnv).MOBILE_MONEY_WALLETS).toEqual([]);
+    expect(loadApiEnv({ ...baseEnv, MOBILE_MONEY_WALLETS: '' }).MOBILE_MONEY_WALLETS).toEqual([]);
+  });
+});

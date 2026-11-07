@@ -12,6 +12,9 @@ import { CashPaymentProvider } from './providers/cash/cash-payment.provider';
 import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
 import { selectRegistrableProviders } from './payment-provider-selection';
 import { AppConfigService } from '../../common/config/config.service';
+import { walletProviders } from './providers/wallet/merchant-wallet-payment.provider';
+import { MobileMoneyReceiptsService } from './mobile-money/mobile-money-receipts.service';
+import { MobileMoneyController } from './mobile-money/mobile-money.controller';
 
 /**
  * At Bloc 0 only `cash` and `mock` providers are registered. Real Mobile Money
@@ -24,7 +27,12 @@ import { AppConfigService } from '../../common/config/config.service';
  */
 @Module({
   imports: [LedgerModule, AuthModule],
-  controllers: [PaymentsController, PaymentMethodsConfigController, SettlementsController],
+  controllers: [
+    PaymentsController,
+    MobileMoneyController,
+    PaymentMethodsConfigController,
+    SettlementsController,
+  ],
   providers: [
     CashPaymentProvider,
     MockPaymentProvider,
@@ -41,11 +49,17 @@ import { AppConfigService } from '../../common/config/config.service';
         mock: MockPaymentProvider,
       ) =>
         new PaymentProviderRegistry(
-          selectRegistrableProviders([cash, mock], { isProduction: config.isProduction }),
+          selectRegistrableProviders(
+            // FEAT-009: one merchant-wallet provider per configured wallet
+            // (`MOBILE_MONEY_WALLETS`); none configured = none registered.
+            [cash, mock, ...walletProviders(config.get('MOBILE_MONEY_WALLETS'))],
+            { isProduction: config.isProduction },
+          ),
         ),
       inject: [AppConfigService, CashPaymentProvider, MockPaymentProvider],
     },
     PaymentsService,
+    MobileMoneyReceiptsService,
     SettlementsService,
   ],
   exports: [PaymentProviderRegistry],

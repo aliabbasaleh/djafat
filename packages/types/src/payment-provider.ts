@@ -31,6 +31,11 @@ export interface ProviderCapabilities {
    * payment intent exists, and the payment succeeds at delivery.
    */
   readonly collectedOnDelivery?: boolean;
+  /**
+   * Paid by a transfer to DJAFAT's merchant number, confirmed by matching a
+   * recorded transfer receipt (transaction number) — FEAT-009.
+   */
+  readonly matchedByTransferReceipt?: boolean;
   readonly minAmount?: Money;
   readonly maxAmount?: Money;
 }
