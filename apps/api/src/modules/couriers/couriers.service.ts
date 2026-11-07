@@ -99,8 +99,16 @@ export class CouriersService implements CourierPort {
         message: 'Cannot go offline with an active delivery — finish or cancel it first.',
       });
     }
-    const updated = await this.prisma.courier.update({ where: { userId }, data: { status } });
-    return this.toDto(updated);
+    // Never overwrite `busy` (an offer is pending or a delivery is in progress)
+    // nor `suspended`: conditional, so a dispatch claim landing between the
+    // read above and this write cannot be wiped either. Found by the full
+    // customer-journey run: a courier re-sending "online" lost the offer
+    // (accept -> 409 COURIER_NOT_ELIGIBLE).
+    await this.prisma.courier.updateMany({
+      where: { userId, status: { notIn: ['busy', 'suspended'] } },
+      data: { status },
+    });
+    return this.toDto(await this.prisma.courier.findUniqueOrThrow({ where: { userId } }));
   }
 
   /**
