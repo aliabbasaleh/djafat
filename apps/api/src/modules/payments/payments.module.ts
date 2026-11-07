@@ -15,6 +15,7 @@ import { AppConfigService } from '../../common/config/config.service';
 import { walletProviders } from './providers/wallet/merchant-wallet-payment.provider';
 import { MobileMoneyReceiptsService } from './mobile-money/mobile-money-receipts.service';
 import { MobileMoneyController } from './mobile-money/mobile-money.controller';
+import { CourierRemittanceService } from './mobile-money/courier-remittance.service';
 
 /**
  * At Bloc 0 only `cash` and `mock` providers are registered. Real Mobile Money
@@ -60,6 +61,7 @@ import { MobileMoneyController } from './mobile-money/mobile-money.controller';
     },
     PaymentsService,
     MobileMoneyReceiptsService,
+    CourierRemittanceService,
     SettlementsService,
   ],
   exports: [PaymentProviderRegistry],

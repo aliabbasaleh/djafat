@@ -709,6 +709,8 @@ model MobileMoneyReceipt {
   source         String    @default("manual")
   status         String    @default("unmatched")
   paymentId      String?   @unique @map("payment_id") @db.Uuid
+  /// FEAT-010: set when the transfer is a courier's cash remittance.
+  courierId      String?   @map("courier_id") @db.Uuid
   matchedAt      DateTime? @map("matched_at") @db.Timestamptz(6)
   recordedBy     String?   @map("recorded_by") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -785,6 +787,9 @@ model Courier {
   vehicleType      String?   @map("vehicle_type")
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  /// FEAT-010: courier holds cash at or above the ceiling; dispatch skips them.
+  cashBlockedAt    DateTime? @map("cash_blocked_at") @db.Timestamptz(6)
 
   @@map("couriers")
 }

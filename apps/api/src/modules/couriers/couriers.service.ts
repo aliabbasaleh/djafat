@@ -177,6 +177,7 @@ export class CouriersService implements CourierPort {
       FROM couriers
       WHERE status = 'online'
         AND active_delivery_id IS NULL
+        AND cash_blocked_at IS NULL -- FEAT-010: holds too much cash
         AND last_geom IS NOT NULL
         AND last_location_at > now() - (${staleSeconds}::text || ' seconds')::interval
         AND NOT (user_id = ANY(${excluded}::uuid[]))
@@ -185,6 +186,24 @@ export class CouriersService implements CourierPort {
       LIMIT 20
     `;
     return rows.map((r) => ({ courierId: r.user_id, distanceMeters: r.distance_m }));
+  }
+
+  /**
+   * FEAT-010: record whether the courier holds cash at or above the ceiling.
+   * Keeps the FIRST blocking time while still blocked; dispatch (API and
+   * worker) skips a courier whose `cash_blocked_at` is set.
+   */
+  async setCashBlocked(courierId: string, blocked: boolean): Promise<void> {
+    if (blocked) {
+      await this.prisma.$executeRaw`
+        UPDATE couriers SET cash_blocked_at = COALESCE(cash_blocked_at, now())
+        WHERE user_id = ${courierId}::uuid
+      `;
+    } else {
+      await this.prisma.$executeRaw`
+        UPDATE couriers SET cash_blocked_at = NULL WHERE user_id = ${courierId}::uuid
+      `;
+    }
   }
 
   /**

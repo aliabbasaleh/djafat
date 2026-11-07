@@ -7,6 +7,8 @@ import { DELIVERY_TRACKING_PORT } from '../../common/ports/delivery-tracking.por
 import { DeliveriesService } from './deliveries.service';
 import { DeliveriesController } from './deliveries.controller';
 import { CourierDeliveryController } from './courier-delivery.controller';
+import { CourierCashService } from './courier-cash.service';
+import { CourierCashController } from './courier-cash.controller';
 
 /**
  * Bloc 6 — real dispatch core (docs/25). DAG: `deliveries` depends on
@@ -23,9 +25,10 @@ import { CourierDeliveryController } from './courier-delivery.controller';
 @Global()
 @Module({
   imports: [LedgerModule, CouriersModule, UsersModule, AuthModule],
-  controllers: [DeliveriesController, CourierDeliveryController],
+  controllers: [DeliveriesController, CourierDeliveryController, CourierCashController],
   providers: [
     DeliveriesService,
+    CourierCashService,
     { provide: DELIVERY_TRACKING_PORT, useExisting: DeliveriesService },
   ],
   exports: [DeliveriesService, DELIVERY_TRACKING_PORT],

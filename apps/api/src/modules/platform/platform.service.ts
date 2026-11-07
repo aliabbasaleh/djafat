@@ -174,6 +174,14 @@ export class PlatformService {
     );
   }
 
+  /** FEAT-010: cash (XAF minor units) a courier may hold before dispatch skips them. */
+  async getCourierCashCeilingMinor(): Promise<number> {
+    return this.getNumberSetting(
+      'courier_cash_ceiling_minor',
+      PLATFORM_SETTINGS_DEFAULTS.courier_cash_ceiling_minor,
+    );
+  }
+
   async getOfferTimeoutSeconds(): Promise<number> {
     return this.getNumberSetting(
       'offer_timeout_seconds',

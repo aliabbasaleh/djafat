@@ -7,8 +7,11 @@ import { CurrentActor } from '../../auth/current-actor.decorator';
 import { RequireAuth, RequireOwnership, RequireRole } from '../../auth/decorators';
 import { PaymentsService } from '../payments.service';
 import { MobileMoneyReceiptsService } from './mobile-money-receipts.service';
+import { CourierRemittanceService } from './courier-remittance.service';
 import {
   ManualMatchSchema,
+  RemitSchema,
+  type RemitBody,
   RecordReceiptSchema,
   TransferClaimSchema,
   type ManualMatchBody,
@@ -29,7 +32,17 @@ export class MobileMoneyController {
   constructor(
     private readonly receipts: MobileMoneyReceiptsService,
     private readonly payments: PaymentsService,
+    private readonly remittances: CourierRemittanceService,
   ) {}
+
+  /** A transfer is a courier's cash remittance (FEAT-010, SPEC-010-02). */
+  @Post('mobile-money/receipts/:id/remit')
+  @HttpCode(200)
+  @RequireAuth()
+  @RequireRole(...STAFF)
+  remit(@Param('id') id: string, @Body(new ZodValidationPipe(RemitSchema)) body: RemitBody) {
+    return this.remittances.remitToCourier(id, body.courierId);
+  }
 
   @Post('mobile-money/receipts')
   @HttpCode(201)

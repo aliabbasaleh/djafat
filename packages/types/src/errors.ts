@@ -13,6 +13,8 @@ export const API_ERROR_CODES = [
   'PAYMENT_PROVIDER_ERROR',
   /** This transaction number is already recorded for this operator (409) — FEAT-009. */
   'RECEIPT_ALREADY_RECORDED',
+  /** A courier remittance larger than the cash the courier holds (409) — FEAT-010. */
+  'REMITTANCE_EXCEEDS_CASH_HELD',
   'OFFER_TAKEN',
   'STEP_UP_REQUIRED',
   'IDEMPOTENCY_KEY_REUSED',

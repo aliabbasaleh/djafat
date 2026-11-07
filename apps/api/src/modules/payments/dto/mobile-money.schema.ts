@@ -24,3 +24,7 @@ export type TransferClaimBody = z.infer<typeof TransferClaimSchema>;
 
 export const ManualMatchSchema = z.object({ paymentId: z.string().uuid() }).strict();
 export type ManualMatchBody = z.infer<typeof ManualMatchSchema>;
+
+/** FEAT-010: the courier whose cash remittance this transfer is. */
+export const RemitSchema = z.object({ courierId: z.string().uuid() }).strict();
+export type RemitBody = z.infer<typeof RemitSchema>;

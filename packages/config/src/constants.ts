@@ -47,6 +47,7 @@ export const PLATFORM_SETTINGS_DEFAULTS = {
   dispatch_radius_expansion_step_m: 2000,
   dispatch_max_waves: 3, // after this many radius expansions with no acceptance -> ops alert, stays searching_courier
   courier_location_stale_seconds: 120, // docs/09 A.2 — 2 min; older = not a dispatch candidate
+  courier_cash_ceiling_minor: 30_000, // FEAT-010 — XAF a courier may hold before being blocked from new offers
 } as const;
 
 export const API_VERSION_PREFIX = 'v1';

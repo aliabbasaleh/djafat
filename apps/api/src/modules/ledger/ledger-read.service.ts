@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { toMoneyJson } from '../../common/money/money.mapper';
 import type { MoneyJson } from '@djafat/types';
@@ -100,5 +101,29 @@ export class LedgerReadService {
       const natural = DEBIT_NORMAL_TYPES.has(r.type) ? debitMinusCredit : -debitMinusCredit;
       return { code: r.code, currency: r.currency, balance: toMoneyJson(natural, r.currency) };
     });
+  }
+
+  /**
+   * FEAT-010: cash a courier physically holds = debit balance of
+   * `CASH_FLOAT:<courierId>` (an asset: debits − credits). 0 when the courier
+   * has no such account yet. Read-only, like everything in this file.
+   */
+  getCashHeld(courierId: string, currency: string): Promise<bigint> {
+    return this.getCashHeldTx(this.prisma, courierId, currency);
+  }
+
+  /** Same, inside a caller's transaction (a remittance checks it before posting). */
+  async getCashHeldTx(
+    tx: Prisma.TransactionClient,
+    courierId: string,
+    currency: string,
+  ): Promise<bigint> {
+    const rows = await tx.$queryRaw<Array<{ held: bigint | null }>>`
+      SELECT COALESCE(SUM(CASE WHEN e.direction = 'debit' THEN e.amount_minor ELSE -e.amount_minor END), 0)::bigint AS held
+      FROM ledger_entries e
+      JOIN ledger_accounts a ON a.id = e.account_id
+      WHERE a.code = 'CASH_FLOAT' AND a.owner_id = ${courierId}::uuid AND e.currency = ${currency}
+    `;
+    return rows[0]?.held ?? 0n;
   }
 }
