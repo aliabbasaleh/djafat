@@ -52,6 +52,11 @@ export function createAuthClient(http: ApiHttp) {
   }
 
   return {
+    /** Login methods available on this deployment (FEAT-008): WhatsApp, SMS, e-mail. */
+    methods: () =>
+      http.get<{
+        methods: Array<{ id: 'whatsapp' | 'sms' | 'email'; available: boolean; link?: string }>;
+      }>('/auth/methods'),
     /**
      * User-initiated sign-out: revoke on the server FIRST (it needs the
      * token), then ALWAYS clear the local session — the user's intent wins

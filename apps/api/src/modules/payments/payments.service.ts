@@ -849,6 +849,23 @@ export class PaymentsService {
     return result;
   }
 
+  /**
+   * The payment methods of THIS order (screens): its city, restaurant, exact
+   * amount and currency, resolved server-side through `OrderAmountPort` — the
+   * browser never knows the city. Throws like `createPayment` if the order is
+   * no longer awaiting payment.
+   */
+  async listMethodsForOrder(orderId: string) {
+    const context = await this.orderAmount.getPaymentContext(orderId);
+    const amount = await this.orderAmount.getAuthoritativeAmount(orderId);
+    return this.listAvailablePaymentMethods({
+      cityId: context.cityId,
+      restaurantId: context.restaurantId,
+      amountMinor: amount.minor,
+      currency: amount.currency,
+    });
+  }
+
   // ── reads ───────────────────────────────────────────────────────────────
 
   async getPayment(id: string): Promise<PaymentDto> {
