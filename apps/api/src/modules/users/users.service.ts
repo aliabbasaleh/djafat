@@ -113,6 +113,15 @@ export class UsersService {
     };
   }
 
+  /** FEAT-017: an existing, non-deleted account for this phone, or null (never creates one). */
+  async findByPhone(phone: string): Promise<UserRecord | null> {
+    const u = await this.prisma.user.findFirst({
+      where: { phone, deletedAt: null },
+      select: { id: true },
+    });
+    return u ? this.getById(u.id) : null;
+  }
+
   async getByIdOrThrow(id: string): Promise<UserRecord> {
     const u = await this.getById(id);
     if (!u) throw new NotFoundException({ code: 'NOT_FOUND', message: `User ${id} not found.` });

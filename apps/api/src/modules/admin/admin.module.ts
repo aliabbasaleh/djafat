@@ -8,6 +8,8 @@ import { PaymentsModule } from '../payments/payments.module';
 import { AdminController } from './admin.controller';
 import { PhoneOrdersController } from './phone-orders.controller';
 import { PhoneOrdersService } from './phone-orders.service';
+import { OfflineOrdersService } from './offline-orders.service';
+import { CatalogModule } from '../catalog/catalog.module';
 import { UsersAdminController } from './users-admin.controller';
 
 /**
@@ -21,8 +23,16 @@ import { UsersAdminController } from './users-admin.controller';
  * and `settlements.controller.ts` already established before this bloc.
  */
 @Module({
-  imports: [UsersModule, AuthModule, AddressesModule, CartsModule, OrdersModule, PaymentsModule],
+  imports: [
+    UsersModule,
+    AuthModule,
+    AddressesModule,
+    CartsModule,
+    CatalogModule,
+    OrdersModule,
+    PaymentsModule,
+  ],
   controllers: [AdminController, UsersAdminController, PhoneOrdersController],
-  providers: [PhoneOrdersService],
+  providers: [PhoneOrdersService, OfflineOrdersService],
 })
 export class AdminModule {}

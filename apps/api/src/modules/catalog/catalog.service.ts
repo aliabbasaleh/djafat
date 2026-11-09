@@ -194,6 +194,21 @@ export class CatalogService {
   }
 
   /**
+   * FEAT-017: the restaurant an offline order message names — by its slug,
+   * or by the first 8 hex characters of its id (what the app writes when it
+   * has no slug at hand). Null when nothing, or more than one, matches.
+   */
+  async findRestaurantIdByRef(ref: string): Promise<string | null> {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT r.id FROM restaurants r
+      WHERE r.status = ANY(${RESTAURANT_PUBLIC_STATUSES}::text[])
+        AND (r.slug = ${ref} OR (${/^[0-9a-f]{8}$/.test(ref)} AND r.id::text LIKE ${`${ref}%`}))
+      LIMIT 2
+    `);
+    return rows.length === 1 ? rows[0]!.id : null;
+  }
+
+  /**
    * "Is this restaurant taking orders right now?" for the WRITE paths.
    *
    * `getActiveRestaurant` above only checks the admin-level `status =

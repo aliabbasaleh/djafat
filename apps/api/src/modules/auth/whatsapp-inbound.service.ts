@@ -5,8 +5,10 @@ import {
   HttpStatus,
   Injectable,
   Logger,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { LAUNCH_MARKET } from '@djafat/config';
 import { makePhoneInputSchema } from '@djafat/validation';
 import { AppConfigService } from '../../common/config/config.service';
@@ -52,6 +54,7 @@ export class WhatsappInboundService {
     private readonly config: AppConfigService,
     private readonly redis: RedisService,
     private readonly rateLimiter: RateLimiterService,
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   /** Meta's subscription handshake: echo the challenge for the right token only. */
@@ -98,7 +101,13 @@ export class WhatsappInboundService {
 
   private async handleMessage(message: InboundMessage, now: number): Promise<boolean> {
     if (message.type !== 'text' || !message.id || !message.from) return false;
-    if (!asksForCode(message.text?.body ?? '')) return false; // FEAT-008-Q02
+    const text = message.text?.body ?? '';
+    // FEAT-017: an order written by the app when the data connection failed.
+    if (isOrderMessage(text)) {
+      await this.handleOrderMessage(message, text, now);
+      return false;
+    }
+    if (!asksForCode(text)) return false; // FEAT-008-Q02
     const sentAt = Number(message.timestamp) * 1000;
     if (!Number.isFinite(sentAt) || now - sentAt > MAX_MESSAGE_AGE_MS) return false;
     const phone = PhoneInput.safeParse(`+${message.from}`); // FEAT-008-Q03: same rule as FEAT-005
@@ -121,6 +130,34 @@ export class WhatsappInboundService {
       const status = err instanceof HttpException ? err.getStatus() : 500;
       this.logger.warn(`WhatsApp login code not sent (${status}) for ${redactPhone(phone.data)}`);
       return false;
+    }
+  }
+
+  /**
+   * Handed to whoever places offline orders (`admin`, which may compose the
+   * other modules) by event — `auth` never imports `orders`. Same freshness,
+   * phone and once-only rules as a login code request.
+   */
+  private async handleOrderMessage(
+    message: InboundMessage,
+    text: string,
+    now: number,
+  ): Promise<void> {
+    const sentAt = Number(message.timestamp) * 1000;
+    if (!Number.isFinite(sentAt) || now - sentAt > MAX_MESSAGE_AGE_MS) return;
+    const phone = PhoneInput.safeParse(`+${message.from}`);
+    if (!phone.success || !this.events) return;
+    if (!(await this.firstDelivery(message.id!))) return;
+    try {
+      await this.events.emitAsync('order_message.received', {
+        phone: phone.data,
+        text,
+        channel: 'whatsapp',
+      } satisfies OrderMessageReceived);
+    } catch (err) {
+      this.logger.error(
+        `offline order from ${redactPhone(phone.data)} failed: ${err instanceof Error ? err.message : 'error'}`,
+      );
     }
   }
 
@@ -153,6 +190,17 @@ export class WhatsappInboundService {
       return true;
     }
   }
+}
+
+/** FEAT-017 — the payload of `order_message.received`. */
+export interface OrderMessageReceived {
+  readonly phone: string;
+  readonly text: string;
+  readonly channel: 'whatsapp';
+}
+
+function isOrderMessage(text: string): boolean {
+  return /^\s*djf1\s/i.test(text);
 }
 
 /** "code" anywhere, ignoring case and accents ("Code DJAFAT", "côde"). */

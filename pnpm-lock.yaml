@@ -496,6 +496,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@djafat/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@djafat/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n

@@ -9,6 +9,7 @@ export * from './idempotency/canonical-json.js';
 export * from './idempotency/reconcile.js';
 
 export * from './order/state-machine.js';
+export * from './order/offline-message.js';
 export * from './payment/state-machine.js';
 export * from './delivery/state-machine.js';
 export * from './delivery/earnings-period.js';

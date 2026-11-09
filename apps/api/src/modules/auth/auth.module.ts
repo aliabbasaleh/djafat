@@ -19,6 +19,7 @@ import {
   OTP_WHATSAPP_DELIVERY_PORT,
 } from './otp-delivery.token';
 import { WhatsappInboundService } from './whatsapp-inbound.service';
+import { WhatsappTextReplyService } from './whatsapp-text-reply.service';
 import { WhatsappWebhookController } from './whatsapp-webhook.controller';
 import { DisabledSmsOtpDeliveryProvider } from './providers/disabled-sms-otp-delivery.provider';
 import { MockWhatsappOtpDeliveryProvider } from './providers/mock-whatsapp-otp-delivery.provider';
@@ -54,6 +55,7 @@ import { RedisService } from '../../common/redis/redis.service';
     OwnershipGuard,
     StepUpGuard,
     WhatsappInboundService,
+    WhatsappTextReplyService,
     // FEAT-006: the OTP transport is chosen by `SMS_PROVIDER`. `loadApiEnv`
     // already refuses `mock` in production and `http` without a URL, so this
     // map can never wire a provider that silently sends nothing in prod.
@@ -91,6 +93,6 @@ import { RedisService } from '../../common/redis/redis.service';
       inject: [AppConfigService, RedisService],
     },
   ],
-  exports: [ActorResolverService, SessionService, TokenService],
+  exports: [ActorResolverService, SessionService, TokenService, WhatsappTextReplyService],
 })
 export class AuthModule {}
