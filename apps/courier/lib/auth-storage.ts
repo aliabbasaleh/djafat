@@ -1,4 +1,12 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStoreNative from 'expo-secure-store';
+import { Platform } from 'react-native';
+import { pickSessionStore } from './session-store';
+
+// FEAT-013: the OS secure store on a phone, the browser storage on the web.
+const SecureStore = pickSessionStore(Platform.OS, {
+  secure: SecureStoreNative,
+  web: () => globalThis.localStorage,
+});
 
 /**
  * Session persistence for the courier app (Bloc 11, docs/04 §4.2

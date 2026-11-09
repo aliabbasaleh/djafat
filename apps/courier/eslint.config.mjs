@@ -8,6 +8,7 @@ export default [
     ignores: [
       '.expo/**',
       'dist/**',
+      'dist-web/**',
       'expo-env.d.ts',
       'babel.config.js',
       'metro.config.js',

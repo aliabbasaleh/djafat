@@ -13,7 +13,8 @@
     "test": "vitest run --passWithNoTests",
     "test:unit": "vitest run --passWithNoTests",
     "build": "expo export --platform ios --platform android",
-    "clean": "rimraf .expo .turbo dist *.tsbuildinfo"
+    "clean": "rimraf .expo .turbo dist dist-web *.tsbuildinfo",
+    "build:web": "expo export --platform web --output-dir dist-web"
   },
   "dependencies": {
     "@babel/runtime": "^7.25.2",
@@ -32,9 +33,11 @@
     "expo-secure-store": "~14.2.3",
     "expo-status-bar": "~2.2.3",
     "react": "19.0.0",
+    "react-dom": "19.0.0",
     "react-native": "0.79.2",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.10.0",
+    "react-native-web": "~0.20.0",
     "socket.io-client": "4.8.1",
     "whatwg-fetch": "^3.6.20"
   },
