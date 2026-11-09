@@ -12,6 +12,7 @@ import { formatMoney } from '@/lib/format';
 import { useRoomRealtime } from '@/lib/realtime';
 import { OrderTracker } from '@/components/OrderTracker';
 import { PaymentPicker } from '@/components/PaymentPicker';
+import { LiveMap } from '@/components/LiveMap';
 import styles from './page.module.css';
 
 type LoadState = 'loading' | 'ready' | 'error' | 'not-found';
@@ -117,6 +118,9 @@ export default function OrderConfirmationPage() {
         <OrderTracker status={order.status} />
         {order.status === 'awaiting_payment' && (
           <PaymentPicker orderId={order.id} onChanged={() => void loadOrder()} />
+        )}
+        {['ready', 'courier_assigned', 'picked_up', 'on_the_way'].includes(order.status) && (
+          <LiveMap orderId={order.id} />
         )}
 
         <Stack gap="xs">

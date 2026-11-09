@@ -196,6 +196,23 @@ export class CouriersService implements CourierPort {
     return rows.map((r) => ({ courierId: r.user_id, distanceMeters: r.distance_m }));
   }
 
+  /** Last known position of a courier (customer live map), or null if never reported. */
+  async getPosition(
+    userId: string,
+  ): Promise<{ lat: number; lng: number; heading: number | null; at: string | null } | null> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{ lat: number; lng: number; heading: number | null; at: Date | null }>
+    >`
+      SELECT ST_Y(last_geom::geometry) AS lat, ST_X(last_geom::geometry) AS lng,
+             last_heading::float8 AS heading, last_location_at AS at
+      FROM couriers WHERE user_id = ${userId}::uuid AND last_geom IS NOT NULL
+    `;
+    const r = rows[0];
+    return r
+      ? { lat: r.lat, lng: r.lng, heading: r.heading, at: r.at ? r.at.toISOString() : null }
+      : null;
+  }
+
   /**
    * FEAT-010: record whether the courier holds cash at or above the ceiling.
    * Keeps the FIRST blocking time while still blocked; dispatch (API and
