@@ -61,6 +61,8 @@ export interface DeliveryContext {
   readonly dropoffLabel: string | null;
   readonly dropoffAddress: string | null;
   readonly dropoffPhone: string | null;
+  /** FEAT-015: first order of this customer — call before leaving the restaurant. */
+  readonly customerIsNew?: boolean;
 }
 
 export interface DeliveryOffer {

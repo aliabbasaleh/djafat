@@ -25,6 +25,7 @@ function harness(opts: {
     findOrCreateByPhone: vi.fn(async () => ({ userId: 'cust-1', isNew: opts.isNew ?? true })),
     getByIdOrThrow: vi.fn(async () => ({ fullName: opts.fullName ?? null })),
     updateFullName: vi.fn(async () => ({})),
+    markPhoneVerified: vi.fn(async () => undefined),
   };
   const addresses = {
     list: vi.fn(async () => opts.addresses ?? []),

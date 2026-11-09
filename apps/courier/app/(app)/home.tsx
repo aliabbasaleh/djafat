@@ -133,6 +133,9 @@ export default function HomeScreen() {
       {offer ? (
         <View style={styles.offerCard}>
           <Badge tone="info" label={`Nouvelle course — ${formatCountdown(remaining)}`} />
+          {offer.context.customerIsNew && (
+            <Badge tone="warning" label="Nouveau client — appelez-le avant de partir" />
+          )}
           <Text style={styles.offerTitle}>{offer.context.restaurantName}</Text>
           <Text style={styles.offerDetail}>
             {offer.context.restaurantAddress ?? 'Adresse non renseignée'}

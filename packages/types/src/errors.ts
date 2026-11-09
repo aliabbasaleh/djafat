@@ -17,6 +17,8 @@ export const API_ERROR_CODES = [
   'REMITTANCE_EXCEEDS_CASH_HELD',
   /** A withdrawal under the minimum, or a second one while one is open (409) — FEAT-014. */
   'PAYOUT_NOT_ALLOWED',
+  /** Cash on delivery not allowed for this customer/amount: pay first by mobile money (409) — FEAT-015. */
+  'COD_LIMIT',
   'OFFER_TAKEN',
   'STEP_UP_REQUIRED',
   'IDEMPOTENCY_KEY_REUSED',

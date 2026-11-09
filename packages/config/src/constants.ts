@@ -49,6 +49,9 @@ export const PLATFORM_SETTINGS_DEFAULTS = {
   courier_location_stale_seconds: 120, // docs/09 A.2 — 2 min; older = not a dispatch candidate
   courier_cash_ceiling_minor: 30_000, // FEAT-010 — XAF a courier may hold before being blocked from new offers
   courier_payout_min_minor: 2_000, // FEAT-014 — smallest on-demand withdrawal, XAF
+  cod_cap_t1_minor: 10_000, // FEAT-015 — most a new customer may pay in cash at the door, XAF
+  cod_cap_t2_minor: 25_000, // FEAT-015
+  cod_cap_t3_minor: 60_000, // FEAT-015
 } as const;
 
 export const API_VERSION_PREFIX = 'v1';

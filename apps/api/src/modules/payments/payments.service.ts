@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
@@ -17,6 +18,7 @@ import { IdempotencyService } from '../../common/idempotency/idempotency.service
 import { toMoneyJson } from '../../common/money/money.mapper';
 import { ORDER_AMOUNT_PORT } from '../../common/ports/order-amount.port';
 import { LedgerService } from '../ledger/ledger.service';
+import { CodTrustService } from './cod-trust.service';
 import { PaymentProviderRegistry } from './payment-provider.registry';
 import { buildOrderAccrualEntries, MOCK_PSP_FEE_BPS } from './accrual-entries';
 import { buildRefundEntries } from './refund-entries';
@@ -61,6 +63,8 @@ export class PaymentsService {
     private readonly ledger: LedgerService,
     private readonly events: EventEmitter2,
     @Inject(ORDER_AMOUNT_PORT) private readonly orderAmount: OrderAmountPort,
+    // FEAT-015: absent only in unit harnesses built before it existed.
+    @Optional() private readonly codTrust?: CodTrustService,
   ) {}
 
   // ── creation ────────────────────────────────────────────────────────────
@@ -94,6 +98,14 @@ export class PaymentsService {
         code: 'PAYMENT_METHOD_UNAVAILABLE',
         message: `Provider "${input.providerCode}" cannot process ${amount.currency}.`,
       });
+    }
+
+    // FEAT-015: cash on delivery only for customers trusted for this amount.
+    if (
+      this.codTrust &&
+      this.registry.get(input.providerCode).getCapabilities().collectedOnDelivery
+    ) {
+      await this.codTrust.assertAllowed(input.orderId, amount);
     }
 
     const payment = await this.prisma.$transaction(async (tx) => {
@@ -866,12 +878,20 @@ export class PaymentsService {
   async listMethodsForOrder(orderId: string) {
     const context = await this.orderAmount.getPaymentContext(orderId);
     const amount = await this.orderAmount.getAuthoritativeAmount(orderId);
-    return this.listAvailablePaymentMethods({
+    const methods = await this.listAvailablePaymentMethods({
       cityId: context.cityId,
       restaurantId: context.restaurantId,
       amountMinor: amount.minor,
       currency: amount.currency,
     });
+    // FEAT-015: hide pay-on-delivery when this customer is not trusted for the amount.
+    if (!this.codTrust) return methods;
+    const cod = await this.codTrust.decide(orderId, amount);
+    return cod.allowed
+      ? methods
+      : methods.filter(
+          (m) => (m.capabilities as { collectedOnDelivery?: boolean }).collectedOnDelivery !== true,
+        );
   }
 
   // ── reads ───────────────────────────────────────────────────────────────

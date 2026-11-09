@@ -190,6 +190,16 @@ export class PlatformService {
     );
   }
 
+  /** FEAT-015: most a customer of each trust tier may pay in cash at the door. */
+  async getCodCapsMinor(): Promise<{ T1: bigint; T2: bigint; T3: bigint }> {
+    const [t1, t2, t3] = await Promise.all([
+      this.getNumberSetting('cod_cap_t1_minor', PLATFORM_SETTINGS_DEFAULTS.cod_cap_t1_minor),
+      this.getNumberSetting('cod_cap_t2_minor', PLATFORM_SETTINGS_DEFAULTS.cod_cap_t2_minor),
+      this.getNumberSetting('cod_cap_t3_minor', PLATFORM_SETTINGS_DEFAULTS.cod_cap_t3_minor),
+    ]);
+    return { T1: BigInt(t1), T2: BigInt(t2), T3: BigInt(t3) };
+  }
+
   async getOfferTimeoutSeconds(): Promise<number> {
     return this.getNumberSetting(
       'offer_timeout_seconds',

@@ -85,6 +85,9 @@ export class PhoneOrdersService {
       input.customerPhone,
       null,
     );
+    // FEAT-015: the operator is speaking with the owner of this number, which
+    // proves possession as much as an SMS code does.
+    await this.users.markPhoneVerified(customerId);
     if (input.customerName) {
       const existing = await this.users.getByIdOrThrow(customerId);
       if (!existing.fullName) await this.users.updateFullName(customerId, input.customerName);
@@ -137,7 +140,7 @@ export class PhoneOrdersService {
         message:
           wanted.method === 'wallet'
             ? `${wanted.providerCode} is not enabled for this restaurant or city.`
-            : 'Payment on delivery is not enabled for this restaurant or city.',
+            : 'Payment on delivery is not available for this order (not enabled here, or above this customer’s cash limit): offer mobile money.',
       });
     }
     let instructions: string | null = null;

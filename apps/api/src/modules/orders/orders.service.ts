@@ -14,6 +14,7 @@ import type {
   MoneyJson,
   OrderAccrualBreakdown,
   OrderAmountPort,
+  CustomerTrustFacts,
   OrderDeliveryContext,
   OrderPaymentContext,
   Role,
@@ -491,6 +492,39 @@ export class OrdersService implements OrderAmountPort {
    * the customer), dropoff from THIS order's frozen snapshot (never the
    * customer's live, possibly-since-edited address book).
    */
+  /**
+   * FEAT-015 — the facts a cash-on-delivery decision rests on, from this
+   * module's own tables: delivered orders, deliveries that failed at the door
+   * (history reason `delivery.failed`), cancellations once a courier was on
+   * the order, account age and phone verification.
+   */
+  async getCustomerTrustSignals(customerId: string): Promise<CustomerTrustFacts> {
+    const [user, delivered, failures] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: customerId },
+        select: { createdAt: true, phoneVerifiedAt: true },
+      }),
+      this.prisma.order.count({ where: { customerId, status: 'delivered' } }),
+      this.prisma.$queryRaw<Array<{ no_shows: bigint; late_cancels: bigint }>>`
+        SELECT
+          COUNT(*) FILTER (WHERE h.reason = 'delivery.failed')::bigint AS no_shows,
+          COUNT(*) FILTER (WHERE h.reason IS DISTINCT FROM 'delivery.failed'
+                             AND h.from_status IN ('courier_assigned', 'picked_up', 'on_the_way'))::bigint AS late_cancels
+        FROM order_status_history h
+        JOIN orders o ON o.id = h.order_id
+        WHERE o.customer_id = ${customerId}::uuid AND h.to_status = 'cancelled'
+      `,
+    ]);
+    const ageMs = user ? Date.now() - user.createdAt.getTime() : 0;
+    return {
+      phoneVerified: user?.phoneVerifiedAt != null,
+      deliveredOrders: delivered,
+      noShows: Number(failures[0]?.no_shows ?? 0n),
+      cancelAfterDispatch: Number(failures[0]?.late_cancels ?? 0n),
+      accountAgeDays: Math.floor(ageMs / 86_400_000),
+    };
+  }
+
   async getDeliveryContext(orderId: string): Promise<OrderDeliveryContext> {
     const rows = await this.prisma.$queryRaw<
       Array<{
@@ -543,6 +577,10 @@ export class OrdersService implements OrderAmountPort {
       },
       select: { id: true },
     });
+    // FEAT-015: a customer with no delivered order yet — the courier calls first.
+    const priorDelivered = await this.prisma.order.count({
+      where: { customerId: row.customer_id, status: 'delivered', id: { not: row.id } },
+    });
 
     return {
       orderId: row.id,
@@ -552,6 +590,7 @@ export class OrdersService implements OrderAmountPort {
       currency: row.currency,
       courierFee: money(row.courier_fee_minor, row.currency),
       courierFeeInPool: prepaidHistory !== null,
+      customerIsNew: priorDelivered === 0,
       pickup:
         row.pickup_lat !== null && row.pickup_lng !== null
           ? { lat: row.pickup_lat, lng: row.pickup_lng }

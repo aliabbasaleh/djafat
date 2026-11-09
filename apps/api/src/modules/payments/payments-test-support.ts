@@ -10,6 +10,7 @@ import { PrismaIdempotencyStore } from '../../common/idempotency/prisma-idempote
 import type { LedgerService } from '../ledger/ledger.service';
 import { PaymentProviderRegistry } from './payment-provider.registry';
 import { CashPaymentProvider } from './providers/cash/cash-payment.provider';
+import type { CodTrustService } from './cod-trust.service';
 import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
 import { PaymentsService } from './payments.service';
 
@@ -494,6 +495,13 @@ export function fakeOrderAmountPort(): OrderAmountPort {
     getPaymentContext: vi.fn().mockResolvedValue(context),
     getAccrualBreakdown: vi.fn().mockResolvedValue(breakdown),
     getOwnerUserId: vi.fn().mockResolvedValue(CUSTOMER_ID),
+    getCustomerTrustSignals: vi.fn().mockResolvedValue({
+      phoneVerified: true,
+      deliveredOrders: 0,
+      noShows: 0,
+      cancelAfterDispatch: 0,
+      accountAgeDays: 0,
+    }),
     getDeliveryContext: vi.fn().mockResolvedValue({
       orderId: ORDER_ID,
       orderCode: 'DJ-0001',
@@ -515,6 +523,7 @@ export function buildPaymentsService(
     new CashPaymentProvider(),
     new MockPaymentProvider(),
   ]),
+  codTrust?: CodTrustService,
 ): { payments: PaymentsService; events: EventEmitter2 } {
   const idempotency = new IdempotencyService(new PrismaIdempotencyStore(db));
   const events = { emit: vi.fn(), emitAsync: vi.fn() } as unknown as EventEmitter2;
@@ -526,6 +535,7 @@ export function buildPaymentsService(
     fakeLedger(ledgerGroups),
     events,
     fakeOrderAmountPort(),
+    codTrust,
   );
   return { payments, events };
 }

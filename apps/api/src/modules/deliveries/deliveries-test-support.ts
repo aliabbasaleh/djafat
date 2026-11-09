@@ -913,6 +913,7 @@ export function fakeOrderAmountPort(courierFeeInPool = true): OrderAmountPort {
     orderCode: 'DJ-0001',
     restaurantId: RESTAURANT_ID,
     customerId: CUSTOMER_ID,
+    customerIsNew: false,
     currency: 'XAF',
     courierFee: money(1200n, 'XAF'),
     courierFeeInPool,

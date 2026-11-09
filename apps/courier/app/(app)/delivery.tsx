@@ -134,6 +134,9 @@ export default function DeliveryScreen() {
   return (
     <Screen>
       <Badge tone="info" label={beforePickup ? 'Direction le restaurant' : 'Direction le client'} />
+      {beforePickup && context?.customerIsNew && (
+        <Badge tone="warning" label="Nouveau client — appelez-le avant de quitter le restaurant" />
+      )}
 
       <View style={styles.card}>
         <Text style={styles.cardLabel}>{beforePickup ? 'Récupérer à' : 'Livrer à'}</Text>

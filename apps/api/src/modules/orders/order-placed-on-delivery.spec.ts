@@ -112,12 +112,14 @@ describe('SPEC-009-01 — orders react to a payment collected on delivery', () =
     const onDelivery = build({
       $queryRaw: vi.fn().mockResolvedValue([row]),
       orderStatusHistory: { findFirst: history('payment.on_delivery:p-1') },
+      order: { count: vi.fn().mockResolvedValue(0) },
     });
     expect((await onDelivery.getDeliveryContext('o-1')).courierFeeInPool).toBe(false);
 
     const prepaid = build({
       $queryRaw: vi.fn().mockResolvedValue([row]),
       orderStatusHistory: { findFirst: history('payment.succeeded:p-2') },
+      order: { count: vi.fn().mockResolvedValue(0) },
     });
     expect((await prepaid.getDeliveryContext('o-1')).courierFeeInPool).toBe(true);
   });

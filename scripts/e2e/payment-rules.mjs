@@ -211,6 +211,42 @@ const courier = await login(COURIER);
 {
   console.log('\nB. Application + espèces : rien à payer avant, confirmé à la livraison');
   const cust = await login(CUSTOMER);
+  // FEAT-015: a customer with no delivered order may not pay cash at night
+  // (22:00–06:00 in N'Djamena). Precondition only: give the test customer one
+  // delivered, prepaid order first, so the cash rules below are what is tested.
+  const localHour = (new Date().getUTCHours() + 1) % 24;
+  const delivered = Number(
+    sql(
+      `select count(*) from orders o join users u on u.id=o.customer_id where u.phone='${CUSTOMER}' and o.status='delivered'`,
+    ),
+  );
+  if ((localHour >= 22 || localHour < 6) && delivered === 0) {
+    const { order: first } = await cartOrder(cust);
+    const p = await call('POST', '/payments', {
+      token: cust,
+      body: {
+        orderId: first.id,
+        providerCode: 'airtel_money',
+        methodCode: 'mobile_money',
+        payerPhone: CUSTOMER,
+      },
+    });
+    const ref = `CIN${Date.now()}`;
+    await call('POST', `/payments/${p.body.payment.id}/mobile-money/claim`, {
+      token: cust,
+      body: { transactionRef: ref, payerPhone: CUSTOMER },
+    });
+    await recordTransfer(staff, { amountMinor: first.total.minor, ref, sender: CUSTOMER });
+    const d0 = await deliver(first.id, {
+      kitchen,
+      courier,
+      code: async (did) =>
+        (await call('GET', `/deliveries/${did}/code`, { token: cust })).body.code,
+    });
+    console.log(
+      `   (nuit : 1re commande prépayée livrée pour le client de test — ${d0.delivered ? 'ok' : 'échec'})`,
+    );
+  }
   const { order } = await cartOrder(cust);
   const methods = (await call('GET', `/payments/methods-for-order/${order.id}`, { token: cust }))
     .body;

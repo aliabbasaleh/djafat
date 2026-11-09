@@ -17,6 +17,7 @@ import { MobileMoneyReceiptsService } from './mobile-money/mobile-money-receipts
 import { MobileMoneyController } from './mobile-money/mobile-money.controller';
 import { CourierRemittanceService } from './mobile-money/courier-remittance.service';
 import { UsersModule } from '../users/users.module';
+import { CodTrustService } from './cod-trust.service';
 import { CourierPayoutsService } from './mobile-money/courier-payouts.service';
 import { CourierPayoutsController } from './mobile-money/courier-payouts.controller';
 
@@ -67,6 +68,7 @@ import { CourierPayoutsController } from './mobile-money/courier-payouts.control
     MobileMoneyReceiptsService,
     CourierRemittanceService,
     CourierPayoutsService,
+    CodTrustService,
     SettlementsService,
   ],
   exports: [PaymentProviderRegistry, PaymentsService, MobileMoneyReceiptsService],
