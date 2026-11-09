@@ -11,6 +11,7 @@ import {
   RestaurantCardGridItem,
   cx,
 } from '@djafat/ui';
+import { Alert } from '@/components/ui-client';
 import { api } from '@/lib/api';
 import { SearchForm } from '@/components/SearchForm';
 import { Pagination } from '@/components/Pagination';
@@ -72,6 +73,8 @@ export default async function RestaurantsPage({
     result = null;
   }
 
+  const openCount = (result?.items ?? []).filter((r) => r.availability === 'OPEN').length;
+
   return (
     <Container as="main" className={cx(styles['main'])}>
       <Stack gap="md">
@@ -96,10 +99,25 @@ export default async function RestaurantsPage({
             message="Essayez une autre recherche, ou retirez le filtre « ouvert maintenant »."
           />
         )}
+        {result && result.items.length > 0 && openCount === 0 && !openNow && (
+          <Alert tone="info">
+            Aucun restaurant n&rsquo;est ouvert sur cette page pour le moment. Vous pouvez parcourir
+            leurs menus, mais la commande ne sera possible qu&rsquo;à leur réouverture.
+          </Alert>
+        )}
         {result && result.items.length > 0 && (
           <div>
+            {/*
+              The raw total answers the wrong question: what a customer needs
+              to know is how many they can order from RIGHT NOW. Counted on
+              the current page only — `total` spans every page, and claiming a
+              market-wide open count from one page's data would be a guess.
+            */}
             <Text tone="secondary" size="small" className={cx(styles['count'])}>
               {result.total} restaurant{result.total > 1 ? 's' : ''}
+              {openCount > 0
+                ? ` · ${openCount} ouvert${openCount > 1 ? 's' : ''} sur cette page`
+                : ' · aucun ouvert sur cette page'}
             </Text>
             <RestaurantCardGrid>
               {result.items.map((r) => (

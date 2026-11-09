@@ -3,7 +3,6 @@ import {
   Container,
   Stack,
   Heading,
-  Text,
   EmptyState,
   ErrorState,
   RestaurantCard,
@@ -43,16 +42,22 @@ async function loadHomeData(): Promise<HomeData | null> {
  */
 export default async function HomePage() {
   const data = await loadHomeData();
+  const items = data?.restaurants.items ?? [];
+  const openNow = items.filter((r) => r.availability === 'OPEN');
+  const closedNow = items.filter((r) => r.availability !== 'OPEN');
 
   return (
     <Container as="main" className={cx(styles['main'])}>
+      {/*
+        No subtitle: it claimed "restaurants ouverts près de chez vous" — the
+        catalogue is neither filtered to open ones nor to any proximity (there
+        is no geo module yet), and it pushed the first orderable card below the
+        fold on a phone. The heading alone carries the promise.
+      */}
       <Stack as="section" gap="md" className={cx(styles['hero'])}>
         <Heading level={1} size="display">
           Vos restaurants préférés, livrés à N&rsquo;Djamena
         </Heading>
-        <Text tone="secondary" className={cx(styles['heroSubtitle'])}>
-          Parcourez les restaurants ouverts près de chez vous et commandez en quelques instants.
-        </Text>
         <SearchForm action="/restaurants" />
       </Stack>
 
@@ -70,54 +75,99 @@ export default async function HomePage() {
         </Stack>
       )}
 
-      <Stack
-        as="section"
-        gap="sm"
-        aria-labelledby="restaurants-heading"
-        className={cx(styles['section'])}
-      >
-        <Heading level={2} id="restaurants-heading">
-          Restaurants près de vous
-        </Heading>
+      {/*
+        Open and closed are shown as two separate sections rather than one
+        mixed grid: a customer cannot order from a closed restaurant, so
+        burying that fact in a corner badge sells something unbuyable. When
+        nothing is open (the seeded market closes at night) the empty state
+        says so explicitly instead of leaving a silent wall of cards nobody
+        can use.
+      */}
+      {!data && (
+        <ErrorState
+          title="Impossible de charger les restaurants"
+          message="Vérifiez votre connexion et réessayez dans un instant."
+        />
+      )}
+      {data && data.restaurants.items.length === 0 && (
+        <EmptyState
+          title="Aucun restaurant pour l'instant"
+          message="Revenez bientôt — de nouveaux restaurants arrivent régulièrement."
+        />
+      )}
 
-        {!data && (
-          <ErrorState
-            title="Impossible de charger les restaurants"
-            message="Vérifiez votre connexion et réessayez dans un instant."
-          />
-        )}
-        {data && data.restaurants.items.length === 0 && (
-          <EmptyState
-            title="Aucun restaurant pour l'instant"
-            message="Revenez bientôt — de nouveaux restaurants arrivent régulièrement."
-          />
-        )}
-        {data && data.restaurants.items.length > 0 && (
-          <>
-            <RestaurantCardGrid>
-              {data.restaurants.items.map((r) => (
-                <RestaurantCardGridItem key={r.id}>
-                  <RestaurantCard
-                    href={`/restaurants/${r.slug}`}
-                    name={r.name}
-                    imageUrl={r.coverUrl}
-                    status={r.availability}
-                    ratingAvg={r.ratingAvg}
-                    ratingCount={r.ratingCount}
-                    etaMinutes={r.prepTimeMin}
-                    description={r.description}
-                  />
-                </RestaurantCardGridItem>
-              ))}
-            </RestaurantCardGrid>
-            <p className={cx(styles['seeMore'])}>
-              <Button href="/restaurants" variant="secondary">
-                Voir tous les restaurants
-              </Button>
-            </p>
-          </>
-        )}
-      </Stack>
+      {data && data.restaurants.items.length > 0 && (
+        <>
+          <Stack
+            as="section"
+            gap="sm"
+            aria-labelledby="open-restaurants-heading"
+            className={cx(styles['section'])}
+          >
+            <Heading level={2} id="open-restaurants-heading">
+              Ouverts maintenant
+            </Heading>
+            {openNow.length === 0 ? (
+              <EmptyState
+                title="Aucun restaurant ouvert à cette heure"
+                message="Les restaurants ci-dessous rouvriront plus tard dans la journée."
+              />
+            ) : (
+              <RestaurantCardGrid>
+                {openNow.map((r) => (
+                  <RestaurantCardGridItem key={r.id}>
+                    <RestaurantCard
+                      href={`/restaurants/${r.slug}`}
+                      name={r.name}
+                      imageUrl={r.coverUrl}
+                      status={r.availability}
+                      ratingAvg={r.ratingAvg}
+                      ratingCount={r.ratingCount}
+                      etaMinutes={r.prepTimeMin}
+                      description={r.description}
+                    />
+                  </RestaurantCardGridItem>
+                ))}
+              </RestaurantCardGrid>
+            )}
+          </Stack>
+
+          {closedNow.length > 0 && (
+            <Stack
+              as="section"
+              gap="sm"
+              aria-labelledby="closed-restaurants-heading"
+              className={cx(styles['section'])}
+            >
+              <Heading level={2} id="closed-restaurants-heading">
+                Fermés pour le moment
+              </Heading>
+              <RestaurantCardGrid>
+                {closedNow.map((r) => (
+                  <RestaurantCardGridItem key={r.id}>
+                    <RestaurantCard
+                      href={`/restaurants/${r.slug}`}
+                      name={r.name}
+                      imageUrl={r.coverUrl}
+                      status={r.availability}
+                      ratingAvg={r.ratingAvg}
+                      ratingCount={r.ratingCount}
+                      etaMinutes={r.prepTimeMin}
+                      description={r.description}
+                    />
+                  </RestaurantCardGridItem>
+                ))}
+              </RestaurantCardGrid>
+            </Stack>
+          )}
+
+          <p className={cx(styles['seeMore'])}>
+            <Button href="/restaurants" variant="secondary">
+              Voir tous les restaurants
+            </Button>
+          </p>
+        </>
+      )}
     </Container>
   );
 }
