@@ -1012,11 +1012,14 @@ export class OrdersService implements OrderAmountPort {
    */
   @OnEvent('payment.succeeded')
   async markPlacedFromPayment(payload: { orderId: string; paymentId: string }): Promise<void> {
-    const affected = await this.prisma.$executeRaw`
+    // RETURNING restaurant_id: the kitchen's board is told through its own
+    // realtime room (`restaurant:orders:{id}`), keyed on this id.
+    const placed = await this.prisma.$queryRaw<Array<{ restaurant_id: string }>>`
       UPDATE orders SET status = 'placed'::order_status, placed_at = now()
       WHERE id = ${payload.orderId}::uuid AND status = 'awaiting_payment'::order_status
+      RETURNING restaurant_id
     `;
-    if (affected === 0) {
+    if (placed.length === 0) {
       this.logger.debug(
         `markPlacedFromPayment: order ${payload.orderId} already left awaiting_payment (idempotent no-op)`,
       );
@@ -1035,7 +1038,7 @@ export class OrdersService implements OrderAmountPort {
         aggregate: 'order',
         aggregateId: payload.orderId,
         eventType: 'order.placed',
-        payload: { orderId: payload.orderId },
+        payload: { orderId: payload.orderId, restaurantId: placed[0]!.restaurant_id },
       },
     });
     this.logger.log(`order ${payload.orderId} placed (payment ${payload.paymentId} succeeded)`);
@@ -1048,11 +1051,14 @@ export class OrdersService implements OrderAmountPort {
    */
   @OnEvent('payment.on_delivery')
   async markPlacedForDelivery(payload: { orderId: string; paymentId: string }): Promise<void> {
-    const affected = await this.prisma.$executeRaw`
+    // RETURNING restaurant_id: the kitchen's board is told through its own
+    // realtime room (`restaurant:orders:{id}`), keyed on this id.
+    const placed = await this.prisma.$queryRaw<Array<{ restaurant_id: string }>>`
       UPDATE orders SET status = 'placed'::order_status, placed_at = now()
       WHERE id = ${payload.orderId}::uuid AND status = 'awaiting_payment'::order_status
+      RETURNING restaurant_id
     `;
-    if (affected === 0) {
+    if (placed.length === 0) {
       this.logger.debug(
         `markPlacedForDelivery: order ${payload.orderId} already left awaiting_payment (idempotent no-op)`,
       );
@@ -1071,7 +1077,7 @@ export class OrdersService implements OrderAmountPort {
         aggregate: 'order',
         aggregateId: payload.orderId,
         eventType: 'order.placed',
-        payload: { orderId: payload.orderId },
+        payload: { orderId: payload.orderId, restaurantId: placed[0]!.restaurant_id },
       },
     });
     this.logger.log(`order ${payload.orderId} placed (payment ${payload.paymentId} on delivery)`);

@@ -10,6 +10,7 @@ import { Badge } from '../../components/Badge';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 import { useCourierRealtime } from '../../lib/realtime';
+import { useForegroundLocationReporting } from '../../lib/location';
 import { newIdempotencyKey } from '../../lib/idempotency';
 import { secondsRemaining, formatCountdown, formatMoney } from '../../lib/format';
 
@@ -28,6 +29,8 @@ export default function HomeScreen() {
   const { user, signOut } = useAuth();
   const [state, setState] = useState<LoadState>('loading');
   const [profile, setProfile] = useState<CourierProfile | null>(null);
+  // Dispatch only offers a course to a courier whose position is fresh: report it while online.
+  useForegroundLocationReporting(profile?.status === 'online');
   const [offer, setOffer] = useState<DeliveryOffer | null>(null);
   const [activeDelivery, setActiveDelivery] = useState<Delivery | null>(null);
   const [busy, setBusy] = useState(false);

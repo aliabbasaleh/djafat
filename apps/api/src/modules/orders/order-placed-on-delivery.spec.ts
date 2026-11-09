@@ -31,12 +31,13 @@ function build(prisma: Record<string, unknown>) {
 }
 
 function placementDb(affected: number) {
-  const executeRaw = vi.fn().mockResolvedValue(affected);
+  // `UPDATE … RETURNING restaurant_id`: one row when the order was placed, none otherwise.
+  const executeRaw = vi.fn().mockResolvedValue(affected === 1 ? [{ restaurant_id: 'r1' }] : []);
   const historyCreate = vi.fn().mockResolvedValue({});
   const outboxCreate = vi.fn().mockResolvedValue({});
   return {
     prisma: {
-      $executeRaw: executeRaw,
+      $queryRaw: executeRaw,
       orderStatusHistory: { create: historyCreate },
       outbox: { create: outboxCreate },
     },
@@ -64,6 +65,10 @@ describe('SPEC-009-01 — orders react to a payment collected on delivery', () =
     });
     expect(ok.outboxCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ eventType: 'order.placed', aggregateId: 'o-1' }),
+    });
+    // the kitchen board is reached through `restaurant:orders:{restaurantId}`
+    expect(ok.outboxCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ payload: { orderId: 'o-1', restaurantId: 'r1' } }),
     });
 
     const already = placementDb(0); // already placed, or expired first
