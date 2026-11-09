@@ -19,6 +19,7 @@ function harness(opts: {
   addresses?: Array<Record<string, unknown>>;
   methods?: Array<{ providerCode: string; methodCode: string; capabilities: unknown }>;
   orderStatus?: string;
+  transfer?: 'paid' | 'pending' | 'amount_mismatch';
 }) {
   const users = {
     findOrCreateByPhone: vi.fn(async () => ({ userId: 'cust-1', isNew: opts.isNew ?? true })),
@@ -45,7 +46,11 @@ function harness(opts: {
     listMethodsForOrder: vi.fn(
       async () =>
         opts.methods ?? [
-          { providerCode: 'airtel_money', methodCode: 'mobile_money', capabilities: {} },
+          {
+            providerCode: 'airtel_money',
+            methodCode: 'mobile_money',
+            capabilities: { matchedByTransferReceipt: true },
+          },
           {
             providerCode: 'cash',
             methodCode: 'cash_on_delivery',
@@ -53,7 +58,13 @@ function harness(opts: {
           },
         ],
     ),
-    createPayment: vi.fn(async () => ({ status: 'created', payment: {} })),
+    createPayment: vi.fn(async (input: { providerCode: string }) => ({
+      status: 'created',
+      payment:
+        input.providerCode === 'airtel_money'
+          ? { action: { type: 'none', instructions: 'Envoyez 6 500 FCFA au +235 60 00 00 10' } }
+          : {},
+    })),
   };
   const audit = { log: vi.fn(async () => undefined) };
   const idempotency = {
@@ -62,6 +73,10 @@ function harness(opts: {
       response: await handler(),
     })),
   };
+  const receipts = {
+    claimForOrder: vi.fn(async () => ({ paymentId: 'pay-1', outcome: opts.transfer ?? 'paid' })),
+  };
+  const deliveries = { presetDeliveryCode: vi.fn(async () => '4821') };
   const service = new PhoneOrdersService(
     users as never,
     addresses as never,
@@ -70,8 +85,21 @@ function harness(opts: {
     payments as never,
     audit as never,
     idempotency as never,
+    receipts as never,
+    deliveries as never,
   );
-  return { service, users, addresses, carts, orders, payments, audit, idempotency };
+  return {
+    service,
+    users,
+    addresses,
+    carts,
+    orders,
+    payments,
+    audit,
+    idempotency,
+    receipts,
+    deliveries,
+  };
 }
 
 describe('FEAT-011 / SPEC-011-01 — order taken on the phone by an operator', () => {
@@ -152,5 +180,70 @@ describe('FEAT-011 / SPEC-011-01 — order taken on the phone by an operator', (
     await h.service.place(body(), OPERATOR, 'key-4');
     expect(h.payments.listMethodsForOrder).not.toHaveBeenCalled();
     expect(h.payments.createPayment).not.toHaveBeenCalled();
+  });
+
+  it("SPEC-012-01-SC01 — Airtel during the call: wallet payment from the caller's phone, instructions, code to give the courier", async () => {
+    const h = harness({});
+    const r = await h.service.place(
+      body({ payment: { method: 'wallet', providerCode: 'airtel_money' } }),
+      OPERATOR,
+      'key-5',
+    );
+    expect(h.payments.createPayment).toHaveBeenCalledWith(
+      {
+        orderId: 'ord-1',
+        providerCode: 'airtel_money',
+        methodCode: 'mobile_money',
+        payerPhone: '+23566123456',
+      },
+      'phone:key-5',
+    );
+    expect(r.payment).toEqual({
+      method: 'wallet',
+      instructions: 'Envoyez 6 500 FCFA au +235 60 00 00 10',
+    });
+    expect(h.receipts.claimForOrder).not.toHaveBeenCalled(); // no number given yet
+    expect(r.deliveryCode).toBe('4821');
+    expect(h.deliveries.presetDeliveryCode).toHaveBeenCalledWith('ord-1', 'op-1');
+  });
+
+  it('SPEC-012-01-SC02 — the caller already paid: the transaction number is checked at once', async () => {
+    const h = harness({});
+    const r = await h.service.place(
+      body({
+        payment: { method: 'wallet', providerCode: 'airtel_money', transactionRef: 'CI1.A' },
+      }),
+      OPERATOR,
+      'key-6',
+    );
+    expect(h.receipts.claimForOrder).toHaveBeenCalledWith('ord-1', 'CI1.A');
+    expect(r.transfer).toBe('paid');
+  });
+
+  it('SPEC-012-01-SC03 — wallet not enabled: refused, no payment', async () => {
+    const h = harness({
+      methods: [
+        {
+          providerCode: 'cash',
+          methodCode: 'cash_on_delivery',
+          capabilities: { collectedOnDelivery: true },
+        },
+      ],
+    });
+    await expect(
+      h.service.place(
+        body({ payment: { method: 'wallet', providerCode: 'airtel_money' } }),
+        OPERATOR,
+        'key-7',
+      ),
+    ).rejects.toMatchObject({ status: 409, response: { code: 'PAYMENT_METHOD_UNAVAILABLE' } });
+    expect(h.payments.createPayment).not.toHaveBeenCalled();
+  });
+
+  it('SPEC-012-01-SC04 — paid after the call: the operator confirms the number later', async () => {
+    const h = harness({ transfer: 'pending' });
+    const r = await h.service.confirmTransfer('ord-1', 'CI2.B');
+    expect(h.receipts.claimForOrder).toHaveBeenCalledWith('ord-1', 'CI2.B');
+    expect(r.transfer).toBe('pending');
   });
 });

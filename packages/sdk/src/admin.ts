@@ -123,7 +123,17 @@ export interface PhoneOrderInput {
     readonly instructions?: string;
     readonly coordinates?: { readonly lat: number; readonly lng: number };
   };
+  /** FEAT-012: cash on delivery (default), or Airtel/Tigo paid now to DJAFAT's number. */
+  readonly payment?:
+    | { readonly method: 'on_delivery' }
+    | {
+        readonly method: 'wallet';
+        readonly providerCode: string;
+        readonly transactionRef?: string;
+      };
 }
+
+export type PhoneTransferOutcome = 'paid' | 'pending' | 'amount_mismatch';
 
 export function createAdminClient(http: ApiHttp) {
   return {
@@ -175,7 +185,16 @@ export function createAdminClient(http: ApiHttp) {
           status: 'created' | 'replayed';
           customer: { id: string; isNew: boolean };
           order: Order;
+          payment: { method: 'on_delivery' | 'wallet'; instructions: string | null };
+          transfer?: PhoneTransferOutcome;
+          /** The code the caller gives the courier at the door (FEAT-012). */
+          deliveryCode: string;
         }>('/admin/phone-orders', { body: input, idempotencyKey }),
+      confirmTransfer: (orderId: string, transactionRef: string) =>
+        http.post<{ transfer: PhoneTransferOutcome; order: Order }>(
+          `/admin/phone-orders/${encodeURIComponent(orderId)}/transfer`,
+          { body: { transactionRef } },
+        ),
     },
     finance: {
       balances: () => http.get<FinanceBalances>('/admin/finance/balances'),

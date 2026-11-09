@@ -40,7 +40,16 @@ export default function PhoneOrderPage() {
   const [instructions, setInstructions] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ order: Order; isNew: boolean } | null>(null);
+  const [payBy, setPayBy] = useState<'on_delivery' | 'airtel_money'>('on_delivery');
+  const [txRef, setTxRef] = useState('');
+  const [done, setDone] = useState<{
+    order: Order;
+    isNew: boolean;
+    deliveryCode: string;
+    method: 'on_delivery' | 'wallet';
+    instructions: string | null;
+    transfer: 'paid' | 'pending' | 'amount_mismatch' | null;
+  } | null>(null);
   const [key, setKey] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
@@ -135,8 +144,24 @@ export default function PhoneOrderPage() {
           landmark: landmark.trim(),
           ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
         },
+        payment:
+          payBy === 'on_delivery'
+            ? { method: 'on_delivery' }
+            : {
+                method: 'wallet',
+                providerCode: payBy,
+                ...(txRef.trim() ? { transactionRef: txRef.trim() } : {}),
+              },
       });
-      setDone({ order: res.order, isNew: res.customer.isNew });
+      setDone({
+        order: res.order,
+        isNew: res.customer.isNew,
+        deliveryCode: res.deliveryCode,
+        method: res.payment.method,
+        instructions: res.payment.instructions,
+        transfer: res.transfer ?? null,
+      });
+      setTxRef('');
     } catch (err) {
       setError(
         err instanceof ApiClientError
@@ -148,8 +173,25 @@ export default function PhoneOrderPage() {
     }
   }
 
+  /** Airtel paid after the order was taken: the caller reads out the transaction number. */
+  async function confirmTransfer() {
+    if (!done) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.admin.phoneOrders.confirmTransfer(done.order.id, txRef.trim());
+      setDone({ ...done, order: res.order, transfer: res.transfer });
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Vérification impossible.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function reset() {
     setDone(null);
+    setPayBy('on_delivery');
+    setTxRef('');
     setLines({});
     setPhone('');
     setName('');
@@ -160,20 +202,57 @@ export default function PhoneOrderPage() {
   }
 
   if (done) {
+    const total = formatMoney(done.order.total);
+    const paid = done.method === 'on_delivery' || done.transfer === 'paid';
     return (
       <Stack gap="lg" className={cx(styles['page'])}>
-        <Heading level={1}>Commande envoyée</Heading>
-        <Alert tone="success">
-          Commande {done.order.code} — {formatMoney(done.order.total)}, payée à la livraison. Elle
-          part au restaurant, puis à un livreur.
-          {done.isNew ? ' Nouveau client : son compte a été créé avec son numéro.' : ''}
-        </Alert>
+        <Heading level={1}>Commande {done.order.code}</Heading>
+        <section className={cx(styles['card'], styles['codeCard'])} aria-label="Code de livraison">
+          <Text>Code à donner au client — il le dira au livreur à la livraison :</Text>
+          <p className={cx(styles['code'])}>{done.deliveryCode}</p>
+        </section>
+        {done.method === 'on_delivery' ? (
+          <Alert tone="success">
+            {total}, payée en espèces à la livraison. La commande part au restaurant, puis à un
+            livreur.
+            {done.isNew ? ' Nouveau client : son compte a été créé avec son numéro.' : ''}
+          </Alert>
+        ) : paid ? (
+          <Alert tone="success">
+            Paiement Airtel Money reçu ({total}) : la commande part au restaurant.
+          </Alert>
+        ) : (
+          <Stack gap="sm">
+            <Alert tone={done.transfer === 'amount_mismatch' ? 'danger' : 'warning'}>
+              {done.transfer === 'amount_mismatch'
+                ? 'Le montant reçu ne correspond pas au total. Vérifiez avec le client.'
+                : 'En attente du paiement Airtel Money : la commande partira au restaurant dès que DJAFAT aura reçu le transfert.'}
+            </Alert>
+            {done.instructions && <Text>À dire au client : « {done.instructions} »</Text>}
+            <Input
+              label="Numéro de transaction (lu par le client)"
+              placeholder="ex. CI251109.1015.D4417"
+              value={txRef}
+              onChange={(e) => setTxRef(e.target.value)}
+            />
+            {error && <Alert tone="danger">{error}</Alert>}
+            <Button onClick={() => void confirmTransfer()} disabled={busy || !txRef.trim()}>
+              {busy ? 'Vérification…' : 'Vérifier le paiement'}
+            </Button>
+          </Stack>
+        )}
         <Text>
-          À dire au client : « Votre commande {done.order.code} est enregistrée. Le livreur vous
-          appellera. Vous payez {formatMoney(done.order.total)} à la livraison, en espèces ou par
-          Airtel Money. »
+          À dire au client : « Votre commande {done.order.code} est enregistrée.
+          {done.method === 'on_delivery'
+            ? ` Vous payez ${total} au livreur, en espèces.`
+            : paid
+              ? ' Votre paiement Airtel Money est bien reçu.'
+              : ''}{' '}
+          Au livreur, donnez le code {done.deliveryCode}. »
         </Text>
-        <Button onClick={reset}>Nouvel appel</Button>
+        <Button variant={paid ? 'primary' : 'secondary'} onClick={reset}>
+          Nouvel appel
+        </Button>
       </Stack>
     );
   }
@@ -296,10 +375,42 @@ export default function PhoneOrderPage() {
         />
       </section>
 
+      <section className={cx(styles['card'])} aria-label="Paiement">
+        <Heading level={2}>4. Le paiement</Heading>
+        <div className={cx(styles['row'])} role="radiogroup" aria-label="Moyen de paiement">
+          <label className={cx(styles['product'], payBy === 'on_delivery' && styles['picked'])}>
+            <input
+              type="radio"
+              name="payBy"
+              checked={payBy === 'on_delivery'}
+              onChange={() => setPayBy('on_delivery')}
+            />{' '}
+            Espèces à la livraison
+          </label>
+          <label className={cx(styles['product'], payBy === 'airtel_money' && styles['picked'])}>
+            <input
+              type="radio"
+              name="payBy"
+              checked={payBy === 'airtel_money'}
+              onChange={() => setPayBy('airtel_money')}
+            />{' '}
+            Airtel Money maintenant (au numéro DJAFAT)
+          </label>
+        </div>
+        {payBy === 'airtel_money' && (
+          <Input
+            label="Numéro de transaction (si le client a déjà payé)"
+            helpText="Sinon, vous le saisirez après : la commande attend le paiement avant de partir au restaurant."
+            value={txRef}
+            onChange={(e) => setTxRef(e.target.value)}
+          />
+        )}
+      </section>
+
       <section className={cx(styles['card'], styles['summary'])} aria-label="Récapitulatif">
         <Text>
           Plats : <strong>{formatMoney({ minor: subtotal.toString(), currency })}</strong> + frais
-          de livraison (calculés à l’envoi). Paiement à la livraison : espèces ou Airtel Money.
+          de livraison (calculés à l’envoi).
         </Text>
         {error && <Alert tone="danger">{error}</Alert>}
         <Button fullWidth onClick={() => void submit()} disabled={!canSubmit}>

@@ -68,3 +68,15 @@
   border-width: 2px;
   border-color: var(--djafat-color-brand-primary);
 }
+.codeCard {
+  align-items: center;
+  border-width: 2px;
+  border-color: var(--djafat-color-brand-primary);
+}
+.code {
+  margin: 0;
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: 10px;
+  color: var(--djafat-color-brand-primary);
+}

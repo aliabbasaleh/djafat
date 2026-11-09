@@ -64,6 +64,6 @@ import { CourierRemittanceService } from './mobile-money/courier-remittance.serv
     CourierRemittanceService,
     SettlementsService,
   ],
-  exports: [PaymentProviderRegistry, PaymentsService],
+  exports: [PaymentProviderRegistry, PaymentsService, MobileMoneyReceiptsService],
 })
 export class PaymentsModule {}

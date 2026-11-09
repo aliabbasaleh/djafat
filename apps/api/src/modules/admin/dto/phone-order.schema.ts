@@ -33,6 +33,29 @@ export const PhoneOrderSchema = z
         coordinates: z.object({ lat: z.number(), lng: z.number() }).strict().optional(),
       })
       .strict(),
+    /**
+     * FEAT-012. `on_delivery` (default): cash to the courier, confirmed at
+     * delivery. `wallet`: the caller pays NOW by Airtel/Tigo to DJAFAT's
+     * number; the order reaches the restaurant only once the transfer is seen.
+     */
+    payment: z
+      .discriminatedUnion('method', [
+        z.object({ method: z.literal('on_delivery') }).strict(),
+        z
+          .object({
+            method: z.literal('wallet'),
+            providerCode: z.string().min(1).max(40),
+            transactionRef: z.string().trim().min(1).max(80).optional(),
+          })
+          .strict(),
+      ])
+      .optional(),
   })
   .strict();
 export type PhoneOrderBody = z.infer<typeof PhoneOrderSchema>;
+
+/** FEAT-012: the transaction number the caller reads out once they have paid. */
+export const PhoneOrderTransferSchema = z
+  .object({ transactionRef: z.string().trim().min(1).max(80) })
+  .strict();
+export type PhoneOrderTransferBody = z.infer<typeof PhoneOrderTransferSchema>;

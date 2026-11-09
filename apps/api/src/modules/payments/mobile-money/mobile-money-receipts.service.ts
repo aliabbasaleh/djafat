@@ -123,6 +123,34 @@ export class MobileMoneyReceiptsService {
   }
 
   /** Customer gives the transaction number (or nothing): match if a recorded transfer fits. */
+  /**
+   * FEAT-012 — the operator types the transaction number the caller read out
+   * on the phone. Same check as the customer's own claim (number, amount, and
+   * the sender is the payer's phone recorded on the payment).
+   */
+  async claimForOrder(
+    orderId: string,
+    transactionRef: string,
+  ): Promise<{ paymentId: string; outcome: ClaimOutcome }> {
+    const rows = await this.prisma.payment.findMany({
+      where: { orderId, status: { in: ['pending', 'succeeded'] } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const wallet = rows.find(
+      (p) =>
+        this.registry.has(p.providerCode) &&
+        this.registry.get(p.providerCode).getCapabilities().matchedByTransferReceipt === true,
+    );
+    if (!wallet) {
+      throw new NotFoundException({
+        code: 'NOT_FOUND',
+        message: 'This order has no mobile money payment to confirm.',
+      });
+    }
+    const { outcome } = await this.claim(wallet.id, { transactionRef, payerPhone: null });
+    return { paymentId: wallet.id, outcome };
+  }
+
   async claim(paymentId: string, claim: TransferClaim): Promise<{ outcome: ClaimOutcome }> {
     const payment = await this.loadPayment(paymentId);
     if (payment.status === 'succeeded') return { outcome: 'paid' }; // idempotent answer

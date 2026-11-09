@@ -6,6 +6,8 @@ import { AddressesService, type AddressDto } from '../addresses/addresses.servic
 import { CartsService } from '../carts/carts.service';
 import { OrdersService } from '../orders/orders.service';
 import { PaymentsService } from '../payments/payments.service';
+import { MobileMoneyReceiptsService } from '../payments/mobile-money/mobile-money-receipts.service';
+import { DeliveriesService } from '../deliveries/deliveries.service';
 import type { PhoneOrderBody } from './dto/phone-order.schema';
 
 /**
@@ -33,6 +35,8 @@ export class PhoneOrdersService {
     private readonly payments: PaymentsService,
     private readonly audit: AuditService,
     private readonly idempotency: IdempotencyService,
+    private readonly receipts: MobileMoneyReceiptsService,
+    private readonly deliveries: DeliveriesService,
   ) {}
 
   /** The same key with the same order answers the first result (double click, retry). */
@@ -47,7 +51,29 @@ export class PhoneOrdersService {
       input,
       () => this.doPlace(input, operator, idempotencyKey),
     );
-    return { status: run.status, ...run.response };
+    const orderId = run.response.order.id;
+    // FEAT-012: the code the caller gives the courier, read out now. Kept out
+    // of the idempotency record (a stored response) — asked again instead,
+    // which returns the same code.
+    const deliveryCode = await this.deliveries.presetDeliveryCode(orderId, operator.userId);
+    // Paid by Airtel/Tigo during the call: check the transaction number now.
+    const transfer =
+      input.payment?.method === 'wallet' && input.payment.transactionRef
+        ? (await this.receipts.claimForOrder(orderId, input.payment.transactionRef)).outcome
+        : null;
+    return {
+      status: run.status,
+      ...run.response,
+      ...(transfer ? { transfer } : {}),
+      order: transfer === 'paid' ? await this.orders.getOrder(orderId) : run.response.order,
+      deliveryCode,
+    };
+  }
+
+  /** FEAT-012 — the caller paid after the order was taken: confirm with the number they read out. */
+  async confirmTransfer(orderId: string, transactionRef: string) {
+    const { outcome } = await this.receipts.claimForOrder(orderId, transactionRef);
+    return { transfer: outcome, order: await this.orders.getOrder(orderId) };
   }
 
   private async doPlace(
@@ -85,29 +111,48 @@ export class PhoneOrdersService {
     // A replay leaves the cart rebuilt above unused: empty it again.
     if (status === 'replayed') await this.carts.clearCart(customerId);
 
-    // Paid on delivery: cash to the courier, or Airtel/Tigo at the door.
-    // Chosen by capability, never by provider name.
+    // FEAT-012 — how the caller pays. Chosen by capability, never by provider
+    // name: on delivery (cash to the courier, confirmed at delivery), or by
+    // wallet NOW to DJAFAT's number — then the order only reaches the
+    // restaurant once the transfer is seen (FEAT-009 matching).
     const current = await this.orders.getOrder(order.id);
     const awaiting = current.status === 'awaiting_payment';
     const methods = awaiting ? await this.payments.listMethodsForOrder(order.id) : [];
-    const onDelivery = methods.find(
-      (m) => (m.capabilities as { collectedOnDelivery?: boolean }).collectedOnDelivery === true,
-    );
-    if (awaiting && !onDelivery) {
+    const wanted = input.payment ?? { method: 'on_delivery' as const };
+    const chosen =
+      wanted.method === 'wallet'
+        ? methods.find(
+            (m) =>
+              m.providerCode === wanted.providerCode &&
+              (m.capabilities as { matchedByTransferReceipt?: boolean })
+                .matchedByTransferReceipt === true,
+          )
+        : methods.find(
+            (m) =>
+              (m.capabilities as { collectedOnDelivery?: boolean }).collectedOnDelivery === true,
+          );
+    if (awaiting && !chosen) {
       throw new ConflictException({
         code: 'PAYMENT_METHOD_UNAVAILABLE',
-        message: 'Payment on delivery is not enabled for this restaurant or city.',
+        message:
+          wanted.method === 'wallet'
+            ? `${wanted.providerCode} is not enabled for this restaurant or city.`
+            : 'Payment on delivery is not enabled for this restaurant or city.',
       });
     }
-    if (onDelivery) {
-      await this.payments.createPayment(
+    let instructions: string | null = null;
+    if (chosen) {
+      const created = await this.payments.createPayment(
         {
           orderId: order.id,
-          providerCode: onDelivery.providerCode,
-          methodCode: onDelivery.methodCode,
+          providerCode: chosen.providerCode,
+          methodCode: chosen.methodCode,
+          // the transfer must come from the caller's phone (sender check)
+          ...(wanted.method === 'wallet' ? { payerPhone: input.customerPhone } : {}),
         },
         `phone:${idempotencyKey}`,
       );
+      instructions = created.payment.action?.instructions ?? null;
     }
 
     if (status === 'created') {
@@ -125,6 +170,7 @@ export class PhoneOrdersService {
     return {
       customer: { id: customerId, isNew },
       order: await this.orders.getOrder(order.id),
+      payment: { method: wanted.method, instructions },
     };
   }
 
