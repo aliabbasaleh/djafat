@@ -24,6 +24,8 @@ export interface UserRecord {
   readonly id: string;
   readonly phone: string;
   readonly phoneVerifiedAt: Date | null;
+  /** Optional so existing fakes stay valid; set by every read from the database. */
+  readonly emailVerifiedAt?: Date | null;
   readonly email: string | null;
   readonly fullName: string | null;
   readonly countryId: string | null;
@@ -49,6 +51,8 @@ export interface MeDto {
   readonly id: string;
   readonly phone: string;
   readonly email: string | null;
+  /** Only a verified address can be used to log in by e-mail (FEAT-007). */
+  readonly emailVerified: boolean;
   readonly fullName: string | null;
   readonly locale: string;
   readonly status: UserStatus;
@@ -99,6 +103,7 @@ export class UsersService {
       id: u.id,
       phone: u.phone,
       phoneVerifiedAt: u.phoneVerifiedAt,
+      emailVerifiedAt: u.emailVerifiedAt,
       email: u.email,
       fullName: u.fullName,
       countryId: u.countryId,
@@ -121,6 +126,15 @@ export class UsersService {
       select: { id: true },
     });
     return u ? this.getById(u.id) : null;
+  }
+
+  /** "Mon profil": the name the courier and the restaurant see (spaces collapsed). */
+  async updateFullName(userId: string, fullName: string): Promise<UserRecord> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { fullName: fullName.trim().replace(/\s+/g, ' ') },
+    });
+    return this.getByIdOrThrow(userId);
   }
 
   /**
@@ -429,6 +443,7 @@ export class UsersService {
       id: user.id,
       phone: user.phone,
       email: user.email,
+      emailVerified: Boolean(user.email && user.emailVerifiedAt),
       fullName: user.fullName,
       locale: user.locale,
       status: user.status,

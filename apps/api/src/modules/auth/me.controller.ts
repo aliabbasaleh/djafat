@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Patch, Post, Req } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedActor } from '@djafat/types';
@@ -6,6 +6,7 @@ import { UsersService } from '../users/users.service';
 import { CurrentActor } from './current-actor.decorator';
 import { RequireAuth } from './decorators';
 import { AuthService } from './auth.service';
+import { UpdateMeSchema, type UpdateMeInput } from './dto/update-me.schema';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import {
   EmailRequestSchema,
@@ -31,6 +32,17 @@ export class MeController {
   @RequireAuth()
   async getMe(@CurrentActor() actor: AuthenticatedActor) {
     const user = await this.users.getByIdOrThrow(actor.userId);
+    return this.users.toMeDto(user, actor.roles);
+  }
+
+  /** "Mon profil": set the name shown to the courier and the restaurant. */
+  @Patch()
+  @RequireAuth()
+  async updateMe(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Body(new ZodValidationPipe(UpdateMeSchema)) body: UpdateMeInput,
+  ) {
+    const user = await this.users.updateFullName(actor.userId, body.fullName);
     return this.users.toMeDto(user, actor.roles);
   }
 

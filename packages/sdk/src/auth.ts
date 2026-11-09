@@ -22,6 +22,15 @@ interface TokenPair {
   readonly access: string;
 }
 
+export interface MeProfile {
+  readonly id: string;
+  readonly phone: string;
+  readonly email: string | null;
+  readonly emailVerified: boolean;
+  readonly fullName: string | null;
+  readonly roles: readonly string[];
+}
+
 export function createAuthClient(http: ApiHttp) {
   /** Revoke the server session (refreshing once if needed). Never throws. */
   async function revoke(refresh: string | null): Promise<SignOutResult> {
@@ -52,6 +61,16 @@ export function createAuthClient(http: ApiHttp) {
   }
 
   return {
+    /** "Mon profil": the signed-in account. */
+    me: () => http.get<MeProfile>('/me'),
+    /** "Mon profil": the name shown to the courier and the restaurant. */
+    updateName: (fullName: string) => http.patch<MeProfile>('/me', { body: { fullName } }),
+    /** Add an e-mail (Gmail…): a 6-digit code is sent to it (FEAT-007). */
+    requestEmailVerification: (email: string) =>
+      http.post<{ status: 'sent' }>('/me/email', { body: { email } }),
+    /** The code makes the address verified: it can then be used to log in. */
+    confirmEmail: (email: string, code: string) =>
+      http.post<MeProfile>('/me/email/verify', { body: { email, code } }),
     /** Login methods available on this deployment (FEAT-008): WhatsApp, SMS, e-mail. */
     methods: () =>
       http.get<{
