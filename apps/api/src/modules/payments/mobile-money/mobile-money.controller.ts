@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import type { AuthenticatedActor } from '@djafat/types';
+import type { AuthenticatedActor, OrderAmountPort } from '@djafat/types';
+import { ORDER_AMOUNT_PORT } from '../../../common/ports/order-amount.port';
 import { toMoneyJson } from '../../../common/money/money.mapper';
 import { ZodValidationPipe } from '../../../common/validation/zod-validation.pipe';
 import { CurrentActor } from '../../auth/current-actor.decorator';
@@ -9,6 +10,8 @@ import { PaymentsService } from '../payments.service';
 import { MobileMoneyReceiptsService } from './mobile-money-receipts.service';
 import { CourierRemittanceService } from './courier-remittance.service';
 import {
+  DoorPaymentSchema,
+  type DoorPaymentBody,
   ManualMatchSchema,
   RemitSchema,
   type RemitBody,
@@ -89,6 +92,37 @@ export class MobileMoneyController {
     @Body(new ZodValidationPipe(TransferClaimSchema)) body: TransferClaimBody,
   ) {
     const { outcome } = await this.receipts.claim(id, {
+      transactionRef: body.transactionRef ?? null,
+      payerPhone: body.payerPhone ?? null,
+    });
+    return { outcome, payment: await this.payments.getPayment(id) };
+  }
+
+  /** The order's pay-on-delivery payment and the wallets to pay it with at the door (owner only). */
+  @Get('door-for-order/:orderId')
+  @RequireAuth()
+  @RequireRole('customer')
+  @RequireOwnership<OrderAmountPort>(ORDER_AMOUNT_PORT, (orderAmount, req) =>
+    orderAmount.getOwnerUserId((req.params as { orderId: string }).orderId),
+  )
+  doorForOrder(@Param('orderId') orderId: string) {
+    return this.receipts.doorForOrder(orderId);
+  }
+
+  /** At the door: the customer paid by wallet and gives the transaction number. */
+  @Post(':id/mobile-money/door')
+  @HttpCode(200)
+  @RequireAuth()
+  @RequireRole('customer')
+  @RequireOwnership(PaymentsService, (payments, req) =>
+    payments.getOwnerUserId((req.params as { id: string }).id),
+  )
+  async payAtDoor(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(DoorPaymentSchema)) body: DoorPaymentBody,
+  ) {
+    const { outcome } = await this.receipts.settleAtDoor(id, {
+      providerCode: body.providerCode,
       transactionRef: body.transactionRef ?? null,
       payerPhone: body.payerPhone ?? null,
     });

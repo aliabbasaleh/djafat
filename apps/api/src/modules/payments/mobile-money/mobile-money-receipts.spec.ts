@@ -5,6 +5,8 @@ import { PaymentProviderRegistry } from '../payment-provider.registry';
 import type { PaymentsService } from '../payments.service';
 import { MerchantWalletPaymentProvider } from '../providers/wallet/merchant-wallet-payment.provider';
 import { MobileMoneyReceiptsService } from './mobile-money-receipts.service';
+import { CashPaymentProvider } from '../providers/cash/cash-payment.provider';
+import type { DeliveryTrackingPort } from '../../../common/ports/delivery-tracking.port';
 
 // FEAT-009 — docs/features/FEAT-009-mobile-money-transfer-matching (SPEC-009-03, SPEC-009-04).
 // In-memory stand-in for the two tables; PostgreSQL's own guarantees (unique
@@ -113,15 +115,44 @@ function harness(paymentsSeed: PaymentRow[] = []) {
       async ({
         where,
       }: {
-        where: { providerCode: string; status: string; amountMinor: bigint; currency: string };
+        where: {
+          orderId?: string;
+          providerCode?: string;
+          status: string | { in: string[] };
+          amountMinor?: bigint;
+          currency?: string;
+          metadata?: { path: string[]; equals: string };
+        };
       }) =>
         payments.filter(
           (p) =>
-            p.providerCode === where.providerCode &&
-            p.status === where.status &&
-            p.amountMinor === where.amountMinor &&
-            p.currency === where.currency,
+            (where.orderId === undefined || p.orderId === where.orderId) &&
+            (where.providerCode === undefined || p.providerCode === where.providerCode) &&
+            (where.metadata === undefined ||
+              (p.metadata ?? {})[where.metadata.path[0]!] === where.metadata.equals) &&
+            (typeof where.status === 'string'
+              ? p.status === where.status
+              : where.status.in.includes(p.status)) &&
+            (where.amountMinor === undefined || p.amountMinor === where.amountMinor) &&
+            (where.currency === undefined || p.currency === where.currency),
         ),
+    ),
+    updateMany: vi.fn(
+      async ({
+        where,
+        data,
+      }: {
+        where: { id: string; status: string; providerCode: string };
+        data: Partial<PaymentRow>;
+      }) => {
+        const p = payments.find(
+          (x) =>
+            x.id === where.id && x.status === where.status && x.providerCode === where.providerCode,
+        );
+        if (!p) return { count: 0 };
+        Object.assign(p, data);
+        return { count: 1 };
+      },
     ),
     findUnique: vi.fn(
       async ({ where }: { where: { id: string } }) =>
@@ -139,10 +170,12 @@ function harness(paymentsSeed: PaymentRow[] = []) {
     // Like PostgreSQL: a throw inside the callback undoes its writes.
     $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => {
       const snapshot = receipts.map((r) => ({ ...r }));
+      const paySnapshot = payments.map((x) => ({ ...x }));
       try {
         return await fn(tx);
       } catch (err) {
         receipts.splice(0, receipts.length, ...snapshot);
+        payments.splice(0, payments.length, ...paySnapshot);
         throw err;
       }
     }),
@@ -150,7 +183,7 @@ function harness(paymentsSeed: PaymentRow[] = []) {
 
   const ledgerPosts: string[] = [];
   const paymentsService = {
-    succeedInTx: vi.fn(async (_tx: unknown, paymentId: string) => {
+    succeedInTx: vi.fn(async (_tx: unknown, paymentId: string, _courierId?: string) => {
       const p = payments.find((x) => x.id === paymentId);
       if (!p || p.status !== 'pending') return null; // conditional UPDATE, like the real one
       p.status = 'succeeded';
@@ -162,9 +195,13 @@ function harness(paymentsSeed: PaymentRow[] = []) {
 
   const registry = new PaymentProviderRegistry([
     new MerchantWalletPaymentProvider('airtel_money', '+23560000010'),
+    new CashPaymentProvider(),
   ]);
-  const service = new MobileMoneyReceiptsService(prisma, registry, paymentsService);
-  return { service, receipts, payments, ledgerPosts, paymentsService };
+  const tracking = {
+    getAssignedCourierUserIdByOrder: vi.fn(async () => 'courier-L'),
+  } as unknown as DeliveryTrackingPort;
+  const service = new MobileMoneyReceiptsService(prisma, registry, paymentsService, tracking);
+  return { service, receipts, payments, ledgerPosts, paymentsService, tracking };
 }
 
 const pending = (over: Partial<PaymentRow> = {}): PaymentRow => ({
@@ -302,5 +339,115 @@ describe('SPEC-009-04 — match a transfer to a payment', () => {
     const m = await ok.service.manualMatch(ok.receipts[0]!.id, 'pay-1');
     expect(m.outcome).toBe('paid');
     expect(ok.payments[0]?.status).toBe('succeeded');
+  });
+});
+
+// Airtel paid AT THE DOOR (user: "Airtel is paid with the code the customer
+// enters in the app"): an order placed "pay on delivery" (cash) is settled by a
+// transfer to DJAFAT's merchant number instead of cash in the courier's hand.
+describe('Airtel at the door — a cash-on-delivery payment settled by transfer', () => {
+  const doorPayment = () =>
+    pending({ providerCode: 'cash', metadata: null, createdAt: AT('14:00') });
+
+  it('transfer already recorded: matched, the payment becomes Airtel, succeeded crediting the ASSIGNED courier', async () => {
+    const { service, receipts, payments, paymentsService } = harness([doorPayment()]);
+    await service.recordReceipt({ ...transfer, receivedAt: AT('14:40') }, 'u-finance');
+    const r = await service.settleAtDoor('pay-1', {
+      providerCode: 'airtel_money',
+      transactionRef: 'CI251107.1432.A81234',
+      payerPhone: '66 12 34 56',
+    });
+    expect(r.outcome).toBe('paid');
+    expect(payments[0]).toMatchObject({ providerCode: 'airtel_money', status: 'succeeded' });
+    expect(receipts[0]).toMatchObject({ status: 'matched', paymentId: 'pay-1' });
+    // not cash: the courier must not be counted as holding it, but must be paid his fee
+    expect(paymentsService.succeedInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      'pay-1',
+      'courier-L',
+    );
+  });
+
+  it('transfer not recorded yet: pending; recording it later matches this door payment automatically', async () => {
+    const { service, receipts, payments } = harness([doorPayment()]);
+    const first = await service.settleAtDoor('pay-1', {
+      providerCode: 'airtel_money',
+      transactionRef: 'CI251107.1432.A81234',
+      payerPhone: '66 12 34 56',
+    });
+    expect(first.outcome).toBe('pending');
+    expect(payments[0]?.metadata).toMatchObject({ doorWallet: 'airtel_money' });
+    const rec = await service.recordReceipt({ ...transfer, receivedAt: AT('14:41') }, 'u-finance');
+    expect(rec.matchedPaymentId).toBe('pay-1');
+    expect(payments[0]).toMatchObject({ providerCode: 'airtel_money', status: 'succeeded' });
+    expect(receipts[0]?.status).toBe('matched');
+  });
+
+  it('only a pending pay-on-delivery payment can be settled at the door', async () => {
+    const prepaid = harness([pending()]); // already an Airtel (prepaid) payment
+    await expect(
+      prepaid.service.settleAtDoor('pay-1', {
+        providerCode: 'airtel_money',
+        transactionRef: 'X1234',
+      }),
+    ).rejects.toMatchObject({ status: 409, response: { code: 'PAYMENT_INVALID_STATE' } });
+    const paid = harness([pending({ providerCode: 'cash', status: 'succeeded' })]);
+    await expect(
+      paid.service.settleAtDoor('pay-1', { providerCode: 'airtel_money', transactionRef: 'X1234' }),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('no courier on the order yet: refused, nothing stored', async () => {
+    const { service, payments, tracking } = harness([doorPayment()]);
+    vi.mocked(tracking.getAssignedCourierUserIdByOrder).mockResolvedValueOnce(null);
+    await expect(
+      service.settleAtDoor('pay-1', { providerCode: 'airtel_money', transactionRef: 'X1234' }),
+    ).rejects.toMatchObject({ status: 409, response: { code: 'PAYMENT_INVALID_STATE' } });
+    expect(payments[0]?.metadata).toBeNull();
+  });
+
+  it('settling again after success answers paid (idempotent)', async () => {
+    const { service } = harness([doorPayment()]);
+    await service.recordReceipt({ ...transfer, receivedAt: AT('14:40') }, 'u-finance');
+    const claim = {
+      providerCode: 'airtel_money',
+      transactionRef: 'CI251107.1432.A81234',
+      payerPhone: '66 12 34 56',
+    };
+    expect((await service.settleAtDoor('pay-1', claim)).outcome).toBe('paid');
+    expect((await service.settleAtDoor('pay-1', claim)).outcome).toBe('paid');
+  });
+
+  it('door options: the merchant wallets with the amount and number to send to', async () => {
+    const { service } = harness([doorPayment()]);
+    const wallets = await service.doorOptions('pay-1');
+    expect(wallets).toHaveLength(1);
+    expect(wallets[0]?.providerCode).toBe('airtel_money');
+    expect(wallets[0]?.instructions).toContain('12 000');
+    const prepaid = harness([pending()]);
+    expect(await prepaid.service.doorOptions('pay-1')).toEqual([]);
+  });
+
+  it('door panel for an order: the pending cash payment and its wallets, then "paid by transfer"', async () => {
+    const { service } = harness([doorPayment()]);
+    const before = await service.doorForOrder('ord-1');
+    expect(before).toMatchObject({ paymentId: 'pay-1', paidByTransfer: false });
+    expect(before.wallets.map((w) => w.providerCode)).toEqual(['airtel_money']);
+    await service.recordReceipt({ ...transfer, receivedAt: AT('14:40') }, 'u-finance');
+    await service.settleAtDoor('pay-1', {
+      providerCode: 'airtel_money',
+      transactionRef: 'CI251107.1432.A81234',
+      payerPhone: '66 12 34 56',
+    });
+    expect(await service.doorForOrder('ord-1')).toEqual({
+      paymentId: 'pay-1',
+      paidByTransfer: true,
+      wallets: [],
+    });
+    expect(await service.doorForOrder('ord-other')).toEqual({
+      paymentId: null,
+      paidByTransfer: false,
+      wallets: [],
+    });
   });
 });

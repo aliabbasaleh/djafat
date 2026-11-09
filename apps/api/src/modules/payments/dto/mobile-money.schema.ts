@@ -22,6 +22,16 @@ export const TransferClaimSchema = z
   .strict();
 export type TransferClaimBody = z.infer<typeof TransferClaimSchema>;
 
+/** Customer pays a pay-on-delivery order by wallet, at the door. */
+export const DoorPaymentSchema = z
+  .object({
+    providerCode: z.string().min(1).max(40),
+    transactionRef: z.string().min(1).max(80).optional(),
+    payerPhone: z.string().min(1).max(32).optional(),
+  })
+  .strict();
+export type DoorPaymentBody = z.infer<typeof DoorPaymentSchema>;
+
 export const ManualMatchSchema = z.object({ paymentId: z.string().uuid() }).strict();
 export type ManualMatchBody = z.infer<typeof ManualMatchSchema>;
 

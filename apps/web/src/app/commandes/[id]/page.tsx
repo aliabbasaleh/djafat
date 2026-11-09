@@ -13,6 +13,7 @@ import { useRoomRealtime } from '@/lib/realtime';
 import { OrderTracker } from '@/components/OrderTracker';
 import { PaymentPicker } from '@/components/PaymentPicker';
 import { LiveMap } from '@/components/LiveMap';
+import { DoorPayment } from '@/components/DoorPayment';
 import styles from './page.module.css';
 
 type LoadState = 'loading' | 'ready' | 'error' | 'not-found';
@@ -118,6 +119,9 @@ export default function OrderConfirmationPage() {
         <OrderTracker status={order.status} />
         {order.status === 'awaiting_payment' && (
           <PaymentPicker orderId={order.id} onChanged={() => void loadOrder()} />
+        )}
+        {['courier_assigned', 'picked_up', 'on_the_way'].includes(order.status) && (
+          <DoorPayment orderId={order.id} />
         )}
         {['ready', 'courier_assigned', 'picked_up', 'on_the_way'].includes(order.status) && (
           <LiveMap orderId={order.id} />

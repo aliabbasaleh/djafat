@@ -32,6 +32,16 @@ export interface Payment {
   readonly action?: PaymentAction | null;
 }
 
+/** A pay-on-delivery order paid by wallet at the door (customer side). */
+export interface DoorPanel {
+  readonly paymentId: string | null;
+  readonly paidByTransfer: boolean;
+  readonly wallets: ReadonlyArray<{
+    readonly providerCode: string;
+    readonly instructions: string | null;
+  }>;
+}
+
 export type TransferClaimOutcome = 'paid' | 'pending' | 'amount_mismatch';
 
 export function createPaymentsClient(http: ApiHttp) {
@@ -52,6 +62,18 @@ export function createPaymentsClient(http: ApiHttp) {
     claimTransfer: (paymentId: string, input: { transactionRef?: string; payerPhone?: string }) =>
       http.post<{ outcome: TransferClaimOutcome; payment: Payment }>(
         `/payments/${encodeURIComponent(paymentId)}/mobile-money/claim`,
+        { body: input },
+      ),
+    /** Pay-on-delivery order: wallets offered at the door, or already paid by transfer. */
+    doorForOrder: (orderId: string) =>
+      http.get<DoorPanel>(`/payments/door-for-order/${encodeURIComponent(orderId)}`),
+    /** At the door: paid by Airtel/Tigo, here is the transaction number. */
+    payAtDoor: (
+      paymentId: string,
+      input: { providerCode: string; transactionRef?: string; payerPhone?: string },
+    ) =>
+      http.post<{ outcome: TransferClaimOutcome; payment: Payment }>(
+        `/payments/${encodeURIComponent(paymentId)}/mobile-money/door`,
         { body: input },
       ),
   };

@@ -395,6 +395,14 @@ export class PaymentsService {
       where: { orderId: payload.orderId, providerCode: 'cash', status: 'pending' },
     });
     if (!payment) return;
+    // Airtel/Tigo paid at the door: the customer said they paid by transfer, so
+    // no cash was collected. It is settled when the transfer is recorded —
+    // never counted as cash held by the courier.
+    const meta = payment.metadata;
+    if (meta && typeof meta === 'object' && !Array.isArray(meta) && 'doorWallet' in meta) {
+      this.logger.log(`payment ${payment.id}: paid at the door by transfer, left for matching`);
+      return;
+    }
     await this.markSucceeded(payment.id, payload.courierId);
   }
 
