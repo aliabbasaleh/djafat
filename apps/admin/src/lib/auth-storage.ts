@@ -84,7 +84,15 @@ export function isAuthenticated(): boolean {
   return getAccessToken() !== null;
 }
 
-/** Deny-by-default gate for the admin shell (Bloc 9 §admin-web) — anyone without BOTH roles never even reaches a loading spinner for protected data. */
+/**
+ * Deny-by-default gate for the admin shell (Bloc 9 §admin-web). `support`
+ * (the DJAFAT operator, FEAT-011) gets in too, but only sees the screens of its
+ * job; the API checks every route's roles anyway.
+ */
 export function hasAdminAccess(user: StoredAdminUser | null): boolean {
+  return !!user && (isFullAdmin(user) || user.roles.includes('support'));
+}
+
+export function isFullAdmin(user: StoredAdminUser | null): boolean {
   return !!user && (user.roles.includes('admin') || user.roles.includes('super_admin'));
 }

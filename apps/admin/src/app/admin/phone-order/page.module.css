@@ -1,0 +1,70 @@
+.page {
+  max-width: 760px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: 12px;
+  background: var(--djafat-color-bg-surface);
+}
+.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.category {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.product {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: 10px;
+}
+.picked {
+  border-color: var(--djafat-color-brand-primary);
+  background: var(--djafat-color-bg-surface-alt);
+}
+.productHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.stepper button {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  border: 2px solid var(--djafat-color-brand-primary);
+  background: var(--djafat-color-bg-surface);
+  color: var(--djafat-color-brand-primary);
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.stepper button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.stepper output {
+  min-width: 20px;
+  text-align: center;
+  font-weight: 700;
+}
+.summary {
+  border-width: 2px;
+  border-color: var(--djafat-color-brand-primary);
+}

@@ -1,5 +1,6 @@
 import type { MoneyJson, Role } from '@djafat/types';
 import type { ApiHttp } from './http.js';
+import type { Order } from './orders.js';
 
 /**
  * Bloc 9 — admin operations client bindings (docs/30). Every route here is
@@ -106,6 +107,24 @@ export interface Settlement {
   readonly reconciliationNotes: string | null;
 }
 
+/** FEAT-011: an order taken on the phone for a customer who called DJAFAT. */
+export interface PhoneOrderInput {
+  readonly customerPhone: string;
+  readonly customerName?: string;
+  readonly items: ReadonlyArray<{
+    readonly productId: string;
+    readonly quantity: number;
+    readonly selectedOptionIds?: readonly string[];
+  }>;
+  readonly address: {
+    readonly quartier: string;
+    readonly landmark: string;
+    readonly street?: string;
+    readonly instructions?: string;
+    readonly coordinates?: { readonly lat: number; readonly lng: number };
+  };
+}
+
 export function createAdminClient(http: ApiHttp) {
   return {
     users: {
@@ -149,6 +168,14 @@ export function createAdminClient(http: ApiHttp) {
       list: (
         params: { status?: string; restaurantId?: string; page?: number; limit?: number } = {},
       ) => http.get<Paginated<AdminOrderSummary>>('/admin/orders', { query: { ...params } }),
+    },
+    phoneOrders: {
+      place: (idempotencyKey: string, input: PhoneOrderInput) =>
+        http.post<{
+          status: 'created' | 'replayed';
+          customer: { id: string; isNew: boolean };
+          order: Order;
+        }>('/admin/phone-orders', { body: input, idempotencyKey }),
     },
     finance: {
       balances: () => http.get<FinanceBalances>('/admin/finance/balances'),
