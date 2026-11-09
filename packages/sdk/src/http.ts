@@ -50,7 +50,10 @@ export class ApiHttp {
     if (typeof impl !== 'function') {
       throw new Error('No fetch implementation available — pass `fetchImpl`.');
     }
-    this.doFetch = impl;
+    // Bound to the global: calling an unbound `fetch` as `this.doFetch(...)` makes
+    // `this` the ApiHttp instance, which browsers reject with "Illegal invocation"
+    // (Node's undici tolerates it, so this only broke client-side calls).
+    this.doFetch = impl.bind(globalThis);
   }
 
   get<T>(path: string, options?: RequestOptions): Promise<T> {

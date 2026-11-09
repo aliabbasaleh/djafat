@@ -3,6 +3,7 @@
 import { Suspense, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ApiClientError } from '@djafat/sdk';
 import { Container, Heading, Text, Stack, cx } from '@djafat/ui';
 import { Button, Input, Alert } from '@/components/ui-client';
 import { api } from '@/lib/api';
@@ -10,6 +11,27 @@ import { setSession } from '@/lib/auth-storage';
 import styles from './page.module.css';
 
 type Step = 'phone' | 'code';
+
+/**
+ * A blanket "check the number format" message hid a real `Illegal invocation`
+ * bug for an entire debugging session — the one failure it never was. Each
+ * cause now says what actually happened.
+ */
+function otpRequestError(err: unknown): string {
+  if (err instanceof ApiClientError) {
+    if (err.code === 'RATE_LIMITED') {
+      return 'Trop de codes demandés pour ce numéro. Réessayez dans quelques minutes.';
+    }
+    if (err.code === 'VALIDATION_ERROR' || err.status === 422) {
+      return 'Numéro invalide. Utilisez le format international, par exemple +23566000000.';
+    }
+    if (err.code === 'NETWORK') {
+      return `Connexion au serveur impossible (${err.message}). Vérifiez votre connexion et réessayez.`;
+    }
+    return `${err.message} (code ${err.code})`;
+  }
+  return "Impossible d'envoyer le code. Réessayez dans un instant.";
+}
 
 /**
  * Minimal OTP login (docs/22 §17.3) — the cart requires an authenticated
@@ -41,8 +63,8 @@ function ConnexionForm() {
     try {
       await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
       setStep('code');
-    } catch {
-      setError("Impossible d'envoyer le code. Vérifiez le numéro (format +235XXXXXXXX).");
+    } catch (err) {
+      setError(otpRequestError(err));
     } finally {
       setLoading(false);
     }
@@ -68,8 +90,12 @@ function ConnexionForm() {
         },
       });
       router.push(redirectTo as Route);
-    } catch {
-      setError('Code invalide ou expiré.');
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError && err.code === 'NETWORK'
+          ? `Connexion au serveur impossible (${err.message}).`
+          : 'Code invalide ou expiré.',
+      );
     } finally {
       setLoading(false);
     }
