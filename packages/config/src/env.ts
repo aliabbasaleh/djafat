@@ -177,6 +177,12 @@ const AuthSchema = z.object({
 
 const PaymentsSchema = z.object({
   PAYMENT_MOCK_URL: url.optional(),
+  /**
+   * FEAT-016: encrypts at rest the secret of each merchant SMS gateway phone
+   * (AES-256-GCM, 32 raw bytes base64). Optional: without it, SMS ingestion
+   * stays off and transfers are recorded by hand as before.
+   */
+  SMS_GATEWAY_ENCRYPTION_KEY: z.string().optional().default(''),
   PAYMENT_WEBHOOK_BASE_URL: url,
 });
 

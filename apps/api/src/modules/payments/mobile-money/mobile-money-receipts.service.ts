@@ -73,7 +73,9 @@ export class MobileMoneyReceiptsService {
   /** Staff records a transfer, then an automatic match is attempted (SPEC-009-04 R4). */
   async recordReceipt(
     input: RecordReceiptInput,
-    recordedBy: string,
+    recordedBy: string | null,
+    /** FEAT-016: `sms_forwarder` when a merchant phone forwarded the operator's SMS. */
+    source: 'manual' | 'sms_forwarder' = 'manual',
   ): Promise<{
     receipt: TransferReceipt & { recordedBy: string | null; source: string };
     matchedPaymentId: string | null;
@@ -104,7 +106,7 @@ export class MobileMoneyReceiptsService {
           currency: input.amount.currency,
           senderPhone: sender.data,
           receivedAt: input.receivedAt,
-          source: 'manual',
+          source,
           recordedBy,
         },
       });

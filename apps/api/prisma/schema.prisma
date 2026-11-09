@@ -943,3 +943,36 @@ model CourierPayout {
 
   @@map("courier_payouts")
 }
+
+/// FEAT-016: a merchant phone forwarding the operator's SMS (payments).
+model SmsGatewayDevice {
+  id               String    @id @default(uuid()) @db.Uuid
+  providerCode     String    @map("provider_code")
+  label            String
+  secretEnc        String    @map("secret_enc")
+  createdBy        String    @map("created_by") @db.Uuid
+  active           Boolean   @default(true)
+  lastSeq          BigInt    @default(0) @map("last_seq")
+  lastSeenAt       DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  lastBalanceMinor BigInt?   @map("last_balance_minor")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("sms_gateway_devices")
+}
+
+/// FEAT-016: every SMS a gateway forwarded, and what became of it.
+model MobileMoneySms {
+  id         String   @id @default(uuid()) @db.Uuid
+  deviceId   String   @map("device_id") @db.Uuid
+  seq        BigInt
+  sender     String
+  body       String
+  receivedAt DateTime @map("received_at") @db.Timestamptz(6)
+  outcome    String
+  template   String?
+  receiptId  String?  @map("receipt_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([deviceId, seq], map: "mobile_money_sms_seq_uk")
+  @@map("mobile_money_sms")
+}

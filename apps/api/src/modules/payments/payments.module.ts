@@ -18,6 +18,8 @@ import { MobileMoneyController } from './mobile-money/mobile-money.controller';
 import { CourierRemittanceService } from './mobile-money/courier-remittance.service';
 import { UsersModule } from '../users/users.module';
 import { CodTrustService } from './cod-trust.service';
+import { SmsIngestService } from './mobile-money/sms-ingest.service';
+import { SmsIngestController } from './mobile-money/sms-ingest.controller';
 import { CourierPayoutsService } from './mobile-money/courier-payouts.service';
 import { CourierPayoutsController } from './mobile-money/courier-payouts.controller';
 
@@ -38,6 +40,7 @@ import { CourierPayoutsController } from './mobile-money/courier-payouts.control
     PaymentMethodsConfigController,
     SettlementsController,
     CourierPayoutsController,
+    SmsIngestController,
   ],
   providers: [
     CashPaymentProvider,
@@ -69,6 +72,7 @@ import { CourierPayoutsController } from './mobile-money/courier-payouts.control
     CourierRemittanceService,
     CourierPayoutsService,
     CodTrustService,
+    SmsIngestService,
     SettlementsService,
   ],
   exports: [PaymentProviderRegistry, PaymentsService, MobileMoneyReceiptsService],

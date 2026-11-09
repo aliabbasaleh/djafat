@@ -47,3 +47,12 @@ export const PayoutSentSchema = z
   })
   .strict();
 export type PayoutSentBody = z.infer<typeof PayoutSentSchema>;
+
+/** FEAT-016: staff register a merchant SMS gateway phone. */
+export const RegisterSmsGatewaySchema = z
+  .object({
+    providerCode: z.string().min(1).max(40),
+    label: z.string().trim().min(1).max(80),
+  })
+  .strict();
+export type RegisterSmsGatewayBody = z.infer<typeof RegisterSmsGatewaySchema>;
