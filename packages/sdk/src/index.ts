@@ -13,6 +13,7 @@ export * from './http.js';
 export * from './auth.js';
 export * from './catalog.js';
 export * from './payments.js';
+export * from './payouts.js';
 export * from './cart.js';
 export * from './orders.js';
 export * from './addresses.js';

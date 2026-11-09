@@ -922,3 +922,24 @@ model NotificationDevice {
   @@unique([pushToken])
   @@map("notification_devices")
 }
+
+/// FEAT-014: a courier's earnings paid to their Airtel Money (payments).
+model CourierPayout {
+  id             String    @id @default(uuid()) @db.Uuid
+  courierId      String    @map("courier_id") @db.Uuid
+  kind           String
+  status         String    @default("requested")
+  feePayer       String    @map("fee_payer")
+  currency       String    @db.Char(3)
+  requestedMinor BigInt    @map("requested_minor")
+  paidMinor      BigInt?   @map("paid_minor")
+  receivedMinor  BigInt?   @map("received_minor")
+  airtelFeeMinor BigInt?   @map("airtel_fee_minor")
+  periodStart    DateTime? @map("period_start") @db.Timestamptz(6)
+  transactionRef String?   @map("transaction_ref")
+  sentBy         String?   @map("sent_by") @db.Uuid
+  requestedAt    DateTime  @default(now()) @map("requested_at") @db.Timestamptz(6)
+  sentAt         DateTime? @map("sent_at") @db.Timestamptz(6)
+
+  @@map("courier_payouts")
+}

@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { label: 'Livreurs', href: '/admin/couriers' },
   { label: 'Commandes', href: '/admin/orders', support: true },
   { label: 'Finance', href: '/admin/finance' },
+  { label: 'Versements livreurs', href: '/admin/payouts' },
 ];
 
 /**

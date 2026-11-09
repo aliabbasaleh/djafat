@@ -126,4 +126,27 @@ export class LedgerReadService {
     `;
     return rows[0]?.held ?? 0n;
   }
+
+  /**
+   * FEAT-014: a courier's AVAILABLE earnings (`COURIER_AVAILABLE`, a liability:
+   * credits minus debits), read from the entries themselves so it is exact
+   * inside the payout transaction.
+   */
+  getCourierAvailable(courierId: string, currency: string): Promise<bigint> {
+    return this.getCourierAvailableTx(this.prisma, courierId, currency);
+  }
+
+  async getCourierAvailableTx(
+    tx: Prisma.TransactionClient,
+    courierId: string,
+    currency: string,
+  ): Promise<bigint> {
+    const rows = await tx.$queryRaw<Array<{ available: bigint | null }>>`
+      SELECT COALESCE(SUM(CASE WHEN e.direction = 'credit' THEN e.amount_minor ELSE -e.amount_minor END), 0)::bigint AS available
+      FROM ledger_entries e
+      JOIN ledger_accounts a ON a.id = e.account_id
+      WHERE a.code = 'COURIER_AVAILABLE' AND a.owner_id = ${courierId}::uuid AND e.currency = ${currency}
+    `;
+    return rows[0]?.available ?? 0n;
+  }
 }

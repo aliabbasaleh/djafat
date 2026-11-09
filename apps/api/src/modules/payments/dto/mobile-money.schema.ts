@@ -38,3 +38,12 @@ export type ManualMatchBody = z.infer<typeof ManualMatchSchema>;
 /** FEAT-010: the courier whose cash remittance this transfer is. */
 export const RemitSchema = z.object({ courierId: z.string().uuid() }).strict();
 export type RemitBody = z.infer<typeof RemitSchema>;
+
+/** FEAT-014: staff record a courier payout sent by Airtel Money. */
+export const PayoutSentSchema = z
+  .object({
+    transactionRef: z.string().trim().min(1).max(80),
+    airtelFeeMinor: z.coerce.bigint().min(0n).max(100_000n).default(0n),
+  })
+  .strict();
+export type PayoutSentBody = z.infer<typeof PayoutSentSchema>;

@@ -15,6 +15,8 @@ export const API_ERROR_CODES = [
   'RECEIPT_ALREADY_RECORDED',
   /** A courier remittance larger than the cash the courier holds (409) — FEAT-010. */
   'REMITTANCE_EXCEEDS_CASH_HELD',
+  /** A withdrawal under the minimum, or a second one while one is open (409) — FEAT-014. */
+  'PAYOUT_NOT_ALLOWED',
   'OFFER_TAKEN',
   'STEP_UP_REQUIRED',
   'IDEMPOTENCY_KEY_REUSED',

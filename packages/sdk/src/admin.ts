@@ -1,6 +1,7 @@
 import type { MoneyJson, Role } from '@djafat/types';
 import type { ApiHttp } from './http.js';
 import type { Order } from './orders.js';
+import type { CourierPayout } from './payouts.js';
 
 /**
  * Bloc 9 — admin operations client bindings (docs/30). Every route here is
@@ -178,6 +179,20 @@ export function createAdminClient(http: ApiHttp) {
       list: (
         params: { status?: string; restaurantId?: string; page?: number; limit?: number } = {},
       ) => http.get<Paginated<AdminOrderSummary>>('/admin/orders', { query: { ...params } }),
+    },
+    payouts: {
+      /** FEAT-014: courier payouts (to send: `status: 'requested'`), with the courier's Airtel number. */
+      list: (status?: string) =>
+        http.get<
+          ReadonlyArray<
+            CourierPayout & {
+              readonly courier: { id: string; name: string | null; phone: string | null };
+            }
+          >
+        >('/admin/payouts', { query: status ? { status } : {} }),
+      prepareWeekly: () => http.post<{ created: number }>('/admin/payouts/weekly'),
+      markSent: (id: string, input: { transactionRef: string; airtelFeeMinor: number }) =>
+        http.post<CourierPayout>(`/admin/payouts/${encodeURIComponent(id)}/sent`, { body: input }),
     },
     phoneOrders: {
       place: (idempotencyKey: string, input: PhoneOrderInput) =>

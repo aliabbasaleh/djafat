@@ -16,6 +16,9 @@ import { walletProviders } from './providers/wallet/merchant-wallet-payment.prov
 import { MobileMoneyReceiptsService } from './mobile-money/mobile-money-receipts.service';
 import { MobileMoneyController } from './mobile-money/mobile-money.controller';
 import { CourierRemittanceService } from './mobile-money/courier-remittance.service';
+import { UsersModule } from '../users/users.module';
+import { CourierPayoutsService } from './mobile-money/courier-payouts.service';
+import { CourierPayoutsController } from './mobile-money/courier-payouts.controller';
 
 /**
  * At Bloc 0 only `cash` and `mock` providers are registered. Real Mobile Money
@@ -27,12 +30,13 @@ import { CourierRemittanceService } from './mobile-money/courier-remittance.serv
  * it consumes `OrderAmountPort` (from `@djafat/types`) via events instead.
  */
 @Module({
-  imports: [LedgerModule, AuthModule],
+  imports: [LedgerModule, AuthModule, UsersModule],
   controllers: [
     PaymentsController,
     MobileMoneyController,
     PaymentMethodsConfigController,
     SettlementsController,
+    CourierPayoutsController,
   ],
   providers: [
     CashPaymentProvider,
@@ -62,6 +66,7 @@ import { CourierRemittanceService } from './mobile-money/courier-remittance.serv
     PaymentsService,
     MobileMoneyReceiptsService,
     CourierRemittanceService,
+    CourierPayoutsService,
     SettlementsService,
   ],
   exports: [PaymentProviderRegistry, PaymentsService, MobileMoneyReceiptsService],

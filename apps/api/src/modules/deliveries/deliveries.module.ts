@@ -8,6 +8,7 @@ import { DeliveriesService } from './deliveries.service';
 import { DeliveriesController } from './deliveries.controller';
 import { CourierDeliveryController } from './courier-delivery.controller';
 import { CourierCashService } from './courier-cash.service';
+import { CourierEarningsService } from './courier-earnings.service';
 import { OrderTrackingService } from './order-tracking.service';
 import { CourierCashController } from './courier-cash.controller';
 
@@ -30,6 +31,7 @@ import { CourierCashController } from './courier-cash.controller';
   providers: [
     DeliveriesService,
     CourierCashService,
+    CourierEarningsService,
     OrderTrackingService,
     { provide: DELIVERY_TRACKING_PORT, useExisting: DeliveriesService },
   ],

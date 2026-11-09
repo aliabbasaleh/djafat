@@ -182,6 +182,14 @@ export class PlatformService {
     );
   }
 
+  /** FEAT-014: smallest on-demand courier withdrawal (XAF minor units). */
+  async getCourierPayoutMinMinor(): Promise<number> {
+    return this.getNumberSetting(
+      'courier_payout_min_minor',
+      PLATFORM_SETTINGS_DEFAULTS.courier_payout_min_minor,
+    );
+  }
+
   async getOfferTimeoutSeconds(): Promise<number> {
     return this.getNumberSetting(
       'offer_timeout_seconds',

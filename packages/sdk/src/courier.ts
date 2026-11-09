@@ -1,6 +1,7 @@
 import type { MoneyJson, Role } from '@djafat/types';
 import type { ApiHttp } from './http.js';
 import type { OwnerBalance } from './admin.js';
+import type { CourierPayout } from './payouts.js';
 
 /**
  * Bloc 11 — `apps/courier` client bindings (docs/04 §4.7, docs/25). Every
@@ -91,10 +92,34 @@ export interface Delivery {
   readonly context?: DeliveryContext;
 }
 
+/** FEAT-014: what the courier earned — never an order amount. */
+export interface CourierEarnings {
+  readonly today: { readonly amount: MoneyJson; readonly count: number };
+  readonly week: { readonly amount: MoneyJson; readonly count: number; readonly since: string };
+  readonly items: ReadonlyArray<{
+    readonly deliveryId: string;
+    readonly deliveredAt: string;
+    readonly restaurantName: string;
+    readonly quartier: string | null;
+    readonly fee: MoneyJson;
+  }>;
+  readonly balance: {
+    readonly available: MoneyJson;
+    readonly cashHeld: MoneyJson;
+    readonly net: MoneyJson;
+  };
+}
+
 export function createCourierClient(http: ApiHttp) {
   return {
     getProfile: () => http.get<CourierProfile>('/couriers/me'),
     getBalance: () => http.get<readonly OwnerBalance[]>('/couriers/me/balance'),
+    getEarnings: () => http.get<CourierEarnings>('/couriers/me/earnings'),
+    payouts: {
+      list: () => http.get<readonly CourierPayout[]>('/couriers/me/payouts'),
+      /** Withdraw the whole net now (from the minimum up; Airtel fee on the courier). */
+      request: () => http.post<CourierPayout>('/couriers/me/payouts'),
+    },
     setStatus: (status: 'online' | 'offline') =>
       http.post<CourierProfile>('/couriers/me/status', { body: { status } }),
     /** Accepts one point or a batch (≤20) — the caller decides which; the server validates each the same way. */
