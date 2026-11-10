@@ -1,6 +1,6 @@
 # Feuille de route DJAFAT
 
-> **Version actuelle : 0.19.1** — 10 nov. 2026
+> **Version actuelle : 0.19.2** — 10 nov. 2026
 > Ce fichier est la feuille de route de référence. Il est mis à jour **à chaque
 > version envoyée sur GitHub** (journal des versions en bas, cases cochées au fil
 > de l'eau). Toute l'équipe le lit ici, depuis n'importe où.
@@ -87,7 +87,8 @@ CORRECTIF pour une correction ou de la documentation).
 
 | Version | Date         | Contenu                                                                                                                     | Commit    |
 | ------- | ------------ | --------------------------------------------------------------------------------------------------------------------------- | --------- |
-| 0.19.1  | 10 nov. 2026 | Mise en ligne Oracle : script `install.sh` (Docker, pare-feu, clés, démarrage), clé de lecture GitHub, images ARM vérifiées | ce commit |
+| 0.19.2  | 10 nov. 2026 | Sécurité : `node-forge` forcé en 1.4.3 (5 nouvelles alertes corrigées, 12 anciennes aussi : 127 → 115 tolérées)             | ce commit |
+| 0.19.1  | 10 nov. 2026 | Mise en ligne Oracle : script `install.sh` (Docker, pare-feu, clés, démarrage), clé de lecture GitHub, images ARM vérifiées | `54d50b5` |
 | 0.19.0  | 10 nov. 2026 | Feuille de route versionnée ; guide « travailler en local » ; tests d'intégration 92/93 ; hébergement gratuit (ARM)         | `41296a8` |
 | 0.18.2  | 10 nov. 2026 | Tests d'intégration indépendants de l'heure et du limiteur (90/93)                                                          | `ef13704` |
 | 0.18.1  | 10 nov. 2026 | Installation serveur : Docker Compose, HTTPS (Caddy), sauvegardes, guide Namecheap                                          | `2a622a1` |

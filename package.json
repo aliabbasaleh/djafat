@@ -1,6 +1,6 @@
 {
   "name": "djafat",
-  "version": "0.19.1",
+  "version": "0.19.2",
   "private": true,
   "description": "DJAFAT — plateforme de livraison multi-plateforme (Tchad). Monorepo.",
   "engines": {
@@ -58,6 +58,9 @@
     ]
   },
   "pnpm": {
+    "overrides": {
+      "node-forge": "^1.4.3"
+    },
     "peerDependencyRules": {
       "allowedVersions": {
         "react": "19",
