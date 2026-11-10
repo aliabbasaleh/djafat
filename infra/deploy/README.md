@@ -27,17 +27,16 @@ de mémoire, assez pour toute la démo et le pilote.
    prélevé tant qu'on reste dans « Always Free »). Région conseillée :
    **France Central (Paris)** ou **Germany Central (Frankfurt)**.
 2. **Compute → Instances → Create instance** : image **Ubuntu 24.04**, forme
-   **VM.Standard.A1.Flex** (Ampere), **4 OCPU, 24 Go**, disque 100 Go ; ajouter
-   sa clé SSH ; créer. Noter l'**adresse IP publique**.
-3. Ouvrir les ports web : **Networking → Virtual cloud networks → (le réseau) →
-   Security Lists → Default → Add Ingress Rules** : source `0.0.0.0/0`, TCP,
-   ports **80** et **443**. Puis sur le serveur :
+   **VM.Standard.A1.Flex** (Ampere), **4 OCPU, 24 Go**, disque 100 Go. Dans
+   « Add SSH keys », choisir **Generate a key pair for me** et cliquer **Save
+   private key** (garder ce fichier précieusement : c'est la clé du serveur) ;
+   créer. Noter l'**adresse IP publique**.
+3. Ouvrir les ports web chez Oracle : **Networking → Virtual cloud networks →
+   (le réseau) → Security Lists → Default Security List → Add Ingress Rules** :
+   source `0.0.0.0/0`, protocole TCP, port de destination **80** ; recommencer
+   avec **443**. (Le pare-feu du serveur lui-même est ouvert par `install.sh`.)
 
-```bash
-sudo iptables -I INPUT -p tcp -m multiport --dports 80,443 -j ACCEPT && sudo netfilter-persistent save
-```
-
-`gen-secrets.sh` détecte le processeur ARM et choisit l'image PostGIS adaptée.
+Le script détecte le processeur ARM et choisit l'image PostGIS adaptée.
 Si « Out of capacity » s'affiche à la création, réessayer plus tard ou dans une
 autre zone de disponibilité : c'est fréquent sur l'offre gratuite.
 
@@ -67,28 +66,43 @@ Redirect) s'il y en a. La prise en compte prend de quelques minutes à une heure
 
 ## 3. Installer
 
-Sur le serveur (en SSH) :
+**Se connecter au serveur** depuis son ordinateur (Oracle : utilisateur
+`ubuntu`, clé SSH choisie à la création) :
 
 ```bash
-curl -fsSL https://get.docker.com | sh
+ssh -i chemin/vers/la-cle-privee.key ubuntu@51.75.12.34
 ```
+
+**a) Une clé pour lire le dépôt GitHub** (il est privé). Sur le serveur :
 
 ```bash
-git clone https://github.com/aliabbasaleh/djafat.git && cd djafat/infra/deploy
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/djafat_deploy -C "serveur djafat" && cat ~/.ssh/djafat_deploy.pub
 ```
+
+Copier la ligne affichée (`ssh-ed25519 …`), puis sur GitHub :
+`aliabbasaleh/djafat` → **Settings** → **Deploy keys** → **Add deploy key** →
+titre « serveur djafat », coller la clé, **ne pas** cocher « Allow write
+access » → **Add key**.
+
+**b) Télécharger le code** (remplacer la branche par `main` une fois la
+_Pull Request_ n°1 fusionnée) :
 
 ```bash
-DOMAIN=djafat.com ACME_EMAIL=contact@djafat.com MODE=demo ./gen-secrets.sh
+GIT_SSH_COMMAND="ssh -i ~/.ssh/djafat_deploy -o StrictHostKeyChecking=accept-new" git clone -b claude/compassionate-franklin-k23vcj git@github.com:aliabbasaleh/djafat.git && cd djafat && git config core.sshCommand "ssh -i ~/.ssh/djafat_deploy"
 ```
+
+**c) Tout installer et démarrer** (Docker, pare-feu, clés secrètes,
+construction, démarrage — 10 à 20 minutes la première fois) :
 
 ```bash
-docker compose --env-file .env.prod -f docker-compose.prod.yml --profile demo up -d --build
+DOMAIN=djafat.com ACME_EMAIL=contact@djafat.com MODE=demo ./infra/deploy/install.sh
 ```
 
-`gen-secrets.sh` crée `.env.prod` avec des clés aléatoires : ce fichier ne
-quitte jamais le serveur et n'est jamais mis dans Git. À la première
-installation, la base est créée, les migrations appliquées et (mode démo) les
-données de démonstration ajoutées.
+`install.sh` peut être relancé sans risque : il met le code à jour et
+redémarre, sans jamais recréer les clés. Les clés aléatoires sont dans
+`infra/deploy/.env.prod` : ce fichier ne quitte jamais le serveur et n'est
+jamais mis dans Git. À la première installation, la base est créée, les
+migrations appliquées et (mode démo) les données de démonstration ajoutées.
 
 ## 4. Mode démo et mode réel
 
@@ -104,10 +118,10 @@ données de démonstration ajoutées.
 
 ## 5. Au quotidien
 
-Mettre à jour après un nouveau commit :
+Mettre à jour après un nouveau commit (depuis le dossier `djafat`) :
 
 ```bash
-git pull && docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+./infra/deploy/install.sh
 ```
 
 Voir l'état et les journaux :

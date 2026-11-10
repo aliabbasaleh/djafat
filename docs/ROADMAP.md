@@ -1,6 +1,6 @@
 # Feuille de route DJAFAT
 
-> **Version actuelle : 0.19.0** — 10 nov. 2026
+> **Version actuelle : 0.19.1** — 10 nov. 2026
 > Ce fichier est la feuille de route de référence. Il est mis à jour **à chaque
 > version envoyée sur GitHub** (journal des versions en bas, cases cochées au fil
 > de l'eau). Toute l'équipe le lit ici, depuis n'importe où.
@@ -40,7 +40,8 @@ démonstration en ligne** sur djafat.com, puis le pilote à N'Djamena.
 
 - [x] Nom de domaine djafat.com (Namecheap)
 - [x] Numéros DJAFAT : WhatsApp/SMS 66 86 89 73, appel 30 10 90 90
-- [ ] Serveur (gratuit pour commencer : Oracle Cloud « Always Free », voir `infra/deploy/README.md`)
+- [ ] Serveur Oracle Cloud « Always Free » (choisi) — guide pas à pas : `infra/deploy/README.md`
+- [ ] Clé de lecture GitHub (« Deploy key ») ajoutée pour le serveur
 - [ ] Les 6 enregistrements DNS chez Namecheap
 - [ ] Fournisseur SMS au Tchad (codes de connexion)
 - [ ] Comptes marchands Airtel Money et Moov Money, téléphone marchand dédié
@@ -84,15 +85,16 @@ Chaque envoi sur GitHub ajoute une ligne ici et met à jour `version` dans le
 `package.json` racine (0.MINEUR.CORRECTIF : MINEUR pour une fonctionnalité,
 CORRECTIF pour une correction ou de la documentation).
 
-| Version | Date         | Contenu                                                                                                             | Commit    |
-| ------- | ------------ | ------------------------------------------------------------------------------------------------------------------- | --------- |
-| 0.19.0  | 10 nov. 2026 | Feuille de route versionnée ; guide « travailler en local » ; tests d'intégration 92/93 ; hébergement gratuit (ARM) | ce commit |
-| 0.18.2  | 10 nov. 2026 | Tests d'intégration indépendants de l'heure et du limiteur (90/93)                                                  | `ef13704` |
-| 0.18.1  | 10 nov. 2026 | Installation serveur : Docker Compose, HTTPS (Caddy), sauvegardes, guide Namecheap                                  | `2a622a1` |
-| 0.18.0  | 10 nov. 2026 | FEAT-018 repères, point appris, note vocale                                                                         | `c7a4692` |
-| 0.17.0  | 9 nov. 2026  | FEAT-017 commande sans Internet (WhatsApp, SMS, appel)                                                              | `00427ac` |
-| 0.16.0  | 9 nov. 2026  | FEAT-016 lecture des SMS du téléphone marchand                                                                      | `ec0ccf1` |
-| 0.15.0  | 9 nov. 2026  | FEAT-015 confiance client et plafond espèces                                                                        | `f878b45` |
-| 0.14.0  | 9 nov. 2026  | FEAT-014 gains et retraits du livreur                                                                               | `edc8096` |
-| 0.13.0  | 9 nov. 2026  | FEAT-013 app livreur en version web                                                                                 | `06c2387` |
-| 0.12.0  | 9 nov. 2026  | FEAT-012 commande par téléphone payée par Airtel, code livreur                                                      | `f5b7fbf` |
+| Version | Date         | Contenu                                                                                                                     | Commit    |
+| ------- | ------------ | --------------------------------------------------------------------------------------------------------------------------- | --------- |
+| 0.19.1  | 10 nov. 2026 | Mise en ligne Oracle : script `install.sh` (Docker, pare-feu, clés, démarrage), clé de lecture GitHub, images ARM vérifiées | ce commit |
+| 0.19.0  | 10 nov. 2026 | Feuille de route versionnée ; guide « travailler en local » ; tests d'intégration 92/93 ; hébergement gratuit (ARM)         | `41296a8` |
+| 0.18.2  | 10 nov. 2026 | Tests d'intégration indépendants de l'heure et du limiteur (90/93)                                                          | `ef13704` |
+| 0.18.1  | 10 nov. 2026 | Installation serveur : Docker Compose, HTTPS (Caddy), sauvegardes, guide Namecheap                                          | `2a622a1` |
+| 0.18.0  | 10 nov. 2026 | FEAT-018 repères, point appris, note vocale                                                                                 | `c7a4692` |
+| 0.17.0  | 9 nov. 2026  | FEAT-017 commande sans Internet (WhatsApp, SMS, appel)                                                                      | `00427ac` |
+| 0.16.0  | 9 nov. 2026  | FEAT-016 lecture des SMS du téléphone marchand                                                                              | `ec0ccf1` |
+| 0.15.0  | 9 nov. 2026  | FEAT-015 confiance client et plafond espèces                                                                                | `f878b45` |
+| 0.14.0  | 9 nov. 2026  | FEAT-014 gains et retraits du livreur                                                                                       | `edc8096` |
+| 0.13.0  | 9 nov. 2026  | FEAT-013 app livreur en version web                                                                                         | `06c2387` |
+| 0.12.0  | 9 nov. 2026  | FEAT-012 commande par téléphone payée par Airtel, code livreur                                                              | `f5b7fbf` |
