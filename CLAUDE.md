@@ -29,6 +29,14 @@ failure (`scripts/pipeline/baselines/known-failures.json`) · skipped · unavail
 Never call a run "green" when anything failed or did not run. Re-run after every
 code/spec/config change; an older result is stale.
 
+## Every push = a version
+
+Each push to GitHub is a new version: bump `version` in the root
+`package.json` (0.MINOR.PATCH — MINOR for a feature, PATCH for a fix or docs),
+add its line to the journal in `docs/ROADMAP.md` and tick what is done there,
+in the same commit. `docs/ROADMAP.md` is the team's roadmap (read from home by
+everyone); `docs/TRAVAILLER-EN-LOCAL.md` is how a teammate runs the project.
+
 ## Never
 
 - Weaken, skip (`.only`/`.skip`) or delete a test, or change an expected value, to get a check passing.

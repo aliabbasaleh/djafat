@@ -17,6 +17,32 @@ sauvegarde de la base est faite chaque nuit dans `infra/deploy/backups/`
 
 ## 1. Le serveur
 
+### Gratuit pour commencer : Oracle Cloud « Always Free »
+
+Oracle offre **sans limite de durée** un serveur ARM de 4 processeurs et 24 Go
+de mémoire, assez pour toute la démo et le pilote.
+
+1. Créer un compte sur [oracle.com/cloud/free](https://www.oracle.com/cloud/free/)
+   (une carte bancaire est demandée pour vérifier l'identité ; rien n'est
+   prélevé tant qu'on reste dans « Always Free »). Région conseillée :
+   **France Central (Paris)** ou **Germany Central (Frankfurt)**.
+2. **Compute → Instances → Create instance** : image **Ubuntu 24.04**, forme
+   **VM.Standard.A1.Flex** (Ampere), **4 OCPU, 24 Go**, disque 100 Go ; ajouter
+   sa clé SSH ; créer. Noter l'**adresse IP publique**.
+3. Ouvrir les ports web : **Networking → Virtual cloud networks → (le réseau) →
+   Security Lists → Default → Add Ingress Rules** : source `0.0.0.0/0`, TCP,
+   ports **80** et **443**. Puis sur le serveur :
+
+```bash
+sudo iptables -I INPUT -p tcp -m multiport --dports 80,443 -j ACCEPT && sudo netfilter-persistent save
+```
+
+`gen-secrets.sh` détecte le processeur ARM et choisit l'image PostGIS adaptée.
+Si « Out of capacity » s'affiche à la création, réessayer plus tard ou dans une
+autre zone de disponibilité : c'est fréquent sur l'offre gratuite.
+
+### Payant (plus simple)
+
 - Ubuntu 24.04, **4 Go de mémoire, 2 processeurs, 80 Go de disque** au minimum
   (OVH VPS, Hetzner CX32 ou équivalent, en France ou en Allemagne).
 - Noter son **adresse IP** (ex. `51.75.12.34`).

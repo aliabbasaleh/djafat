@@ -7,6 +7,10 @@ Monorepo TypeScript : **multi-pays, multi-devise, multi-provider de paiement** d
 > Voir [`docs/17-bloc-0-implementation.md`](docs/17-bloc-0-implementation.md) pour le rapport, et
 > [`docs/16-final-architecture-validation.md`](docs/16-final-architecture-validation.md) pour le checkpoint d'architecture.
 
+> **Feuille de route et versions : [`docs/ROADMAP.md`](docs/ROADMAP.md)** ·
+> travailler depuis chez soi : [`docs/TRAVAILLER-EN-LOCAL.md`](docs/TRAVAILLER-EN-LOCAL.md) ·
+> mise en ligne : [`infra/deploy/README.md`](infra/deploy/README.md)
+
 ## Architecture
 
 Toute la conception est dans [`docs/`](docs/) (`README.md` + `01` → `16`). Points d'entrée :

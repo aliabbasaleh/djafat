@@ -97,7 +97,10 @@ async function loadFixtures(): Promise<Fixtures> {
 
 beforeAll(async () => {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+  // `rawBody: true` exactly like main.ts: webhook signatures are checked on the raw bytes.
+  app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter(), {
+    rawBody: true,
+  });
   configureApp(app); // raw-body parser + URI versioning + global exception filter — same as main.ts
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
@@ -175,10 +178,15 @@ describe('walking skeleton — full flow', () => {
     expect(order.commission).toEqual({ minor: '900', currency: 'XAF' }); // 20% of 4500
     expect(order.courierFee).toEqual(order.deliveryFee); // decision A5, structural
     expect(order.total).toEqual({ minor: '5500', currency: 'XAF' }); // 4500 + 1000
-    expect(order.courierId).toEqual(expect.any(String)); // single seeded courier resolved
+    // The courier is no longer chosen at order time: dispatch (`deliveries`)
+    // offers the delivery once the order is ready (docs/25). The seeded courier
+    // is the one this flow expects to be assigned.
+    expect(order.courierId).toBeUndefined();
     expect(order.items[0].options ?? order.items[1].options).toBeDefined(); // option snapshot present (docs/22 §9)
     const orderId: string = order.id;
-    const courierId: string = order.courierId;
+    const courierId: string = (
+      await prisma.user.findFirstOrThrow({ where: { phone: COURIER_PHONE }, select: { id: true } })
+    ).id;
 
     // ── idempotency: replaying the SAME key must return the SAME order — the
     // cart is already `converted` by now, proving the replay short-circuits
@@ -196,6 +204,7 @@ describe('walking skeleton — full flow', () => {
     const paymentIdemKey = `int-payment-${randomUUID()}`;
     const createPaymentRes = await request(server)
       .post('/v1/payments')
+      .set('Authorization', `Bearer ${customerAccess}`)
       .set('idempotency-key', paymentIdemKey)
       .send({
         orderId,
@@ -214,7 +223,10 @@ describe('walking skeleton — full flow', () => {
     const providerRef: string = payment.providerRef;
 
     // Order is still awaiting_payment — nothing happens until the webhook lands.
-    const stillAwaiting = await request(server).get(`/v1/orders/${orderId}`).expect(200);
+    const stillAwaiting = await request(server)
+      .get(`/v1/orders/${orderId}`)
+      .set('Authorization', `Bearer ${customerAccess}`)
+      .expect(200);
     expect(stillAwaiting.body.status).toBe('awaiting_payment');
 
     // ── 3. the signed webhook resolves the payment ──
@@ -236,9 +248,15 @@ describe('walking skeleton — full flow', () => {
       .expect({ status: 'ok' });
 
     // ── 4. payment succeeded -> order placed (via the in-process event) ──
-    const paidOrder = await request(server).get(`/v1/orders/${orderId}`).expect(200);
+    const paidOrder = await request(server)
+      .get(`/v1/orders/${orderId}`)
+      .set('Authorization', `Bearer ${customerAccess}`)
+      .expect(200);
     expect(paidOrder.body.status).toBe('placed');
-    const paidPayment = await request(server).get(`/v1/payments/${paymentId}`).expect(200);
+    const paidPayment = await request(server)
+      .get(`/v1/payments/${paymentId}`)
+      .set('Authorization', `Bearer ${customerAccess}`)
+      .expect(200);
     expect(paidPayment.body.status).toBe('succeeded');
 
     // ── duplicate webhook (same eventId+providerRef) must be a pure no-op ──
@@ -266,8 +284,8 @@ describe('walking skeleton — full flow', () => {
     expect(accrualGroup?.kind).toBe('order_accrual');
     const accrualSums = await prisma.$queryRaw<Array<{ debit: bigint; credit: bigint }>>`
       SELECT
-        COALESCE(SUM(amount_minor) FILTER (WHERE direction = 'debit'), 0)  AS debit,
-        COALESCE(SUM(amount_minor) FILTER (WHERE direction = 'credit'), 0) AS credit
+        COALESCE(SUM(amount_minor) FILTER (WHERE direction = 'debit'), 0)::bigint  AS debit,
+        COALESCE(SUM(amount_minor) FILTER (WHERE direction = 'credit'), 0)::bigint AS credit
       FROM ledger_entries WHERE entry_group = ${accrualGroup!.id}::uuid
     `;
     expect(accrualSums[0]!.debit).toBe(accrualSums[0]!.credit); // Σdebit === Σcredit
@@ -365,8 +383,8 @@ describe('walking skeleton — full flow', () => {
     expect(releaseGroup?.kind).toBe('funds_available');
     const releaseSums = await prisma.$queryRaw<Array<{ debit: bigint; credit: bigint }>>`
       SELECT
-        COALESCE(SUM(amount_minor) FILTER (WHERE direction = 'debit'), 0)  AS debit,
-        COALESCE(SUM(amount_minor) FILTER (WHERE direction = 'credit'), 0) AS credit
+        COALESCE(SUM(amount_minor) FILTER (WHERE direction = 'debit'), 0)::bigint  AS debit,
+        COALESCE(SUM(amount_minor) FILTER (WHERE direction = 'credit'), 0)::bigint AS credit
       FROM ledger_entries WHERE entry_group = ${releaseGroup!.id}::uuid
     `;
     expect(releaseSums[0]!.debit).toBe(releaseSums[0]!.credit);

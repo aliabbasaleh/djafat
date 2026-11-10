@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Test } from '@nestjs/testing';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import request from 'supertest';
-import { totpCodeAt } from '@djafat/core';
+import { REFRESH_ROTATION_GRACE_MS, totpCodeAt } from '@djafat/core';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
 import { PrismaService } from '../src/infra/prisma/prisma.service';
@@ -83,19 +83,27 @@ describe('scenario 1 — OTP login -> /me -> refresh -> old refresh rejected -> 
     expect(newAccess).not.toBe(access);
     expect(newRefresh).not.toBe(refresh);
 
-    // The OLD refresh token is now consumed — presenting it again must fail.
-    await request(server).post('/v1/auth/refresh').send({ refresh }).expect(401);
-
-    // The NEW access token still works.
+    // The NEW access token works.
     await request(server).get('/v1/me').set('Authorization', `Bearer ${newAccess}`).expect(200);
 
+    // The OLD refresh token, presented again within the grace window
+    // (REFRESH_ROTATION_GRACE_MS, a concurrent double-submit), continues the
+    // SAME family instead of logging the customer out…
+    const retried = await request(server).post('/v1/auth/refresh').send({ refresh }).expect(200);
+    const currentRefresh = retried.body.refresh as string;
+    // …but once the window has passed it is a reuse: refused, and the whole
+    // family is revoked, including the most recent refresh token.
+    await new Promise((r) => setTimeout(r, REFRESH_ROTATION_GRACE_MS + 500));
+    await request(server).post('/v1/auth/refresh').send({ refresh }).expect(401);
+    await request(server).post('/v1/auth/refresh').send({ refresh: currentRefresh }).expect(401);
+
+    // Logout: a fresh session, then refresh is rejected immediately after.
+    const again = await loginViaOtp(CUSTOMER_A_PHONE);
     await request(server)
       .post('/v1/auth/logout')
-      .set('Authorization', `Bearer ${newAccess}`)
+      .set('Authorization', `Bearer ${again.access}`)
       .expect(204);
-
-    // Refresh is rejected immediately after logout.
-    await request(server).post('/v1/auth/refresh').send({ refresh: newRefresh }).expect(401);
+    await request(server).post('/v1/auth/refresh').send({ refresh: again.refresh }).expect(401);
   });
 });
 
@@ -130,12 +138,13 @@ describe("scenario 2 — ownership: own resource allowed, another customer's res
       .set('Authorization', `Bearer ${customerA.access}`)
       .expect(200);
 
-    // A different, brand-new customer cannot.
+    // A different, brand-new customer cannot — and is not even told the order
+    // exists: 404, the same answer as for an unknown id (common/authz/order-access.ts).
     const customerB = await loginViaOtp(`+2356600${Math.floor(1000 + Math.random() * 8999)}`);
     await request(server)
       .get(`/v1/orders/${orderId}`)
       .set('Authorization', `Bearer ${customerB.access}`)
-      .expect(403);
+      .expect(404);
 
     // IDOR probe: a client-supplied `customerId` in the body must never let
     // customer B create an order impersonating customer A (docs/19 §38) — the

@@ -24,11 +24,19 @@ PG=$(openssl rand -hex 24)
 S3_KEY=djafat$(openssl rand -hex 6)
 S3_SECRET=$(openssl rand -hex 24)
 
+# PostGIS has no official ARM image: on an ARM server (e.g. Oracle Cloud
+# "Always Free" Ampere) use the community multi-arch build.
+case "$(uname -m)" in
+  aarch64|arm64) POSTGIS_IMAGE=imresamu/postgis:16-3.5 ;;
+  *) POSTGIS_IMAGE=postgis/postgis:16-3.5 ;;
+esac
+
 umask 077
 cat > "$OUT" <<ENV
 # Generated $(date -u +%FT%TZ) — mode $MODE. Keep this file secret.
 DOMAIN=$DOMAIN
 ACME_EMAIL=$ACME_EMAIL
+POSTGIS_IMAGE=$POSTGIS_IMAGE
 SEED_DEMO=$([ "$MODE" = demo ] && echo 1 || echo 0)
 NODE_ENV=production
 LOG_LEVEL=info
