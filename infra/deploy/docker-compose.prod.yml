@@ -1,0 +1,141 @@
+# DJAFAT production / demo stack — one server, Docker Compose.
+#   cd infra/deploy && ./gen-secrets.sh && docker compose -f docker-compose.prod.yml up -d --build
+# Every secret comes from .env.prod (generated on the server, never in Git).
+name: djafat
+
+x-api-env: &api-env
+  env_file: .env.prod
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.5
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: djafat
+      POSTGRES_USER: djafat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run gen-secrets.sh}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U djafat -d djafat']
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redisdata:/data
+
+  minio:
+    # S3-compatible store required by the API configuration (ObjectStoragePort).
+    image: quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
+    restart: unless-stopped
+    command: ['server', '/data']
+    environment:
+      MINIO_ROOT_USER: ${OBJECT_STORAGE_ACCESS_KEY_ID:?run gen-secrets.sh}
+      MINIO_ROOT_PASSWORD: ${OBJECT_STORAGE_SECRET_ACCESS_KEY:?run gen-secrets.sh}
+    volumes:
+      - miniodata:/data
+
+  # One-shot: applies the database migrations (and the demo seed when
+  # SEED_DEMO=1), then exits. The API waits for it.
+  migrate:
+    build: { context: ../.., dockerfile: infra/docker/api.Dockerfile, target: build }
+    <<: *api-env
+    working_dir: /repo/apps/api
+    command:
+      [
+        'sh',
+        '-c',
+        'node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma && if [ "$$SEED_DEMO" = "1" ]; then node_modules/.bin/tsx prisma/seed.ts; fi',
+      ]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: 'no'
+
+  api:
+    build: { context: ../.., dockerfile: infra/docker/api.Dockerfile }
+    <<: *api-env
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+
+  worker:
+    build: { context: ../.., dockerfile: infra/docker/worker.Dockerfile }
+    <<: *api-env
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/deploy/next.Dockerfile
+      args:
+        APP: web
+        NEXT_PUBLIC_API_BASE_URL: https://api.${DOMAIN}/v1
+        NEXT_PUBLIC_DJAFAT_ORDER_NUMBER: ${DJAFAT_ORDER_NUMBER:-}
+        NEXT_PUBLIC_DJAFAT_CALL_NUMBER: ${DJAFAT_CALL_NUMBER:-}
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_BASE_URL: http://api:3001/v1
+
+  admin:
+    build:
+      context: ../..
+      dockerfile: infra/deploy/next.Dockerfile
+      args: { APP: admin, NEXT_PUBLIC_API_BASE_URL: 'https://api.${DOMAIN}/v1' }
+    restart: unless-stopped
+
+  restaurant:
+    build:
+      context: ../..
+      dockerfile: infra/deploy/next.Dockerfile
+      args: { APP: restaurant, NEXT_PUBLIC_API_BASE_URL: 'https://api.${DOMAIN}/v1' }
+    restart: unless-stopped
+
+  caddy:
+    build:
+      context: ../..
+      dockerfile: infra/deploy/caddy.Dockerfile
+      args: { EXPO_PUBLIC_API_BASE_URL: 'https://api.${DOMAIN}/v1' }
+    restart: unless-stopped
+    ports: ['80:80', '443:443']
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on: [web, admin, restaurant, api]
+
+  # DEMO ONLY: login codes land in this inbox instead of being sent by SMS.
+  # Reachable from the server itself only (SSH tunnel), never from the internet.
+  mock-sms:
+    build: { context: ../mock-sms }
+    profiles: ['demo']
+    restart: unless-stopped
+    ports: ['127.0.0.1:4020:4020']
+
+  # Nightly database dump, 14 days kept, in ./backups on the server.
+  backup:
+    image: postgis/postgis:16-3.5
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+      - ./backup.sh:/backup.sh:ro
+    entrypoint: ['sh', '/backup.sh']
+    depends_on:
+      postgres: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+  caddydata:
+  caddyconfig:
