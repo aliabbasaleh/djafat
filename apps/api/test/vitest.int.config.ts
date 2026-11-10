@@ -18,6 +18,7 @@ export default defineConfig({
     include: ['test/**/*.int.spec.ts'],
     exclude: ['**/node_modules/**', 'dist/**'],
     environment: 'node',
+    setupFiles: ['test/int-setup.ts'],
     testTimeout: 30_000,
     hookTimeout: 30_000,
     fileParallelism: false, // one shared Postgres — avoid cross-test interference
