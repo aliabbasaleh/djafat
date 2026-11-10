@@ -185,21 +185,54 @@ model User {
 /// SQL but is intentionally NOT modelled — same PostGIS convention as
 /// `Restaurant.geom` below.
 model Address {
-  id             String   @id @default(uuid()) @db.Uuid
-  userId         String   @map("user_id") @db.Uuid
-  label          String?
-  recipientPhone String?  @map("recipient_phone")
-  cityId         String?  @map("city_id") @db.Uuid
-  quartier       String?
-  street         String?
-  landmark       String?
-  instructions   String?
-  geocodeStatus  String   @default("pending") @map("geocode_status")
-  isDefault      Boolean  @default(false) @map("is_default")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  label            String?
+  recipientPhone   String?   @map("recipient_phone")
+  cityId           String?   @map("city_id") @db.Uuid
+  quartier         String?
+  street           String?
+  landmark         String?
+  instructions     String?
+  geocodeStatus    String    @default("pending") @map("geocode_status")
+  isDefault        Boolean   @default(false) @map("is_default")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  /// FEAT-018 — landmark-relative address, door hint, learned point (geography columns via raw SQL).
+  landmarkId       String?   @map("landmark_id") @db.Uuid
+  landmarkRelation String?   @map("landmark_relation")
+  doorHint         String?   @map("door_hint")
+  gpsAccuracyM     Int?      @map("gps_accuracy_m")
+  geomSource       String    @default("user") @map("geom_source")
+  verifiedCount    Int       @default(0) @map("verified_count")
+  verifiedAt       DateTime? @map("verified_at") @db.Timestamptz(6)
 
   @@map("addresses")
+}
+
+/// FEAT-018 — shared landmarks of a city (`geom` via raw SQL).
+model Landmark {
+  id        String   @id @default(uuid()) @db.Uuid
+  cityId    String   @map("city_id") @db.Uuid
+  name      String
+  kind      String   @default("other")
+  aliases   String[] @default([])
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([cityId, name])
+  @@map("landmarks")
+}
+
+/// FEAT-018 — ≤ 10 s voice note for the courier, one per address.
+model AddressVoiceNote {
+  addressId  String   @id @map("address_id") @db.Uuid
+  mime       String
+  data       Bytes
+  durationMs Int      @map("duration_ms")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("address_voice_notes")
 }
 
 model Session {
@@ -567,6 +600,8 @@ model Order {
   dropoffInstructions   String?     @map("dropoff_instructions")
   dropoffRecipientPhone String?     @map("dropoff_recipient_phone")
   dropoffGeocodeStatus  String      @default("pending") @map("dropoff_geocode_status")
+  /// FEAT-018 — door hint frozen at order time ("portail bleu").
+  dropoffDoorHint       String?     @map("dropoff_door_hint")
   createdAt             DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime    @default(now()) @map("updated_at") @db.Timestamptz(6)
 

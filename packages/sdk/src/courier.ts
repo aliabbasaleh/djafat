@@ -63,6 +63,17 @@ export interface DeliveryContext {
   readonly dropoffPhone: string | null;
   /** FEAT-015: first order of this customer — call before leaving the restaurant. */
   readonly customerIsNew?: boolean;
+  /** FEAT-018 — « portail bleu », frozen at order time. */
+  readonly dropoffDoorHint?: string | null;
+  /** FEAT-018 — the customer left a voice note for the courier. */
+  readonly dropoffHasVoiceNote?: boolean;
+}
+
+/** FEAT-018 — the customer's ≤ 10 s voice note. */
+export interface CourierVoiceNote {
+  readonly mime: string;
+  readonly dataBase64: string;
+  readonly durationMs: number;
 }
 
 export interface DeliveryOffer {
@@ -153,6 +164,11 @@ export function createCourierClient(http: ApiHttp) {
           body: { reason },
           idempotencyKey,
         }),
+      /** FEAT-018 — the customer's voice note for this delivery, or null. */
+      getVoiceNote: (deliveryId: string) =>
+        http.get<CourierVoiceNote | null>(
+          `/couriers/me/deliveries/${encodeURIComponent(deliveryId)}/voice-note`,
+        ),
     },
   };
 }

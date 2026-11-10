@@ -56,6 +56,13 @@ export interface OrderAmountPort {
    * the pure `scoreCustomerTrust` (`@djafat/core`).
    */
   getCustomerTrustSignals(customerId: string): Promise<CustomerTrustFacts>;
+  /**
+   * FEAT-018 — the voice note of the order's delivery address (≤ 10 s), or
+   * null. The caller (`deliveries`) has already checked who may hear it.
+   */
+  getDropoffVoiceNote(
+    orderId: string,
+  ): Promise<{ mime: string; dataBase64: string; durationMs: number } | null>;
 }
 
 /** FEAT-015 — order-history facts about a customer (no time-of-day: the caller knows "now"). */
@@ -126,6 +133,10 @@ export interface OrderDeliveryContext {
   readonly dropoffPhone: string | null;
   /** FEAT-015: no delivered order yet — the courier calls before leaving the restaurant. */
   readonly customerIsNew: boolean;
+  /** FEAT-018 — « Portail bleu », frozen at order time. */
+  readonly dropoffDoorHint?: string | null;
+  /** FEAT-018 — the customer left a voice note for the courier. */
+  readonly dropoffHasVoiceNote?: boolean;
 }
 
 /**

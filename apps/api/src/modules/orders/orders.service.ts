@@ -19,7 +19,13 @@ import type {
   OrderPaymentContext,
   Role,
 } from '@djafat/types';
-import { addMoney, assertOrderTransition, money } from '@djafat/core';
+import {
+  addMoney,
+  assertOrderTransition,
+  describeDropoff,
+  money,
+  type LandmarkRelation,
+} from '@djafat/core';
 import { CatalogService } from '../catalog/catalog.service';
 import { PricingService } from '../pricing/pricing.service';
 import { PlatformService } from '../platform/platform.service';
@@ -86,22 +92,35 @@ interface DropoffSnapshot {
   geocode_status: string;
   lat: number | null;
   lng: number | null;
+  /** FEAT-018 */
+  door_hint?: string | null;
 }
 
 /** Maps a customer's selected `AddressDto` (camelCase, city joined by name) onto the `DropoffSnapshot` shape. */
 function toDropoffSnapshot(address: AddressDto): DropoffSnapshot {
+  // FEAT-018: the courier is sent to the point learned from past deliveries
+  // when there is one, and reads the landmark the customer chose.
+  const learned = address.learnedPoint ?? null;
+  const landmarkText = address.landmarkName
+    ? describeDropoff({
+        relation: address.landmarkRelation ?? null,
+        landmarkName: address.landmarkName,
+        doorHint: null,
+      })
+    : null;
   return {
     id: address.id,
     label: address.label,
     city: address.cityName,
     quartier: address.quartier,
     street: address.street,
-    landmark: address.landmark,
+    landmark: [landmarkText, address.landmark].filter((x): x is string => !!x).join(' · ') || null,
     instructions: address.instructions,
     recipient_phone: address.recipientPhone,
-    geocode_status: address.geocodeStatus,
-    lat: address.lat,
-    lng: address.lng,
+    geocode_status: learned ? 'ok' : address.geocodeStatus,
+    lat: learned ? learned.lat : address.lat,
+    lng: learned ? learned.lng : address.lng,
+    door_hint: address.doorHint ?? null,
   };
 }
 
@@ -308,6 +327,7 @@ export class OrdersService implements OrderAmountPort {
           dropoffInstructions: dropoff.instructions,
           dropoffRecipientPhone: dropoff.recipient_phone,
           dropoffGeocodeStatus: dropoff.geocode_status,
+          dropoffDoorHint: dropoff.door_hint ?? null,
         },
       });
       // `dropoff_geom` is PostGIS — not writable through the Prisma client
@@ -402,13 +422,36 @@ export class OrdersService implements OrderAmountPort {
     const defaultAddress = await tx.$queryRaw<DropoffSnapshot[]>`
       SELECT a.id, a.quartier, a.street, a.landmark, a.instructions, a.recipient_phone,
              a.geocode_status, a.label, c.name AS city,
-             ST_Y(a.geom::geometry) AS lat, ST_X(a.geom::geometry) AS lng
+             -- FEAT-018: the point learned from past deliveries wins
+             ST_Y(COALESCE(a.verified_geom, a.geom)::geometry) AS lat,
+             ST_X(COALESCE(a.verified_geom, a.geom)::geometry) AS lng,
+             a.door_hint, a.landmark_relation, l.name AS landmark_name
       FROM addresses a
       LEFT JOIN cities c ON c.id = a.city_id
+      LEFT JOIN landmarks l ON l.id = a.landmark_id
       WHERE a.user_id = ${customerId}::uuid AND a.is_default = true
       LIMIT 1
     `;
-    const dropoff = defaultAddress[0];
+    const raw = defaultAddress[0] as
+      | (DropoffSnapshot & { landmark_name?: string | null; landmark_relation?: string | null })
+      | undefined;
+    const dropoff: DropoffSnapshot | undefined =
+      raw && raw.landmark_name
+        ? {
+            ...raw,
+            landmark:
+              [
+                describeDropoff({
+                  relation: (raw.landmark_relation ?? null) as LandmarkRelation | null,
+                  landmarkName: raw.landmark_name,
+                  doorHint: null,
+                }),
+                raw.landmark,
+              ]
+                .filter((x): x is string => !!x)
+                .join(' · ') || null,
+          }
+        : raw;
     if (!dropoff) {
       throw new ConflictException({
         code: 'VALIDATION_ERROR',
@@ -546,6 +589,8 @@ export class OrdersService implements OrderAmountPort {
         dropoff_street: string | null;
         dropoff_landmark: string | null;
         dropoff_recipient_phone: string | null;
+        dropoff_door_hint?: string | null;
+        dropoff_has_voice_note?: boolean | null;
       }>
     >`
       SELECT o.id, o.code, o.restaurant_id, o.customer_id, o.currency, o.courier_fee_minor,
@@ -553,7 +598,9 @@ export class OrdersService implements OrderAmountPort {
              ST_Y(o.dropoff_geom::geometry) AS dropoff_lat, ST_X(o.dropoff_geom::geometry) AS dropoff_lng,
              r.name AS restaurant_name, r.address_text AS restaurant_address, r.phone AS restaurant_phone,
              o.dropoff_label, o.dropoff_quartier, o.dropoff_street, o.dropoff_landmark,
-             o.dropoff_recipient_phone
+             o.dropoff_recipient_phone, o.dropoff_door_hint,
+             EXISTS (SELECT 1 FROM address_voice_notes v WHERE v.address_id = o.dropoff_address_id)
+               AS dropoff_has_voice_note
       FROM orders o
       JOIN restaurants r ON r.id = o.restaurant_id
       WHERE o.id = ${orderId}::uuid
@@ -609,7 +656,46 @@ export class OrdersService implements OrderAmountPort {
         row.dropoff_landmark,
       ]),
       dropoffPhone: row.dropoff_recipient_phone,
+      dropoffDoorHint: row.dropoff_door_hint ?? null,
+      dropoffHasVoiceNote: row.dropoff_has_voice_note === true,
     };
+  }
+
+  /** FEAT-018 — `OrderAmountPort.getDropoffVoiceNote`. */
+  async getDropoffVoiceNote(
+    orderId: string,
+  ): Promise<{ mime: string; dataBase64: string; durationMs: number } | null> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { dropoffAddressId: true },
+    });
+    if (!order?.dropoffAddressId) return null;
+    const note = await this.addresses.getVoiceNote(order.dropoffAddressId);
+    return note
+      ? { mime: note.mime, durationMs: note.durationMs, dataBase64: note.data.toString('base64') }
+      : null;
+  }
+
+  /**
+   * FEAT-018 (SPEC-018-02) — where the courier stood when the delivery was
+   * confirmed refines the address's delivery point for the next orders.
+   */
+  @OnEvent('delivery.dropoff_fix')
+  async onDropoffFix(payload: {
+    orderId: string;
+    lat: number;
+    lng: number;
+    accuracyM: number | null;
+  }): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: payload.orderId },
+      select: { dropoffAddressId: true },
+    });
+    if (!order?.dropoffAddressId) return;
+    const outcome = await this.addresses.learnDeliveryPoint(order.dropoffAddressId, payload);
+    this.logger.log(
+      `order ${payload.orderId}: delivery point ${outcome.accepted ? `learned (${outcome.point.count})` : `ignored (${outcome.reason})`}`,
+    );
   }
 
   // ── reads ───────────────────────────────────────────────────────────────

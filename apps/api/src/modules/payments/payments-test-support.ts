@@ -495,6 +495,7 @@ export function fakeOrderAmountPort(): OrderAmountPort {
     getPaymentContext: vi.fn().mockResolvedValue(context),
     getAccrualBreakdown: vi.fn().mockResolvedValue(breakdown),
     getOwnerUserId: vi.fn().mockResolvedValue(CUSTOMER_ID),
+    getDropoffVoiceNote: vi.fn().mockResolvedValue(null),
     getCustomerTrustSignals: vi.fn().mockResolvedValue({
       phoneVerified: true,
       deliveredOrders: 0,

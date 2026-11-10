@@ -196,6 +196,21 @@ export class CouriersService implements CourierPort {
     return rows.map((r) => ({ courierId: r.user_id, distanceMeters: r.distance_m }));
   }
 
+  /** FEAT-018 — last fix with its accuracy and time (delivery point learning). */
+  async getFix(
+    userId: string,
+  ): Promise<{ lat: number; lng: number; accuracyM: number | null; at: Date } | null> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{ lat: number; lng: number; accuracy_m: number | null; at: Date | null }>
+    >`
+      SELECT ST_Y(last_geom::geometry) AS lat, ST_X(last_geom::geometry) AS lng,
+             last_accuracy_m::float8 AS accuracy_m, last_location_at AS at
+      FROM couriers WHERE user_id = ${userId}::uuid AND last_geom IS NOT NULL
+    `;
+    const r = rows[0];
+    return r && r.at ? { lat: r.lat, lng: r.lng, accuracyM: r.accuracy_m, at: r.at } : null;
+  }
+
   /** Last known position of a courier (customer live map), or null if never reported. */
   async getPosition(
     userId: string,

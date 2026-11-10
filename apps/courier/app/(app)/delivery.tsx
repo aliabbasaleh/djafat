@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { tokens } from '@djafat/tokens';
 import type { Delivery } from '@djafat/sdk';
 import { ApiClientError } from '@djafat/sdk';
@@ -39,6 +39,8 @@ export default function DeliveryScreen() {
   const [code, setCode] = useState('');
   const [failing, setFailing] = useState(false);
   const [failReason, setFailReason] = useState('');
+  const [noteBusy, setNoteBusy] = useState(false);
+  const [noteMsg, setNoteMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -86,6 +88,35 @@ export default function DeliveryScreen() {
       setError('Code invalide — vérifiez-le auprès du client.');
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** FEAT-018 — the customer's ≤ 10 s voice note (« portail bleu après la boutique »). */
+  async function playVoiceNote() {
+    if (!delivery) return;
+    setNoteMsg(null);
+    if (Platform.OS !== 'web') {
+      setNoteMsg('La note vocale s’écoute sur la version web de l’application.');
+      return;
+    }
+    setNoteBusy(true);
+    try {
+      const note = await api.courier.deliveries.getVoiceNote(delivery.id);
+      if (!note) {
+        setNoteMsg('Le client a retiré sa note vocale.');
+        return;
+      }
+      const AudioCtor = (globalThis as { Audio?: new (src: string) => { play(): Promise<void> } })
+        .Audio;
+      if (!AudioCtor) {
+        setNoteMsg('Lecture audio indisponible sur cet appareil.');
+        return;
+      }
+      await new AudioCtor(`data:${note.mime};base64,${note.dataBase64}`).play();
+    } catch {
+      setNoteMsg('Impossible de lire la note vocale — réessayez.');
+    } finally {
+      setNoteBusy(false);
     }
   }
 
@@ -149,8 +180,25 @@ export default function DeliveryScreen() {
         {beforePickup && context?.restaurantPhone && (
           <Text style={styles.cardDetail}>Tél. restaurant : {context.restaurantPhone}</Text>
         )}
+        {afterPickup && context?.dropoffDoorHint && (
+          <View style={styles.doorHint} accessibilityRole="text">
+            <Text style={styles.doorHintLabel}>Indication pour le portail</Text>
+            <Text style={styles.doorHintText}>{context.dropoffDoorHint}</Text>
+          </View>
+        )}
         {afterPickup && context?.dropoffPhone && (
           <Text style={styles.cardDetail}>Tél. client : {context.dropoffPhone}</Text>
+        )}
+        {afterPickup && context?.dropoffHasVoiceNote && (
+          <View style={styles.noteBox}>
+            <BigButton
+              label="▶ Écouter la note du client"
+              variant="secondary"
+              onPress={() => void playVoiceNote()}
+              loading={noteBusy}
+            />
+            {noteMsg && <Text style={styles.cardDetail}>{noteMsg}</Text>}
+          </View>
         )}
         <View style={styles.divider} />
         <Text style={styles.cardLabel}>Gain de cette course</Text>
@@ -266,4 +314,17 @@ const styles = StyleSheet.create({
     marginBottom: tokens.space['3'],
   },
   errorText: { color: tokens.color.state.danger, fontSize: tokens.type.size.body },
+  doorHint: {
+    borderLeftWidth: 4,
+    borderLeftColor: tokens.color.brand.primary,
+    paddingLeft: tokens.space['3'],
+    marginTop: tokens.space['2'],
+  },
+  doorHintLabel: { fontSize: tokens.type.size.label, color: tokens.color.text.muted },
+  doorHintText: {
+    fontSize: tokens.type.size.h2,
+    fontWeight: '700',
+    color: tokens.color.text.primary,
+  },
+  noteBox: { marginTop: tokens.space['2'], gap: tokens.space['2'] },
 });

@@ -15,6 +15,7 @@ export * from './delivery/state-machine.js';
 export * from './delivery/earnings-period.js';
 export * from './trust/cod-trust.js';
 export * from './geo/distance.js';
+export * from './geo/learned-point.js';
 
 export * from './mfa/totp.js';
 

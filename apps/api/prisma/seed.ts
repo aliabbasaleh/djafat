@@ -54,6 +54,43 @@ async function main(): Promise<void> {
     },
   });
 
+  // --- landmarks (FEAT-018) -----------------------------------------------------
+  // Well-known N'Djamena landmarks customers place their address against.
+  // Coordinates are APPROXIMATE (demo seed) and must be checked on the ground
+  // before launch; each delivery then refines the customer's own point.
+  const landmarks: Array<[string, string, string[], number, number]> = [
+    [
+      'Grande Mosquée Roi Fayçal',
+      'mosque',
+      ['grande mosquee', 'mosquee roi faycal'],
+      12.1066,
+      15.0436,
+    ],
+    ['Marché central', 'market', ['grand marche'], 12.1078, 15.0418],
+    ['Place de la Nation', 'administration', ['place de la nation'], 12.1101, 15.0486],
+    ['Rond-point Hamama', 'roundabout', ['hamama'], 12.1215, 15.0634],
+    ['Rond-point Kondolé', 'roundabout', ['kondole'], 12.14, 15.062],
+    ['Marché de Dembé', 'market', ['dembe'], 12.1102, 15.0785],
+    ['Hôpital de la Liberté', 'health', ['hopital liberte'], 12.1131, 15.0571],
+    ['Cathédrale Notre-Dame de la Paix', 'church', ['cathedrale'], 12.1068, 15.0505],
+    ['Stade Idriss Mahamat Ouya', 'other', ['stade omnisport', 'stade'], 12.1146, 15.0699],
+    [
+      'Université de N’Djamena (Ardep Djoumbal)',
+      'school',
+      ['universite', 'ardep djoumbal'],
+      12.1203,
+      15.0455,
+    ],
+  ];
+  for (const [name, kind, aliases, lat, lng] of landmarks) {
+    await prisma.$executeRaw`
+      INSERT INTO landmarks (city_id, name, kind, aliases, geom)
+      VALUES (${city.id}::uuid, ${name}, ${kind}, ${aliases}::text[],
+              ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography)
+      ON CONFLICT (city_id, name) DO NOTHING
+    `;
+  }
+
   // --- roles -----------------------------------------------------------------
   const roles: Array<{ code: string; label: string }> = [
     { code: 'customer', label: 'Client' },

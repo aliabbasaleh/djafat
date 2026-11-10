@@ -4,7 +4,7 @@ import { createCatalogClient } from './catalog.js';
 import { createPaymentsClient } from './payments.js';
 import { createCartClient } from './cart.js';
 import { createOrdersClient } from './orders.js';
-import { createAddressesClient } from './addresses.js';
+import { createAddressesClient, createLandmarksClient } from './addresses.js';
 import { createAdminClient } from './admin.js';
 import { createRestaurantClient } from './restaurant.js';
 import { createCourierClient } from './courier.js';
@@ -61,6 +61,7 @@ export function createApiClient(options: ApiClientOptions) {
     orders: createOrdersClient(http),
     payments: createPaymentsClient(http),
     addresses: createAddressesClient(http),
+    landmarks: createLandmarksClient(http),
     admin: createAdminClient(http),
     restaurant: createRestaurantClient(http),
     courier: createCourierClient(http),

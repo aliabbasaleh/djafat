@@ -156,3 +156,61 @@ describe('addresses client (Bloc 8, docs/29)', () => {
     ]);
   });
 });
+
+describe('FEAT-018 — landmarks, voice notes', () => {
+  it('SPEC-018-01-SC01 / SPEC-018-03-SC01 — searches landmarks and manages the voice note on the expected routes', async () => {
+    const calls: Array<{ method: string; url: string; body: unknown }> = [];
+    const client = createApiClient({
+      baseUrl: 'http://api.test/v1',
+      fetchImpl: mockFetch((url, init) => {
+        calls.push({
+          method: init.method ?? 'GET',
+          url,
+          body: init.body ? JSON.parse(String(init.body)) : undefined,
+        });
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }),
+    });
+
+    await client.landmarks.search('mosquée');
+    await client.addresses.setVoiceNote('a1', {
+      mime: 'audio/webm',
+      dataBase64: 'AAAA',
+      durationMs: 4000,
+    });
+    await client.addresses.getVoiceNote('a1');
+    await client.addresses.removeVoiceNote('a1');
+    await client.courier.deliveries.getVoiceNote('d1');
+
+    expect(calls).toEqual([
+      {
+        method: 'GET',
+        url: 'http://api.test/v1/landmarks?q=mosqu%C3%A9e',
+        body: undefined,
+      },
+      {
+        method: 'PUT',
+        url: 'http://api.test/v1/users/me/addresses/a1/voice-note',
+        body: { mime: 'audio/webm', dataBase64: 'AAAA', durationMs: 4000 },
+      },
+      {
+        method: 'GET',
+        url: 'http://api.test/v1/users/me/addresses/a1/voice-note',
+        body: undefined,
+      },
+      {
+        method: 'DELETE',
+        url: 'http://api.test/v1/users/me/addresses/a1/voice-note',
+        body: undefined,
+      },
+      {
+        method: 'GET',
+        url: 'http://api.test/v1/couriers/me/deliveries/d1/voice-note',
+        body: undefined,
+      },
+    ]);
+  });
+});

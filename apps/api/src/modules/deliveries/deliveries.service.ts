@@ -148,6 +148,9 @@ type DeliveryRow = {
  * `couriers.lockAndClaim`/`release` (which locks the courier row) SECOND —
  * never the reverse, anywhere in this file.
  */
+/** FEAT-018: a fix older than this says nothing about where the door is. */
+const DROPOFF_FIX_MAX_AGE_MS = 2 * 60 * 1000;
+
 @Injectable()
 export class DeliveriesService {
   private readonly logger = new Logger(DeliveriesService.name);
@@ -1050,6 +1053,7 @@ export class DeliveriesService {
     // payment now that the courier has collected it (docs/25 §28).
     this.events.emit('delivery.delivered', { orderId: outcome.orderId, courierId });
     this.logger.log(`delivery ${outcome.deliveryId} delivered by courier ${courierId}`);
+    await this.emitDropoffFix(outcome.orderId, courierId);
     return this.getByIdOrThrow(outcome.deliveryId);
   }
 
@@ -1472,6 +1476,36 @@ export class DeliveriesService {
         };
       }),
     );
+  }
+
+  /**
+   * FEAT-018 (SPEC-018-02) — the courier's fresh GPS fix when the customer
+   * confirmed the delivery (the code was given at the door): `orders`
+   * refines the address's delivery point with it. Best effort.
+   */
+  private async emitDropoffFix(orderId: string, courierId: string): Promise<void> {
+    try {
+      const fix = await this.couriers.getFix(courierId);
+      if (!fix || Date.now() - fix.at.getTime() > DROPOFF_FIX_MAX_AGE_MS) return;
+      this.events.emit('delivery.dropoff_fix', {
+        orderId,
+        lat: fix.lat,
+        lng: fix.lng,
+        accuracyM: fix.accuracyM,
+      });
+    } catch (err) {
+      this.logger.warn(`dropoff fix for ${orderId} not recorded: ${String(err)}`);
+    }
+  }
+
+  /** FEAT-018 — the address's voice note, for the courier delivering this order only. */
+  async getVoiceNoteForCourier(deliveryId: string, courierId: string) {
+    const d = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
+    const active = ['courier_accepted', 'pickup_in_progress', 'picked_up', 'on_the_way'];
+    if (!d || d.courierId !== courierId || !active.includes(d.status)) {
+      throw new NotFoundException({ code: 'DELIVERY_NOT_FOUND', message: 'Delivery not found.' });
+    }
+    return this.orderAmount.getDropoffVoiceNote(d.orderId);
   }
 
   async listActiveForCourier(courierId: string): Promise<DeliveryDto[]> {
