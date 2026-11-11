@@ -1,0 +1,11 @@
+# Commits the docs_2/ audit accounts for — one "<commit> <ref>" per line.
+# Every commit reachable from one of these counts as reviewed (docs_2/README.md §4).
+# "Reviewed" means read and reflected in the documents at the evidence level they state,
+# not "verified working".
+# Change these lines ONLY as the last step of an incremental audit sync (docs_2/README.md §3),
+# and name the sync below.
+# Last sync: S-001 (2026-11-11)
+d1439c6004efa7e9ce882124ae7543c2cd99328f HEAD
+d1439c6004efa7e9ce882124ae7543c2cd99328f origin/main
+804176f65cc0fb12e32de356b92b29e511ce4de4 origin/claude/compassionate-franklin-k23vcj
+a68934d1a1c2abf5417222f0257e7a101d5ec97e origin/fix/payment-reliability-backlog

@@ -1,0 +1,81 @@
+# Module: authentication and identity
+
+`apps/api/src/modules/auth` and `modules/users`, with the policies in `packages/core/src/auth` and
+`packages/core/src/mfa`. Design intent: `docs/19-bloc-1-identity-access.md` (French).
+
+**State: Partially Completed.** The mechanics are sound and verified in development. It cannot
+serve real users: no code is ever delivered outside a developer's Redis.
+
+## 1. How it works
+
+| Step           | Behaviour                                                                                                                                                                                                     | Key file                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Request a code | Per-IP limit (30 / hour) and per-phone limit (3 / 10 min) in Redis; refused if the phone is locked; a 6-digit code is generated, stored as a keyed hash with a 5-minute life, and handed to the delivery port | `otp.service.ts`                            |
+| Verify         | Latest unconsumed code for that phone and purpose, compared in constant time under a row lock; 5 attempts per code; 10 failures lock the phone for 15 minutes (stored in PostgreSQL)                          | `otp.service.ts`, `core/auth/otp-policy.ts` |
+| Account        | A phone seen for the first time becomes a user with the `customer` role                                                                                                                                       | `users.service.ts`                          |
+| Session        | A random refresh token (stored as a keyed hash) in a token family, 30 days; an HS256 access token, 15 minutes, carrying user, session and roles                                                               | `session.service.ts`, `token.service.ts`    |
+| Refresh        | Rotation under a row lock; presenting an already-rotated token within 5 seconds rotates the current one; later than that, the whole family is revoked                                                         | `core/auth/rotation-policy.ts`              |
+| Each request   | Signature, expiry, issuer, audience; then account status and permissions from the database; roles from the token                                                                                              | `actor-resolver.service.ts`                 |
+| Guards         | `@RequireAuth`, `@RequireRole`, `@RequirePermission`, `@RequireOwnership`, `@RequireStepUp` — applied per route                                                                                               | `decorators.ts`, `guards/`                  |
+| MFA            | TOTP for `admin` and `super_admin`: set up, confirm, then a 10-minute step-up window per session; secret encrypted at rest; 5 attempts per 5 minutes                                                          | `mfa.service.ts`, `core/mfa/totp.ts`        |
+| Roles          | Granted and revoked by administrators with rules: never on oneself; only a `super_admin` handles `admin` roles; restaurant roles need exactly one restaurant                                                  | `users.service.ts`                          |
+| Audit          | Logins, failures, rotations, reuse, MFA events, role and status changes go to the append-only `audit_logs`                                                                                                    | `common/audit`                              |
+
+Tables: `users`, `user_roles`, `roles`, `permissions`, `role_permissions`, `sessions`,
+`otp_codes`, `phone_auth_locks`, `mfa_totp_secrets`, `audit_logs`.
+
+## 2. Features
+
+| Feature                                       | State                                        | Evidence                                                      |
+| --------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------- |
+| OTP request and verify                        | Completed (development)                      | LIVE, eight roles                                             |
+| **Delivery of the code to a phone**           | **Not Implemented**                          | LIVE in production mode — [`AUTH-01`](../FINDINGS.md#auth-01) |
+| Per-phone request limit                       | Completed                                    | LIVE (fourth request → 429)                                   |
+| Phone lock after repeated failures            | Completed, abusable                          | LIVE — [`SEC-03`](../FINDINGS.md#sec-03)                      |
+| Token issue, verify, refresh, reuse detection | Completed                                    | LIVE                                                          |
+| Logout, logout everywhere                     | Completed for refresh; access token lives on | LIVE — [`SEC-08`](../FINDINGS.md#sec-08)                      |
+| Role and permission guards                    | Completed                                    | LIVE, 16 wall checks                                          |
+| Ownership guard with staff override           | Completed                                    | LIVE                                                          |
+| TOTP enrolment and step-up                    | Completed for admin roles                    | LIVE                                                          |
+| Step-up for `finance`                         | Broken                                       | LIVE — [`ADM-01`](../FINDINGS.md#adm-01)                      |
+| Role grant and revoke rules                   | Completed                                    | LIVE                                                          |
+| Suspend, block, reactivate                    | Completed, under-protected                   | LIVE — [`ADM-02`](../FINDINGS.md#adm-02)                      |
+| Blocked account refused immediately           | Completed                                    | LIVE (403 on next request)                                    |
+| Profile update (name, e-mail, language)       | Not Implemented                              | [`AUTH-02`](../FINDINGS.md#auth-02)                           |
+| Phone number change                           | Not Implemented                              | The `change_phone` purpose exists in the schema only          |
+| Account deletion                              | Not Implemented                              | `deleteAndAnonymize` exists with no route                     |
+| Country detection from the phone prefix       | Not Implemented                              | New users get no country                                      |
+| Courier or restaurant onboarding              | Not Implemented                              | Roles are granted by hand through the admin API               |
+| Secret validation at boot                     | Broken                                       | LIVE — [`SEC-01`](../FINDINGS.md#sec-01)                      |
+
+## 3. Assessment
+
+**Strong:** nothing secret is stored in clear; comparisons are constant-time; the refresh design
+(families, rotation, reuse revocation, a short grace for genuine retries) is textbook and behaved
+exactly as specified; account status and permissions are fresh on every request; the grant rules
+resist the obvious escalations; "who did what" is recorded.
+
+**Weak:**
+
+- **The only OTP sender is a development mock.** The interface for a real one exists.
+- **Guards are opt-in.** A route without a decorator is public. All 95 were checked; the next one
+  is a matter of discipline.
+- **MFA is optional and action-scoped.** An administrator who has not enrolled can be enrolled by
+  whoever holds their session, which then passes the step-up.
+- **Roles are read from the token**, so a revoked role works for up to 15 minutes; the comment in
+  `actor-resolver.service.ts` says otherwise.
+- **Verification is not throttled per caller**, so the lock that protects a phone can be used
+  against it.
+- **Client address comes from a header anyone can set** ([`SEC-04`](../FINDINGS.md#sec-04)),
+  which weakens the per-IP limit and the audit trail.
+- **A simultaneous first login** for one phone would hit the unique index and return a 500 (code
+  reading; [`API-01`](../FINDINGS.md#api-01)).
+- **Token signing and TOTP are hand-written.** Small and correct as read; a maintained library
+  would be simpler to defend.
+
+## 4. Findings and tasks
+
+`AUTH-01` · `SEC-01` · `SEC-03` · `SEC-04` · `SEC-08` · `ADM-01` · `ADM-02` · `AUTH-02` · `SEC-02`
+→ T-104, T-203, T-213, T-217, T-302, T-303, T-304, T-305, T-308.
+
+Last updated: 2026-11-11 (evidence collected 2026-11-10)
