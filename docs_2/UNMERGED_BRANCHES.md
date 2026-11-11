@@ -46,6 +46,10 @@ both will need conflict resolution.
 
 **The webhook fix exists only here.** The larger branch still inserts before verifying.
 
+`a68934d` also gives the integration job two throwaway base64 keys (`MFA_ENCRYPTION_KEY`,
+`DELIVERY_CODE_ENCRYPTION_KEY`), labelled as such in the file. The weekly gitleaks scan flags both,
+so they need an allowlist entry ([`CI-01`](FINDINGS.md#ci-01)) _(updated 2026-11-11, sync S-003)_.
+
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits)
 
 ### What it adds
@@ -106,6 +110,10 @@ Checked by reading the specific files on the branch.
   the applications.
 - **The two remote branches conflict** in 6 files (S-001, tested in a throwaway clone), among them
   `payments.service.ts` and the lockfile.
+- **A green audit job does not mean no critical vulnerability.** The advisory baseline
+  (`scripts/pipeline/baselines/audit.json`) accepts all eight critical advisories, including five
+  in `next` (four of them remote code execution), although its stated reason names only Expo and
+  React Native ([`DEP-01`](FINDINGS.md#dep-01)) _(updated 2026-11-11, sync S-003)_.
 
 ### 3.4 Since the audit — sync S-001 (2026-11-11)
 
@@ -120,6 +128,12 @@ Four commits pushed on 2026-11-10 between 10:31 and 18:10, author "Claude". Full
 | `804176f` | Forces `node-forge` to 1.4.3; root `package.json` version `0.19.2`                                                                                                  | `DEP-01` partly addressed                                  |
 
 Evidence: BRANCH — read, not run.
+
+_(updated 2026-11-11, sync S-003)_ Pull request #2 (`docs/audit-sync`) carries this branch's
+`gitleaks` job lines unchanged (`281c323`). Merged together, `security.yml` comes out as this
+branch's file, and the only conflict between the two pull requests is `.claude/settings.json`
+(merge test RUN). Hosted checks of this branch's pull request #1 (head `804176f`): `check`,
+`gitleaks` and `pnpm audit` pass; `integration` fails.
 
 ## 4. Options
 

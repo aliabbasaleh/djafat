@@ -8,6 +8,40 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-11 — Sync S-003: pull request #2's checks; the secret scan runs on pull requests
+
+**Changed**
+
+- `.github/workflows/security.yml` (commit `281c323`, pull request #2): the `gitleaks` job gets the
+  run's `GITHUB_TOKEN` and read-only `contents` and `pull-requests` permissions. Without them
+  `gitleaks-action` stops on every pull request before scanning. The lines are those of pull
+  request #1 (`6d04e4e`, `397ca6b`), so the two pull requests merge without a conflict in that
+  file. The audit job is unchanged.
+
+**Verified:** the gitleaks check passes on pull request #2 (run 43046807317: 4 commits, no leaks),
+as on pull request #1. A local gitleaks 8.30.1 scan of the same commits, with and without
+`.gitleaks.toml`, finds nothing. Merge test with pull request #1: only `.claude/settings.json`
+conflicts (expected), and `security.yml` comes out as #1's file; no conflict with
+`fix/payment-reliability-backlog`.
+
+**Learned:** the other three red checks on pull request #2 fail at the same steps as on `main`
+(Build, Seed, audit). The audit job reports 151 advisories, 8 critical. Five of these are in
+`next` 15.1.3, four of them remote code execution, and according to the advisories none affects
+15.5.28 or later. Pull request #1's audit baseline accepts all eight critical ones. The weekly
+secret scan reads every branch: besides the two fixtures on `main`, it flags two throwaway CI keys
+on `fix/payment-reliability-backlog`.
+
+**New issue:** `CI-02` (Low): the pre-push secret scan reads the staged changes, not the pushed
+commits, so it never finds anything; reproduced in a throwaway repository, task T-313.
+
+**Documents changed:** `FINDINGS.md` (`DEP-01`, `CI-01`, new `CI-02`, counts), `tasks/BACKLOG.md`
+(T-105, T-109, new T-313), `PROJECT_STATUS.md`, `SECURITY_AUDIT.md`,
+`TESTING_AND_QUALITY_ASSURANCE.md` §4, `DEPLOYMENT_AND_ENVIRONMENT.md` §4,
+`APPLICATION_INVENTORY.md`, `UNMERGED_BRANCHES.md`, `applications/WEB.md`, `ADMIN.md`,
+`RESTAURANT.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-11 — The after-pull reminder is shared with the collaborator
 
 **Changed**

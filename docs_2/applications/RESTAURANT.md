@@ -63,6 +63,9 @@ All observations below are from the pass with the SDK defect worked around in th
 - The balance page labels include the English words "pending" and "available".
 - No error, loading or not-found pages of its own; framework defaults apply.
 - Tokens in `localStorage` ([`SEC-05`](../FINDINGS.md#sec-05)).
+- `next@15.1.3` with the App Router: five published critical vulnerabilities, among them remote
+  code execution in the React flight protocol; none affects 15.5.28 or later
+  ([`DEP-01`](../FINDINGS.md#dep-01)) _(added 2026-11-11, sync S-003)_.
 - Interface review: [`../UI_UX_AUDIT.md`](../UI_UX_AUDIT.md) §3.
 
 ## 4. Outstanding tasks

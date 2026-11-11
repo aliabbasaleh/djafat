@@ -8,7 +8,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 **A task is Done only when its "Done when" is met and its "Test" has been run and recorded.**
 
-59 tasks: Phase 0 (1) · 1 (10) · 2 (17) · 3 (12) · 4 (6) · 5 (6) · 6 (7).
+60 tasks: Phase 0 (1) · 1 (10) · 2 (17) · 3 (13) · 4 (6) · 5 (6) · 6 (7) _(updated 2026-11-11, sync S-003: T-313 added)_.
 
 ---
 
@@ -60,6 +60,9 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Why:** [`DEP-01`](../FINDINGS.md#dep-01) · **Depends on:** T-108, T-602 (to upgrade Fastify/Nest safely); the `next` patch upgrade can go first
 - **Done when:** `pnpm audit --prod --audit-level high` exits 0, exceptions listed in `SECURITY_AUDIT.md`.
 - **Test:** all checks, integration suite and browser pass after each upgrade step.
+- **Note (updated 2026-11-11, sync S-003):** target `next` ≥ 15.5.28, the highest patched version
+  among its 17 critical and high advisories in the hosted audit of pull request #2. Pull request
+  #1's audit baseline accepts the critical ones in the meantime ([`DEP-01`](../FINDINGS.md#dep-01)).
 
 ### T-106 · Take the Expo apps out of the default build
 
@@ -85,10 +88,14 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-109 · Green CI
 
-- **Area:** `.github/workflows` · **Priority:** High · **Status:** Not started
+- **Area:** `.github/workflows` · **Priority:** High · **Status:** In progress
 - **Why:** [`CI-01`](../FINDINGS.md#ci-01) · **Depends on:** T-105 (audit job), T-106, T-108
-- **Done when:** both workflows pass on the integration branch; the two test fixtures are allowlisted in `.gitleaks.toml`; branch protection requires green.
+- **Done when:** both workflows pass on the integration branch; the four test values the weekly scan flags are allowlisted in `.gitleaks.toml` (two fixtures in `env.spec.ts`, two CI keys in `ci.yml` on `fix/payment-reliability-backlog`); branch protection requires green.
 - **Test:** workflow runs on the hosted pipeline.
+- **Progress (updated 2026-11-11, sync S-003):** the `gitleaks` job gets the token it needs on pull
+  requests, on pull request #1 (`6d04e4e`, `397ca6b`) and, with the same lines, on pull request #2
+  (`281c323`). The check passes on both; `main` gets the fix when either is merged. Remaining: the
+  allowlist, T-105, T-106, T-108, branch protection.
 
 ### T-110 · Fix `pnpm infra:up`
 
@@ -298,6 +305,13 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Area:** `apps/api` catalog · **Priority:** Medium · **Status:** Not started
 - **Why:** [`ORD-04`](../FINDINGS.md#ord-04) · **Depends on:** product decision
 - **Test:** owner creation refused, or onboarding flow complete.
+
+### T-313 · Make the pre-push secret scan read the pushed commits
+
+- **Area:** `.husky/pre-push` · **Priority:** Low · **Status:** Not started
+- **Why:** [`CI-02`](../FINDINGS.md#ci-02) · **Depends on:** — _(added 2026-11-11, sync S-003)_
+- **Done when:** with gitleaks installed, pushing a commit that contains a fake token is refused locally.
+- **Test:** the throwaway-repository check described in `CI-02`.
 
 ---
 

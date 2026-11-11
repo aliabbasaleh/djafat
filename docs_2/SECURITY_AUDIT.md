@@ -71,12 +71,13 @@ in production — which is what `PAY-01`'s fix must ensure.
 | [`SEC-02`](FINDINGS.md#sec-02)   | The only seed creates administrator accounts on known numbers and enables test payments                                                                                                       | High                    |
 | [`AUTH-01`](FINDINGS.md#auth-01) | Only a mock OTP sender exists                                                                                                                                                                 | Critical (availability) |
 | [`OPS-05`](FINDINGS.md#ops-05)   | Active branch only: a live server lacks reference data, and the obvious workaround seeds staff accounts on fixture numbers that would receive real SMS codes _(added 2026-11-11, sync S-001)_ | High                    |
+| [`CI-02`](FINDINGS.md#ci-02)     | The local pre-push secret scan never reads the pushed commits _(added 2026-11-11, sync S-003)_                                                                                                | Low                     |
 
 ### 3.3 Dependencies
 
-| ID                             | Finding                                                      | Priority |
-| ------------------------------ | ------------------------------------------------------------ | -------- |
-| [`DEP-01`](FINDINGS.md#dep-01) | 8 critical and 64 high advisories in production dependencies | Critical |
+| ID                             | Finding                                                                                         | Priority |
+| ------------------------------ | ----------------------------------------------------------------------------------------------- | -------- |
+| [`DEP-01`](FINDINGS.md#dep-01) | 8 critical and 66 high advisories in production dependencies _(updated 2026-11-11, sync S-003)_ | Critical |
 
 Most relevant to this codebase: `next@15.1.3` (remote code execution, middleware bypass, request
 forgery, denial of service); `fastify@4.29.0`, `@nestjs/platform-fastify@10.4.15` and

@@ -66,7 +66,10 @@ behind login runs in the browser.
 - No `public/` directory: no favicon, no icons.
 - The image configuration allows one remote host (`placehold.co`), used only by seed data; real
   images have no upload path ([`STOR-01`](../FINDINGS.md#stor-01)).
-- `next@15.1.3` carries published critical vulnerabilities ([`DEP-01`](../FINDINGS.md#dep-01)).
+- `next@15.1.3` carries published critical vulnerabilities ([`DEP-01`](../FINDINGS.md#dep-01)): five,
+  four of them remote code execution — one in the App Router's React flight protocol, two in the
+  Image Optimization API that `next/image` uses here, one on Windows-hosted servers. None affects
+  15.5.28 or later, according to the advisories _(updated 2026-11-11, sync S-003)_.
 - Interface review: [`../UI_UX_AUDIT.md`](../UI_UX_AUDIT.md) §2.
 
 ## 4. Outstanding tasks

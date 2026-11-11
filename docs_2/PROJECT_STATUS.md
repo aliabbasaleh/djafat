@@ -3,13 +3,13 @@
 **The single source of truth for where DJAFAT stands.** Update it with every meaningful change
 (rules in [`README.md`](README.md)). Details live in the linked documents; this page points.
 
-|                        |                                                                                                                                        |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Last updated**       | 2026-11-11                                                                                                                             |
-| **Branch described**   | `main` @ `d1439c6` — unchanged since the audit                                                                                         |
-| **Evidence collected** | 2026-11-10 for `main`; branches read at BRANCH level (not run)                                                                         |
-| **Last synced**        | S-001, 2026-11-11 — 4 commits on `origin/claude/compassionate-franklin-k23vcj` reviewed ([`history/SYNC_LOG.md`](history/SYNC_LOG.md)) |
-| **Updated by**         | Initial full audit; sync S-001                                                                                                         |
+|                        |                                                                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Last updated**       | 2026-11-11                                                                                                                                                    |
+| **Branch described**   | `main` @ `d1439c6` — unchanged since the audit                                                                                                                |
+| **Evidence collected** | 2026-11-10 for `main`; branches read at BRANCH level (not run)                                                                                                |
+| **Last synced**        | S-003, 2026-11-11 — our own CI fix on pull request #2 (`281c323`); S-001 reviewed the collaborator's 4 commits ([`history/SYNC_LOG.md`](history/SYNC_LOG.md)) |
+| **Updated by**         | Initial full audit; syncs S-001 to S-003                                                                                                                      |
 
 ---
 
@@ -41,9 +41,11 @@ already fixes some of these and adds much more _(updated 2026-11-11, sync S-001:
 
 | Open findings | Critical | High | Medium | Low |
 | ------------- | -------- | ---- | ------ | --- |
-| 63            | 9        | 22   | 22     | 10  |
+| 64            | 9        | 22   | 22     | 11  |
 
 Sync S-001 added one High finding, on the active branch only: a live server deployed from it would start without roles, permissions or ledger accounts ([`OPS-05`](FINDINGS.md#ops-05)). The other changes it brought are summarised in [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
+
+_(updated 2026-11-11, sync S-003)_ Sync S-003 added one Low finding: the local pre-push secret scan never reads the pushed commits ([`CI-02`](FINDINGS.md#ci-02)). It also found that the hosted dependency audit now lists five critical advisories in `next` 15.1.3, four of them remote code execution, and that the active branch's audit baseline accepts them ([`DEP-01`](FINDINGS.md#dep-01)).
 
 ## 2. Current development phase
 
@@ -197,9 +199,10 @@ reminded automatically (shared hook in `.claude/settings.json`) when the code ha
 
 Recent entries; full history in [`history/CHANGELOG.md`](history/CHANGELOG.md).
 
-| Date       | Change                                                                                                                                                                                             | Verified                                                                  |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| 2026-11-11 | Reminder shared with the collaborator: hook moved from local to versioned `.claude/settings.json`; pushed for review as pull request [#2](https://github.com/aliabbasaleh/djafat/pull/2) to `main` | Shared hook seen firing in a live session; JSON validated                 |
-| 2026-11-11 | Sync S-001: 4 new commits on the collaborator's branch reviewed; finding `OPS-05` added; `GOV-01` updated                                                                                          | BRANCH (read, not run); merge conflict check RUN                          |
-| 2026-11-11 | Audit documents moved to `docs_2/`; `docs/` and root `README.md` restored to their committed state; pull-sync procedure, checker and reminder added                                                | `git status` clean for `docs/` and `README.md`; checker tested on 9 cases |
-| 2026-11-10 | Initial full audit; documentation system created; no application code changed                                                                                                                      | See `FINDINGS.md` evidence levels                                         |
+| Date       | Change                                                                                                                                                                                                              | Verified                                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-11 | Sync S-003: pull request #2's red checks examined, and all four fail on `main` too; #1's gitleaks fix copied to #2 (`281c323`); `DEP-01` and `CI-01` detailed; new `CI-02` (the pre-push secret scan reads nothing) | gitleaks passes on #2 (run 43046807317); local scans; merge test with #1; `CI-02` reproduced in a throwaway repository |
+| 2026-11-11 | Reminder shared with the collaborator: hook moved from local to versioned `.claude/settings.json`; pushed for review as pull request [#2](https://github.com/aliabbasaleh/djafat/pull/2) to `main`                  | Shared hook seen firing in a live session; JSON validated                                                              |
+| 2026-11-11 | Sync S-001: 4 new commits on the collaborator's branch reviewed; finding `OPS-05` added; `GOV-01` updated                                                                                                           | BRANCH (read, not run); merge conflict check RUN                                                                       |
+| 2026-11-11 | Audit documents moved to `docs_2/`; `docs/` and root `README.md` restored to their committed state; pull-sync procedure, checker and reminder added                                                                 | `git status` clean for `docs/` and `README.md`; checker tested on 9 cases                                              |
+| 2026-11-10 | Initial full audit; documentation system created; no application code changed                                                                                                                                       | See `FINDINGS.md` evidence levels                                                                                      |

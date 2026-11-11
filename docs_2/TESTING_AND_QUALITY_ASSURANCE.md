@@ -74,6 +74,13 @@ none has run in this configuration.
 
 Format, typecheck, lint and unit tests pass inside the failing `check` job.
 
+**Pull requests (updated 2026-11-11, sync S-003).** On a pull request the `gitleaks` job needs the
+run's `GITHUB_TOKEN`. `main`'s workflow does not pass it, so the job stops there before scanning.
+Both open pull requests add it, and the check passes on both. On pull request #2, which changes no
+application code, the three other checks fail at the same steps as on `main`; the audit reports
+151 advisories (8 critical, 66 high). On pull request #1 only `integration` fails
+([`CI-01`](FINDINGS.md#ci-01)). The local pre-push scan reads nothing ([`CI-02`](FINDINGS.md#ci-02)).
+
 ## 5. Live scenarios — executed against the running system
 
 ✅ behaved correctly · ❌ defect found · the finding gives the detail.

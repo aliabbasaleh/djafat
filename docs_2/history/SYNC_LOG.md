@@ -10,6 +10,63 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-003 — 2026-11-11 — our own commit: the secret scan runs on pull requests
+
+|                 |                                                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Trigger**     | The user pasted the failing checks of pull request #2; the fix, our own commit, was then reported by the shared hook     |
+| **Range**       | `HEAD` `5e379b3..281c323`: `281c323` (the repository's user, with Claude); `7adfd6a` and `7198f30` change only `docs_2/` |
+| **Size**        | 1 file outside `docs_2/`: `.github/workflows/security.yml`, +10 lines                                                    |
+| **Evidence**    | RUN — hosted pipeline runs on both pull requests, local gitleaks scans, merge tests, a throwaway repository              |
+| **Reviewed by** | Claude, in the audit session                                                                                             |
+
+### Added
+
+- `security.yml`, job `gitleaks`: `permissions` (`contents: read`, `pull-requests: read`) and the
+  run's `GITHUB_TOKEN`. These are the lines of pull request #1 (`6d04e4e`, `397ca6b`), unchanged.
+
+### Removed
+
+- none
+
+### Fixed
+
+- `CI-01`, in part, on both pull requests: the secret scan now runs on a pull request instead of
+  stopping, and passes (pull request #2: run 43046807317, 4 commits, no leaks). The status stays
+  Open: `main` keeps the old workflow until one of the pull requests is merged, and three checks
+  are still red there.
+
+### Changed
+
+- none in the application.
+
+### New findings
+
+- `CI-02` (Low, RUN): the pre-push hook's `gitleaks protect --staged` never reads the commits being
+  pushed. Found while checking the secret scans; task T-313.
+- Refined, not new: `DEP-01` (151 advisories on the unchanged lockfile, the eight critical listed,
+  `next` ≥ 15.5.28 as the target, pull request #1's baseline accepting all eight); `CI-01` (why the
+  scan failed on pull requests; the weekly scan reads every branch and flags four test values).
+
+### Documents updated
+
+`FINDINGS.md`, `tasks/BACKLOG.md`, `PROJECT_STATUS.md`, `SECURITY_AUDIT.md`,
+`TESTING_AND_QUALITY_ASSURANCE.md`, `DEPLOYMENT_AND_ENVIRONMENT.md`, `APPLICATION_INVENTORY.md`,
+`UNMERGED_BRANCHES.md`, `applications/WEB.md`, `applications/ADMIN.md`,
+`applications/RESTAURANT.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+Whether any of the Next.js apps is reachable from the internet. That `next` 15.5.28 clears the
+advisories is read from their version ranges, not tested. The new workflow on `main` itself: it
+runs there only after a merge.
+
+### Marker
+
+`HEAD`: `5e379b3` → `281c323`. Other lines unchanged.
+
+---
+
 ## S-002 — 2026-11-11 — our own commit: the audit and its reminder shared
 
 |                 |                                                                                 |

@@ -9,9 +9,10 @@ these IDs instead of repeating the detail.
   their production builds, HTTP scenarios with `curl`, the three web apps in headless Chrome, and
   the hosted CI logs. Environment details: [`TESTING_AND_QUALITY_ASSURANCE.md`](TESTING_AND_QUALITY_ASSURANCE.md) §1.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
-- **Counts:** 9 Critical · 22 High · 22 Medium · 10 Low = 63 open findings.
-- **Last synced:** S-001, 2026-11-11 — four new commits on `origin/claude/compassionate-franklin-k23vcj`
-  reviewed; `main` unchanged since the audit. Pull-by-pull history: [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
+- **Counts:** 9 Critical · 22 High · 22 Medium · 11 Low = 64 open findings _(updated 2026-11-11,
+  sync S-003: `CI-02` added)_.
+- **Last synced:** S-003, 2026-11-11 — our own CI fix on pull request #2 reviewed (S-001: four new
+  commits on `origin/claude/compassionate-franklin-k23vcj`); `main` unchanged since the audit. Pull-by-pull history: [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
 
 An entry is never deleted. When fixed, set `Status: Resolved`, add the commit and how the fix was
 verified.
@@ -27,7 +28,7 @@ verified.
 | [FE-01](#fe-01)       | No customer screen or SDK call can pay for an order                                      | Not Implemented     | Critical | LIVE     |
 | [AUTH-01](#auth-01)   | No real OTP delivery — nobody can log in to a production deployment                      | Not Implemented     | Critical | LIVE     |
 | [SEC-01](#sec-01)     | The API boots with the published placeholder secrets                                     | Broken              | Critical | LIVE     |
-| [DEP-01](#dep-01)     | 8 critical and 64 high vulnerabilities in production dependencies                        | Needs Improvement   | Critical | RUN      |
+| [DEP-01](#dep-01)     | 8 critical and 66 high vulnerabilities in production dependencies                        | Needs Improvement   | Critical | RUN      |
 | [MOB-01](#mob-01)     | Neither Expo app can be bundled; root build and CI fail                                  | Broken              | Critical | RUN      |
 | [PAY-04](#pay-04)     | Paid orders that are rejected, cancelled or failed are never refunded or reversed        | Not Implemented     | High     | LIVE     |
 | [PAY-05](#pay-05)     | An unauthenticated request can make a genuine payment webhook be ignored                 | Broken              | High     | LIVE     |
@@ -82,6 +83,7 @@ verified.
 | [RT-01](#rt-01)       | Realtime: multi-instance fan-out unproven; refused joins are silent                      | Needs Verification  | Low      | LIVE     |
 | [I18N-01](#i18n-01)   | Text is hard-coded in French; Arabic not started                                         | Partially Completed | Low      | CODE     |
 | [QA-01](#qa-01)       | Accessibility and performance were not measured                                          | Needs Verification  | Low      | —        |
+| [CI-02](#ci-02)       | The pre-push secret scan never reads the pushed commits                                  | Broken              | Low      | RUN      |
 | [PAY-09](#pay-09)     | Payment idempotency scope is global; attempt counter never moves                         | Needs Improvement   | Low      | CODE     |
 
 ---
@@ -227,7 +229,7 @@ verified.
 
 ### DEP-01
 
-**8 critical and 64 high vulnerabilities in production dependencies** · Needs Improvement · Critical · RUN · Status: Open
+**8 critical and 66 high vulnerabilities in production dependencies** · Needs Improvement · Critical · RUN · Status: Open
 
 - **Where:** `pnpm-lock.yaml`; `apps/web|admin|restaurant` (`next@15.1.3`), `apps/api`
   (`fastify@4.29.0`, `@nestjs/platform-fastify@10.4.15`, `@fastify/static@7.0.4`), Expo tool chain.
@@ -246,6 +248,36 @@ verified.
   clearing its advisories. `next` 15.1.3, `fastify` 4.29.0, `@nestjs/platform-fastify` 10.4.15,
   `zod` 3.24.1 and `prisma` 6.2.1 are unchanged there, and the branch tolerates the remaining
   advisories through a baseline file (115 by its own count). Open (partly addressed) on the branch.
+- **Sync S-003 note (2026-11-11), RUN (hosted pipeline):** the `pnpm audit` job on pull request #2
+  (runs 43044189948 and 43046807317) reports 151 advisories: 8 critical, 66 high, 58 moderate,
+  19 low. The lockfile is unchanged since the 2026-11-10 run, so the nine extra advisories were
+  presumably published in between. The eight critical, with the first patched version:
+
+  - `next` 15.1.3: GHSA-9qr9-h5gf-34mp, remote code execution in the React flight protocol
+    (15.1.9); GHSA-f82v-jwr5-mffw, authorization bypass in middleware (15.2.3);
+    GHSA-p293-qw3h-jr36, unauthenticated remote code execution on Windows-hosted servers (15.5.24);
+    GHSA-2xp9-vwfh-vxw4 and GHSA-2464-fhr4-w9xw, unauthenticated remote code execution in the Image
+    Optimization API with AVIF and with SVG files (15.5.24, 15.5.28).
+  - `@fastify/middie` 8.3.3, through `@nestjs/platform-fastify`: GHSA-72c6-fx6q-fr5w,
+    authentication bypass in child plugin scopes (9.3.2).
+  - `proxy-addr` 2.0.7, through `fastify`: GHSA-jqcg-44mw-7w3h, IP spoofing via an IPv4-mapped
+    IPv6 trust subnet (2.0.8).
+  - `shell-quote` 1.10.0, through React Native's `react-devtools-core`: GHSA-pqg4-j6r4-53mv,
+    command injection in `quote()` (1.11.0).
+
+  Relevance (CODE): the three Next.js apps use the App Router (`src/app`), the code path of
+  GHSA-9qr9-h5gf-34mp; `apps/web` serves images through `next/image`, that is through the Image
+  Optimization API; none of the three has a `middleware.ts`, so GHSA-f82v-jwr5-mffw has nothing to
+  bypass today. Whether any of them is reachable from the internet was not checked. The highest
+  patched version among the 17 critical and high `next` advisories is 15.5.28, so `next` ≥ 15.5.28
+  should clear them all; re-run the audit to confirm (T-105).
+
+  Pull request #1 (BRANCH): its `scripts/pipeline/baselines/audit.json` accepts all eight critical
+  advisories (38 of its 115 entries are for `next`), though its stated reason is "essentially via
+  expo/react-native". Once it is merged, the audit job turns green while these stay open, because
+  the job then fails only on advisories missing from the baseline. That is a sound gate against new
+  problems, as long as a green audit job is not read as "no critical vulnerability"; the `next`
+  entries should leave the baseline with the upgrade.
 
 ### MOB-01
 
@@ -444,6 +476,23 @@ properties of undefined (reading 'get')` in `new RedisService(undefined)` — Vi
   make green CI a merge requirement.
 - **Depends on:** `MOB-01`, `TEST-01`, `DEP-01`.
 - **Verify:** both workflows green on `main`.
+- **Sync S-003 note (2026-11-11), RUN (hosted pipeline):**
+  - On pull requests the `gitleaks` job stopped before scanning ("GITHUB_TOKEN is now required to
+    scan pull requests"): the workflow passes no token, so pull requests went unscanned. Pull
+    request #1 fixes this (commits `6d04e4e`, `397ca6b`: the run's token, with read-only
+    `contents` and `pull-requests` permissions); commit `281c323` copies the same lines to pull
+    request #2, and the two merge without a conflict in that file (merge test RUN). The check now
+    passes on both (pull request #2: run 43046807317, gitleaks 8.24.3, 4 commits, no leaks).
+  - The weekly scan reads every branch, not only `main`. Its last run (2026-11-09) flagged four
+    test values: the two `env.spec.ts` fixtures on `main`, and two throwaway CI keys
+    (`MFA_ENCRYPTION_KEY`, `DELIVERY_CODE_ENCRYPTION_KEY`) that commit `a68934d` adds to `ci.yml`
+    on `fix/payment-reliability-backlog`, labelled as such there. The allowlist must cover all four.
+    Locally, gitleaks 8.30.1 also flags one line of `apps/web/src/lib/offline-order.ts` on
+    `claude/compassionate-franklin-k23vcj`; the pipeline's 8.24.3 does not.
+  - The three other checks fail on pull request #2 at the same steps as on `main`: `check` at
+    Build (`MOB-01`), `integration` at Seed, `pnpm audit` (`DEP-01`). On pull request #1 (head
+    `804176f`) only `integration` fails.
+  - The local pre-push scan does not make up for any of this: it reads nothing (`CI-02`).
 
 ### OPS-01
 
@@ -854,10 +903,14 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 **Accessibility and performance were not measured** · Needs Verification · Low — no Lighthouse, screen-reader or load test was run. First-load JavaScript is 105–143 kB per route (build output).
 
+### CI-02
+
+**The pre-push secret scan never reads the pushed commits** · Broken · Low · RUN — `.husky/pre-push` runs `gitleaks protect --staged`, which scans the staged changes; when `git push` runs, the index is normally empty. In a throwaway repository with a fake GitHub token committed and a clean index, the command scanned 0 bytes and reported no leaks, while a scan of the commit found the token. A secret is therefore caught only by CI, after it has left the machine. Fix: scan the commits no remote has yet, `gitleaks git --redact --config .gitleaks.toml --log-opts="HEAD --not --remotes"` (gitleaks 8.19 or later; the refs Git passes to the hook on standard input give the exact range when another branch is pushed). In the same throwaway repository it scanned exactly the unpushed commits and found the token (T-313). Found in sync S-003 (2026-11-11); the collaborator's branch leaves `.husky/` unchanged.
+
 ### PAY-09
 
 **Payment idempotency details** · Needs Improvement · Low · CODE — the idempotency scope for payments, cancels and refunds is global rather than per user; `payments.attempt_no` is never incremented; a stale `reserved` key (process died mid-request) blocks its key forever.
 
 ---
 
-Last updated: 2026-11-11 (sync S-001)
+Last updated: 2026-11-11 (sync S-003)
