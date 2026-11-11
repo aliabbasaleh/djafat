@@ -10,6 +10,55 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-002 — 2026-11-11 — our own commit: the audit and its reminder shared
+
+|                 |                                                                                 |
+| --------------- | ------------------------------------------------------------------------------- |
+| **Trigger**     | Our own commit on the branch `docs/audit-sync`, reported by the new shared hook |
+| **Range**       | `HEAD` `5e379b3` — 1 commit (the repository's user, with Claude)                |
+| **Size**        | 42 files; outside `docs_2/`: `.claude/settings.json` (new), `.gitignore`        |
+| **Evidence**    | RUN — the hook was seen firing; the checker was run before and after            |
+| **Reviewed by** | Claude, in the audit session                                                    |
+
+### Added
+
+- `.claude/settings.json` (versioned): runs `docs_2/tools/audit-sync-check.sh` on every prompt and
+  after branch-moving `git` commands, in every Claude Code session in the repository.
+- `docs_2/` as a whole, now under version control.
+
+### Removed
+
+- none
+
+### Fixed
+
+- none (no finding concerns this change)
+
+### Changed
+
+- `.gitignore`: `.claude/` is no longer ignored as a whole; only `settings.json`, `skills/` and
+  `agents/` are versioned. Lines copied verbatim from the collaborator's branch.
+- The checker now ignores commits that change only `docs_2/` — such as the commit recording this
+  entry — so recording a review never asks for another one.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`, `history/CHANGELOG.md`, `README.md` §4.
+
+### Not verified
+
+The hook on the collaborator's machine.
+
+### Marker
+
+`HEAD`: `d1439c6` → `5e379b3`. Other lines unchanged.
+
+---
+
 ## S-001 — 2026-11-11 — four new commits on the collaborator's branch
 
 |                 |                                                                                                                                                                        |
@@ -158,4 +207,4 @@ Copy above the most recent entry and fill every heading; write "none" rather tha
 ### Marker
 ```
 
-Last updated: 2026-11-11 (sync S-001)
+Last updated: 2026-11-11 (sync S-002)

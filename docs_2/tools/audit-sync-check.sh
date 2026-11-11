@@ -12,8 +12,9 @@
 # How "reviewed" is decided
 #   docs_2/history/LAST_REVIEWED_COMMIT lists "<commit> <ref>" lines. Every commit reachable from
 #   ANY of those commits counts as reviewed. HEAD and every remote-tracking branch are checked;
-#   a ref is reported when it holds commits outside that set. So a fast-forward onto a commit
-#   that was already reviewed on another branch is not reported, but a merge commit is.
+#   a ref is reported when it holds commits outside that set that change something outside
+#   docs_2/. So a fast-forward onto a commit already reviewed on another branch is not reported,
+#   nor is a commit that only records a review.
 #
 # What to do when something is reported: docs_2/README.md §3 (the incremental audit sync).
 # Wired into Claude Code by the shared .claude/settings.json (see docs_2/README.md §4).
@@ -85,30 +86,49 @@ summary=""
 seen=" "           # current commits already reported (dedupes HEAD == origin/main)
 total=0
 
+# A commit needs review only if it changes something outside docs_2/: recording a review
+# is itself a docs_2-only commit and must not trigger another one. A merge counts only if it
+# changes code against EVERY parent (a merge that one parent already fully contains adds
+# nothing; the merged commits themselves are checked one by one).
+touches_code() { # $1 = commit
+  local c=$1 parents p
+  parents=$(git rev-parse "$c^@" 2>/dev/null)
+  [ -n "$parents" ] || return 0 # root commit
+  for p in $parents; do
+    git diff --name-only "$p" "$c" 2>/dev/null | grep -q -v '^docs_2/' || return 1
+  done
+  return 0
+}
+
 check_ref() { # $1 = label, $2 = current commit
-  local label=$1 cur=$2 n authors files subjects more
+  local label=$1 cur=$2 n c rel authors files subjects more
   case "$seen" in *" $cur "*)
     report="$(printf '%s' "$report" | sed "s|@@${cur}@@|, $label@@${cur}@@|")$nl"
     return 0
     ;;
   esac
+  rel=""
   # shellcheck disable=SC2086  # $recorded is a deliberate word list
-  n=$(git rev-list --count "$cur" --not $recorded 2>/dev/null) || return 0
-  [ "${n:-0}" -gt 0 ] || return 0
+  for c in $(git rev-list "$cur" --not $recorded 2>/dev/null); do
+    touches_code "$c" && rel="$rel $c"
+  done
+  [ -n "$rel" ] || return 0
+  n=$(printf '%s\n' $rel | wc -l | tr -d ' ')
   seen="$seen$cur "
   total=$((total + n))
   # shellcheck disable=SC2086
-  authors=$(git log --format='%an' "$cur" --not $recorded 2>/dev/null | sort | uniq -c | sort -rn |
+  authors=$(git log --no-walk=unsorted --format='%an' $rel 2>/dev/null | sort | uniq -c | sort -rn |
     awk '{c=$1; $1=""; sub(/^ /,""); printf "%s%s (%s)", (NR>1?", ":""), $0, c}')
+  # Files outside docs_2/, each commit against its first parent.
+  files=$(for c in $rel; do
+    if git rev-parse -q --verify "$c^" >/dev/null 2>&1; then git diff --name-only "$c^" "$c"; else git show --format= --name-only "$c"; fi
+  done 2>/dev/null | grep -v '^docs_2/' | sed '/^$/d' | sort -u | wc -l | tr -d ' ')
   # shellcheck disable=SC2086
-  # -m --first-parent: a merge commit counts the files it changes on the receiving branch.
-  files=$(git log --format= --name-only -m --first-parent "$cur" --not $recorded 2>/dev/null | sed '/^$/d' | sort -u | wc -l | tr -d ' ')
-  # shellcheck disable=SC2086
-  subjects=$(git log --format='    %h %ad %s' --date=short -n 6 "$cur" --not $recorded 2>/dev/null |
+  subjects=$(git log --no-walk=unsorted --format='    %h %ad %s' --date=short $(printf '%s\n' $rel | head -n 6) 2>/dev/null |
     LC_ALL=C tr -d '\000-\010\013\014\016-\037' | cut -c1-150)
   more=""
   [ "$n" -gt 6 ] && more="$nl    … and $((n - 6)) more"
-  report="$report- $label@@${cur}@@: $n unreviewed commit(s) by $authors, $files file(s) touched$nl$subjects$more$nl    list them: git log --reverse --format='%h %ad %an | %s' --date=short ${cur:0:7} --not$short_recorded$nl"
+  report="$report- $label@@${cur}@@: $n unreviewed commit(s) by $authors, $files file(s) touched outside docs_2/$nl$subjects$more$nl    list them: git log --reverse --format='%h %ad %an | %s' --date=short ${cur:0:7} --not$short_recorded$nl"
   summary="$summary${summary:+, }$label"
 }
 

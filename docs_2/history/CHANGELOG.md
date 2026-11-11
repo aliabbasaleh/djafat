@@ -23,6 +23,8 @@ Format: date · what changed · affected areas · verification · newly discover
 - `README.md` §4 rewritten for the shared setup: when it runs, requirements, how to silence it, and
   how to resolve the expected conflict on `.claude/settings.json` with the collaborator's branch.
 - Committed on the branch `docs/audit-sync` and proposed to `main` as a pull request.
+- Sync S-002 recorded for that commit. The checker now ignores commits that change only `docs_2/`,
+  so recording a review does not trigger another reminder.
 
 **Verified:** the shared hook fired inside the running session (temporary sentinel, removed); the
 checker reminds after `git pull` and `git fetch`, stays silent after `git commit`; JSON settings

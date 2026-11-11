@@ -184,7 +184,8 @@ sync entry and move the marker, so the next reminder is about someone else's cha
 `history/LAST_REVIEWED_COMMIT` lists, one per line, a commit and the ref it belongs to: `HEAD` for
 the checked-out branch, then each remote branch being followed. Every commit reachable from any of
 these lines counts as reviewed, so a pull that only brings commits already reviewed on another
-branch stays silent, while a new merge commit is reported.
+branch stays silent. Commits that change only files under `docs_2/` are never reported — recording a
+review is such a commit — and a merge is reported only if it changes code against every parent.
 
 `tools/audit-sync-check.sh` compares those lines with the repository. If nothing is unreviewed it
 prints nothing. Otherwise it prints a short instruction naming the commits, their authors and the

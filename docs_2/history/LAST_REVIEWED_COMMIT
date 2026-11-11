@@ -4,8 +4,9 @@
 # not "verified working".
 # Change these lines ONLY as the last step of an incremental audit sync (docs_2/README.md §3),
 # and name the sync below.
-# Last sync: S-001 (2026-11-11)
-d1439c6004efa7e9ce882124ae7543c2cd99328f HEAD
+# Commits that change only docs_2/ are never reported, so recording a review is silent.
+# Last sync: S-002 (2026-11-11)
+5e379b3dcc7dec18ed2615c5f7147bcb3da65bc6 HEAD
 d1439c6004efa7e9ce882124ae7543c2cd99328f origin/main
 804176f65cc0fb12e32de356b92b29e511ce4de4 origin/claude/compassionate-franklin-k23vcj
 a68934d1a1c2abf5417222f0257e7a101d5ec97e origin/fix/payment-reliability-backlog
