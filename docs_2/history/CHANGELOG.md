@@ -22,7 +22,8 @@ Format: date · what changed · affected areas · verification · newly discover
   `LAST_REVIEWED_COMMIT` Git's `union` merge.
 - `README.md` §4 rewritten for the shared setup: when it runs, requirements, how to silence it, and
   how to resolve the expected conflict on `.claude/settings.json` with the collaborator's branch.
-- Committed on the branch `docs/audit-sync` and proposed to `main` as a pull request.
+- Committed on the branch `docs/audit-sync` and proposed to `main` as pull request
+  [#2](https://github.com/aliabbasaleh/djafat/pull/2) (merge with a merge commit, not a squash).
 - Sync S-002 recorded for that commit. The checker now ignores commits that change only `docs_2/`,
   so recording a review does not trigger another reminder.
 

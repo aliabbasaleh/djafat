@@ -22,7 +22,7 @@ test:int` — 96 passed"; "Chrome: login on :3000 → POST /auth/otp/request 202
 
 ### AUDIT-3 · After-pull reminder shared with the collaborator
 
-- **Completed:** 2026-11-11 · **Commit:** branch `docs/audit-sync`, proposed to `main` by pull request
+- **Completed:** 2026-11-11 · **Commit:** `5e379b3`, `7adfd6a` on branch `docs/audit-sync`, proposed to `main` in pull request [#2](https://github.com/aliabbasaleh/djafat/pull/2)
 - **Asked for:** make the after-pull check run in the collaborator's Claude Code sessions too.
 - **What changed:** hook moved to the versioned `.claude/settings.json`; `.gitignore` lines copied
   from the collaborator's branch so `.claude/settings.json` can be committed; checker no longer
