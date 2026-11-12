@@ -10,6 +10,58 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-005 — 2026-11-12 — two commits on pull request #3 from another session
+
+|                 |                                                                                                                                  |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook, after the editor fetched `origin/fix/next-15.5`                                                                 |
+| **Range**       | `origin/fix/next-15.5` `480ec14..6cbbad4`: 2 commits, 2026-11-12 05:43–05:45, by another Claude session as the repository's user |
+| **Size**        | 3 files: `apps/courier/metro.config.js`, `apps/mobile/metro.config.js`, `.github/workflows/ci.yml`; +14 / −2                     |
+| **Evidence**    | RUN — hosted pipeline run 43156964436 on pull request #3; merge tests                                                            |
+| **Reviewed by** | Claude, in the audit session                                                                                                     |
+
+### Added
+
+- CI, `integration` job: "Build workspace packages used by the API" before the migrations
+  (`6cbbad4`), the same step as pull request #1's.
+
+### Removed
+
+- `config.resolver.disableHierarchicalLookup = true` in both Expo apps' `metro.config.js`
+  (`c616695`, the same lines as pull request #1's `a972a35`).
+
+### Fixed
+
+- `MOB-01`, on the branch only: the hosted `check` job passes every step, Build included, so both
+  Expo apps export. Not run on a device.
+- `CI-01`, in part, on the branch: `integration` no longer stops at Seed; it now fails at
+  Integration tests (`TEST-01`).
+
+### Changed
+
+- Merge with pull request #1: `.github/workflows/ci.yml` now conflicts as well. Both add the build
+  step, and #1 adds a throwaway-secrets step next to it; take #1's file.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `tasks/BACKLOG.md`, `PROJECT_STATUS.md`, `DEPLOYMENT_AND_ENVIRONMENT.md`,
+`UNMERGED_BRANCHES.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The Expo apps on a device or simulator. The commits' own local checks (`CI=true pnpm build`, the
+seed without a database) were not re-run here; the hosted run covers the build.
+
+### Marker
+
+`origin/fix/next-15.5`: `480ec14` → `6cbbad4`. Other lines unchanged.
+
+---
+
 ## S-004 — 2026-11-12 — our own branch: `next` upgraded to 15.5.29 (pull request #3)
 
 |                 |                                                                                                                    |

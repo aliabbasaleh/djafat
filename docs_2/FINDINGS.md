@@ -11,9 +11,9 @@ these IDs instead of repeating the detail.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
 - **Counts:** 9 Critical · 22 High · 22 Medium · 13 Low = 66 open findings _(updated 2026-11-12,
   sync S-004: `CI-03` and `FE-07` added; S-003 added `CI-02`)_.
-- **Last synced:** S-004, 2026-11-12 — our own `next` upgrade, pull request #3 (S-003: our CI fix on
-  pull request #2; S-001: four commits on `origin/claude/compassionate-franklin-k23vcj`); `main`
-  unchanged since the audit. Pull-by-pull history: [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
+- **Last synced:** S-005, 2026-11-12 — two more commits on pull request #3 (S-004: our `next` upgrade
+  there; S-003: our CI fix on pull request #2; S-001: four commits on
+  `origin/claude/compassionate-franklin-k23vcj`); `main` unchanged since the audit. Pull-by-pull history: [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
 
 An entry is never deleted. When fixed, set `Status: Resolved`, add the commit and how the fix was
 verified.
@@ -316,6 +316,12 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   then, take the two apps out of the default `build` task so CI reports the rest. Validate the real
   path (`eas build`) on a device.
 - **Depends on:** nothing. A fix exists on the unmerged branch (not verified here).
+- **Sync S-005 note (2026-11-12): fix present on a branch, verified there in CI.** Commit
+  `c616695` on pull request #3 (the same lines as `a972a35` on pull request #1) stops
+  `metro.config.js` from disabling Metro's hierarchical lookup, which hid each package's own
+  dependencies under pnpm's isolated layout. On that branch the hosted `check` job now passes every
+  step, Build included (run 43156964436), so both Expo apps export. Status stays Open: the fix is
+  not on `main`, and neither app has been run on a device (T-210).
 - **Verify:** `expo export` succeeds for both; the app runs on an Android device against a staging API.
 
 ---
@@ -518,6 +524,13 @@ properties of undefined (reading 'get')` in `new RedisService(undefined)` — Vi
   fix of pull requests #1 and #2; it now passes (run 43154793991, 2 commits, no leaks). `check`
   still fails at Build (`MOB-01`) after format, typecheck, lint and unit tests pass, `integration`
   at Seed, and `pnpm audit` on the advisories left outside `next` (`DEP-01`).
+- **Sync S-005 note (2026-11-12), RUN (hosted pipeline):** on pull request #3, commit `6cbbad4`
+  builds the API's workspace packages before seeding (the same step as pull request #1), and
+  `c616695` fixes the Expo bundling (`MOB-01`). Run 43156964436: `check` passes; `integration` now
+  gets past Seed and fails at Integration tests (`TEST-01`); `pnpm audit` still fails (`DEP-01`);
+  gitleaks passes. Merging pull requests #1 and #3 now also conflicts in `ci.yml`: both add the
+  build step, and pull request #1 adds a throwaway-secrets step next to it, so take pull request
+  #1's file.
 
 ### OPS-01
 
@@ -946,4 +959,4 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ---
 
-Last updated: 2026-11-12 (sync S-004)
+Last updated: 2026-11-12 (sync S-005)

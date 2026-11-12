@@ -49,6 +49,15 @@ Things that will surprise you:
   creation is refused, correctly.
 - `pnpm dev` at the root starts everything in parallel, including the two Expo apps.
 
+_(updated 2026-11-12)_ Re-run end to end on the audit machine. The `.env` was generated from
+`.env.example`, with the five secrets drawn by `openssl rand`, never the placeholders
+([`SEC-01`](FINDINGS.md#sec-01)). Only `postgres`, `pgbouncer` and `redis` were started, with the
+PostgreSQL container's port remapped because a host PostgreSQL already holds 5432, and Node 22 was
+used. Migrations, seed, the package build, the API, the worker and the three web apps in watch mode
+all started, and an API login worked. In the browser, login still fails until
+[`SDK-01`](FINDINGS.md#sdk-01) is fixed, and order creation is refused outside the restaurant's
+hours, as designed.
+
 ## 3. Configuration
 
 Validated at boot by `packages/config/src/env.ts`; the process refuses to start if a required

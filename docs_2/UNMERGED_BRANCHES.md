@@ -54,7 +54,7 @@ _(updated 2026-11-12, sync S-004)_ Two branches of ours are also open against `m
 `DELIVERY_CODE_ENCRYPTION_KEY`), labelled as such in the file. The weekly gitleaks scan flags both,
 so they need an allowlist entry ([`CI-01`](FINDINGS.md#ci-01)) _(updated 2026-11-11, sync S-003)_.
 
-## 2b. `fix/next-15.5`, pull request #3 (2 commits) _(added 2026-11-12, sync S-004)_
+## 2b. `fix/next-15.5`, pull request #3 (4 commits) _(added 2026-11-12, sync S-004; updated sync S-005)_
 
 Our own branch, from `main` `d1439c6`, made at the user's request.
 
@@ -62,11 +62,18 @@ Our own branch, from `main` `d1439c6`, made at the user's request.
 | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `5d36c6a` fix(web,admin,restaurant): upgrade next from 15.1.3 to 15.5.29    | `next` 15.5.29 in the three web apps and `packages/ui`; lockfile; `typedRoutes` out of `experimental`; regenerated `next-env.d.ts` | Fixes the `next` part of [`DEP-01`](FINDINGS.md#dep-01), verified there |
 | `480ec14` fix(ci): give gitleaks-action the token it needs on pull requests | The same lines as pull requests #1 and #2                                                                                          | Part of [`CI-01`](FINDINGS.md#ci-01)                                    |
+| `c616695` fix(mobile): let Metro find each package's own dependencies       | Metro's hierarchical lookup back on in both Expo apps; the same lines as pull request #1's `a972a35`                               | Fixes [`MOB-01`](FINDINGS.md#mob-01) on the branch (CI build passes)    |
+| `6cbbad4` fix(ci): build the API's workspace packages before seeding        | One CI step, the same as pull request #1's                                                                                         | Part of [`CI-01`](FINDINGS.md#ci-01): `integration` gets past Seed      |
 
 Merging (tested with `git merge-tree`): clean with `main` and `docs/audit-sync`. With
 `claude/compassionate-franklin-k23vcj`: conflicts in `apps/web/package.json` (keep `leaflet` from
 there and `next` 15.5.29 from here) and in `pnpm-lock.yaml` (take either side, then run
 `pnpm install`). With `fix/payment-reliability-backlog`: `pnpm-lock.yaml` only.
+
+_(updated 2026-11-12, sync S-005)_ `c616695` and `6cbbad4` were pushed by another Claude session
+working as the repository's user. Since `6cbbad4`, `.github/workflows/ci.yml` conflicts with pull
+request #1 as well: both add the same build step, and pull request #1 adds a throwaway-secrets step
+next to it, so take pull request #1's version.
 
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits)
 

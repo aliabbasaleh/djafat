@@ -77,6 +77,8 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Depends on:** —
 - **Done when:** `pnpm build` passes; a separate, visible job builds the mobile apps and is allowed to fail until T-210.
 - **Test:** `pnpm build` exits 0 locally and in CI.
+- **Note (updated 2026-11-12, sync S-005):** may no longer be needed: pull request #3 carries the
+  real fix (T-210), and its `check` job builds every app.
 
 ### T-107 · Verify the webhook signature before recording the event
 
@@ -104,6 +106,8 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
   allowlist, T-105, T-106, T-108, branch protection.
 - **Progress (updated 2026-11-12, sync S-004):** pull request #3 carries the same gitleaks lines
   (`480ec14`); its check passes too.
+- **Progress (updated 2026-11-12, sync S-005):** on pull request #3 the `check` job passes and
+  `integration` reaches the tests (`c616695`, `6cbbad4`). Left there: `TEST-01` and the audit job.
 
 ### T-110 · Fix `pnpm infra:up`
 
@@ -181,10 +185,13 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-210 · Make the Expo apps bundle; validate a device build
 
-- **Area:** `apps/mobile`, `apps/courier` · **Priority:** Critical · **Status:** Not started
+- **Area:** `apps/mobile`, `apps/courier` · **Priority:** Critical · **Status:** In progress
 - **Why:** [`MOB-01`](../FINDINGS.md#mob-01) · **Depends on:** — (a fix exists on branch, unverified)
 - **Done when:** `expo export` succeeds for both and a build runs on an Android device against staging.
 - **Test:** CI job; device smoke test of login and one delivery.
+- **Progress (updated 2026-11-12, sync S-005):** `expo export` succeeds for both apps in CI on pull
+  request #3 (`c616695`, the same lines as pull request #1's `a972a35`). Left: a device build
+  against staging.
 
 ### T-211 · Courier background location and push
 

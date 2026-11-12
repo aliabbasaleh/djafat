@@ -3,13 +3,13 @@
 **The single source of truth for where DJAFAT stands.** Update it with every meaningful change
 (rules in [`README.md`](README.md)). Details live in the linked documents; this page points.
 
-|                        |                                                                                                                                                                                    |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Last updated**       | 2026-11-12                                                                                                                                                                         |
-| **Branch described**   | `main` @ `d1439c6` — unchanged since the audit                                                                                                                                     |
-| **Evidence collected** | 2026-11-10 for `main`; branches read at BRANCH level (not run)                                                                                                                     |
-| **Last synced**        | S-004, 2026-11-12 — our own `next` upgrade, pull request #3 (`480ec14`); S-003 our CI fix on #2; S-001 the collaborator's 4 commits ([`history/SYNC_LOG.md`](history/SYNC_LOG.md)) |
-| **Updated by**         | Initial full audit; syncs S-001 to S-004                                                                                                                                           |
+|                        |                                                                                                                                                                                                          |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Last updated**       | 2026-11-12                                                                                                                                                                                               |
+| **Branch described**   | `main` @ `d1439c6` — unchanged since the audit                                                                                                                                                           |
+| **Evidence collected** | 2026-11-10 for `main`; branches read at BRANCH level (not run)                                                                                                                                           |
+| **Last synced**        | S-005, 2026-11-12 — two more commits on pull request #3 (`6cbbad4`); S-004 our `next` upgrade; S-003 our CI fix on #2; S-001 the collaborator's 4 commits ([`history/SYNC_LOG.md`](history/SYNC_LOG.md)) |
+| **Updated by**         | Initial full audit; syncs S-001 to S-005                                                                                                                                                                 |
 
 ---
 
@@ -48,6 +48,8 @@ Sync S-001 added one High finding, on the active branch only: a live server depl
 _(updated 2026-11-11, sync S-003)_ Sync S-003 added one Low finding: the local pre-push secret scan never reads the pushed commits ([`CI-02`](FINDINGS.md#ci-02)). It also found that the hosted dependency audit now lists five critical advisories in `next` 15.1.3, four of them remote code execution, and that the active branch's audit baseline accepts them ([`DEP-01`](FINDINGS.md#dep-01)).
 
 _(updated 2026-11-12, sync S-004)_ Pull request #3 upgrades `next` to 15.5.29 in the three web apps. Verified on that branch: the hosted audit lists no `next` advisory (critical advisories 8 → 3, all outside `next`), the local checks pass, and a page-by-page browser comparison with `main`'s build found no regression. Two Low findings were added: the pre-commit hook cannot run ESLint on `main` ([`CI-03`](FINDINGS.md#ci-03)), and typed routes are never checked ([`FE-07`](FINDINGS.md#fe-07)).
+
+_(updated 2026-11-12, sync S-005)_ Two more commits on pull request #3 copy fixes from pull request #1: the Expo apps now bundle there ([`MOB-01`](FINDINGS.md#mob-01), CI build passes) and the integration job reaches its tests (`TEST-01` remains). The local run was re-verified on the audit machine with a generated `.env` ([`DEPLOYMENT_AND_ENVIRONMENT.md`](DEPLOYMENT_AND_ENVIRONMENT.md) §2); browser login on `main` still needs [`SDK-01`](FINDINGS.md#sdk-01).
 
 ## 2. Current development phase
 
@@ -203,6 +205,7 @@ Recent entries; full history in [`history/CHANGELOG.md`](history/CHANGELOG.md).
 
 | Date       | Change                                                                                                                                                                                                              | Verified                                                                                                               |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-12 | Sync S-005: `c616695` (Expo bundling) and `6cbbad4` (build before seed) on pull request #3, copied from #1; local run re-verified with a generated `.env`                                                           | Hosted run 43156964436: `check` passes, `integration` reaches the tests; local API login, 29-page browser walk         |
 | 2026-11-12 | Sync S-004: `next` 15.1.3 → 15.5.29 on pull request #3 (`5d36c6a`), with the gitleaks fix of #1 and #2 (`480ec14`); new `CI-03` and `FE-07`                                                                         | Local checks; 29-page before/after browser comparison; hosted audit lists no `next` advisory; gitleaks passes          |
 | 2026-11-11 | Sync S-003: pull request #2's red checks examined, and all four fail on `main` too; #1's gitleaks fix copied to #2 (`281c323`); `DEP-01` and `CI-01` detailed; new `CI-02` (the pre-push secret scan reads nothing) | gitleaks passes on #2 (run 43046807317); local scans; merge test with #1; `CI-02` reproduced in a throwaway repository |
 | 2026-11-11 | Reminder shared with the collaborator: hook moved from local to versioned `.claude/settings.json`; pushed for review as pull request [#2](https://github.com/aliabbasaleh/djafat/pull/2) to `main`                  | Shared hook seen firing in a live session; JSON validated                                                              |

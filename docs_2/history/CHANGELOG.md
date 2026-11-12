@@ -8,6 +8,33 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-12 — Local run configured; sync S-005: two more commits on pull request #3
+
+**Local run (this machine only, nothing versioned):** a `.env` generated from `.env.example` with
+random secrets; a Docker Compose override for the port clash and the missing arm64 image; Node 22
+in an ignored folder; a helper script for setup, start, stop and login codes. The two AES keys were
+kept from the earlier local session so the data already encrypted in the local database stays
+readable.
+
+**Verified:** the project's own configuration check accepts the `.env`; migrations (none pending),
+seed and the package build pass; the API, the worker and the three web apps start in watch mode.
+An API login (code request, code read from Redis, verification, `/me`) works. A 29-page browser
+walk renders every screen. With the fetch workaround the logged-in screens work. Order creation is
+refused because the test restaurant was closed at the hour of the test, as designed.
+
+**Sync S-005:** `c616695` and `6cbbad4` on `fix/next-15.5`, pushed by another Claude session
+working as the repository's user, both copied from pull request #1. Hosted run 43156964436: `check`
+passes, Expo apps included (`MOB-01` fixed there); `integration` gets past Seed and fails at the
+tests (`TEST-01`). Merging pull requests #1 and #3 now also conflicts in `ci.yml` (take #1's file).
+
+**Not verified:** the Expo apps on a device; browser login on `main`, which needs `SDK-01` fixed.
+
+**Documents changed:** `FINDINGS.md` (`MOB-01`, `CI-01`), `tasks/BACKLOG.md` (T-106, T-109,
+T-210), `PROJECT_STATUS.md`, `DEPLOYMENT_AND_ENVIRONMENT.md` §2, `UNMERGED_BRANCHES.md` §2b,
+`history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-12 — Sync S-004: `next` upgraded to 15.5.29 on pull request #3
 
 **Changed**
