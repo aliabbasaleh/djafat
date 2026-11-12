@@ -133,6 +133,27 @@ describe('system', () => {
   });
 });
 
+async function wallet(
+  ownerType: 'restaurant' | 'courier',
+  ownerId: string,
+): Promise<{ pending: bigint; available: bigint }> {
+  const row = await prisma.walletBalanceRow.findUnique({
+    where: { ownerType_ownerId_currency: { ownerType, ownerId, currency: 'XAF' } },
+  });
+  return { pending: row?.pendingMinor ?? 0n, available: row?.availableMinor ?? 0n };
+}
+
+/** The order follows delivery events (`@OnEvent`, after the response): wait up to 5 s for `want`. */
+async function orderStatus(orderId: string, want?: string): Promise<string> {
+  let status = '';
+  for (let i = 0; i < 50; i++) {
+    status = (await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status;
+    if (!want || status === want) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return status;
+}
+
 describe('walking skeleton — full flow', () => {
   it('runs catalogue -> cart -> quote -> order -> payment -> webhook -> delivery -> funds_available end to end', async () => {
     // ── 1. build the cart (docs/22 §3-§6) — the client supplies references and
@@ -199,6 +220,10 @@ describe('walking skeleton — full flow', () => {
       .expect(201);
     expect(replayOrderRes.body.status).toBe('replayed');
     expect(replayOrderRes.body.order.id).toBe(orderId);
+
+    // Wallets before this order (other suites may have used the same accounts).
+    const restaurantBefore = await wallet('restaurant', fx.restaurantId);
+    const courierBefore = await wallet('courier', courierId);
 
     // ── 2. initiate a mock payment — pending_then_succeed, so the webhook does the work ──
     const paymentIdemKey = `int-payment-${randomUUID()}`;
@@ -290,23 +315,12 @@ describe('walking skeleton — full flow', () => {
     `;
     expect(accrualSums[0]!.debit).toBe(accrualSums[0]!.credit); // Σdebit === Σcredit
 
-    // ── 6. wallet PENDING reflects the restaurant/courier shares (docs/08 §8.9) ──
-    const restaurantWalletPending = await prisma.walletBalanceRow.findUnique({
-      where: {
-        ownerType_ownerId_currency: {
-          ownerType: 'restaurant',
-          ownerId: fx.restaurantId,
-          currency: 'XAF',
-        },
-      },
-    });
-    expect(restaurantWalletPending?.pendingMinor).toBe(3600n); // subtotal(4500) - commission(900)
-    const courierWalletPending = await prisma.walletBalanceRow.findUnique({
-      where: {
-        ownerType_ownerId_currency: { ownerType: 'courier', ownerId: courierId, currency: 'XAF' },
-      },
-    });
-    expect(courierWalletPending?.pendingMinor).toBe(1000n); // courierFee === deliveryFee (A5)
+    // ── 6. wallet PENDING: the restaurant's share is pending at once; the
+    //      courier's fee waits in the pool until a courier accepts (docs/25 §12) ──
+    expect((await wallet('restaurant', fx.restaurantId)).pending - restaurantBefore.pending).toBe(
+      3600n,
+    ); // subtotal(4500) - commission(900)
+    expect((await wallet('courier', courierId)).pending - courierBefore.pending).toBe(0n);
 
     // ── 7. restaurant confirms + marks ready (Bloc 9, docs/30 §order-authorization,
     //      Phase 5 adversarial matrix) — rejected BEFORE the legitimate call, against
@@ -326,6 +340,24 @@ describe('walking skeleton — full flow', () => {
       .set('Authorization', `Bearer ${restaurantStaffAccess}`)
       .expect(200);
 
+    // The seeded courier is online, next to the restaurant, before the order is ready.
+    const pickup = (
+      await prisma.$queryRaw<Array<{ lat: number; lng: number }>>`
+        SELECT ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng
+        FROM restaurants WHERE id = ${fx.restaurantId}::uuid
+      `
+    )[0]!;
+    await request(server)
+      .post('/v1/couriers/me/status')
+      .set('Authorization', `Bearer ${courierAccess}`)
+      .send({ status: 'online' })
+      .expect((r) => expect([200, 201]).toContain(r.status));
+    await request(server)
+      .post('/v1/couriers/me/location')
+      .set('Authorization', `Bearer ${courierAccess}`)
+      .send({ lat: pickup.lat + 0.001, lng: pickup.lng, accuracyM: 10 })
+      .expect((r) => expect([200, 201, 204]).toContain(r.status));
+
     await request(server).post(`/v1/orders/${orderId}/ready`).expect(401); // anonymous
     await request(server)
       .post(`/v1/orders/${orderId}/ready`)
@@ -337,48 +369,71 @@ describe('walking skeleton — full flow', () => {
       .expect(200);
     expect(readyRes.body.status).toBe('ready');
 
-    // ── 8. delivery: assign -> picked-up -> delivered ──
-    const deliveryIdemKey = `int-delivery-${randomUUID()}`;
-    const assignRes = await request(server)
-      .post('/v1/deliveries')
-      .set('idempotency-key', deliveryIdemKey)
-      .send({ orderId })
-      .expect(201);
-    expect(assignRes.body.delivery.status).toBe('assigned');
-    expect(assignRes.body.delivery.courierId).toBe(courierId);
-    expect((await request(server).get(`/v1/orders/${orderId}`).expect(200)).body.status).toBe(
-      'courier_assigned',
-    );
+    // ── 8. delivery: dispatch offers it to the courier -> accept -> pickup -> deliver
+    //      with the code the customer gives at the door (docs/25, docs/36) ──
+    let offer: { deliveryId: string } | null = null;
+    for (let i = 0; i < 50 && !offer; i++) {
+      const delivery = await prisma.delivery.findUnique({
+        where: { orderId },
+        select: { id: true },
+      });
+      offer = delivery
+        ? await prisma.deliveryOffer.findFirst({
+            where: { courierId, status: 'offered', deliveryId: delivery.id },
+            select: { deliveryId: true },
+          })
+        : null;
+      if (!offer) await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(offer).not.toBeNull();
+    const deliveryId = offer!.deliveryId;
 
     await request(server)
-      .post(`/v1/deliveries/${orderId}/picked-up`)
+      .post(`/v1/deliveries/${deliveryId}/accept`)
+      .set('Authorization', `Bearer ${courierAccess}`)
+      .set('idempotency-key', `int-accept-${randomUUID()}`)
+      .expect(200);
+    expect(await orderStatus(orderId, 'courier_assigned')).toBe('courier_assigned');
+    // The pooled fee is now this courier's (pending until delivered).
+    expect((await wallet('courier', courierId)).pending - courierBefore.pending).toBe(1000n); // courierFee === deliveryFee (A5)
+
+    await request(server)
+      .post(`/v1/deliveries/${deliveryId}/pickup`)
+      .set('Authorization', `Bearer ${courierAccess}`)
       .set('idempotency-key', `int-pickup-${randomUUID()}`)
       .expect(200);
-    expect((await request(server).get(`/v1/orders/${orderId}`).expect(200)).body.status).toBe(
-      'on_the_way',
-    );
+    expect(await orderStatus(orderId, 'on_the_way')).toBe('on_the_way');
+
+    const proofCode = (
+      await request(server)
+        .get(`/v1/deliveries/${deliveryId}/code`)
+        .set('Authorization', `Bearer ${customerAccess}`)
+        .expect(200)
+    ).body.code as string;
 
     const deliveredIdemKey = `int-delivered-${randomUUID()}`;
     const deliveredRes = await request(server)
-      .post(`/v1/deliveries/${orderId}/delivered`)
+      .post(`/v1/deliveries/${deliveryId}/deliver`)
+      .set('Authorization', `Bearer ${courierAccess}`)
       .set('idempotency-key', deliveredIdemKey)
+      .send({ proofCode })
       .expect(200);
     expect(deliveredRes.body.delivery.status).toBe('delivered');
-    expect((await request(server).get(`/v1/orders/${orderId}`).expect(200)).body.status).toBe(
-      'delivered',
-    );
+    expect(await orderStatus(orderId, 'delivered')).toBe('delivered');
 
     // Idempotent replay: funds must NOT be released twice.
     const deliveredReplayRes = await request(server)
-      .post(`/v1/deliveries/${orderId}/delivered`)
+      .post(`/v1/deliveries/${deliveryId}/deliver`)
+      .set('Authorization', `Bearer ${courierAccess}`)
       .set('idempotency-key', deliveredIdemKey)
+      .send({ proofCode })
       .expect(200);
+    expect(deliveredReplayRes.body.status).toBe('replayed');
     expect(deliveredReplayRes.body.delivery.status).toBe('delivered');
 
     // ── 9. funds_available must be balanced, and wallet AVAILABLE now holds the shares ──
-    const deliveryRow = await prisma.delivery.findUniqueOrThrow({ where: { orderId } });
     const releaseGroup = await prisma.ledgerEntryGroup.findUnique({
-      where: { idempotencyKey: `delivery:${deliveryRow.id}:funds_available` },
+      where: { idempotencyKey: `delivery:${deliveryId}:funds_available` },
     });
     expect(releaseGroup?.kind).toBe('funds_available');
     const releaseSums = await prisma.$queryRaw<Array<{ debit: bigint; credit: bigint }>>`
@@ -389,26 +444,13 @@ describe('walking skeleton — full flow', () => {
     `;
     expect(releaseSums[0]!.debit).toBe(releaseSums[0]!.credit);
 
-    const restaurantWalletFinal = await prisma.walletBalanceRow.findUnique({
-      where: {
-        ownerType_ownerId_currency: {
-          ownerType: 'restaurant',
-          ownerId: fx.restaurantId,
-          currency: 'XAF',
-        },
-      },
-    });
-    expect(restaurantWalletFinal).toMatchObject({ pendingMinor: 0n, availableMinor: 3600n });
-    const courierWalletFinal = await prisma.walletBalanceRow.findUnique({
-      where: {
-        ownerType_ownerId_currency: { ownerType: 'courier', ownerId: courierId, currency: 'XAF' },
-      },
-    });
-    expect(courierWalletFinal).toMatchObject({ pendingMinor: 0n, availableMinor: 1000n });
-
-    // A second `delivered` call did not double-release funds: pending is 0, not negative.
-    expect(restaurantWalletFinal!.pendingMinor).toBe(0n);
-    expect(courierWalletFinal!.pendingMinor).toBe(0n);
+    const restaurantAfter = await wallet('restaurant', fx.restaurantId);
+    const courierAfter = await wallet('courier', courierId);
+    expect(restaurantAfter.available - restaurantBefore.available).toBe(3600n);
+    expect(courierAfter.available - courierBefore.available).toBe(1000n);
+    // A second `deliver` call did not double-release funds: pending is back to where it was.
+    expect(restaurantAfter.pending).toBe(restaurantBefore.pending);
+    expect(courierAfter.pending).toBe(courierBefore.pending);
 
     // ── 10. the outbox carries the full event trail (relayed to Redis by the worker) ──
     const outboxTypes = (
