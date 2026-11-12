@@ -86,6 +86,10 @@ middleware, which lowers but does not remove exposure); `proxy-addr` (address sp
 `SEC-04`); `@fastify/static`, `js-yaml`, `lodash` through Swagger (development only). The Expo
 chain contributes many build-time advisories.
 
+_(updated 2026-11-12, sync S-004)_ Pull request #3 upgrades `next` to 15.5.29. The hosted audit of
+that branch lists no `next` advisory and 3 critical instead of 8. The remaining critical ones are
+`@fastify/middie` and `proxy-addr` in the API and `shell-quote` in the React Native tool chain.
+
 ### 3.4 Authentication and session management
 
 | ID                             | Finding                                                               | Priority |

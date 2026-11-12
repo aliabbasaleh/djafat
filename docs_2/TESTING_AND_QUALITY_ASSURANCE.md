@@ -154,6 +154,16 @@ application code, the three other checks fail at the same steps as on `main`; th
 | Patched: restaurant console, six screens                                | ✅                                                       |
 | Patched: admin console, six screens; customer account refused           | ✅                                                       |
 
+**`next` 15.5.29 upgrade check (2026-11-12, sync S-004).** Same API, database and browser, with
+production builds of the three apps: first from `main` (`next` 15.1.3), then from pull request #3
+(15.5.29). 29 pages: the public catalog pages, the shipped login on each app, then, with the fetch
+workaround, the customer journey (login, add to cart, cart, order placed, addresses), six
+restaurant screens and seven admin screens. Recorded for each page: final path, HTTP status, title,
+text, console errors, failed requests, API calls, image responses and a screenshot. Result: 26
+pages identical in every field; the other three differ only by the order each run placed and an
+elapsed time. 22 screenshots are byte-identical and the 7 others were checked by eye. The errors
+seen in both runs were already known: the `FE-05` images, missing favicons, `SDK-01`.
+
 ## 6. How to repeat the live scenarios
 
 1. Start PostgreSQL, PgBouncer and Redis (see [`DEPLOYMENT_AND_ENVIRONMENT.md`](DEPLOYMENT_AND_ENVIRONMENT.md) §2), migrate, seed.

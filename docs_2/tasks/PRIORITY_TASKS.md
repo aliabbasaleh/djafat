@@ -39,6 +39,9 @@ Do these in this order. Items marked ⇄ exist on a remote branch: merge rather 
 | 9     | T-105 Dependency upgrades (`next` first) | DEP-01        | T-109, any deployment                    |
 | 10    | T-109 Green CI                           | CI-01         | Enforceable quality gate                 |
 
+_(updated 2026-11-12, sync S-004)_ T-105: the `next` step is done on pull request #3, not yet
+merged. Fastify/Nest, `zod`, the Expo tool chain and `postcss` remain.
+
 **Exit criteria:** the three web apps log in from a browser; CI is green; no known way to order for
 free; a refund works; the API refuses to start with placeholder secrets.
 

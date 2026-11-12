@@ -97,7 +97,9 @@ Two workflows on push to `main` and on pull requests; the security one also week
 Causes and fixes: [`CI-01`](FINDINGS.md#ci-01). There is no deployment job, no image build, no
 mobile build, no browser test, and no worker integration test. Local hooks: commitlint on commit
 messages, lint-staged on commit, gitleaks on push if installed — although that scan reads the
-staged changes, not the pushed commits, so it finds nothing ([`CI-02`](FINDINGS.md#ci-02)).
+staged changes, not the pushed commits, so it finds nothing ([`CI-02`](FINDINGS.md#ci-02)). On
+`main` the pre-commit ESLint step cannot run at all ([`CI-03`](FINDINGS.md#ci-03), updated
+2026-11-12, sync S-004).
 
 _(updated 2026-11-11, sync S-003)_ On pull requests `gitleaks-action` needs the run's
 `GITHUB_TOKEN`. `main`'s workflow does not pass it, so the job stops there before scanning. Both

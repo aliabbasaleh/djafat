@@ -8,6 +8,40 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-12 — Sync S-004: `next` upgraded to 15.5.29 on pull request #3
+
+**Changed**
+
+- New branch `fix/next-15.5`, pull request [#3](https://github.com/aliabbasaleh/djafat/pull/3),
+  from `main`: `next` 15.1.3 → 15.5.29 in `apps/web`, `apps/admin`, `apps/restaurant` and
+  `packages/ui`. The lockfile changes only within `next`'s own dependency tree; `typedRoutes`
+  moves out of `experimental`; `next-env.d.ts` is regenerated (commit `5d36c6a`). The gitleaks
+  token fix of pull requests #1 and #2 is copied unchanged (commit `480ec14`).
+
+**Verified:** locally with Node 22, format, typecheck, lint, unit tests and the build without the
+Expo apps pass; the typecheck also passes with no `.next` folder. In headless Chrome, 29 pages of
+the three apps were walked against the same API and data, once on `main`'s build and once on the
+branch. 26 pages are identical in every recorded field, and the other 3 differ only by the order
+each run placed and an elapsed time; 22 screenshots are byte-identical, the 7 others checked by
+eye. Hosted pipeline on pull request #3: no `next` advisory left (110 advisories instead of 151,
+3 critical instead of 8); gitleaks passes; `check` fails at Build and `integration` at Seed, as
+on `main`.
+
+**New issues:** `CI-03` (Low): the pre-commit hook cannot run ESLint on `main`. `FE-07` (Low):
+typed routes are configured but never checked.
+
+**Not verified:** the upgraded apps on a server reachable from outside; the Expo apps, which the
+change does not touch and which cannot be bundled on `main` either (`MOB-01`).
+
+**Documents changed:** `FINDINGS.md` (`DEP-01`, `CI-01`, new `CI-03` and `FE-07`, counts),
+`tasks/BACKLOG.md` (T-105, T-109, new T-407 and T-408), `tasks/PRIORITY_TASKS.md`,
+`PROJECT_STATUS.md`, `SECURITY_AUDIT.md`, `TESTING_AND_QUALITY_ASSURANCE.md` §5,
+`DEPLOYMENT_AND_ENVIRONMENT.md` §4, `APPLICATION_INVENTORY.md`, `UNMERGED_BRANCHES.md`,
+`applications/WEB.md`, `ADMIN.md`, `RESTAURANT.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-11 — Sync S-003: pull request #2's checks; the secret scan runs on pull requests
 
 **Changed**

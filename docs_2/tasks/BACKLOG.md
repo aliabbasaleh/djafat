@@ -8,7 +8,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 **A task is Done only when its "Done when" is met and its "Test" has been run and recorded.**
 
-60 tasks: Phase 0 (1) · 1 (10) · 2 (17) · 3 (13) · 4 (6) · 5 (6) · 6 (7) _(updated 2026-11-11, sync S-003: T-313 added)_.
+62 tasks: Phase 0 (1) · 1 (10) · 2 (17) · 3 (13) · 4 (8) · 5 (6) · 6 (7) _(updated 2026-11-12, sync S-004: T-407 and T-408 added; S-003 added T-313)_.
 
 ---
 
@@ -56,13 +56,19 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-105 · Upgrade vulnerable dependencies
 
-- **Area:** whole workspace · **Priority:** Critical · **Status:** Not started
+- **Area:** whole workspace · **Priority:** Critical · **Status:** In progress
 - **Why:** [`DEP-01`](../FINDINGS.md#dep-01) · **Depends on:** T-108, T-602 (to upgrade Fastify/Nest safely); the `next` patch upgrade can go first
 - **Done when:** `pnpm audit --prod --audit-level high` exits 0, exceptions listed in `SECURITY_AUDIT.md`.
 - **Test:** all checks, integration suite and browser pass after each upgrade step.
 - **Note (updated 2026-11-11, sync S-003):** target `next` ≥ 15.5.28, the highest patched version
   among its 17 critical and high advisories in the hosted audit of pull request #2. Pull request
   #1's audit baseline accepts the critical ones in the meantime ([`DEP-01`](../FINDINGS.md#dep-01)).
+- **Progress (updated 2026-11-12, sync S-004):** the `next` step is done on a branch: pull request
+  #3 upgrades `next` to 15.5.29, its hosted audit lists no `next` advisory (run 43154080538), and
+  the browser comparison with `main` found no regression. Left: Fastify 5 and Nest 11 for the API
+  (`@fastify/middie`, `proxy-addr`, `fastify`, `find-my-way`, `@fastify/static`; `js-yaml` and
+  `lodash` through `@nestjs/swagger`), `zod` 4, the Expo tool chain (`shell-quote`, `node-forge`,
+  `undici`, `image-size` and others), and `postcss`, which `next` 15.5.29 pins at 8.4.31.
 
 ### T-106 · Take the Expo apps out of the default build
 
@@ -96,6 +102,8 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
   requests, on pull request #1 (`6d04e4e`, `397ca6b`) and, with the same lines, on pull request #2
   (`281c323`). The check passes on both; `main` gets the fix when either is merged. Remaining: the
   allowlist, T-105, T-106, T-108, branch protection.
+- **Progress (updated 2026-11-12, sync S-004):** pull request #3 carries the same gitleaks lines
+  (`480ec14`); its check passes too.
 
 ### T-110 · Fix `pnpm infra:up`
 
@@ -352,6 +360,20 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Area:** `apps/api` payments, idempotency · **Priority:** Low · **Status:** Not started
 - **Why:** [`PAY-09`](../FINDINGS.md#pay-09) · **Depends on:** —
 - **Test:** unit and integration tests.
+
+### T-407 · Let the pre-commit hook run ESLint
+
+- **Area:** root `package.json`, `.husky/pre-commit` · **Priority:** Low · **Status:** Not started
+- **Why:** [`CI-03`](../FINDINGS.md#ci-03) · **Depends on:** — (done on `claude/compassionate-franklin-k23vcj`: `eslint` 9.17.0 in the root `devDependencies`) _(added 2026-11-12, sync S-004)_
+- **Done when:** committing a staged `.ts` file runs `eslint --fix` from the hook without extra setup.
+- **Test:** on a fresh clone, commit a file with a lint error; the hook refuses it with ESLint's message, not ENOENT.
+
+### T-408 · Make typed routes actually checked
+
+- **Area:** `apps/web` · **Priority:** Low · **Status:** Not started
+- **Why:** [`FE-07`](../FINDINGS.md#fe-07) · **Depends on:** — _(added 2026-11-12, sync S-004)_
+- **Done when:** a link to a route that does not exist fails `next build`; the existing untyped `href` on the product page is typed.
+- **Test:** the probe page described in `FE-07` fails the build.
 
 ---
 

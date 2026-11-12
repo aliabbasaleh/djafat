@@ -37,6 +37,10 @@ Both start from `main`'s head, so each could fast-forward `main` alone. They tou
 files (`payments.service.ts`, the integration test configuration, the lockfile, CI), so merging
 both will need conflict resolution.
 
+_(updated 2026-11-12, sync S-004)_ Two branches of ours are also open against `main`:
+`docs/audit-sync` (pull request #2: this documentation and the gitleaks token) and `fix/next-15.5`
+(pull request #3, §2b).
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |
@@ -49,6 +53,20 @@ both will need conflict resolution.
 `a68934d` also gives the integration job two throwaway base64 keys (`MFA_ENCRYPTION_KEY`,
 `DELIVERY_CODE_ENCRYPTION_KEY`), labelled as such in the file. The weekly gitleaks scan flags both,
 so they need an allowlist entry ([`CI-01`](FINDINGS.md#ci-01)) _(updated 2026-11-11, sync S-003)_.
+
+## 2b. `fix/next-15.5`, pull request #3 (2 commits) _(added 2026-11-12, sync S-004)_
+
+Our own branch, from `main` `d1439c6`, made at the user's request.
+
+| Commit                                                                      | What it does                                                                                                                       | Audit finding                                                           |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `5d36c6a` fix(web,admin,restaurant): upgrade next from 15.1.3 to 15.5.29    | `next` 15.5.29 in the three web apps and `packages/ui`; lockfile; `typedRoutes` out of `experimental`; regenerated `next-env.d.ts` | Fixes the `next` part of [`DEP-01`](FINDINGS.md#dep-01), verified there |
+| `480ec14` fix(ci): give gitleaks-action the token it needs on pull requests | The same lines as pull requests #1 and #2                                                                                          | Part of [`CI-01`](FINDINGS.md#ci-01)                                    |
+
+Merging (tested with `git merge-tree`): clean with `main` and `docs/audit-sync`. With
+`claude/compassionate-franklin-k23vcj`: conflicts in `apps/web/package.json` (keep `leaflet` from
+there and `next` 15.5.29 from here) and in `pnpm-lock.yaml` (take either side, then run
+`pnpm install`). With `fix/payment-reliability-backlog`: `pnpm-lock.yaml` only.
 
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits)
 

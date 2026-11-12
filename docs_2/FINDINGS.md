@@ -9,10 +9,11 @@ these IDs instead of repeating the detail.
   their production builds, HTTP scenarios with `curl`, the three web apps in headless Chrome, and
   the hosted CI logs. Environment details: [`TESTING_AND_QUALITY_ASSURANCE.md`](TESTING_AND_QUALITY_ASSURANCE.md) §1.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
-- **Counts:** 9 Critical · 22 High · 22 Medium · 11 Low = 64 open findings _(updated 2026-11-11,
-  sync S-003: `CI-02` added)_.
-- **Last synced:** S-003, 2026-11-11 — our own CI fix on pull request #2 reviewed (S-001: four new
-  commits on `origin/claude/compassionate-franklin-k23vcj`); `main` unchanged since the audit. Pull-by-pull history: [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
+- **Counts:** 9 Critical · 22 High · 22 Medium · 13 Low = 66 open findings _(updated 2026-11-12,
+  sync S-004: `CI-03` and `FE-07` added; S-003 added `CI-02`)_.
+- **Last synced:** S-004, 2026-11-12 — our own `next` upgrade, pull request #3 (S-003: our CI fix on
+  pull request #2; S-001: four commits on `origin/claude/compassionate-franklin-k23vcj`); `main`
+  unchanged since the audit. Pull-by-pull history: [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
 
 An entry is never deleted. When fixed, set `Status: Resolved`, add the commit and how the fix was
 verified.
@@ -84,6 +85,8 @@ verified.
 | [I18N-01](#i18n-01)   | Text is hard-coded in French; Arabic not started                                         | Partially Completed | Low      | CODE     |
 | [QA-01](#qa-01)       | Accessibility and performance were not measured                                          | Needs Verification  | Low      | —        |
 | [CI-02](#ci-02)       | The pre-push secret scan never reads the pushed commits                                  | Broken              | Low      | RUN      |
+| [CI-03](#ci-03)       | The pre-commit hook cannot run ESLint on `main`                                          | Broken              | Low      | RUN      |
+| [FE-07](#fe-07)       | Typed routes are configured but never checked                                            | Broken              | Low      | RUN      |
 | [PAY-09](#pay-09)     | Payment idempotency scope is global; attempt counter never moves                         | Needs Improvement   | Low      | CODE     |
 
 ---
@@ -278,6 +281,23 @@ verified.
   the job then fails only on advisories missing from the baseline. That is a sound gate against new
   problems, as long as a green audit job is not read as "no critical vulnerability"; the `next`
   entries should leave the baseline with the upgrade.
+
+- **Sync S-004 note (2026-11-12): fix present on a branch, verified there.** Pull request #3
+  (`fix/next-15.5`, commit `5d36c6a`) upgrades `next` to 15.5.29 in the three web apps and
+  `packages/ui`. Verified (RUN): the hosted audit of that branch (run 43154080538) lists no `next`
+  advisory: 110 advisories instead of 151, 3 critical instead of 8, 51 high instead of 66. Format,
+  typecheck, lint, unit tests and the build pass locally, and a 29-page browser comparison with
+  `main`'s build shows no regression (`TESTING_AND_QUALITY_ASSURANCE.md` §5). Status stays Open:
+  the fix is not on `main`, and what remains still fails the audit job:
+  - API: `@fastify/middie` (critical, fixed in 9.3.2) and `proxy-addr` (critical, 2.0.8), plus
+    `fastify`, `@nestjs/platform-fastify`, `find-my-way` and `@fastify/static` (high; Fastify 5
+    and Nest 11 territory), `js-yaml` and `lodash` through `@nestjs/swagger`, and `zod` (fixed in
+    version 4).
+  - Expo apps: `shell-quote` (critical, 1.11.0), `node-forge` (8 high, 1.4.1; pull request #1
+    forces 1.4.3), `undici`, `image-size`, `decode-uri-component`, `compression`.
+  - `postcss` (2 high, 8.5.18): `next` 15.5.29 itself pins 8.4.31.
+  - `brace-expansion` (6 high), through React Native's tooling, `@fastify/static` and the ESLint
+    plugins of `packages/eslint-config`.
 
 ### MOB-01
 
@@ -493,6 +513,11 @@ properties of undefined (reading 'get')` in `new RedisService(undefined)` — Vi
     Build (`MOB-01`), `integration` at Seed, `pnpm audit` (`DEP-01`). On pull request #1 (head
     `804176f`) only `integration` fails.
   - The local pre-push scan does not make up for any of this: it reads nothing (`CI-02`).
+- **Sync S-004 note (2026-11-12), RUN (hosted pipeline):** pull request #3 (`fix/next-15.5`) shows
+  the same picture. Its gitleaks job failed for want of the token until commit `480ec14` copied the
+  fix of pull requests #1 and #2; it now passes (run 43154793991, 2 commits, no leaks). `check`
+  still fails at Build (`MOB-01`) after format, typecheck, lint and unit tests pass, `integration`
+  at Seed, and `pnpm audit` on the advisories left outside `next` (`DEP-01`).
 
 ### OPS-01
 
@@ -907,10 +932,18 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 **The pre-push secret scan never reads the pushed commits** · Broken · Low · RUN — `.husky/pre-push` runs `gitleaks protect --staged`, which scans the staged changes; when `git push` runs, the index is normally empty. In a throwaway repository with a fake GitHub token committed and a clean index, the command scanned 0 bytes and reported no leaks, while a scan of the commit found the token. A secret is therefore caught only by CI, after it has left the machine. Fix: scan the commits no remote has yet, `gitleaks git --redact --config .gitleaks.toml --log-opts="HEAD --not --remotes"` (gitleaks 8.19 or later; the refs Git passes to the hook on standard input give the exact range when another branch is pushed). In the same throwaway repository it scanned exactly the unpushed commits and found the token (T-313). Found in sync S-003 (2026-11-11); the collaborator's branch leaves `.husky/` unchanged.
 
+### CI-03
+
+**The pre-commit hook cannot run ESLint on `main`** · Broken · Low · RUN — `lint-staged` runs `eslint --fix` on staged code files from the repository root, but `eslint` is not a root dependency, and pnpm's isolated layout puts no `eslint` in the root `node_modules/.bin`. Any commit that touches a `.ts`, `.tsx`, `.js`, `.mjs` or `.cjs` file is refused with "eslint … failed without output (ENOENT)". This was seen on 2026-11-12 while committing pull request #3, so such commits on `main` must have been made without the hook. The root `eslint.config.mjs` itself works: with the workspace's ESLint 9.17.0 put on `PATH`, the hook ran in full. Fix: add `eslint` 9.17.0 to the root `devDependencies`, as `claude/compassionate-franklin-k23vcj` already does (T-407). Found in sync S-004.
+
+### FE-07
+
+**Typed routes are configured but never checked** · Broken · Low · RUN — `apps/web` enables `typedRoutes`, but its `tsconfig.json` lists `.next` under `exclude`, and an exclusion overrides the `.next/types/**/*.ts` include. So the generated link types are loaded neither by `tsc` nor by `next build`. On `next` 15.5.29, a page linking to a route that does not exist built without error. With the generated types loaded, `tsc` reports that link, and one existing one: a plain `string` passed as `href` in `src/app/restaurants/[slug]/products/[productId]/page.tsx` (line 29). The same `tsconfig.json` is on `main` (CODE). Fix: remove `.next` from `exclude` (the `include` list only pulls in `.next/types`) and type that link; optionally run `next typegen` before `tsc` so the typecheck step catches it before the build (T-408). Found in sync S-004.
+
 ### PAY-09
 
 **Payment idempotency details** · Needs Improvement · Low · CODE — the idempotency scope for payments, cancels and refunds is global rather than per user; `payments.attempt_no` is never incremented; a stale `reserved` key (process died mid-request) blocks its key forever.
 
 ---
 
-Last updated: 2026-11-11 (sync S-003)
+Last updated: 2026-11-12 (sync S-004)

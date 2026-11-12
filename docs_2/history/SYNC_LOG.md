@@ -10,6 +10,67 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-004 — 2026-11-12 — our own branch: `next` upgraded to 15.5.29 (pull request #3)
+
+|                 |                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Trigger**     | The user asked for the upgrade and a check that nothing breaks; the shared hook then reported the new branch       |
+| **Range**       | `origin/fix/next-15.5` `d1439c6..480ec14`: 2 commits (the repository's user, with Claude)                          |
+| **Size**        | 10 files: four `package.json`, `pnpm-lock.yaml`, three `next-env.d.ts`, `apps/web/next.config.mjs`, `security.yml` |
+| **Evidence**    | RUN — local checks, a before/after browser comparison, hosted pipeline runs on pull request #3                     |
+| **Reviewed by** | Claude, in the audit session                                                                                       |
+
+### Added
+
+- Branch `fix/next-15.5` and pull request #3 against `main`.
+- On that branch, in `security.yml`: the gitleaks token and permissions, the lines of pull
+  requests #1 and #2.
+
+### Removed
+
+- From the lockfile: `next` 15.1.3 and its tree; `busboy`, `streamsearch` and `@swc/counter`, which
+  `next` 15.5 no longer uses.
+
+### Fixed
+
+- `DEP-01`, the `next` part, on the branch only: the hosted audit of pull request #3 (run 43154080538) lists no `next` advisory. The status stays Open: `main` keeps 15.1.3 until the
+  merge, and 3 critical and 51 high advisories remain in other packages.
+
+### Changed
+
+- `next` 15.5.29 in `apps/web`, `apps/admin`, `apps/restaurant` and `packages/ui`; `sharp` 0.35.5
+  under it.
+- `apps/web/next.config.mjs`: `typedRoutes` at the top level, as 15.5 asks.
+- `next-env.d.ts` (three apps): one added reference to `.next/types/routes.d.ts`, written by
+  `next build`.
+
+### New findings
+
+- `CI-03` (Low, RUN): the pre-commit hook cannot run ESLint on `main`. Seen when committing
+  `5d36c6a`, which then went through the full hook with the workspace's ESLint on `PATH`.
+- `FE-07` (Low, RUN): typed routes are configured but never checked; a deliberately wrong link
+  built without error.
+
+### Documents updated
+
+`FINDINGS.md`, `tasks/BACKLOG.md`, `tasks/PRIORITY_TASKS.md`, `PROJECT_STATUS.md`,
+`SECURITY_AUDIT.md`, `TESTING_AND_QUALITY_ASSURANCE.md`, `DEPLOYMENT_AND_ENVIRONMENT.md`,
+`APPLICATION_INVENTORY.md`, `UNMERGED_BRANCHES.md`, `applications/WEB.md`,
+`applications/ADMIN.md`, `applications/RESTAURANT.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The upgraded apps on a server reachable from outside. The Expo apps: the change does not touch
+them, and they cannot be bundled on `main` either (`MOB-01`). The logged-in screens were compared
+with the fetch workaround (`SDK-01`).
+
+### Marker
+
+Added `480ec14 origin/fix/next-15.5`. Other lines unchanged.
+
+---
+
 ## S-003 — 2026-11-11 — our own commit: the secret scan runs on pull requests
 
 |                 |                                                                                                                          |

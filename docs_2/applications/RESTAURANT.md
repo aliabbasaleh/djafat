@@ -65,7 +65,8 @@ All observations below are from the pass with the SDK defect worked around in th
 - Tokens in `localStorage` ([`SEC-05`](../FINDINGS.md#sec-05)).
 - `next@15.1.3` with the App Router: five published critical vulnerabilities, among them remote
   code execution in the React flight protocol; none affects 15.5.28 or later
-  ([`DEP-01`](../FINDINGS.md#dep-01)) _(added 2026-11-11, sync S-003)_.
+  ([`DEP-01`](../FINDINGS.md#dep-01)) _(added 2026-11-11, sync S-003)_. Pull request #3 upgrades
+  to 15.5.29 _(updated 2026-11-12, sync S-004)_.
 - Interface review: [`../UI_UX_AUDIT.md`](../UI_UX_AUDIT.md) §3.
 
 ## 4. Outstanding tasks
