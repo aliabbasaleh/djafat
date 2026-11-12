@@ -93,6 +93,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @djafat/api run db:generate
 
+      # Workspace packages resolve to their dist/ (package.json exports):
+      # without this, `db:seed` fails on `Cannot find module @djafat/config`
+      # before any test runs. `^...` = the API's dependencies only.
+      - name: Build workspace packages used by the API
+        run: pnpm exec turbo run build --filter=@djafat/api^...
+
       - name: Apply migrations
         run: pnpm --filter @djafat/api run db:migrate
 
