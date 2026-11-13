@@ -32,6 +32,8 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Why:** [`SDK-01`](../FINDINGS.md#sdk-01) · **Depends on:** — (exists on branch: prefer merging)
 - **Done when:** the three web apps log in from a real browser.
 - **Test:** unit test with a `this`-sensitive fetch stub; browser check of `POST /auth/otp/request` → 202.
+- **Progress (updated 2026-11-13, sync S-006):** done on pull request #1's branch and verified there
+  in a browser: login works in all four web apps. Merge pull request #1, or copy its lines.
 
 ### T-102 · Enforce provider enablement when creating a payment
 
@@ -126,6 +128,8 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Why:** [`FE-01`](../FINDINGS.md#fe-01) · **Depends on:** T-101, T-102
 - **Done when:** a customer chooses a method, pays, sees the result, and can retry a failed payment.
 - **Test:** browser test: cart → pay → `placed`.
+- **Progress (updated 2026-11-13, sync S-006):** done on pull request #1's branch for cash on
+  delivery and verified there in a browser (`placed`); no other method was offered or tried.
 
 ### T-202 · Cash on delivery
 
@@ -133,6 +137,9 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Why:** [`PAY-02`](../FINDINGS.md#pay-02), [`PAY-08`](../FINDINGS.md#pay-08) · **Depends on:** T-102, policy decision
 - **Done when:** a cash order is placed immediately, never expired, settled atomically at delivery, with the agreed limits enforced.
 - **Test:** integration test of the full cash path; balances never negative.
+- **Progress (updated 2026-11-13, sync S-006):** on pull request #1's branch a cash order was
+  placed, delivered and settled in a browser run: payment `succeeded`, ledger balanced, restaurant
+  and courier credited.
 
 ### T-203 · Real OTP delivery
 
@@ -175,6 +182,9 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Why:** [`FE-03`](../FINDINGS.md#fe-03) · **Depends on:** T-201
 - **Done when:** the code is shown from pickup to delivery.
 - **Test:** browser test.
+- **Note (updated 2026-11-13, sync S-006):** still missing on pull request #1's branch. The API part
+  exists there (`GET /v1/deliveries/:id/code`, HTTP 200 for the order's customer); only the screens
+  are missing.
 
 ### T-209 · Enforce the minimum order
 

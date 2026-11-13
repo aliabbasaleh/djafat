@@ -58,6 +58,13 @@ all started, and an API login worked. In the browser, login still fails until
 [`SDK-01`](FINDINGS.md#sdk-01) is fixed, and order creation is refused outside the restaurant's
 hours, as designed.
 
+_(updated 2026-11-13, sync S-006)_ The newest work (pull request #1's branch) was run the same way
+from a separate working tree with its own database. Its `.env.example` has 53 variables; locally
+the SMS, e-mail and WhatsApp providers stay on `mock` (codes in Redis), `MOBILE_MONEY_WALLETS` and
+`SMS_GATEWAY_ENCRYPTION_KEY` stay empty, and the WhatsApp secrets get random values. The seed needs
+the shared packages built first. The courier app is served from its `build:web` export, whose
+origin must be listed in `API_CORS_ORIGINS`.
+
 ## 3. Configuration
 
 Validated at boot by `packages/config/src/env.ts`; the process refuses to start if a required

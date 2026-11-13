@@ -122,7 +122,8 @@ Checked by reading the specific files on the branch.
 
 - **Volume and pace.** Forty-one commits and about 31 600 lines in five days, across authentication,
   payments, cash handling and payouts — the areas where `main` already has its most serious
-  defects. None of it has been reviewed against a running system by this audit.
+  defects. None of it has been reviewed against a running system by this audit. _(updated
+  2026-11-13, sync S-006: the core journeys have since been run locally on `4c756e0`, §3.5.)_
 - **Built on the defects found here.** Payouts and cash control were added on a ledger whose
   refund path crashes and whose failure paths do not reverse money.
 - **Its own governance documents.** The branch tracks features in `docs/features/FEAT-nnn`, has a
@@ -159,6 +160,30 @@ _(updated 2026-11-11, sync S-003)_ Pull request #2 (`docs/audit-sync`) carries t
 branch's file, and the only conflict between the two pull requests is `.claude/settings.json`
 (merge test RUN). Hosted checks of this branch's pull request #1 (head `804176f`): `check`,
 `gitleaks` and `pnpm audit` pass; `integration` fails.
+
+### 3.5 Run locally — sync S-006 (2026-11-13)
+
+One new commit, `4c756e0` (2026-11-12, author "Claude"): the integration walking skeleton is
+rewritten on the current delivery flow; version 0.19.3. Hosted run 43212219986 on it: all four
+checks pass, the integration suite included.
+
+The branch was then run on the audit machine from a separate working tree, with its own database
+(37 migrations, the branch's seed) and a `.env` built from its `.env.example`. The journey went
+through the real screens in a browser, with no workaround:
+
+| Step                                                                         | Result                                               |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Customer logs in with an SMS code (mock), adds a dish, orders                | ✅ order created, payment step shown                 |
+| Customer chooses cash on delivery and confirms                               | ✅ `placed`                                          |
+| Restaurant console: the order appears at once; accept, then mark ready       | ✅ `confirmed`, then `ready`                         |
+| Courier web app, position 50 m from the restaurant: offer received, accepted | ✅ `courier_accepted`                                |
+| Courier confirms the pickup, then the delivery with the customer's code      | ✅ `delivered`; payment `succeeded`; ledger balanced |
+| Customer sees the delivery code                                              | ❌ not shown anywhere ([`FE-03`](FINDINGS.md#fe-03)) |
+| Admin console: login, dashboard, the order in the list                       | ✅                                                   |
+
+The code was fetched through the API (`GET /v1/deliveries/:id/code`) to finish the run. Not
+tried: payment methods other than cash, the WhatsApp and e-mail logins, native mobile builds, a
+server deployment (`OPS-05`).
 
 ## 4. Options
 

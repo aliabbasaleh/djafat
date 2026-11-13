@@ -8,6 +8,35 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-13 — Sync S-006: the newest code run locally end to end
+
+**Reviewed:** `4c756e0` on `claude/compassionate-franklin-k23vcj` (pull request #1), which
+rewrites the integration walking skeleton on the current delivery flow. Hosted run 43212219986:
+all four checks green.
+
+**Local run (this machine only, nothing versioned):** the branch checked out in a separate
+working tree, `/Users/mac/projects/djafat-latest`, with its own Docker project and database, a
+`.env` built from the branch's `.env.example` with random secrets, and a helper script that also
+pulls updates and serves the courier web app.
+
+**Verified (RUN, branch only):** 37 migrations and the seed on a fresh database; the API, the
+worker and the four web apps start. In the browser, with no workaround, the full journey works:
+customer login by SMS code, order, cash payment, restaurant accept and ready, courier offer,
+pickup, delivery with the code, admin listing. Afterwards the payment was `succeeded` and the ledger
+balanced. This verifies the branch's fixes for `SDK-01`, `FE-01` (cash) and `PAY-02`.
+
+**Still open on the branch:** `FE-03`: no screen shows the customer their delivery code.
+
+**Not verified:** other payment methods, WhatsApp and e-mail login, native mobile builds, a
+server deployment.
+
+**Documents changed:** `FINDINGS.md` (`SDK-01`, `PAY-02`, `FE-01`, `MOB-01`, `FE-03`, `TEST-01`,
+`DOC-02`), `tasks/BACKLOG.md` (T-101, T-201, T-202, T-208), `PROJECT_STATUS.md`,
+`UNMERGED_BRANCHES.md` §3.5, `TESTING_AND_QUALITY_ASSURANCE.md` §5,
+`DEPLOYMENT_AND_ENVIRONMENT.md` §2, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-12 — Local run configured; sync S-005: two more commits on pull request #3
 
 **Local run (this machine only, nothing versioned):** a `.env` generated from `.env.example` with

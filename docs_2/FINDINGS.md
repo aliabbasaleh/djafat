@@ -11,9 +11,10 @@ these IDs instead of repeating the detail.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
 - **Counts:** 9 Critical · 22 High · 22 Medium · 13 Low = 66 open findings _(updated 2026-11-12,
   sync S-004: `CI-03` and `FE-07` added; S-003 added `CI-02`)_.
-- **Last synced:** S-005, 2026-11-12 — two more commits on pull request #3 (S-004: our `next` upgrade
-  there; S-003: our CI fix on pull request #2; S-001: four commits on
-  `origin/claude/compassionate-franklin-k23vcj`); `main` unchanged since the audit. Pull-by-pull history: [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
+- **Last synced:** S-006, 2026-11-13 — pull request #1 at `4c756e0`, run locally end to end (S-005:
+  two commits on pull request #3; S-004: our `next` upgrade there; S-003: our CI fix on pull request
+  #2; S-001: four commits on `origin/claude/compassionate-franklin-k23vcj`); `main` unchanged since
+  the audit. Pull-by-pull history: [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
 
 An entry is never deleted. When fixed, set `Status: Resolved`, add the commit and how the fix was
 verified.
@@ -113,6 +114,11 @@ verified.
 - **Depends on:** nothing. Already fixed on the unmerged branch (see `UNMERGED_BRANCHES.md`).
 - **Verify:** in a real browser, log in on `:3000/connexion`; the network panel must show
   `POST /v1/auth/otp/request` → 202.
+- **Sync S-006 note (2026-11-13), RUN on pull request #1's branch (`4c756e0`), not on `main`:**
+  verified there. Through the real login pages, with no workaround, all four web apps log in
+  (customer site by SMS code, restaurant console, admin console, courier app):
+  `POST /v1/auth/otp/request` → 202, `verify` → 200. The branch's fix calls `fetch` as a plain
+  function in `packages/sdk/src/http.ts`.
 
 ### PAY-01
 
@@ -158,6 +164,12 @@ verified.
 - **Depends on:** a product decision on cash limits. See `PAY-08` before enabling.
 - **Verify:** cash order appears on the board as `placed`; delivered → payment `succeeded`,
   ledger balanced, wallets credited; never expired by the job.
+- **Sync S-006 note (2026-11-13), RUN on pull request #1's branch (`4c756e0`), not on `main`:** this
+  Verify step passes there. A cash order chosen in the browser became `placed`, appeared on the
+  restaurant board, and was accepted, readied, picked up and delivered. After delivery the payment is
+  `succeeded` (`cash_on_delivery`), and the ledger's two entry groups balance: 6 000 of cash float,
+  4 000 to the restaurant, 1 000 to the courier, 1 000 of revenue, with the restaurant's and the
+  courier's shares moved to available.
 
 ### PAY-03
 
@@ -195,6 +207,10 @@ verified.
   payment state and a retry on the order page.
 - **Depends on:** `PAY-01`, `PAY-02`; `SDK-01`.
 - **Verify:** browser test: cart → pay → order shows `placed`.
+- **Sync S-006 note (2026-11-13), RUN on pull request #1's branch (`4c756e0`), not on `main`:** the
+  order page asks how to pay. With cash on delivery chosen, "Confirmer la commande" gave
+  `POST /v1/payments` → 201, and the order went to `placed`. Cash was the only method offered and
+  tried.
 
 ### AUTH-01
 
@@ -322,6 +338,9 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   dependencies under pnpm's isolated layout. On that branch the hosted `check` job now passes every
   step, Build included (run 43156964436), so both Expo apps export. Status stays Open: the fix is
   not on `main`, and neither app has been run on a device (T-210).
+- **Sync S-006 note (2026-11-13), RUN on pull request #1's branch (`4c756e0`):** the courier app
+  builds for the browser (`build:web`). Served locally, it logs in, shares its position, receives
+  the offer, and completes pickup and delivery. Native builds were not tried.
 - **Verify:** `expo export` succeeds for both; the app runs on an Android device against a staging API.
 
 ---
@@ -453,6 +472,13 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 - **Fix:** SDK binding and a prominent code on the order page once the order is picked up.
 - **Depends on:** `FE-01`.
 - **Verify:** browser test shows the code after pickup; it disappears after delivery.
+- **Sync S-006 note (2026-11-13), RUN on pull request #1's branch (`4c756e0`): still open there.**
+  During a full delivery the customer's order page only said "Préparez votre code de livraison" and
+  never showed the code. No message carried it either: the mock SMS store held only the login code,
+  and the notifications were `order.confirmed` and `order.delivered`. `GET /v1/deliveries/:id/code`
+  returns it to the customer (HTTP 200), but no screen calls it, on the web or in the mobile app.
+  The courier app refuses a delivery without the right code, so a real delivery cannot be completed
+  from the screens alone; the test run fetched the code through the API.
 
 ### TEST-01
 
@@ -473,6 +499,9 @@ properties of undefined (reading 'get')` in `new RedisService(undefined)` — Vi
   On the branch: fix present, unverified (BRANCH). On `main`: unchanged, Open.
 - **Depends on:** nothing.
 - **Verify:** `pnpm --filter @djafat/api test:int` green locally and in CI.
+- **Sync S-006 note (2026-11-13), RUN (hosted pipeline), branch only:** on `4c756e0`, pull request
+  #1's `integration` job passes (run 43212219986). The commit reports 93/93 on a fresh local
+  database; that was not re-run here.
 
 ### TEST-02
 
@@ -923,7 +952,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### DOC-02
 
-**Earlier "GO" verdicts covered the API only** · Needs Improvement · Low · LIVE — `docs/36-bloc-13-hardening.md` concludes "GO" for a pilot and `docs/36-pilot-e2e-scenario.md` reports 19/19. Both runs drove the API with `curl`; the same journey fails in a browser (`SDK-01`, `FE-01`), and the cited integration tests cannot run (`TEST-01`). _Sync S-001 note (2026-11-11): the active branch's new `docs/ROADMAP.md` makes the same kind of claim — pilot functions "faites et vérifiées en vrai", integration tests 92/93 — which this audit has not been able to verify (BRANCH)._
+**Earlier "GO" verdicts covered the API only** · Needs Improvement · Low · LIVE — `docs/36-bloc-13-hardening.md` concludes "GO" for a pilot and `docs/36-pilot-e2e-scenario.md` reports 19/19. Both runs drove the API with `curl`; the same journey fails in a browser (`SDK-01`, `FE-01`), and the cited integration tests cannot run (`TEST-01`). _Sync S-001 note (2026-11-11): the active branch's new `docs/ROADMAP.md` makes the same kind of claim — pilot functions "faites et vérifiées en vrai", integration tests 92/93 — which this audit has not been able to verify (BRANCH)._ _Sync S-006 note (2026-11-13): run locally on `4c756e0`, the customer, restaurant, courier and admin journeys work end to end, with one gap the roadmap does not mention: the customer cannot see the delivery code (`FE-03`) (RUN)._
 
 ### OPS-04
 
@@ -959,4 +988,4 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ---
 
-Last updated: 2026-11-12 (sync S-005)
+Last updated: 2026-11-13 (sync S-006)

@@ -164,6 +164,14 @@ pages identical in every field; the other three differ only by the order each ru
 elapsed time. 22 screenshots are byte-identical and the 7 others were checked by eye. The errors
 seen in both runs were already known: the `FE-05` images, missing favicons, `SDK-01`.
 
+**Collaborator's branch run end to end (2026-11-13, sync S-006).** Pull request #1 at `4c756e0`,
+in watch mode, with its own database, through the real screens and with no workaround. The
+customer logged in by SMS code, ordered and paid cash; the restaurant accepted and readied the
+order; the courier web app (position emulated near the restaurant) received the offer, picked up
+and delivered with the customer's code; the admin console listed the order. Afterwards the payment
+was `succeeded` and the ledger balanced. One step failed: the customer has no screen showing the
+delivery code ([`FE-03`](FINDINGS.md#fe-03)). Details: [`UNMERGED_BRANCHES.md`](UNMERGED_BRANCHES.md) §3.5.
+
 ## 6. How to repeat the live scenarios
 
 1. Start PostgreSQL, PgBouncer and Redis (see [`DEPLOYMENT_AND_ENVIRONMENT.md`](DEPLOYMENT_AND_ENVIRONMENT.md) §2), migrate, seed.

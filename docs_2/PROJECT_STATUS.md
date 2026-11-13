@@ -3,13 +3,13 @@
 **The single source of truth for where DJAFAT stands.** Update it with every meaningful change
 (rules in [`README.md`](README.md)). Details live in the linked documents; this page points.
 
-|                        |                                                                                                                                                                                                          |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Last updated**       | 2026-11-12                                                                                                                                                                                               |
-| **Branch described**   | `main` @ `d1439c6` — unchanged since the audit                                                                                                                                                           |
-| **Evidence collected** | 2026-11-10 for `main`; branches read at BRANCH level (not run)                                                                                                                                           |
-| **Last synced**        | S-005, 2026-11-12 — two more commits on pull request #3 (`6cbbad4`); S-004 our `next` upgrade; S-003 our CI fix on #2; S-001 the collaborator's 4 commits ([`history/SYNC_LOG.md`](history/SYNC_LOG.md)) |
-| **Updated by**         | Initial full audit; syncs S-001 to S-005                                                                                                                                                                 |
+|                        |                                                                                                                                                                                                                                        |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Last updated**       | 2026-11-12                                                                                                                                                                                                                             |
+| **Branch described**   | `main` @ `d1439c6` — unchanged since the audit                                                                                                                                                                                         |
+| **Evidence collected** | 2026-11-10 for `main`; branches read at BRANCH level (not run)                                                                                                                                                                         |
+| **Last synced**        | S-006, 2026-11-13 — pull request #1 at `4c756e0`, run locally end to end; S-005 two commits on #3; S-004 our `next` upgrade; S-003 our CI fix on #2; S-001 the collaborator's 4 commits ([`history/SYNC_LOG.md`](history/SYNC_LOG.md)) |
+| **Updated by**         | Initial full audit; syncs S-001 to S-006                                                                                                                                                                                               |
 
 ---
 
@@ -50,6 +50,8 @@ _(updated 2026-11-11, sync S-003)_ Sync S-003 added one Low finding: the local p
 _(updated 2026-11-12, sync S-004)_ Pull request #3 upgrades `next` to 15.5.29 in the three web apps. Verified on that branch: the hosted audit lists no `next` advisory (critical advisories 8 → 3, all outside `next`), the local checks pass, and a page-by-page browser comparison with `main`'s build found no regression. Two Low findings were added: the pre-commit hook cannot run ESLint on `main` ([`CI-03`](FINDINGS.md#ci-03)), and typed routes are never checked ([`FE-07`](FINDINGS.md#fe-07)).
 
 _(updated 2026-11-12, sync S-005)_ Two more commits on pull request #3 copy fixes from pull request #1: the Expo apps now bundle there ([`MOB-01`](FINDINGS.md#mob-01), CI build passes) and the integration job reaches its tests (`TEST-01` remains). The local run was re-verified on the audit machine with a generated `.env` ([`DEPLOYMENT_AND_ENVIRONMENT.md`](DEPLOYMENT_AND_ENVIRONMENT.md) §2); browser login on `main` still needs [`SDK-01`](FINDINGS.md#sdk-01).
+
+_(updated 2026-11-13, sync S-006)_ The collaborator's branch (pull request #1, `4c756e0`) was run locally end to end, through the real screens. A customer logged in, ordered and paid cash; the restaurant accepted and readied the order; the courier received the offer, picked up and delivered; the ledger balanced. On that branch this verifies the fixes for [`SDK-01`](FINDINGS.md#sdk-01), [`FE-01`](FINDINGS.md#fe-01) (cash) and [`PAY-02`](FINDINGS.md#pay-02), and its CI is fully green, the integration suite included ([`TEST-01`](FINDINGS.md#test-01)). One gap remains there: the customer cannot see the delivery code ([`FE-03`](FINDINGS.md#fe-03)), and the courier cannot deliver without it. None of this is on `main` until pull request #1 is merged.
 
 ## 2. Current development phase
 
@@ -149,14 +151,14 @@ Full list with acceptance criteria: [`tasks/BACKLOG.md`](tasks/BACKLOG.md). Orde
 
 ## 7. Critical bugs and unresolved issues
 
-- [ ] `SDK-01` Browser calls fail in all web apps → T-101
+- [ ] `SDK-01` Browser calls fail in all web apps → T-101 (fixed and verified on pull request #1's branch, not merged; _sync S-006_)
 - [ ] `PAY-01` Free orders through a disabled provider → T-102
 - [ ] `PAY-03` Refunds crash → T-103
 - [ ] `SEC-01` Boots with published placeholder secrets → T-104
 - [ ] `DEP-01` Critical dependency vulnerabilities → T-105 (the `next` part is fixed on pull request #3, not merged; _updated 2026-11-12, sync S-004_)
 - [ ] `MOB-01` Expo apps cannot be bundled → T-106, T-210
-- [ ] `PAY-02` Cash on delivery never places an order → T-202
-- [ ] `FE-01` No payment step → T-201
+- [ ] `PAY-02` Cash on delivery never places an order → T-202 (fixed and verified on pull request #1's branch, not merged; _sync S-006_)
+- [ ] `FE-01` No payment step → T-201 (cash payment step present and verified on pull request #1's branch, not merged; _sync S-006_)
 - [ ] `AUTH-01` No real OTP delivery → T-203
 
 High-priority issues: see [`FINDINGS.md`](FINDINGS.md) index.
@@ -205,6 +207,7 @@ Recent entries; full history in [`history/CHANGELOG.md`](history/CHANGELOG.md).
 
 | Date       | Change                                                                                                                                                                                                              | Verified                                                                                                               |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-13 | Sync S-006: `4c756e0` on pull request #1 (integration test rewrite); the branch run locally end to end (order, cash payment, restaurant, courier, delivery)                                                         | Local browser run without workaround; ledger balanced; hosted run 43212219986 all green; `FE-03` still open there      |
 | 2026-11-12 | Sync S-005: `c616695` (Expo bundling) and `6cbbad4` (build before seed) on pull request #3, copied from #1; local run re-verified with a generated `.env`                                                           | Hosted run 43156964436: `check` passes, `integration` reaches the tests; local API login, 29-page browser walk         |
 | 2026-11-12 | Sync S-004: `next` 15.1.3 → 15.5.29 on pull request #3 (`5d36c6a`), with the gitleaks fix of #1 and #2 (`480ec14`); new `CI-03` and `FE-07`                                                                         | Local checks; 29-page before/after browser comparison; hosted audit lists no `next` advisory; gitleaks passes          |
 | 2026-11-11 | Sync S-003: pull request #2's red checks examined, and all four fail on `main` too; #1's gitleaks fix copied to #2 (`281c323`); `DEP-01` and `CI-01` detailed; new `CI-02` (the pre-push secret scan reads nothing) | gitleaks passes on #2 (run 43046807317); local scans; merge test with #1; `CI-02` reproduced in a throwaway repository |

@@ -10,6 +10,58 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-006 — 2026-11-13 — one commit on pull request #1, and the branch run end to end
+
+|                 |                                                                                                            |
+| --------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook after a fetch; the user asked to run the newest code locally                               |
+| **Range**       | `origin/claude/compassionate-franklin-k23vcj` `804176f..4c756e0`: 1 new commit, 2026-11-12 11:46, "Claude" |
+| **Size**        | 3 files: `apps/api/test/walking-skeleton.int.spec.ts`, `docs/ROADMAP.md`, `package.json` (0.19.3)          |
+| **Evidence**    | RUN — hosted run 43212219986; the branch run locally, browser journey without workaround, SQL checks       |
+| **Reviewed by** | Claude, in the audit session                                                                               |
+
+### Added
+
+- none in the application; the walking-skeleton integration test now follows the current delivery
+  flow (courier online, offer, accept, pickup, delivery with the customer's code).
+
+### Removed
+
+- From that test: the removed `POST /deliveries` assignment flow.
+
+### Fixed
+
+- Verified on the branch, by running it (not on `main`): `SDK-01` (browser login in all four web
+  apps), `FE-01` (cash payment step), `PAY-02` (a cash order is placed, delivered and settled; ledger
+  balanced). `MOB-01`: the courier web export runs end to end.
+- `TEST-01`, on the branch: the hosted `integration` job passes.
+
+### Changed
+
+- `docs/ROADMAP.md` and the root version (0.19.3), per the branch's versioning rule.
+
+### New findings
+
+- none. `FE-03` is confirmed still open on the branch: no screen shows the delivery code, although
+  `GET /v1/deliveries/:id/code` serves it.
+
+### Documents updated
+
+`FINDINGS.md`, `tasks/BACKLOG.md`, `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`,
+`TESTING_AND_QUALITY_ASSURANCE.md`, `DEPLOYMENT_AND_ENVIRONMENT.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The 93/93 local integration result the commit reports (the hosted run passed). Payment methods
+other than cash, WhatsApp and e-mail login, native mobile builds, a server deployment.
+
+### Marker
+
+`origin/claude/compassionate-franklin-k23vcj`: `804176f` → `4c756e0`. Other lines unchanged.
+
+---
+
 ## S-005 — 2026-11-12 — two commits on pull request #3 from another session
 
 |                 |                                                                                                                                  |
