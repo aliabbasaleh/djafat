@@ -73,8 +73,78 @@ const OtpSchema = z.object({
         .map((s) => s.trim())
         .filter(Boolean),
     ),
-  SMS_PROVIDER: nonEmpty.default('mock'),
+  /**
+   * `mock` (dev/CI: code readable in Redis) | `http` (real gateway) — FEAT-006 |
+   * `disabled` (no paid SMS at launch, 503 SMS_UNAVAILABLE) — FEAT-008.
+   */
+  SMS_PROVIDER: z.enum(['mock', 'http', 'disabled']).default('mock'),
   SMS_MOCK_URL: url.optional(),
+  /** HTTP SMS gateway: `POST { to, from, body }` (aggregator, operator, Kannel, Android gateway). */
+  SMS_HTTP_URL: url.optional(),
+  /** Bearer key of the gateway — secret, from the environment only. */
+  SMS_HTTP_API_KEY: z.string().optional(),
+  /** Alphanumeric sender id shown on the handset (1–11 chars). */
+  SMS_SENDER_ID: z
+    .string()
+    .regex(/^[A-Za-z0-9]{1,11}$/, 'SMS_SENDER_ID must be 1-11 letters or digits')
+    .default('DJAFAT'),
+  /** `mock` (dev/CI, Redis) | `smtp` (any SMTP provider) — FEAT-007. Optional feature. */
+  EMAIL_PROVIDER: z.enum(['mock', 'smtp']).default('mock'),
+  /** `smtp://` or `smtps://user:pass@host:port` — secret, environment only. */
+  SMTP_URL: z
+    .string()
+    .regex(/^smtps?:\/\//, 'SMTP_URL must start with smtp:// or smtps://')
+    .optional(),
+  /** Sender, e.g. `DJAFAT <no-reply@djafat.td>`. */
+  EMAIL_FROM: z.string().min(3).optional(),
+  /** `mock` (dev/CI, Redis) | `cloud` (Meta WhatsApp Cloud API) — FEAT-008. */
+  WHATSAPP_PROVIDER: z.enum(['mock', 'cloud']).default('mock'),
+  /** Graph API base, version included (Meta changes versions regularly). */
+  WHATSAPP_GRAPH_URL: url.default('https://graph.facebook.com/v21.0'),
+  /** System-user access token — secret, environment only. */
+  WHATSAPP_ACCESS_TOKEN: z.string().min(1).optional(),
+  /** Id of DJAFAT's WhatsApp number in Meta (not the number itself). */
+  WHATSAPP_PHONE_NUMBER_ID: z
+    .string()
+    .regex(/^\d+$/, 'WHATSAPP_PHONE_NUMBER_ID must be digits')
+    .optional(),
+  /** App secret: verifies the webhook signature — secret, environment only. */
+  WHATSAPP_APP_SECRET: z.string().min(1).optional(),
+  /** Token Meta echoes during webhook subscription — secret, environment only. */
+  WHATSAPP_VERIFY_TOKEN: z.string().min(1).optional(),
+  /** DJAFAT's WhatsApp number, E.164 — used to build the wa.me link. */
+  WHATSAPP_BUSINESS_NUMBER: z
+    .string()
+    .regex(/^\+\d{8,15}$/, 'WHATSAPP_BUSINESS_NUMBER must be E.164, e.g. +23560000001')
+    .optional(),
+  /** Global cap on WhatsApp codes per hour (protects the bill beyond the free tier). */
+  WHATSAPP_MAX_CODES_PER_HOUR: intFromString(300),
+  /**
+   * DJAFAT's merchant wallets (FEAT-009): `airtel_money=+23560000010,tigo_cash=+23560000020`.
+   * A wallet absent here is not registered, so never offered. Not a secret
+   * (the number is shown to customers).
+   */
+  MOBILE_MONEY_WALLETS: z
+    .string()
+    .default('')
+    .transform((raw, ctx) => {
+      const wallets: Array<{ code: string; merchantNumber: string }> = [];
+      for (const part of raw
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean)) {
+        const m = /^([a-z][a-z_]*)=(\+\d{8,15})$/.exec(part);
+        if (!m) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `invalid entry "${part}" — expected code=+E164, e.g. airtel_money=+23560000010`,
+          });
+          return z.NEVER;
+        }
+        wallets.push({ code: m[1]!, merchantNumber: m[2]! });
+      }
+      return wallets;
+    }),
   /** HMAC pepper for hashing OTP codes at rest (docs/19 §7) — never the same as JWT_ACCESS_SECRET. */
   OTP_HASH_SECRET: nonEmpty,
 });
@@ -107,6 +177,12 @@ const AuthSchema = z.object({
 
 const PaymentsSchema = z.object({
   PAYMENT_MOCK_URL: url.optional(),
+  /**
+   * FEAT-016: encrypts at rest the secret of each merchant SMS gateway phone
+   * (AES-256-GCM, 32 raw bytes base64). Optional: without it, SMS ingestion
+   * stays off and transfers are recorded by hand as before.
+   */
+  SMS_GATEWAY_ENCRYPTION_KEY: z.string().optional().default(''),
   PAYMENT_WEBHOOK_BASE_URL: url,
 });
 
@@ -157,7 +233,54 @@ export function loadEnv<T extends z.ZodTypeAny>(
   return parsed.data as z.infer<T>;
 }
 
-export const loadApiEnv = (src?: Record<string, string | undefined>): ApiEnv =>
-  loadEnv(ApiEnvSchema, src);
+/**
+ * Cross-field rules a per-field schema cannot express (FEAT-006). Returned as
+ * issues so they surface exactly like any other invalid variable at boot.
+ */
+export function apiEnvConsistencyIssues(env: ApiEnv): string[] {
+  const issues: string[] = [];
+  if (env.NODE_ENV === 'production' && env.SMS_PROVIDER === 'mock') {
+    issues.push(
+      'SMS_PROVIDER: "mock" is not allowed in production — no SMS would be sent and nobody could log in. Configure SMS_PROVIDER=http and SMS_HTTP_URL.',
+    );
+  }
+  if (
+    env.NODE_ENV === 'production' &&
+    env.SMS_PROVIDER === 'disabled' &&
+    env.WHATSAPP_PROVIDER !== 'cloud'
+  ) {
+    issues.push(
+      'SMS_PROVIDER: "disabled" in production needs WHATSAPP_PROVIDER=cloud — otherwise nobody could log in with a phone number.',
+    );
+  }
+  if (env.WHATSAPP_PROVIDER === 'cloud') {
+    for (const key of [
+      'WHATSAPP_ACCESS_TOKEN',
+      'WHATSAPP_PHONE_NUMBER_ID',
+      'WHATSAPP_APP_SECRET',
+      'WHATSAPP_VERIFY_TOKEN',
+      'WHATSAPP_BUSINESS_NUMBER',
+    ] as const) {
+      if (!env[key]) issues.push(`${key}: required when WHATSAPP_PROVIDER=cloud`);
+    }
+  }
+  if (env.SMS_PROVIDER === 'http' && !env.SMS_HTTP_URL) {
+    issues.push('SMS_HTTP_URL: required when SMS_PROVIDER=http');
+  }
+  if (env.EMAIL_PROVIDER === 'smtp' && !env.SMTP_URL) {
+    issues.push('SMTP_URL: required when EMAIL_PROVIDER=smtp');
+  }
+  if (env.EMAIL_PROVIDER === 'smtp' && !env.EMAIL_FROM) {
+    issues.push('EMAIL_FROM: required when EMAIL_PROVIDER=smtp');
+  }
+  return issues;
+}
+
+export const loadApiEnv = (src?: Record<string, string | undefined>): ApiEnv => {
+  const env = loadEnv(ApiEnvSchema, src);
+  const issues = apiEnvConsistencyIssues(env);
+  if (issues.length > 0) throw new ConfigValidationError(issues);
+  return env;
+};
 export const loadWorkerEnv = (src?: Record<string, string | undefined>): WorkerEnv =>
   loadEnv(WorkerEnvSchema, src);

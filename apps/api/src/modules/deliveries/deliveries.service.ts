@@ -148,6 +148,9 @@ type DeliveryRow = {
  * `couriers.lockAndClaim`/`release` (which locks the courier row) SECOND —
  * never the reverse, anywhere in this file.
  */
+/** FEAT-018: a fix older than this says nothing about where the door is. */
+const DROPOFF_FIX_MAX_AGE_MS = 2 * 60 * 1000;
+
 @Injectable()
 export class DeliveriesService {
   private readonly logger = new Logger(DeliveriesService.name);
@@ -749,7 +752,18 @@ export class DeliveriesService {
    * (raw 500) against a real PostgreSQL (docs/25 §B6.1-7).
    */
   async issueDeliveryCode(deliveryId: string, issuedByUserId: string): Promise<string> {
-    const code = (randomBytes(2).readUInt16BE(0) % 10000).toString().padStart(4, '0');
+    // FEAT-012: an order taken on the phone already has its code — the operator
+    // gave it to the customer during the call (no app to read it from).
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id: deliveryId },
+      select: { orderId: true },
+    });
+    const preset = delivery
+      ? await this.prisma.deliveryCodePreset.findUnique({ where: { orderId: delivery.orderId } })
+      : null;
+    const code = preset
+      ? decryptAtRest(preset.reference, this.deliveryCodeKey(), 'DELIVERY_CODE_ENCRYPTION_KEY')
+      : (randomBytes(2).readUInt16BE(0) % 10000).toString().padStart(4, '0');
     const valueHash = this.hashProof(code);
     await this.prisma.deliveryProof.create({
       data: {
@@ -769,6 +783,42 @@ export class DeliveriesService {
       },
     });
     return code;
+  }
+
+  /**
+   * FEAT-012 — choose the delivery code of an order taken on the phone, now,
+   * so the operator can give it to the customer during the call. Idempotent:
+   * the same order always gets the same code back. Used at pickup by
+   * `issueDeliveryCode`; verification is unchanged (hash, single use, TTL).
+   * Only the operator flow calls this — never a courier-facing route.
+   */
+  async presetDeliveryCode(orderId: string, operatorUserId: string): Promise<string> {
+    const existing = await this.prisma.deliveryCodePreset.findUnique({ where: { orderId } });
+    if (existing) {
+      return decryptAtRest(
+        existing.reference,
+        this.deliveryCodeKey(),
+        'DELIVERY_CODE_ENCRYPTION_KEY',
+      );
+    }
+    const code = (randomBytes(2).readUInt16BE(0) % 10000).toString().padStart(4, '0');
+    try {
+      await this.prisma.deliveryCodePreset.create({
+        data: {
+          orderId,
+          valueHash: this.hashProof(code),
+          reference: encryptAtRest(code, this.deliveryCodeKey(), 'DELIVERY_CODE_ENCRYPTION_KEY'),
+          createdBy: operatorUserId,
+        },
+      });
+      return code;
+    } catch (err) {
+      // a concurrent call for the same order won the insert: answer its code
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        return this.presetDeliveryCode(orderId, operatorUserId);
+      }
+      throw err;
+    }
   }
 
   private deliveryCodeKey(): string {
@@ -1003,6 +1053,7 @@ export class DeliveriesService {
     // payment now that the courier has collected it (docs/25 §28).
     this.events.emit('delivery.delivered', { orderId: outcome.orderId, courierId });
     this.logger.log(`delivery ${outcome.deliveryId} delivered by courier ${courierId}`);
+    await this.emitDropoffFix(outcome.orderId, courierId);
     return this.getByIdOrThrow(outcome.deliveryId);
   }
 
@@ -1425,6 +1476,36 @@ export class DeliveriesService {
         };
       }),
     );
+  }
+
+  /**
+   * FEAT-018 (SPEC-018-02) — the courier's fresh GPS fix when the customer
+   * confirmed the delivery (the code was given at the door): `orders`
+   * refines the address's delivery point with it. Best effort.
+   */
+  private async emitDropoffFix(orderId: string, courierId: string): Promise<void> {
+    try {
+      const fix = await this.couriers.getFix(courierId);
+      if (!fix || Date.now() - fix.at.getTime() > DROPOFF_FIX_MAX_AGE_MS) return;
+      this.events.emit('delivery.dropoff_fix', {
+        orderId,
+        lat: fix.lat,
+        lng: fix.lng,
+        accuracyM: fix.accuracyM,
+      });
+    } catch (err) {
+      this.logger.warn(`dropoff fix for ${orderId} not recorded: ${String(err)}`);
+    }
+  }
+
+  /** FEAT-018 — the address's voice note, for the courier delivering this order only. */
+  async getVoiceNoteForCourier(deliveryId: string, courierId: string) {
+    const d = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
+    const active = ['courier_accepted', 'pickup_in_progress', 'picked_up', 'on_the_way'];
+    if (!d || d.courierId !== courierId || !active.includes(d.status)) {
+      throw new NotFoundException({ code: 'DELIVERY_NOT_FOUND', message: 'Delivery not found.' });
+    }
+    return this.orderAmount.getDropoffVoiceNote(d.orderId);
   }
 
   async listActiveForCourier(courierId: string): Promise<DeliveryDto[]> {

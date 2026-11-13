@@ -1,7 +1,15 @@
 import { Module } from '@nestjs/common';
 import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
+import { AddressesModule } from '../addresses/addresses.module';
+import { CartsModule } from '../carts/carts.module';
+import { OrdersModule } from '../orders/orders.module';
+import { PaymentsModule } from '../payments/payments.module';
 import { AdminController } from './admin.controller';
+import { PhoneOrdersController } from './phone-orders.controller';
+import { PhoneOrdersService } from './phone-orders.service';
+import { OfflineOrdersService } from './offline-orders.service';
+import { CatalogModule } from '../catalog/catalog.module';
 import { UsersAdminController } from './users-admin.controller';
 
 /**
@@ -15,7 +23,16 @@ import { UsersAdminController } from './users-admin.controller';
  * and `settlements.controller.ts` already established before this bloc.
  */
 @Module({
-  imports: [UsersModule, AuthModule],
-  controllers: [AdminController, UsersAdminController],
+  imports: [
+    UsersModule,
+    AuthModule,
+    AddressesModule,
+    CartsModule,
+    CatalogModule,
+    OrdersModule,
+    PaymentsModule,
+  ],
+  controllers: [AdminController, UsersAdminController, PhoneOrdersController],
+  providers: [PhoneOrdersService, OfflineOrdersService],
 })
 export class AdminModule {}

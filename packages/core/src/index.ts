@@ -9,9 +9,13 @@ export * from './idempotency/canonical-json.js';
 export * from './idempotency/reconcile.js';
 
 export * from './order/state-machine.js';
+export * from './order/offline-message.js';
 export * from './payment/state-machine.js';
 export * from './delivery/state-machine.js';
+export * from './delivery/earnings-period.js';
+export * from './trust/cod-trust.js';
 export * from './geo/distance.js';
+export * from './geo/learned-point.js';
 
 export * from './mfa/totp.js';
 
@@ -22,3 +26,5 @@ export * from './catalog/restaurant-availability.js';
 export * from './catalog/product-option-validator.js';
 
 export * from './cart/cart-pricing.js';
+
+export * from './phone/normalize-phone.js';

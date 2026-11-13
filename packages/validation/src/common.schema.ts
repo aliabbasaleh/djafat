@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizePhone, type PhoneMarket } from '@djafat/core';
 
 /** E.164 phone number (the identity primitive — docs/01). */
 export const PhoneSchema = z
@@ -48,3 +49,21 @@ export const AddressInputSchema = z
     path: ['lng'],
   });
 export type AddressInput = z.infer<typeof AddressInputSchema>;
+
+/**
+ * Phone INPUT as people type it (FEAT-005): spaces, dashes, 00 prefix, Arabic
+ * digits, national format of the given market. Output is always E.164, so
+ * services, rate limits and accounts see one canonical number.
+ */
+export function makePhoneInputSchema(market: PhoneMarket) {
+  const national = market.nationalNumberLength;
+  return z.string().transform((raw, ctx) => {
+    const result = normalizePhone(raw, market);
+    if (result.ok) return result.e164;
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `numéro invalide : ${national} chiffres (ex. 66 12 34 56) ou format international (${market.dialCode}…)`,
+    });
+    return z.NEVER;
+  });
+}

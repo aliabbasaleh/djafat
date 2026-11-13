@@ -4,6 +4,7 @@ const nextConfig = {
   poweredByHeader: false,
   // Shared workspace packages ship TS/CJS — let Next transpile them.
   transpilePackages: [
+    '@djafat/core',
     '@djafat/sdk',
     '@djafat/tokens',
     '@djafat/i18n',

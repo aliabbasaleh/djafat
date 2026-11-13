@@ -153,3 +153,31 @@ describe('getDeliveryCodeFor — lifecycle of the code itself', () => {
     expect(delivery.status).toBe('delivered');
   });
 });
+
+describe('FEAT-012 / SPEC-012-02 — a code chosen when the order is taken on the phone', () => {
+  it('SPEC-012-02-SC01 — the code given during the call is the one issued at pickup and accepted at the door', async () => {
+    const { db, deliveries, offers, couriers, proofs, ledgerGroups } = makeDeliveriesRaceDb();
+    const { delivery } = seedAssignedOffer(deliveries, offers, couriers, COURIER);
+    const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
+
+    const given = await service.presetDeliveryCode(delivery.orderId, 'operator-1');
+    expect(given).toMatch(/^\d{4}$/);
+    // asked again (retry, second screen): the same code, never a new one
+    expect(await service.presetDeliveryCode(delivery.orderId, 'operator-1')).toBe(given);
+
+    const issued = await service.issueDeliveryCode(delivery.id, COURIER);
+    expect(issued).toBe(given);
+    const stored = proofs.find((p) => p.deliveryId === delivery.id)!;
+    expect(stored.valueHash).not.toContain(given); // still hashed, never raw at rest
+    const read = await service.getDeliveryCodeFor(actor(CUSTOMER_ID), delivery.id);
+    expect(read.code).toBe(given);
+  });
+
+  it('SPEC-012-02-SC02 — without a preset, pickup still draws a fresh random code', async () => {
+    const { db, deliveries, offers, couriers, ledgerGroups } = makeDeliveriesRaceDb();
+    const { delivery } = seedAssignedOffer(deliveries, offers, couriers, COURIER);
+    const { deliveries: service } = buildDeliveriesServices(db, ledgerGroups);
+    const issued = await service.issueDeliveryCode(delivery.id, COURIER);
+    expect(issued).toMatch(/^\d{4}$/);
+  });
+});

@@ -109,6 +109,19 @@ export class AllExceptionsFilter implements ExceptionFilter {
         : this.httpStatusToCode(status);
       return { status, code, message };
     }
+    // Framework client errors (Fastify FST_ERR_*: empty JSON body, malformed
+    // JSON, payload too large…) carry their own 4xx `statusCode`. They are the
+    // caller's mistake: answer that 4xx, never an opaque 500 (found by the
+    // full customer-journey run). Anything else stays INTERNAL, without detail.
+    const frameworkStatus = (exception as { statusCode?: unknown } | null)?.statusCode;
+    if (
+      exception instanceof Error &&
+      typeof frameworkStatus === 'number' &&
+      frameworkStatus >= 400 &&
+      frameworkStatus < 500
+    ) {
+      return { status: frameworkStatus, code: 'VALIDATION_ERROR', message: exception.message };
+    }
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
       code: 'INTERNAL',

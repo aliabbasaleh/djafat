@@ -14,11 +14,18 @@ import type {
   MoneyJson,
   OrderAccrualBreakdown,
   OrderAmountPort,
+  CustomerTrustFacts,
   OrderDeliveryContext,
   OrderPaymentContext,
   Role,
 } from '@djafat/types';
-import { addMoney, assertOrderTransition, money } from '@djafat/core';
+import {
+  addMoney,
+  assertOrderTransition,
+  describeDropoff,
+  money,
+  type LandmarkRelation,
+} from '@djafat/core';
 import { CatalogService } from '../catalog/catalog.service';
 import { PricingService } from '../pricing/pricing.service';
 import { PlatformService } from '../platform/platform.service';
@@ -85,22 +92,35 @@ interface DropoffSnapshot {
   geocode_status: string;
   lat: number | null;
   lng: number | null;
+  /** FEAT-018 */
+  door_hint?: string | null;
 }
 
 /** Maps a customer's selected `AddressDto` (camelCase, city joined by name) onto the `DropoffSnapshot` shape. */
 function toDropoffSnapshot(address: AddressDto): DropoffSnapshot {
+  // FEAT-018: the courier is sent to the point learned from past deliveries
+  // when there is one, and reads the landmark the customer chose.
+  const learned = address.learnedPoint ?? null;
+  const landmarkText = address.landmarkName
+    ? describeDropoff({
+        relation: address.landmarkRelation ?? null,
+        landmarkName: address.landmarkName,
+        doorHint: null,
+      })
+    : null;
   return {
     id: address.id,
     label: address.label,
     city: address.cityName,
     quartier: address.quartier,
     street: address.street,
-    landmark: address.landmark,
+    landmark: [landmarkText, address.landmark].filter((x): x is string => !!x).join(' · ') || null,
     instructions: address.instructions,
     recipient_phone: address.recipientPhone,
-    geocode_status: address.geocodeStatus,
-    lat: address.lat,
-    lng: address.lng,
+    geocode_status: learned ? 'ok' : address.geocodeStatus,
+    lat: learned ? learned.lat : address.lat,
+    lng: learned ? learned.lng : address.lng,
+    door_hint: address.doorHint ?? null,
   };
 }
 
@@ -307,6 +327,7 @@ export class OrdersService implements OrderAmountPort {
           dropoffInstructions: dropoff.instructions,
           dropoffRecipientPhone: dropoff.recipient_phone,
           dropoffGeocodeStatus: dropoff.geocode_status,
+          dropoffDoorHint: dropoff.door_hint ?? null,
         },
       });
       // `dropoff_geom` is PostGIS — not writable through the Prisma client
@@ -401,13 +422,36 @@ export class OrdersService implements OrderAmountPort {
     const defaultAddress = await tx.$queryRaw<DropoffSnapshot[]>`
       SELECT a.id, a.quartier, a.street, a.landmark, a.instructions, a.recipient_phone,
              a.geocode_status, a.label, c.name AS city,
-             ST_Y(a.geom::geometry) AS lat, ST_X(a.geom::geometry) AS lng
+             -- FEAT-018: the point learned from past deliveries wins
+             ST_Y(COALESCE(a.verified_geom, a.geom)::geometry) AS lat,
+             ST_X(COALESCE(a.verified_geom, a.geom)::geometry) AS lng,
+             a.door_hint, a.landmark_relation, l.name AS landmark_name
       FROM addresses a
       LEFT JOIN cities c ON c.id = a.city_id
+      LEFT JOIN landmarks l ON l.id = a.landmark_id
       WHERE a.user_id = ${customerId}::uuid AND a.is_default = true
       LIMIT 1
     `;
-    const dropoff = defaultAddress[0];
+    const raw = defaultAddress[0] as
+      | (DropoffSnapshot & { landmark_name?: string | null; landmark_relation?: string | null })
+      | undefined;
+    const dropoff: DropoffSnapshot | undefined =
+      raw && raw.landmark_name
+        ? {
+            ...raw,
+            landmark:
+              [
+                describeDropoff({
+                  relation: (raw.landmark_relation ?? null) as LandmarkRelation | null,
+                  landmarkName: raw.landmark_name,
+                  doorHint: null,
+                }),
+                raw.landmark,
+              ]
+                .filter((x): x is string => !!x)
+                .join(' · ') || null,
+          }
+        : raw;
     if (!dropoff) {
       throw new ConflictException({
         code: 'VALIDATION_ERROR',
@@ -491,6 +535,39 @@ export class OrdersService implements OrderAmountPort {
    * the customer), dropoff from THIS order's frozen snapshot (never the
    * customer's live, possibly-since-edited address book).
    */
+  /**
+   * FEAT-015 — the facts a cash-on-delivery decision rests on, from this
+   * module's own tables: delivered orders, deliveries that failed at the door
+   * (history reason `delivery.failed`), cancellations once a courier was on
+   * the order, account age and phone verification.
+   */
+  async getCustomerTrustSignals(customerId: string): Promise<CustomerTrustFacts> {
+    const [user, delivered, failures] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: customerId },
+        select: { createdAt: true, phoneVerifiedAt: true },
+      }),
+      this.prisma.order.count({ where: { customerId, status: 'delivered' } }),
+      this.prisma.$queryRaw<Array<{ no_shows: bigint; late_cancels: bigint }>>`
+        SELECT
+          COUNT(*) FILTER (WHERE h.reason = 'delivery.failed')::bigint AS no_shows,
+          COUNT(*) FILTER (WHERE h.reason IS DISTINCT FROM 'delivery.failed'
+                             AND h.from_status IN ('courier_assigned', 'picked_up', 'on_the_way'))::bigint AS late_cancels
+        FROM order_status_history h
+        JOIN orders o ON o.id = h.order_id
+        WHERE o.customer_id = ${customerId}::uuid AND h.to_status = 'cancelled'
+      `,
+    ]);
+    const ageMs = user ? Date.now() - user.createdAt.getTime() : 0;
+    return {
+      phoneVerified: user?.phoneVerifiedAt != null,
+      deliveredOrders: delivered,
+      noShows: Number(failures[0]?.no_shows ?? 0n),
+      cancelAfterDispatch: Number(failures[0]?.late_cancels ?? 0n),
+      accountAgeDays: Math.floor(ageMs / 86_400_000),
+    };
+  }
+
   async getDeliveryContext(orderId: string): Promise<OrderDeliveryContext> {
     const rows = await this.prisma.$queryRaw<
       Array<{
@@ -512,6 +589,8 @@ export class OrdersService implements OrderAmountPort {
         dropoff_street: string | null;
         dropoff_landmark: string | null;
         dropoff_recipient_phone: string | null;
+        dropoff_door_hint?: string | null;
+        dropoff_has_voice_note?: boolean | null;
       }>
     >`
       SELECT o.id, o.code, o.restaurant_id, o.customer_id, o.currency, o.courier_fee_minor,
@@ -519,7 +598,9 @@ export class OrdersService implements OrderAmountPort {
              ST_Y(o.dropoff_geom::geometry) AS dropoff_lat, ST_X(o.dropoff_geom::geometry) AS dropoff_lng,
              r.name AS restaurant_name, r.address_text AS restaurant_address, r.phone AS restaurant_phone,
              o.dropoff_label, o.dropoff_quartier, o.dropoff_street, o.dropoff_landmark,
-             o.dropoff_recipient_phone
+             o.dropoff_recipient_phone, o.dropoff_door_hint,
+             EXISTS (SELECT 1 FROM address_voice_notes v WHERE v.address_id = o.dropoff_address_id)
+               AS dropoff_has_voice_note
       FROM orders o
       JOIN restaurants r ON r.id = o.restaurant_id
       WHERE o.id = ${orderId}::uuid
@@ -529,14 +610,23 @@ export class OrdersService implements OrderAmountPort {
       throw new NotFoundException({ code: 'NOT_FOUND', message: `Order ${orderId} not found.` });
     }
 
-    // Prepaid orders always pass through `awaiting_payment` before `placed`
-    // (only `payment.succeeded` lifts that gate — `markPlacedFromPayment`
-    // above); cash orders go straight to `placed` at creation (docs/08 §8.4).
-    // This history row is the one signal `orders` can answer without
-    // reaching into `payments`' tables (DAG).
+    // Prepaid orders leave `awaiting_payment` through `payment.succeeded`
+    // (`markPlacedFromPayment`); orders paid on delivery leave it through
+    // `payment.on_delivery` (`markPlacedForDelivery`, FEAT-009). The history
+    // reason tells them apart without reaching into `payments`' tables (DAG).
+    // FEAT-009: an order placed for payment ON DELIVERY also leaves
+    // awaiting_payment, but nothing was pooled — only a succeeded payment counts.
     const prepaidHistory = await this.prisma.orderStatusHistory.findFirst({
-      where: { orderId, fromStatus: 'awaiting_payment' },
+      where: {
+        orderId,
+        fromStatus: 'awaiting_payment',
+        reason: { startsWith: 'payment.succeeded:' },
+      },
       select: { id: true },
+    });
+    // FEAT-015: a customer with no delivered order yet — the courier calls first.
+    const priorDelivered = await this.prisma.order.count({
+      where: { customerId: row.customer_id, status: 'delivered', id: { not: row.id } },
     });
 
     return {
@@ -547,6 +637,7 @@ export class OrdersService implements OrderAmountPort {
       currency: row.currency,
       courierFee: money(row.courier_fee_minor, row.currency),
       courierFeeInPool: prepaidHistory !== null,
+      customerIsNew: priorDelivered === 0,
       pickup:
         row.pickup_lat !== null && row.pickup_lng !== null
           ? { lat: row.pickup_lat, lng: row.pickup_lng }
@@ -565,7 +656,46 @@ export class OrdersService implements OrderAmountPort {
         row.dropoff_landmark,
       ]),
       dropoffPhone: row.dropoff_recipient_phone,
+      dropoffDoorHint: row.dropoff_door_hint ?? null,
+      dropoffHasVoiceNote: row.dropoff_has_voice_note === true,
     };
+  }
+
+  /** FEAT-018 — `OrderAmountPort.getDropoffVoiceNote`. */
+  async getDropoffVoiceNote(
+    orderId: string,
+  ): Promise<{ mime: string; dataBase64: string; durationMs: number } | null> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { dropoffAddressId: true },
+    });
+    if (!order?.dropoffAddressId) return null;
+    const note = await this.addresses.getVoiceNote(order.dropoffAddressId);
+    return note
+      ? { mime: note.mime, durationMs: note.durationMs, dataBase64: note.data.toString('base64') }
+      : null;
+  }
+
+  /**
+   * FEAT-018 (SPEC-018-02) — where the courier stood when the delivery was
+   * confirmed refines the address's delivery point for the next orders.
+   */
+  @OnEvent('delivery.dropoff_fix')
+  async onDropoffFix(payload: {
+    orderId: string;
+    lat: number;
+    lng: number;
+    accuracyM: number | null;
+  }): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: payload.orderId },
+      select: { dropoffAddressId: true },
+    });
+    if (!order?.dropoffAddressId) return;
+    const outcome = await this.addresses.learnDeliveryPoint(order.dropoffAddressId, payload);
+    this.logger.log(
+      `order ${payload.orderId}: delivery point ${outcome.accepted ? `learned (${outcome.point.count})` : `ignored (${outcome.reason})`}`,
+    );
   }
 
   // ── reads ───────────────────────────────────────────────────────────────
@@ -1007,11 +1137,14 @@ export class OrdersService implements OrderAmountPort {
    */
   @OnEvent('payment.succeeded')
   async markPlacedFromPayment(payload: { orderId: string; paymentId: string }): Promise<void> {
-    const affected = await this.prisma.$executeRaw`
+    // RETURNING restaurant_id: the kitchen's board is told through its own
+    // realtime room (`restaurant:orders:{id}`), keyed on this id.
+    const placed = await this.prisma.$queryRaw<Array<{ restaurant_id: string }>>`
       UPDATE orders SET status = 'placed'::order_status, placed_at = now()
       WHERE id = ${payload.orderId}::uuid AND status = 'awaiting_payment'::order_status
+      RETURNING restaurant_id
     `;
-    if (affected === 0) {
+    if (placed.length === 0) {
       this.logger.debug(
         `markPlacedFromPayment: order ${payload.orderId} already left awaiting_payment (idempotent no-op)`,
       );
@@ -1030,10 +1163,49 @@ export class OrdersService implements OrderAmountPort {
         aggregate: 'order',
         aggregateId: payload.orderId,
         eventType: 'order.placed',
-        payload: { orderId: payload.orderId },
+        payload: { orderId: payload.orderId, restaurantId: placed[0]!.restaurant_id },
       },
     });
     this.logger.log(`order ${payload.orderId} placed (payment ${payload.paymentId} succeeded)`);
+  }
+
+  /**
+   * FEAT-009 (SPEC-009-01): the payment will be collected at delivery (cash),
+   * so the order goes to the restaurant now. Same conditional UPDATE as
+   * `markPlacedFromPayment`: idempotent, and a no-op if the expiry job won.
+   */
+  @OnEvent('payment.on_delivery')
+  async markPlacedForDelivery(payload: { orderId: string; paymentId: string }): Promise<void> {
+    // RETURNING restaurant_id: the kitchen's board is told through its own
+    // realtime room (`restaurant:orders:{id}`), keyed on this id.
+    const placed = await this.prisma.$queryRaw<Array<{ restaurant_id: string }>>`
+      UPDATE orders SET status = 'placed'::order_status, placed_at = now()
+      WHERE id = ${payload.orderId}::uuid AND status = 'awaiting_payment'::order_status
+      RETURNING restaurant_id
+    `;
+    if (placed.length === 0) {
+      this.logger.debug(
+        `markPlacedForDelivery: order ${payload.orderId} already left awaiting_payment (idempotent no-op)`,
+      );
+      return;
+    }
+    await this.prisma.orderStatusHistory.create({
+      data: {
+        orderId: payload.orderId,
+        fromStatus: 'awaiting_payment',
+        toStatus: 'placed',
+        reason: `payment.on_delivery:${payload.paymentId}`,
+      },
+    });
+    await this.prisma.outbox.create({
+      data: {
+        aggregate: 'order',
+        aggregateId: payload.orderId,
+        eventType: 'order.placed',
+        payload: { orderId: payload.orderId, restaurantId: placed[0]!.restaurant_id },
+      },
+    });
+    this.logger.log(`order ${payload.orderId} placed (payment ${payload.paymentId} on delivery)`);
   }
 
   /**

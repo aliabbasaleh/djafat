@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, type Address, type Cart, type CartQuote } from '@djafat/sdk';
@@ -9,6 +9,19 @@ import { Button, Radio, Alert } from '@/components/ui-client';
 import { api } from '@/lib/api';
 import { isAuthenticated, clearSession } from '@/lib/auth-storage';
 import { formatMoney } from '@/lib/format';
+import {
+  RETRY_DELAYS_S,
+  isTransient,
+  newOrderKey,
+  offlineLinks,
+  offlineOrderText,
+} from '@/lib/offline-order';
+
+/** DJAFAT's number for orders sent by WhatsApp / SMS (FEAT-017); no panel without it. */
+const ORDER_NUMBER = process.env['NEXT_PUBLIC_DJAFAT_ORDER_NUMBER'] ?? '';
+/** Number to call (may differ from the WhatsApp/SMS one). */
+const CALL_NUMBER = process.env['NEXT_PUBLIC_DJAFAT_CALL_NUMBER'] || ORDER_NUMBER;
+const sleep = (s: number) => new Promise((r) => setTimeout(r, s * 1000));
 import styles from './page.module.css';
 
 type LoadState = 'loading' | 'ready' | 'error';
@@ -32,6 +45,12 @@ export default function PanierPage() {
   const [orderError, setOrderError] = useState<string | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  // FEAT-017: one key per order attempt, kept across retries and shared with
+  // the WhatsApp/SMS message, so the order is created once whatever gets through.
+  const orderKey = useRef<string | null>(null);
+  const [retryIn, setRetryIn] = useState<number | null>(null);
+  const [offline, setOffline] = useState(false);
+  const [offlinePayment, setOfflinePayment] = useState<'cash' | 'airtel'>('cash');
 
   const load = useCallback(async () => {
     if (!isAuthenticated()) {
@@ -120,17 +139,35 @@ export default function PanierPage() {
 
   async function placeOrder() {
     setOrderError(null);
+    setOffline(false);
     setOrdering(true);
+    orderKey.current ??= newOrderKey();
+    const key = orderKey.current;
     try {
-      const idempotencyKey = crypto.randomUUID();
-      const { order } = await api.orders.create(idempotencyKey, selectedAddressId ?? undefined);
-      window.dispatchEvent(new Event('djafat:cart-changed'));
-      router.push(`/commandes/${order.id}` as Route);
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          const { order } = await api.orders.create(key, selectedAddressId ?? undefined);
+          orderKey.current = null;
+          window.dispatchEvent(new Event('djafat:cart-changed'));
+          router.push(`/commandes/${order.id}` as Route);
+          return;
+        } catch (err) {
+          const wait = RETRY_DELAYS_S[attempt];
+          if (!isTransient(err) || wait === undefined) throw err;
+          setRetryIn(wait);
+          await sleep(wait);
+          setRetryIn(null);
+        }
+      }
     } catch (err) {
-      if (err instanceof ApiClientError && err.code === 'NOT_FOUND') {
+      if (isTransient(err)) {
+        setOffline(true); // same key: "Commander" again, or send it by message
+      } else if (err instanceof ApiClientError && err.code === 'NOT_FOUND') {
+        orderKey.current = null;
         setOrderError('Cette adresse n’existe plus — choisissez-en une autre.');
         setAddresses(await api.addresses.list().catch(() => addresses));
       } else {
+        orderKey.current = null;
         setOrderError(
           err instanceof ApiClientError && err.code === 'CART_EMPTY'
             ? 'Votre panier est vide.'
@@ -138,6 +175,7 @@ export default function PanierPage() {
         );
       }
     } finally {
+      setRetryIn(null);
       setOrdering(false);
     }
   }
@@ -299,15 +337,82 @@ export default function PanierPage() {
 
         {orderError && <ErrorState title="Commande impossible" message={orderError} />}
 
+        {retryIn !== null && (
+          <Alert tone="info">Connexion instable — nouvel essai dans {retryIn} s…</Alert>
+        )}
+
+        {offline && (
+          <OfflinePanel
+            text={
+              orderKey.current && selectedAddressId
+                ? offlineOrderText(cart, selectedAddressId, offlinePayment, orderKey.current)
+                : null
+            }
+            payment={offlinePayment}
+            onPayment={setOfflinePayment}
+          />
+        )}
+
         <Button
           fullWidth
           loading={ordering}
           disabled={!quote || !selectedAddressId}
           onClick={() => void placeOrder()}
         >
-          Commander
+          {offline ? 'Réessayer l’envoi par Internet' : 'Commander'}
         </Button>
       </Stack>
     </Container>
+  );
+}
+
+/** FEAT-017 — the order by WhatsApp or SMS, or a call, when the data connection is down. */
+function OfflinePanel({
+  text,
+  payment,
+  onPayment,
+}: {
+  text: string | null;
+  payment: 'cash' | 'airtel';
+  onPayment: (p: 'cash' | 'airtel') => void;
+}) {
+  const links = text && ORDER_NUMBER ? offlineLinks(ORDER_NUMBER, text, CALL_NUMBER) : null;
+  return (
+    <section className={cx(styles['offlinePanel'])} aria-label="Commander par message">
+      <Text weight="bold">Pas de connexion Internet ?</Text>
+      <Text size="small" tone="secondary">
+        Envoyez la même commande par message : vous recevez la réponse avec le numéro de commande et
+        le code à donner au livreur. Elle ne sera jamais passée deux fois.
+      </Text>
+      <Stack gap="xs">
+        <Radio
+          name="offline-payment"
+          label="Espèces à la livraison"
+          checked={payment === 'cash'}
+          onChange={() => onPayment('cash')}
+        />
+        <Radio
+          name="offline-payment"
+          label="Airtel Money"
+          checked={payment === 'airtel'}
+          onChange={() => onPayment('airtel')}
+        />
+      </Stack>
+      {links ? (
+        <div className={cx(styles['offlineActions'])}>
+          <Button href={links.whatsapp} fullWidth>
+            Envoyer par WhatsApp
+          </Button>
+          <Button href={links.sms} variant="secondary" fullWidth>
+            Envoyer par SMS
+          </Button>
+          <Button href={links.call} variant="ghost" fullWidth>
+            Appeler DJAFAT
+          </Button>
+        </div>
+      ) : (
+        <Alert tone="warning">Réessayez dans un instant.</Alert>
+      )}
+    </section>
   );
 }

@@ -5,11 +5,12 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import type { Prisma } from '@prisma/client';
-import type { MoneyJson, OrderAmountPort, RawWebhookRequest } from '@djafat/types';
+import type { MoneyJson, OrderAmountPort, PaymentAction, RawWebhookRequest } from '@djafat/types';
 import { assertPositive, money } from '@djafat/core';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { OutboxService } from '../../infra/outbox/outbox.service';
@@ -17,6 +18,7 @@ import { IdempotencyService } from '../../common/idempotency/idempotency.service
 import { toMoneyJson } from '../../common/money/money.mapper';
 import { ORDER_AMOUNT_PORT } from '../../common/ports/order-amount.port';
 import { LedgerService } from '../ledger/ledger.service';
+import { CodTrustService } from './cod-trust.service';
 import { PaymentProviderRegistry } from './payment-provider.registry';
 import { buildOrderAccrualEntries, MOCK_PSP_FEE_BPS } from './accrual-entries';
 import { buildRefundEntries } from './refund-entries';
@@ -33,6 +35,12 @@ export interface PaymentDto {
   pspFee: MoneyJson;
   providerRef: string | null;
   attemptNo: number;
+  /**
+   * What the customer must do next, as returned by the provider at creation
+   * (USSD push, redirect, or instructions such as « Envoyez 3 000 FCFA au … »).
+   * Present on the creation response only (FEAT-009, SPEC-009-02).
+   */
+  action?: PaymentAction | null;
 }
 
 export interface RefundDto {
@@ -55,6 +63,8 @@ export class PaymentsService {
     private readonly ledger: LedgerService,
     private readonly events: EventEmitter2,
     @Inject(ORDER_AMOUNT_PORT) private readonly orderAmount: OrderAmountPort,
+    // FEAT-015: absent only in unit harnesses built before it existed.
+    @Optional() private readonly codTrust?: CodTrustService,
   ) {}
 
   // ── creation ────────────────────────────────────────────────────────────
@@ -90,6 +100,14 @@ export class PaymentsService {
       });
     }
 
+    // FEAT-015: cash on delivery only for customers trusted for this amount.
+    if (
+      this.codTrust &&
+      this.registry.get(input.providerCode).getCapabilities().collectedOnDelivery
+    ) {
+      await this.codTrust.assertAllowed(input.orderId, amount);
+    }
+
     const payment = await this.prisma.$transaction(async (tx) => {
       const created = await tx.payment.create({
         data: {
@@ -100,8 +118,15 @@ export class PaymentsService {
           amountMinor: amount.minor,
           currency: amount.currency,
           idempotencyKey,
-          ...(input.metadata !== undefined
-            ? { metadata: input.metadata as Prisma.InputJsonValue }
+          // FEAT-009: the payer phone is kept so a transfer from that phone can
+          // be matched without a transaction number (SPEC-009-04 R3).
+          ...(input.metadata !== undefined || input.payerPhone !== undefined
+            ? {
+                metadata: {
+                  ...(input.metadata ?? {}),
+                  ...(input.payerPhone !== undefined ? { payerPhone: input.payerPhone } : {}),
+                } as Prisma.InputJsonValue,
+              }
             : {}),
         },
       });
@@ -150,8 +175,15 @@ export class PaymentsService {
       await this.markFailed(payment.id, 'provider rejected at initiate');
     }
 
+    // FEAT-009 (SPEC-009-01): money collected at delivery must not gate the
+    // order — otherwise it never leaves awaiting_payment and expires. `orders`
+    // reacts to this event (DAG: it never imports `payments`).
+    if (result.status === 'pending' && provider.getCapabilities().collectedOnDelivery === true) {
+      this.events.emit('payment.on_delivery', { orderId: payment.orderId, paymentId: payment.id });
+    }
+
     const final = await this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
-    return this.toDto(final);
+    return { ...this.toDto(final), action: result.action ?? null };
   }
 
   // ── webhook ─────────────────────────────────────────────────────────────
@@ -266,74 +298,87 @@ export class PaymentsService {
    * to `COURIER_FEE_POOL` and reclassified once `deliveries` assigns one.
    */
   async markSucceeded(paymentId: string, resolvedCourierId?: string): Promise<void> {
-    const outcome = await this.prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<
-        Array<{
-          id: string;
-          order_id: string;
-          amount_minor: bigint;
-          currency: string;
-          provider_code: string;
-        }>
-      >`
-        UPDATE payments SET status = 'succeeded'::payment_status
-        WHERE id = ${paymentId}::uuid
-          AND status = ANY(ARRAY['pending', 'authorized']::payment_status[])
-        RETURNING id, order_id, amount_minor, currency, provider_code
-      `;
-      // 'authorized' matters once a capture-capable provider is activated
-      // (docs/08 §8.3: AUTHORIZED --capture()--> SUCCESS) — without it here, a
-      // final-success webhook for such a payment would silently no-op instead
-      // of completing it. No current provider sets capabilities.capture, so
-      // this path is latent today, not exercised by mock/cash.
-      if (!rows[0]) return null; // already succeeded/failed elsewhere — idempotent no-op
+    const outcome = await this.prisma.$transaction((tx) =>
+      this.succeedInTx(tx, paymentId, resolvedCourierId),
+    );
+    if (outcome) this.emitSucceeded(outcome);
+  }
 
-      const payment = rows[0];
-      const breakdown = await this.orderAmount.getAccrualBreakdown(payment.order_id);
-      const feeBps = await this.resolveProviderFeeBps(
-        payment.provider_code,
-        breakdown.restaurantId,
-      );
+  /**
+   * The body of `markSucceeded`, inside a caller's transaction (FEAT-009): a
+   * transfer-receipt match claims the receipt AND succeeds the payment in ONE
+   * PostgreSQL transaction. Returns null when the payment was not
+   * pending/authorized (idempotent no-op). The caller must call
+   * `emitSucceeded` after commit.
+   */
+  async succeedInTx(
+    tx: Prisma.TransactionClient,
+    paymentId: string,
+    resolvedCourierId?: string,
+  ): Promise<{ paymentId: string; orderId: string } | null> {
+    const rows = await tx.$queryRaw<
+      Array<{
+        id: string;
+        order_id: string;
+        amount_minor: bigint;
+        currency: string;
+        provider_code: string;
+      }>
+    >`
+      UPDATE payments SET status = 'succeeded'::payment_status
+      WHERE id = ${paymentId}::uuid
+        AND status = ANY(ARRAY['pending', 'authorized']::payment_status[])
+      RETURNING id, order_id, amount_minor, currency, provider_code
+    `;
+    // 'authorized' matters once a capture-capable provider is activated
+    // (docs/08 §8.3: AUTHORIZED --capture()--> SUCCESS) — without it here, a
+    // final-success webhook for such a payment would silently no-op instead
+    // of completing it. No current provider sets capabilities.capture, so
+    // this path is latent today, not exercised by mock/cash.
+    if (!rows[0]) return null; // already succeeded/failed elsewhere — idempotent no-op
 
-      // Pure, unit-tested elsewhere (accrual-entries.spec.ts) — see docs/18 §13.
-      const { entries, pspFee } = buildOrderAccrualEntries(
-        {
-          amountMinor: payment.amount_minor,
-          currency: payment.currency,
-          providerCode: payment.provider_code,
-          feeBps,
-          courierId: resolvedCourierId ?? null,
-        },
-        breakdown,
-      );
+    const payment = rows[0];
+    const breakdown = await this.orderAmount.getAccrualBreakdown(payment.order_id);
+    const feeBps = await this.resolveProviderFeeBps(payment.provider_code, breakdown.restaurantId);
 
-      await this.ledger.postEntryGroupTx(tx, {
-        kind: 'order_accrual',
-        idempotencyKey: `payment:${payment.id}`,
+    // Pure, unit-tested elsewhere (accrual-entries.spec.ts) — see docs/18 §13.
+    const { entries, pspFee } = buildOrderAccrualEntries(
+      {
+        amountMinor: payment.amount_minor,
         currency: payment.currency,
-        entries,
-        refs: { orderId: payment.order_id, paymentId: payment.id },
-        createdBy: 'payments',
-      });
+        providerCode: payment.provider_code,
+        feeBps,
+        courierId: resolvedCourierId ?? null,
+      },
+      breakdown,
+    );
 
-      await tx.payment.update({
-        where: { id: payment.id },
-        data: { pspFeeMinor: pspFee.minor },
-      });
-
-      await this.outbox.enqueue(tx, {
-        aggregate: 'payment',
-        aggregateId: payment.id,
-        eventType: 'payment.succeeded',
-        payload: { paymentId: payment.id, orderId: payment.order_id },
-      });
-
-      return { paymentId: payment.id, orderId: payment.order_id };
+    await this.ledger.postEntryGroupTx(tx, {
+      kind: 'order_accrual',
+      idempotencyKey: `payment:${payment.id}`,
+      currency: payment.currency,
+      entries,
+      refs: { orderId: payment.order_id, paymentId: payment.id },
+      createdBy: 'payments',
     });
 
-    if (!outcome) return;
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: { pspFeeMinor: pspFee.minor },
+    });
 
-    // Fast, same-process reaction — fired AFTER commit (docs/05 §5.4).
+    await this.outbox.enqueue(tx, {
+      aggregate: 'payment',
+      aggregateId: payment.id,
+      eventType: 'payment.succeeded',
+      payload: { paymentId: payment.id, orderId: payment.order_id },
+    });
+
+    return { paymentId: payment.id, orderId: payment.order_id };
+  }
+
+  /** Fast, same-process reaction — call AFTER commit (docs/05 §5.4). */
+  emitSucceeded(outcome: { paymentId: string; orderId: string }): void {
     this.events.emit('payment.succeeded', {
       paymentId: outcome.paymentId,
       orderId: outcome.orderId,
@@ -362,6 +407,14 @@ export class PaymentsService {
       where: { orderId: payload.orderId, providerCode: 'cash', status: 'pending' },
     });
     if (!payment) return;
+    // Airtel/Tigo paid at the door: the customer said they paid by transfer, so
+    // no cash was collected. It is settled when the transfer is recorded —
+    // never counted as cash held by the courier.
+    const meta = payment.metadata;
+    if (meta && typeof meta === 'object' && !Array.isArray(meta) && 'doorWallet' in meta) {
+      this.logger.log(`payment ${payment.id}: paid at the door by transfer, left for matching`);
+      return;
+    }
     await this.markSucceeded(payment.id, payload.courierId);
   }
 
@@ -814,6 +867,31 @@ export class PaymentsService {
       });
     }
     return result;
+  }
+
+  /**
+   * The payment methods of THIS order (screens): its city, restaurant, exact
+   * amount and currency, resolved server-side through `OrderAmountPort` — the
+   * browser never knows the city. Throws like `createPayment` if the order is
+   * no longer awaiting payment.
+   */
+  async listMethodsForOrder(orderId: string) {
+    const context = await this.orderAmount.getPaymentContext(orderId);
+    const amount = await this.orderAmount.getAuthoritativeAmount(orderId);
+    const methods = await this.listAvailablePaymentMethods({
+      cityId: context.cityId,
+      restaurantId: context.restaurantId,
+      amountMinor: amount.minor,
+      currency: amount.currency,
+    });
+    // FEAT-015: hide pay-on-delivery when this customer is not trusted for the amount.
+    if (!this.codTrust) return methods;
+    const cod = await this.codTrust.decide(orderId, amount);
+    return cod.allowed
+      ? methods
+      : methods.filter(
+          (m) => (m.capabilities as { collectedOnDelivery?: boolean }).collectedOnDelivery !== true,
+        );
   }
 
   // ── reads ───────────────────────────────────────────────────────────────

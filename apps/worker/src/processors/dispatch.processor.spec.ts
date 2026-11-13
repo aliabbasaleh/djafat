@@ -58,6 +58,8 @@ interface CourierRow {
   lat: number | null;
   lng: number | null;
   last_location_at: Date | null;
+  /** FEAT-010: set while the courier holds cash at or above the ceiling. */
+  cash_blocked_at?: Date | null;
 }
 interface OfferRow {
   id: string;
@@ -228,6 +230,8 @@ function makeClient(taken: Array<() => void>) {
           .filter(
             (c) =>
               c.status === 'online' && // suspended/busy/offline all excluded here
+              // honoured only if the REAL query carries the filter (FEAT-010)
+              (!text.includes('cash_blocked_at IS NULL') || c.cash_blocked_at == null) &&
               c.active_delivery_id === null &&
               c.lat !== null &&
               c.last_location_at !== null &&
@@ -393,6 +397,18 @@ describe('dispatchRetryProcessor — finding a courier (mandate §2)', () => {
     expect(result.newlyOffered).toBe(0);
     expect(delivery.courier_id).toBeNull();
     expect(couriers[0]!.status).toBe('suspended'); // still suspended
+  });
+
+  // SPEC-010-01-SC04
+  it('SPEC-010-01-SC04 — a courier blocked for holding too much cash is never a candidate (worker copy)', async () => {
+    const delivery = seedDelivery();
+    seedCourier('courier-cash-blocked', { cash_blocked_at: new Date(), lat: PICKUP.lat + 0.0001 });
+    seedCourier('courier-free', { lat: PICKUP.lat + 0.002 });
+
+    const result = await runProcessor();
+
+    expect(result.newlyOffered).toBe(1);
+    expect(delivery.courier_id).toBe('courier-free');
   });
 
   it('a courier who is already BUSY is never a candidate', async () => {

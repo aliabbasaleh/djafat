@@ -50,6 +50,28 @@ export interface OrderAmountPort {
    * Throws `NotFound` if the order doesn't exist.
    */
   getDeliveryContext(orderId: string): Promise<OrderDeliveryContext>;
+  /**
+   * FEAT-015: the facts a cash-on-delivery decision is made on, read from the
+   * customer's own order history. Never a score: `payments` scores them with
+   * the pure `scoreCustomerTrust` (`@djafat/core`).
+   */
+  getCustomerTrustSignals(customerId: string): Promise<CustomerTrustFacts>;
+  /**
+   * FEAT-018 — the voice note of the order's delivery address (≤ 10 s), or
+   * null. The caller (`deliveries`) has already checked who may hear it.
+   */
+  getDropoffVoiceNote(
+    orderId: string,
+  ): Promise<{ mime: string; dataBase64: string; durationMs: number } | null>;
+}
+
+/** FEAT-015 — order-history facts about a customer (no time-of-day: the caller knows "now"). */
+export interface CustomerTrustFacts {
+  readonly phoneVerified: boolean;
+  readonly deliveredOrders: number;
+  readonly noShows: number;
+  readonly cancelAfterDispatch: number;
+  readonly accountAgeDays: number;
 }
 
 export interface OrderPaymentContext {
@@ -109,6 +131,12 @@ export interface OrderDeliveryContext {
   /** `quartier, street, landmark` joined, skipping any that are null — never an empty string, `null` when every part is. */
   readonly dropoffAddress: string | null;
   readonly dropoffPhone: string | null;
+  /** FEAT-015: no delivered order yet — the courier calls before leaving the restaurant. */
+  readonly customerIsNew: boolean;
+  /** FEAT-018 — « Portail bleu », frozen at order time. */
+  readonly dropoffDoorHint?: string | null;
+  /** FEAT-018 — the customer left a voice note for the courier. */
+  readonly dropoffHasVoiceNote?: boolean;
 }
 
 /**

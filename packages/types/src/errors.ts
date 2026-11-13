@@ -11,6 +11,14 @@ export const API_ERROR_CODES = [
   'PAYMENT_ALREADY_COMPLETED',
   'PAYMENT_INVALID_STATE',
   'PAYMENT_PROVIDER_ERROR',
+  /** This transaction number is already recorded for this operator (409) — FEAT-009. */
+  'RECEIPT_ALREADY_RECORDED',
+  /** A courier remittance larger than the cash the courier holds (409) — FEAT-010. */
+  'REMITTANCE_EXCEEDS_CASH_HELD',
+  /** A withdrawal under the minimum, or a second one while one is open (409) — FEAT-014. */
+  'PAYOUT_NOT_ALLOWED',
+  /** Cash on delivery not allowed for this customer/amount: pay first by mobile money (409) — FEAT-015. */
+  'COD_LIMIT',
   'OFFER_TAKEN',
   'STEP_UP_REQUIRED',
   'IDEMPOTENCY_KEY_REUSED',
@@ -20,6 +28,16 @@ export const API_ERROR_CODES = [
   'RATE_LIMITED',
   'OTP_INVALID',
   'OTP_LOCKED',
+  /** The SMS gateway could not deliver the login code (503, retryable) — FEAT-006. */
+  'OTP_DELIVERY_FAILED',
+  /** Email login/verification is not configured on this deployment (503) — FEAT-007. */
+  'EMAIL_UNAVAILABLE',
+  /** SMS login is switched off on this deployment (503) — FEAT-008. */
+  'SMS_UNAVAILABLE',
+  /** WhatsApp login is not configured on this deployment (503) — FEAT-008. */
+  'WHATSAPP_UNAVAILABLE',
+  /** The email is already verified on another account (409) — FEAT-007. */
+  'EMAIL_ALREADY_USED',
   'MFA_INVALID',
   'MFA_REQUIRED',
   'ACCOUNT_INACTIVE',

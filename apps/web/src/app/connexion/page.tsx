@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Container, Heading, Text, Stack, cx } from '@djafat/ui';
@@ -9,12 +9,15 @@ import { api } from '@/lib/api';
 import { setSession } from '@/lib/auth-storage';
 import styles from './page.module.css';
 
-type Step = 'phone' | 'code';
+type Step = 'start' | 'code';
+type Method = 'whatsapp' | 'sms' | 'email';
 
 /**
- * Minimal OTP login (docs/22 §17.3) — the cart requires an authenticated
- * actor and Bloc 2/3 never built a login page. Two steps, no MFA/step-up
- * UI (that's an admin-only concern, docs/19 §22, not needed by a customer).
+ * Login (docs/22 §17.3, FEAT-007, FEAT-008): the customer picks how to get a
+ * 6-digit code — WhatsApp (free for DJAFAT: the customer writes "Code DJAFAT",
+ * DJAFAT replies), SMS, or e-mail (an address already verified on the
+ * account, e.g. a Gmail address). Only the methods the server reports as
+ * available (`GET /auth/methods`) are offered.
  */
 export default function ConnexionPage() {
   return (
@@ -29,20 +32,54 @@ function ConnexionForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') ?? '/';
 
-  const [step, setStep] = useState<Step>('phone');
+  const [available, setAvailable] = useState<Array<{ id: Method; link?: string }>>([]);
+  const [method, setMethod] = useState<Method>('sms');
+  const [step, setStep] = useState<Step>('start');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    api.auth
+      .methods()
+      .then((res) => {
+        const list = res.methods.filter((m) => m.available);
+        setAvailable(list.map((m) => ({ id: m.id, ...(m.link ? { link: m.link } : {}) })));
+        if (list[0]) setMethod(list[0].id);
+      })
+      .catch(() => setAvailable([{ id: 'sms' }]));
+  }, []);
+
+  const waLink = available.find((m) => m.id === 'whatsapp')?.link;
+
+  function choose(m: Method) {
+    setMethod(m);
+    setStep('start');
+    setError(null);
+    setCode('');
+  }
 
   async function requestCode() {
     setError(null);
     setLoading(true);
     try {
-      await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
+      if (method === 'whatsapp') {
+        // The customer writes to DJAFAT on WhatsApp; DJAFAT replies with the code.
+        if (waLink) window.open(waLink, '_blank', 'noopener');
+      } else if (method === 'email') {
+        await api.http.post('/auth/email/request', { body: { email } });
+      } else {
+        await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
+      }
       setStep('code');
     } catch {
-      setError("Impossible d'envoyer le code. Vérifiez le numéro (format +235XXXXXXXX).");
+      setError(
+        method === 'email'
+          ? "Impossible d'envoyer le code. Vérifiez l'adresse e-mail."
+          : "Impossible d'envoyer le code. Vérifiez le numéro (ex. 66 12 34 56).",
+      );
     } finally {
       setLoading(false);
     }
@@ -52,11 +89,19 @@ function ConnexionForm() {
     setError(null);
     setLoading(true);
     try {
-      const result = await api.http.post<{
+      type LoginResult = {
         access: string;
         refresh: string;
         user: { id: string; phone: string; fullName: string | null; roles: string[] };
-      }>('/auth/otp/verify', { body: { phone, code, purpose: 'login' } });
+      };
+      const result =
+        method === 'whatsapp'
+          ? await api.http.post<LoginResult>('/auth/whatsapp/verify', { body: { phone, code } })
+          : method === 'email'
+            ? await api.http.post<LoginResult>('/auth/email/verify', { body: { email, code } })
+            : await api.http.post<LoginResult>('/auth/otp/verify', {
+                body: { phone, code, purpose: 'login' },
+              });
       setSession({
         access: result.access,
         refresh: result.refresh,
@@ -75,21 +120,53 @@ function ConnexionForm() {
     }
   }
 
+  const LABELS: Record<Method, { icon: string; name: string }> = {
+    whatsapp: { icon: '🟢', name: 'WhatsApp' },
+    sms: { icon: '💬', name: 'SMS' },
+    email: { icon: '✉️', name: 'E-mail' },
+  };
+
+  const intro =
+    step === 'code'
+      ? method === 'email'
+        ? `Entrez le code envoyé à ${email}.`
+        : method === 'whatsapp'
+          ? 'Envoyez le message « Code DJAFAT » sur WhatsApp, puis entrez le code reçu en réponse.'
+          : `Entrez le code envoyé au ${phone}.`
+      : method === 'whatsapp'
+        ? 'Gratuit : vous écrivez à DJAFAT sur WhatsApp et recevez votre code en réponse.'
+        : method === 'email'
+          ? 'Pour les comptes qui ont déjà ajouté leur e-mail (Gmail, etc.).'
+          : 'Recevez un code de vérification par SMS.';
+
   return (
     <Container as="main" maxWidth={420} className={cx(styles['main'])}>
       <Stack gap="lg">
         <Stack gap="xs">
           <Heading level={1}>Connexion</Heading>
-          <Text tone="secondary">
-            {step === 'phone'
-              ? 'Recevez un code de vérification par SMS.'
-              : `Entrez le code envoyé au ${phone}.`}
-          </Text>
+          <Text tone="secondary">{intro}</Text>
         </Stack>
+
+        {available.length > 1 && (
+          <div className={cx(styles['methods'])} role="tablist" aria-label="Moyen de connexion">
+            {available.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                role="tab"
+                aria-selected={method === m.id}
+                className={cx(styles['method'], method === m.id && styles['methodActive'])}
+                onClick={() => choose(m.id)}
+              >
+                <span aria-hidden="true">{LABELS[m.id].icon}</span> {LABELS[m.id].name}
+              </button>
+            ))}
+          </div>
+        )}
 
         {error && <Alert tone="danger">{error}</Alert>}
 
-        {step === 'phone' ? (
+        {step === 'start' ? (
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -97,16 +174,27 @@ function ConnexionForm() {
             }}
           >
             <Stack gap="md">
-              <Input
-                label="Numéro de téléphone"
-                type="tel"
-                placeholder="+23566000000"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-              />
+              {method === 'email' ? (
+                <Input
+                  label="Adresse e-mail"
+                  type="email"
+                  placeholder="vous@gmail.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              ) : (
+                <Input
+                  label="Numéro de téléphone"
+                  type="tel"
+                  placeholder="66 12 34 56"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                />
+              )}
               <Button type="submit" loading={loading} fullWidth>
-                Envoyer le code
+                {method === 'whatsapp' ? 'Recevoir mon code sur WhatsApp' : 'Envoyer le code'}
               </Button>
             </Stack>
           </form>
@@ -130,8 +218,8 @@ function ConnexionForm() {
               <Button type="submit" loading={loading} fullWidth>
                 Vérifier
               </Button>
-              <Button type="button" variant="ghost" fullWidth onClick={() => setStep('phone')}>
-                Changer de numéro
+              <Button type="button" variant="ghost" fullWidth onClick={() => setStep('start')}>
+                Retour
               </Button>
             </Stack>
           </form>

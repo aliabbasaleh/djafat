@@ -38,6 +38,11 @@ export interface RequestOptions {
   readonly body?: unknown;
   readonly idempotencyKey?: string;
   readonly signal?: AbortSignal;
+  /**
+   * Bearer token for THIS request only, instead of `getAccessToken()` — e.g.
+   * revoking a session with the access token a refresh just returned (FEAT-004).
+   */
+  readonly accessToken?: string;
 }
 
 export class ApiHttp {
@@ -50,7 +55,10 @@ export class ApiHttp {
     if (typeof impl !== 'function') {
       throw new Error('No fetch implementation available — pass `fetchImpl`.');
     }
-    this.doFetch = impl;
+    // Call fetch as a plain function, never as a method of this object:
+    // browsers throw "Illegal invocation" when fetch's receiver is not the
+    // global object (Node does not check, so only a real browser showed it).
+    this.doFetch = (input, init) => impl(input, init);
   }
 
   get<T>(path: string, options?: RequestOptions): Promise<T> {
@@ -77,7 +85,7 @@ export class ApiHttp {
     const url = this.buildUrl(path, options.query);
     const headers = new Headers({ accept: 'application/json', ...this.opts.defaultHeaders });
 
-    const token = (await this.opts.getAccessToken?.()) ?? null;
+    const token = options.accessToken ?? (await this.opts.getAccessToken?.()) ?? null;
     if (token) headers.set('authorization', `Bearer ${token}`);
     if (options.idempotencyKey) headers.set('idempotency-key', options.idempotencyKey);
 
@@ -125,7 +133,7 @@ export class ApiHttp {
   private buildUrl(path: string, query?: RequestOptions['query']): string {
     const base = this.opts.baseUrl.replace(/\/$/, '');
     const rel = path.startsWith('/') ? path : `/${path}`;
-    const url = new URL(base + rel);
+    const url = new URL(base + rel, resolveRelativeBase(base));
     for (const [k, v] of Object.entries(query ?? {})) {
       if (v !== undefined) url.searchParams.set(k, String(v));
     }
@@ -139,4 +147,20 @@ function safeParse(text: string): unknown {
   } catch {
     return { raw: text };
   }
+}
+
+/**
+ * Same-origin deployment: a relative base URL ("/v1", site and API behind one
+ * domain) resolves against the page origin. Server side there is no page, so
+ * a relative base URL is a configuration error, reported clearly.
+ */
+function resolveRelativeBase(base: string): string | undefined {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(base)) return undefined; // already absolute
+  const origin = (globalThis as { location?: { origin?: string } }).location?.origin;
+  if (!origin) {
+    throw new Error(
+      `relative base URL "${base}" needs a browser page origin — use an absolute URL on the server`,
+    );
+  }
+  return origin;
 }

@@ -1,0 +1,62 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border: 2px solid var(--djafat-color-brand-primary);
+  border-radius: 16px;
+  padding: 16px;
+  background: var(--djafat-color-bg-surface);
+}
+.heading {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--djafat-color-text-primary);
+}
+.muted {
+  color: var(--djafat-color-text-secondary);
+}
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 14px;
+  border-radius: 12px;
+  border: 2px solid var(--djafat-color-border-default);
+  background: var(--djafat-color-bg-surface);
+  cursor: pointer;
+  font: inherit;
+  color: var(--djafat-color-text-primary);
+}
+.selected {
+  border-color: var(--djafat-color-brand-primary);
+  background: var(--djafat-color-bg-surface-alt);
+}
+.optionIcon {
+  font-size: 30px;
+}
+.optionName {
+  display: block;
+  font-weight: 700;
+  font-size: 16px;
+}
+.optionHint {
+  display: block;
+  font-size: 13px;
+  color: var(--djafat-color-text-secondary);
+}
+.instructions {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--djafat-color-state-info-bg);
+  color: var(--djafat-color-text-primary);
+}

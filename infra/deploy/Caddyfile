@@ -1,0 +1,37 @@
+# DJAFAT — public entry point. Caddy gets and renews the HTTPS certificates
+# itself (Let's Encrypt) as soon as the DNS records point at this server.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:3000
+}
+
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
+
+api.{$DOMAIN} {
+	encode zstd gzip
+	# REST + realtime (WebSocket) API
+	reverse_proxy api:3001
+}
+
+admin.{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy admin:3000
+}
+
+resto.{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy restaurant:3000
+}
+
+livreur.{$DOMAIN} {
+	encode zstd gzip
+	root * /srv/courier
+	try_files {path} {path}.html /index.html
+	file_server
+}

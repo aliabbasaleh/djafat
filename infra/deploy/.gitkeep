@@ -1,3 +1,0 @@
-# Placeholder. Production compose / IaC / release scripts are added before the
-# first staging deploy (condition H2 in docs/16). Nothing here couples the code
-# to a specific cloud (decision A6).

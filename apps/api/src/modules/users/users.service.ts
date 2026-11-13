@@ -24,6 +24,8 @@ export interface UserRecord {
   readonly id: string;
   readonly phone: string;
   readonly phoneVerifiedAt: Date | null;
+  /** Optional so existing fakes stay valid; set by every read from the database. */
+  readonly emailVerifiedAt?: Date | null;
   readonly email: string | null;
   readonly fullName: string | null;
   readonly countryId: string | null;
@@ -49,6 +51,8 @@ export interface MeDto {
   readonly id: string;
   readonly phone: string;
   readonly email: string | null;
+  /** Only a verified address can be used to log in by e-mail (FEAT-007). */
+  readonly emailVerified: boolean;
   readonly fullName: string | null;
   readonly locale: string;
   readonly status: UserStatus;
@@ -99,6 +103,7 @@ export class UsersService {
       id: u.id,
       phone: u.phone,
       phoneVerifiedAt: u.phoneVerifiedAt,
+      emailVerifiedAt: u.emailVerifiedAt,
       email: u.email,
       fullName: u.fullName,
       countryId: u.countryId,
@@ -108,10 +113,60 @@ export class UsersService {
     };
   }
 
+  /** FEAT-017: an existing, non-deleted account for this phone, or null (never creates one). */
+  async findByPhone(phone: string): Promise<UserRecord | null> {
+    const u = await this.prisma.user.findFirst({
+      where: { phone, deletedAt: null },
+      select: { id: true },
+    });
+    return u ? this.getById(u.id) : null;
+  }
+
   async getByIdOrThrow(id: string): Promise<UserRecord> {
     const u = await this.getById(id);
     if (!u) throw new NotFoundException({ code: 'NOT_FOUND', message: `User ${id} not found.` });
     return u;
+  }
+
+  /** Non-deleted account whose email is VERIFIED and equal to `email` (citext) — FEAT-007. */
+  async findByVerifiedEmail(email: string): Promise<UserRecord | null> {
+    const u = await this.prisma.user.findFirst({
+      where: { email, emailVerifiedAt: { not: null }, deletedAt: null },
+      select: { id: true },
+    });
+    return u ? this.getById(u.id) : null;
+  }
+
+  /** "Mon profil": the name the courier and the restaurant see (spaces collapsed). */
+  async updateFullName(userId: string, fullName: string): Promise<UserRecord> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { fullName: fullName.trim().replace(/\s+/g, ' ') },
+    });
+    return this.getByIdOrThrow(userId);
+  }
+
+  /**
+   * Record `email` as this account's verified address (FEAT-007). The
+   * partial unique index `users_email_active_uk` guarantees one non-deleted
+   * account per address: a clash surfaces as 409 EMAIL_ALREADY_USED.
+   */
+  async setVerifiedEmail(userId: string, email: string): Promise<UserRecord> {
+    try {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { email, emailVerifiedAt: new Date() },
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        throw new ConflictException({
+          code: 'EMAIL_ALREADY_USED',
+          message: 'Cette adresse e-mail est déjà utilisée par un autre compte.',
+        });
+      }
+      throw err;
+    }
+    return this.getByIdOrThrow(userId);
   }
 
   async markPhoneVerified(userId: string): Promise<void> {
@@ -397,6 +452,7 @@ export class UsersService {
       id: user.id,
       phone: user.phone,
       email: user.email,
+      emailVerified: Boolean(user.email && user.emailVerifiedAt),
       fullName: user.fullName,
       locale: user.locale,
       status: user.status,

@@ -7,6 +7,10 @@ Monorepo TypeScript : **multi-pays, multi-devise, multi-provider de paiement** d
 > Voir [`docs/17-bloc-0-implementation.md`](docs/17-bloc-0-implementation.md) pour le rapport, et
 > [`docs/16-final-architecture-validation.md`](docs/16-final-architecture-validation.md) pour le checkpoint d'architecture.
 
+> **Feuille de route et versions : [`docs/ROADMAP.md`](docs/ROADMAP.md)** ·
+> travailler depuis chez soi : [`docs/TRAVAILLER-EN-LOCAL.md`](docs/TRAVAILLER-EN-LOCAL.md) ·
+> mise en ligne : [`infra/deploy/README.md`](infra/deploy/README.md)
+
 ## Architecture
 
 Toute la conception est dans [`docs/`](docs/) (`README.md` + `01` → `16`). Points d'entrée :
@@ -42,12 +46,17 @@ pnpm dev                             # api + worker + web (mobile : `pnpm --filt
 ## Contrôles
 
 ```bash
+pnpm verify:fast   # pendant le travail : périmètre modifié + contrôles graphe complet
+pnpm verify        # vérification complète, classée (nouveau / préexistant / indisponible)
 pnpm typecheck
 pnpm lint
 pnpm format:check
 pnpm test
 pnpm build
 ```
+
+Pipeline de développement agentique (Claude Code : features → specs → tests →
+revue → PR) et politique d'architecture : [`docs/pipeline/`](docs/pipeline/README.md).
 
 ## Règles non négociables (voir `docs/15` / `docs/16`)
 

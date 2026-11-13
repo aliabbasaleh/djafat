@@ -27,9 +27,17 @@ import { api } from './api';
  * gap in the final report, not hidden behind a plausible-looking stub.
  */
 const THROTTLE_MS = 8_000;
+/**
+ * A courier waiting for a course does not move, so `watchPositionAsync`
+ * (distanceInterval 20 m) stays silent — and dispatch ignores a position older
+ * than `courier_location_stale_seconds` (120 s by default). The last fix is
+ * therefore re-sent at this pace while reporting is active.
+ */
+const HEARTBEAT_MS = 45_000;
 
 export function useForegroundLocationReporting(active: boolean): void {
   const subscriptionRef = useRef<Location.LocationSubscription | null>(null);
+  const lastRef = useRef<Location.LocationObject | null>(null);
 
   useEffect(() => {
     if (!active) return;
@@ -46,31 +54,50 @@ export function useForegroundLocationReporting(active: boolean): void {
           distanceInterval: 20, // meters — avoids a flood of near-identical fixes while stationary
         },
         (position) => {
-          void api.courier.updateLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-            ...(position.coords.accuracy !== null ? { accuracyM: position.coords.accuracy } : {}),
-            ...(position.coords.heading !== null && position.coords.heading >= 0
-              ? { heading: position.coords.heading }
-              : {}),
-            ...(position.coords.speed !== null && position.coords.speed >= 0
-              ? { speedMps: position.coords.speed }
-              : {}),
-            timestamp: new Date(position.timestamp).toISOString(),
-          });
+          lastRef.current = position;
+          send(position, new Date(position.timestamp));
         },
       );
       if (cancelled) {
-        sub.remove();
+        stop(sub);
       } else {
         subscriptionRef.current = sub;
       }
     })();
 
+    const heartbeat = setInterval(() => {
+      if (lastRef.current) send(lastRef.current, new Date());
+    }, HEARTBEAT_MS);
+
     return () => {
       cancelled = true;
-      subscriptionRef.current?.remove();
+      clearInterval(heartbeat);
+      if (subscriptionRef.current) stop(subscriptionRef.current);
       subscriptionRef.current = null;
     };
   }, [active]);
+}
+
+/** `remove()` throws on some platforms (expo-location web); stopping must never crash the screen. */
+function stop(sub: Location.LocationSubscription): void {
+  try {
+    sub.remove();
+  } catch {
+    // already stopped, or not supported here: nothing to release
+  }
+}
+
+function send(position: Location.LocationObject, at: Date): void {
+  void api.courier.updateLocation({
+    lat: position.coords.latitude,
+    lng: position.coords.longitude,
+    ...(position.coords.accuracy !== null ? { accuracyM: position.coords.accuracy } : {}),
+    ...(position.coords.heading !== null && position.coords.heading >= 0
+      ? { heading: position.coords.heading }
+      : {}),
+    ...(position.coords.speed !== null && position.coords.speed >= 0
+      ? { speedMps: position.coords.speed }
+      : {}),
+    timestamp: at.toISOString(),
+  });
 }

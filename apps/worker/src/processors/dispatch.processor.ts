@@ -118,6 +118,7 @@ async function retrySearching(): Promise<number> {
         const candidates = await tx.query<{ user_id: string }>(
           `SELECT c.user_id FROM couriers c, deliveries d
            WHERE d.id = $1 AND c.status = 'online' AND c.active_delivery_id IS NULL
+             AND c.cash_blocked_at IS NULL -- FEAT-010: holds too much cash (same rule as the API)
              AND c.last_geom IS NOT NULL
              AND c.last_location_at > now() - ($2 || ' seconds')::interval
              AND NOT (c.user_id = ANY($3::uuid[]))

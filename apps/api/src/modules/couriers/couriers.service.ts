@@ -99,8 +99,16 @@ export class CouriersService implements CourierPort {
         message: 'Cannot go offline with an active delivery — finish or cancel it first.',
       });
     }
-    const updated = await this.prisma.courier.update({ where: { userId }, data: { status } });
-    return this.toDto(updated);
+    // Never overwrite `busy` (an offer is pending or a delivery is in progress)
+    // nor `suspended`: conditional, so a dispatch claim landing between the
+    // read above and this write cannot be wiped either. Found by the full
+    // customer-journey run: a courier re-sending "online" lost the offer
+    // (accept -> 409 COURIER_NOT_ELIGIBLE).
+    await this.prisma.courier.updateMany({
+      where: { userId, status: { notIn: ['busy', 'suspended'] } },
+      data: { status },
+    });
+    return this.toDto(await this.prisma.courier.findUniqueOrThrow({ where: { userId } }));
   }
 
   /**
@@ -177,6 +185,7 @@ export class CouriersService implements CourierPort {
       FROM couriers
       WHERE status = 'online'
         AND active_delivery_id IS NULL
+        AND cash_blocked_at IS NULL -- FEAT-010: holds too much cash
         AND last_geom IS NOT NULL
         AND last_location_at > now() - (${staleSeconds}::text || ' seconds')::interval
         AND NOT (user_id = ANY(${excluded}::uuid[]))
@@ -185,6 +194,56 @@ export class CouriersService implements CourierPort {
       LIMIT 20
     `;
     return rows.map((r) => ({ courierId: r.user_id, distanceMeters: r.distance_m }));
+  }
+
+  /** FEAT-018 — last fix with its accuracy and time (delivery point learning). */
+  async getFix(
+    userId: string,
+  ): Promise<{ lat: number; lng: number; accuracyM: number | null; at: Date } | null> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{ lat: number; lng: number; accuracy_m: number | null; at: Date | null }>
+    >`
+      SELECT ST_Y(last_geom::geometry) AS lat, ST_X(last_geom::geometry) AS lng,
+             last_accuracy_m::float8 AS accuracy_m, last_location_at AS at
+      FROM couriers WHERE user_id = ${userId}::uuid AND last_geom IS NOT NULL
+    `;
+    const r = rows[0];
+    return r && r.at ? { lat: r.lat, lng: r.lng, accuracyM: r.accuracy_m, at: r.at } : null;
+  }
+
+  /** Last known position of a courier (customer live map), or null if never reported. */
+  async getPosition(
+    userId: string,
+  ): Promise<{ lat: number; lng: number; heading: number | null; at: string | null } | null> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{ lat: number; lng: number; heading: number | null; at: Date | null }>
+    >`
+      SELECT ST_Y(last_geom::geometry) AS lat, ST_X(last_geom::geometry) AS lng,
+             last_heading::float8 AS heading, last_location_at AS at
+      FROM couriers WHERE user_id = ${userId}::uuid AND last_geom IS NOT NULL
+    `;
+    const r = rows[0];
+    return r
+      ? { lat: r.lat, lng: r.lng, heading: r.heading, at: r.at ? r.at.toISOString() : null }
+      : null;
+  }
+
+  /**
+   * FEAT-010: record whether the courier holds cash at or above the ceiling.
+   * Keeps the FIRST blocking time while still blocked; dispatch (API and
+   * worker) skips a courier whose `cash_blocked_at` is set.
+   */
+  async setCashBlocked(courierId: string, blocked: boolean): Promise<void> {
+    if (blocked) {
+      await this.prisma.$executeRaw`
+        UPDATE couriers SET cash_blocked_at = COALESCE(cash_blocked_at, now())
+        WHERE user_id = ${courierId}::uuid
+      `;
+    } else {
+      await this.prisma.$executeRaw`
+        UPDATE couriers SET cash_blocked_at = NULL WHERE user_id = ${courierId}::uuid
+      `;
+    }
   }
 
   /**

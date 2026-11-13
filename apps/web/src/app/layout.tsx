@@ -75,6 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             { label: 'Restaurants', icon: '🍽️', href: '/restaurants' },
             { label: 'Panier', icon: '🛒', href: '/panier' },
             { label: 'Adresses', icon: '📍', href: '/adresses' },
+            { label: 'Profil', icon: '👤', href: '/profil' },
           ]}
         />
       </body>
