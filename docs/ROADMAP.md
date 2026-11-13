@@ -1,6 +1,6 @@
 # Feuille de route DJAFAT
 
-> **Version actuelle : 0.19.4** — 13 nov. 2026
+> **Version actuelle : 0.19.5** — 13 nov. 2026
 > Ce fichier est la feuille de route de référence. Il est mis à jour **à chaque
 > version envoyée sur GitHub** (journal des versions en bas, cases cochées au fil
 > de l'eau). Toute l'équipe le lit ici, depuis n'importe où.
@@ -86,7 +86,8 @@ CORRECTIF pour une correction ou de la documentation).
 
 | Version | Date         | Contenu                                                                                                                                    | Commit    |
 | ------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
-| 0.19.4  | 13 nov. 2026 | Audit du projet (`docs_2/` : état, constats, tâches) et rappel automatique après chaque pull                                               | ce commit |
+| 0.19.5  | 13 nov. 2026 | Sécurité : Next.js 15.1.3 → 15.5.29 (5 alertes critiques, dont 4 d'exécution de code à distance) ; tolérées 115 → 77                       | ce commit |
+| 0.19.4  | 13 nov. 2026 | Audit du projet (`docs_2/` : état, constats, tâches) et rappel automatique après chaque pull                                               | `fbc759d` |
 | 0.19.3  | 12 nov. 2026 | Tests d'intégration **93/93** : `walking-skeleton` réécrit sur le parcours actuel (proposition, acceptation, retrait, livraison avec code) | `4c756e0` |
 | 0.19.2  | 10 nov. 2026 | Sécurité : `node-forge` forcé en 1.4.3 (5 nouvelles alertes corrigées, 12 anciennes aussi : 127 → 115 tolérées)                            | `804176f` |
 | 0.19.1  | 10 nov. 2026 | Mise en ligne Oracle : script `install.sh` (Docker, pare-feu, clés, démarrage), clé de lecture GitHub, images ARM vérifiées                | `54d50b5` |
