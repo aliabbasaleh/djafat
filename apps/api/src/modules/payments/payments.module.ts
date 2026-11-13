@@ -10,6 +10,18 @@ import { SettlementsController } from './settlements.controller';
 import { SettlementsService } from './settlements.service';
 import { CashPaymentProvider } from './providers/cash/cash-payment.provider';
 import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
+import { selectRegistrableProviders } from './payment-provider-selection';
+import { AppConfigService } from '../../common/config/config.service';
+import { walletProviders } from './providers/wallet/merchant-wallet-payment.provider';
+import { MobileMoneyReceiptsService } from './mobile-money/mobile-money-receipts.service';
+import { MobileMoneyController } from './mobile-money/mobile-money.controller';
+import { CourierRemittanceService } from './mobile-money/courier-remittance.service';
+import { UsersModule } from '../users/users.module';
+import { CodTrustService } from './cod-trust.service';
+import { SmsIngestService } from './mobile-money/sms-ingest.service';
+import { SmsIngestController } from './mobile-money/sms-ingest.controller';
+import { CourierPayoutsService } from './mobile-money/courier-payouts.service';
+import { CourierPayoutsController } from './mobile-money/courier-payouts.controller';
 
 /**
  * At Bloc 0 only `cash` and `mock` providers are registered. Real Mobile Money
@@ -21,8 +33,15 @@ import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
  * it consumes `OrderAmountPort` (from `@djafat/types`) via events instead.
  */
 @Module({
-  imports: [LedgerModule, AuthModule],
-  controllers: [PaymentsController, PaymentMethodsConfigController, SettlementsController],
+  imports: [LedgerModule, AuthModule, UsersModule],
+  controllers: [
+    PaymentsController,
+    MobileMoneyController,
+    PaymentMethodsConfigController,
+    SettlementsController,
+    CourierPayoutsController,
+    SmsIngestController,
+  ],
   providers: [
     CashPaymentProvider,
     MockPaymentProvider,
@@ -30,13 +49,32 @@ import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
     { provide: PAYMENT_PROVIDER, useExisting: MockPaymentProvider },
     {
       provide: PaymentProviderRegistry,
-      useFactory: (cash: CashPaymentProvider, mock: MockPaymentProvider) =>
-        new PaymentProviderRegistry([cash, mock]),
-      inject: [CashPaymentProvider, MockPaymentProvider],
+      // FEAT-002: in production, sandbox-only providers (mock) are never
+      // registered, so creation, webhooks and the payment-methods list all
+      // refuse them through `registry.has()` — whatever the database says.
+      useFactory: (
+        config: AppConfigService,
+        cash: CashPaymentProvider,
+        mock: MockPaymentProvider,
+      ) =>
+        new PaymentProviderRegistry(
+          selectRegistrableProviders(
+            // FEAT-009: one merchant-wallet provider per configured wallet
+            // (`MOBILE_MONEY_WALLETS`); none configured = none registered.
+            [cash, mock, ...walletProviders(config.get('MOBILE_MONEY_WALLETS'))],
+            { isProduction: config.isProduction },
+          ),
+        ),
+      inject: [AppConfigService, CashPaymentProvider, MockPaymentProvider],
     },
     PaymentsService,
+    MobileMoneyReceiptsService,
+    CourierRemittanceService,
+    CourierPayoutsService,
+    CodTrustService,
+    SmsIngestService,
     SettlementsService,
   ],
-  exports: [PaymentProviderRegistry],
+  exports: [PaymentProviderRegistry, PaymentsService, MobileMoneyReceiptsService],
 })
 export class PaymentsModule {}

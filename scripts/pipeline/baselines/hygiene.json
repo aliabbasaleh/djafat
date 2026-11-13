@@ -1,0 +1,23 @@
+{
+  "$comment": "Pre-existing hygiene findings accepted explicitly; new ones are rejected. Focused tests are never baselinable.",
+  "findings": [
+    {
+      "rule": "unjustified-disable",
+      "file": "apps/api/src/common/validation/zod-validation.pipe.ts",
+      "text": "// eslint-disable-next-line @typescript-eslint/no-unsafe-return",
+      "reason": "Pre-existing at pipeline adoption (2026-11-06): justified in surrounding comments but not on the directive itself. Ratchet: add ' -- <reason>' when the line is next touched."
+    },
+    {
+      "rule": "unjustified-disable",
+      "file": "apps/api/src/modules/auth/guards/step-up-route-order.spec.ts",
+      "text": "// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type",
+      "reason": "Pre-existing at pipeline adoption (2026-11-06): justified in surrounding comments but not on the directive itself. Ratchet: add ' -- <reason>' when the line is next touched."
+    },
+    {
+      "rule": "unjustified-disable",
+      "file": "packages/config/src/env.ts",
+      "text": "// eslint-disable-next-line @typescript-eslint/no-unsafe-return",
+      "reason": "Pre-existing at pipeline adoption (2026-11-06): justified in surrounding comments but not on the directive itself. Ratchet: add ' -- <reason>' when the line is next touched."
+    }
+  ]
+}

@@ -652,6 +652,7 @@ describe('checkout — a closed restaurant cannot take an order (pilot 2 fix, do
     return { orderRows, carts, orders, catalog, addressId: addr.id };
   }
 
+  // SPEC-001-01-SC01 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it('refuses with RESTAURANT_CLOSED (409) instead of creating the order', async () => {
     const { orders, addressId } = await attemptAgainst('CLOSED');
     await expect(orders.createOrder('u1', 'key-1', addressId)).rejects.toMatchObject({
@@ -659,12 +660,14 @@ describe('checkout — a closed restaurant cannot take an order (pilot 2 fix, do
     });
   });
 
+  // SPEC-001-01-SC03 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it('creates NO order row — the refusal happens before anything is written', async () => {
     const { orders, orderRows, addressId } = await attemptAgainst('CLOSED');
     await expect(orders.createOrder('u1', 'key-1', addressId)).rejects.toThrow();
     expect(orderRows).toHaveLength(0);
   });
 
+  // SPEC-001-01-SC02 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it('PAUSED and UNAVAILABLE are refused too — the guard is "is it OPEN", not "is it CLOSED"', async () => {
     for (const status of ['PAUSED', 'UNAVAILABLE']) {
       const { orders, orderRows, addressId } = await attemptAgainst(status);
@@ -675,6 +678,7 @@ describe('checkout — a closed restaurant cannot take an order (pilot 2 fix, do
     }
   });
 
+  // SPEC-001-01-SC03 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it('the customer keeps their cart: the refusal rolls back, it does not consume the cart', async () => {
     const { orders, carts, addressId } = await attemptAgainst('CLOSED');
     await expect(orders.createOrder('u1', 'key-1', addressId)).rejects.toThrow();
@@ -682,6 +686,7 @@ describe('checkout — a closed restaurant cannot take an order (pilot 2 fix, do
     expect(cart?.items).toHaveLength(1);
   });
 
+  // SPEC-001-01-SC04 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it('does NOT burn the idempotency key: the SAME key succeeds once the restaurant reopens', async () => {
     // The real recovery path for a customer who tried at 22:01 and retries at
     // 11:00. `IdempotencyService.run` releases the key when the callback
@@ -699,6 +704,7 @@ describe('checkout — a closed restaurant cannot take an order (pilot 2 fix, do
     expect(orderRows).toHaveLength(1);
   });
 
+  // SPEC-001-01-SC05 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it('an OPEN restaurant is unaffected — the guard adds no new failure to the happy path', async () => {
     const { orders, orderRows, addressId } = await attemptAgainst('OPEN');
     const { order } = await orders.createOrder('u1', 'key-1', addressId);

@@ -4,6 +4,7 @@ node_modules/
 
 # Build output
 dist/
+dist-web/
 build/
 .next/
 out/
@@ -47,5 +48,10 @@ pnpm-debug.log*
 tmp/
 .cache/
 
-# Claude Code local session state (not project config)
-.claude/
+# Claude Code: local session state stays ignored; the SHARED project config
+# (hooks, skills, sub-agents — docs/pipeline/README.md) is versioned.
+.claude/*
+!.claude/settings.json
+!.claude/skills/
+!.claude/agents/
+infra/deploy/backups/

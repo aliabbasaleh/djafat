@@ -1,4 +1,6 @@
 import base from './packages/eslint-config/base.js';
+import react from './packages/eslint-config/react.js';
+import { domainPurity } from './packages/eslint-config/domain-purity.js';
 
 /**
  * Root-level flat config — exists ONLY so `lint-staged` (invoked by the
@@ -13,6 +15,15 @@ import base from './packages/eslint-config/base.js';
  */
 export default [
   ...base,
+  // Same React overlay as the Next/Expo/ui package configs, so a staged
+  // file is judged by the rules its own package applies.
+  ...react,
+  // Domain purity, with the same file sets as packages/core and apps/api
+  // configs. Without it, `eslint --fix` from lint-staged sees their justified
+  // `eslint-disable … no-restricted-syntax` as UNUSED and deletes it
+  // (reportUnusedDisableDirectives), breaking the package lint after commit.
+  ...domainPurity(['packages/core/src/**/*.ts']),
+  ...domainPurity(['apps/api/src/modules/*/+([a-z0-9-]).ts', 'apps/api/src/modules/*/*.util.ts']),
   // `**/scripts/**`: small standalone Node build utilities (e.g.
   // packages/ui/scripts/copy-assets.mjs) that no package tsconfig
   // `include`s — same reasoning as each package's own ignore for this.

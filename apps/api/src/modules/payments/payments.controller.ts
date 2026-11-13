@@ -55,6 +55,19 @@ export class PaymentsController {
     return { status, payment };
   }
 
+  /** Payment methods for one of the caller's orders (screens) — owner only. Declared before `:id`. */
+  @Get('methods-for-order/:orderId')
+  @RequireAuth()
+  @RequireRole('customer')
+  @RequireOwnership<OrderAmountPort>(
+    ORDER_AMOUNT_PORT,
+    (orderAmount, req) => orderAmount.getOwnerUserId((req.params as { orderId: string }).orderId),
+    'payments:read',
+  )
+  methodsForOrder(@Param('orderId') orderId: string) {
+    return this.payments.listMethodsForOrder(orderId);
+  }
+
   /** Owner of the payment's order, or staff with `payments:read` (closes docs/19 D-15 — was unauthenticated). */
   @Get(':id')
   @RequireAuth()

@@ -92,3 +92,125 @@ describe('constants', () => {
     expect(PLATFORM_SETTINGS_DEFAULTS.cart_max_item_quantity).toBe(99);
   });
 });
+
+// FEAT-006 — docs/features/FEAT-006-real-sms-otp-delivery (SPEC-006-02).
+describe('SPEC-006-02 — SMS provider configuration', () => {
+  // SPEC-006-02-SC01
+  it('SPEC-006-02-SC01 — production with SMS_PROVIDER=mock refuses to start', () => {
+    expect(() =>
+      loadApiEnv({ ...baseEnv, NODE_ENV: 'production', SMS_PROVIDER: 'mock' }),
+    ).toThrowError(/SMS_PROVIDER.*mock.*production/s);
+    expect(() => loadApiEnv({ ...baseEnv, NODE_ENV: 'production' })).toThrowError(
+      ConfigValidationError,
+    );
+  });
+
+  // SPEC-006-02-SC02
+  it('SPEC-006-02-SC02 — SMS_PROVIDER=http without SMS_HTTP_URL is refused in any environment', () => {
+    for (const NODE_ENV of ['production', 'test']) {
+      expect(() => loadApiEnv({ ...baseEnv, NODE_ENV, SMS_PROVIDER: 'http' })).toThrowError(
+        /SMS_HTTP_URL/,
+      );
+    }
+  });
+
+  // SPEC-006-02-SC03
+  it('SPEC-006-02-SC03 — production with an http gateway is accepted, sender defaults to DJAFAT', () => {
+    const env = loadApiEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      SMS_PROVIDER: 'http',
+      SMS_HTTP_URL: 'https://sms.example.test/send',
+    });
+    expect(env.SMS_PROVIDER).toBe('http');
+    expect(env.SMS_SENDER_ID).toBe('DJAFAT');
+  });
+
+  // SPEC-006-02-SC04
+  it('SPEC-006-02-SC04 — mock by default outside production; unknown provider and bad sender id refused', () => {
+    expect(loadApiEnv(baseEnv).SMS_PROVIDER).toBe('mock');
+    expect(() => loadApiEnv({ ...baseEnv, SMS_PROVIDER: 'twilio' })).toThrowError(
+      ConfigValidationError,
+    );
+    expect(() => loadApiEnv({ ...baseEnv, SMS_SENDER_ID: 'DJAFAT-LIVRAISON' })).toThrowError(
+      /SMS_SENDER_ID/,
+    );
+  });
+});
+
+// FEAT-007 — docs/features/FEAT-007-email-login (SPEC-007-01-SC04).
+describe('SPEC-007-01 — email provider configuration', () => {
+  // SPEC-007-01-SC04
+  it('SPEC-007-01-SC04 — smtp needs SMTP_URL and EMAIL_FROM; production without email config still boots on mock', () => {
+    expect(() =>
+      loadApiEnv({ ...baseEnv, EMAIL_PROVIDER: 'smtp', EMAIL_FROM: 'DJAFAT <a@b.td>' }),
+    ).toThrowError(/SMTP_URL/);
+    expect(() =>
+      loadApiEnv({ ...baseEnv, EMAIL_PROVIDER: 'smtp', SMTP_URL: 'smtp://mail.example.test:587' }),
+    ).toThrowError(/EMAIL_FROM/);
+    const prod = loadApiEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      SMS_PROVIDER: 'http',
+      SMS_HTTP_URL: 'https://sms.example.test/send',
+    });
+    expect(prod.EMAIL_PROVIDER).toBe('mock');
+    const smtp = loadApiEnv({
+      ...baseEnv,
+      EMAIL_PROVIDER: 'smtp',
+      SMTP_URL: 'smtps://user:pass@mail.example.test:465',
+      EMAIL_FROM: 'DJAFAT <no-reply@djafat.td>',
+    });
+    expect(smtp.EMAIL_PROVIDER).toBe('smtp');
+  });
+});
+
+describe('SPEC-008-01 — WhatsApp and switchable SMS configuration', () => {
+  const cloud = {
+    WHATSAPP_PROVIDER: 'cloud',
+    WHATSAPP_ACCESS_TOKEN: 'tok',
+    WHATSAPP_PHONE_NUMBER_ID: '100000000000001',
+    WHATSAPP_APP_SECRET: 'app-secret',
+    WHATSAPP_VERIFY_TOKEN: 'verify-me',
+    WHATSAPP_BUSINESS_NUMBER: '+23560000001',
+  };
+
+  // SPEC-008-01-SC04
+  it('SPEC-008-01-SC04 — production: SMS disabled needs WhatsApp Cloud; cloud needs all its variables', () => {
+    const prod = { ...baseEnv, NODE_ENV: 'production', SMS_PROVIDER: 'disabled' };
+    expect(() => loadApiEnv(prod)).toThrowError(/SMS_PROVIDER/);
+    const ok = loadApiEnv({ ...prod, ...cloud });
+    expect(ok.SMS_PROVIDER).toBe('disabled');
+    expect(ok.WHATSAPP_PROVIDER).toBe('cloud');
+    expect(ok.WHATSAPP_MAX_CODES_PER_HOUR).toBe(300);
+    expect(ok.WHATSAPP_GRAPH_URL).toBe('https://graph.facebook.com/v21.0');
+    const { WHATSAPP_ACCESS_TOKEN: _omit, ...noToken } = cloud;
+    expect(() => loadApiEnv({ ...prod, ...noToken })).toThrowError(/WHATSAPP_ACCESS_TOKEN/);
+    // defaults outside production: WhatsApp on the mock, SMS unchanged
+    const dev = loadApiEnv(baseEnv);
+    expect(dev.WHATSAPP_PROVIDER).toBe('mock');
+    expect(dev.SMS_PROVIDER).toBe('mock');
+  });
+});
+
+describe('SPEC-009-02 — merchant wallets configuration', () => {
+  // SPEC-009-02-SC03
+  it('SPEC-009-02-SC03 — MOBILE_MONEY_WALLETS: code=E.164 pairs; invalid entries refused; empty is fine', () => {
+    const env = loadApiEnv({
+      ...baseEnv,
+      MOBILE_MONEY_WALLETS: 'airtel_money=+23560000010, tigo_cash=+23560000020',
+    });
+    expect(env.MOBILE_MONEY_WALLETS).toEqual([
+      { code: 'airtel_money', merchantNumber: '+23560000010' },
+      { code: 'tigo_cash', merchantNumber: '+23560000020' },
+    ]);
+    expect(() =>
+      loadApiEnv({ ...baseEnv, MOBILE_MONEY_WALLETS: 'airtel_money=60000010' }),
+    ).toThrowError(/MOBILE_MONEY_WALLETS/);
+    expect(() =>
+      loadApiEnv({ ...baseEnv, MOBILE_MONEY_WALLETS: 'Airtel=+23560000010' }),
+    ).toThrowError(/MOBILE_MONEY_WALLETS/);
+    expect(loadApiEnv(baseEnv).MOBILE_MONEY_WALLETS).toEqual([]);
+    expect(loadApiEnv({ ...baseEnv, MOBILE_MONEY_WALLETS: '' }).MOBILE_MONEY_WALLETS).toEqual([]);
+  });
+});

@@ -1,0 +1,7 @@
+# docs_2/ — see README.md §4.
+# The checker is a bash script: keep LF line endings so Git Bash on Windows can run it.
+tools/*.sh text eol=lf
+# Reviews may be recorded on two branches at once. "union" keeps every line from both
+# sides instead of stopping on a conflict; extra lines are harmless, since each one only
+# marks more commits as reviewed.
+history/LAST_REVIEWED_COMMIT text eol=lf merge=union

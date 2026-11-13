@@ -10,6 +10,7 @@ import { Badge } from '../../components/Badge';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 import { useCourierRealtime } from '../../lib/realtime';
+import { useForegroundLocationReporting } from '../../lib/location';
 import { newIdempotencyKey } from '../../lib/idempotency';
 import { secondsRemaining, formatCountdown, formatMoney } from '../../lib/format';
 
@@ -28,6 +29,8 @@ export default function HomeScreen() {
   const { user, signOut } = useAuth();
   const [state, setState] = useState<LoadState>('loading');
   const [profile, setProfile] = useState<CourierProfile | null>(null);
+  // Dispatch only offers a course to a courier whose position is fresh: report it while online.
+  useForegroundLocationReporting(profile?.status === 'online');
   const [offer, setOffer] = useState<DeliveryOffer | null>(null);
   const [activeDelivery, setActiveDelivery] = useState<Delivery | null>(null);
   const [busy, setBusy] = useState(false);
@@ -51,6 +54,7 @@ export default function HomeScreen() {
       }
       setState('error');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- PRE-EXISTING (FU-REACT-01): `signOut` is read stale; adding it changes the callback identity, review separately.
   }, []);
 
   useEffect(() => {
@@ -129,6 +133,9 @@ export default function HomeScreen() {
       {offer ? (
         <View style={styles.offerCard}>
           <Badge tone="info" label={`Nouvelle course — ${formatCountdown(remaining)}`} />
+          {offer.context.customerIsNew && (
+            <Badge tone="warning" label="Nouveau client — appelez-le avant de partir" />
+          )}
           <Text style={styles.offerTitle}>{offer.context.restaurantName}</Text>
           <Text style={styles.offerDetail}>
             {offer.context.restaurantAddress ?? 'Adresse non renseignée'}

@@ -1,0 +1,91 @@
+.tracker {
+  border-radius: calc(var(--djafat-radius-lg, 16) * 1px);
+  padding: 20px 18px;
+  color: #fff;
+  background: var(--djafat-color-brand-primary);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.success {
+  background: var(--djafat-color-state-success);
+}
+.danger {
+  background: var(--djafat-color-state-danger);
+}
+.current {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.icon {
+  font-size: 44px;
+  line-height: 1;
+}
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.detail {
+  margin: 4px 0 0;
+  font-size: 15px;
+  line-height: 1.35;
+  opacity: 0.95;
+}
+.steps {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  position: relative;
+}
+.steps::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 10%;
+  right: 10%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.35);
+}
+.step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+.dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  z-index: 1;
+}
+.done {
+  opacity: 1;
+}
+.done .dot {
+  background: #fff;
+}
+.now .dot {
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.35);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.stepLabel {
+  text-align: center;
+}
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 9px rgba(255, 255, 255, 0.12);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .now .dot {
+    animation: none;
+  }
+}

@@ -12,6 +12,13 @@ export interface RequestMeta {
   readonly userAgent: string | null;
 }
 
+type LoginMeta = RequestMeta;
+
+/** Trim + lower-case: one canonical form for codes, locks and the unique index. */
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export interface TokenPairDto {
   readonly access: string;
   readonly accessExpiresAt: string;
@@ -61,6 +68,78 @@ export class AuthService {
 
     const { userId } = await this.users.findOrCreateByPhone(phone, meta.countryId);
     await this.users.markPhoneVerified(userId);
+    return this.openSession(userId, meta);
+  }
+
+  // ── Email as a secondary, verified identifier (FEAT-007) ───────────────────
+
+  /** Send a `verify_email` code to an address the authenticated user wants to add. */
+  requestEmailVerification(userId: string, email: string, ip: string | null): Promise<void> {
+    void userId; // the code goes to the mailbox: only its owner can read it (FEAT-007-Q07)
+    return this.otp.requestCode(
+      { channel: 'email', target: normalizeEmail(email) },
+      'verify_email',
+      ip,
+    );
+  }
+
+  /** Check the code, then record the address as this account's verified email. */
+  async confirmEmailVerification(
+    userId: string,
+    email: string,
+    code: string,
+    ip: string | null,
+  ): Promise<MeDto> {
+    const target = normalizeEmail(email);
+    await this.otp.verifyCode({ channel: 'email', target }, code, 'verify_email', ip); // throws OTP_INVALID / OTP_LOCKED
+    const user = await this.users.setVerifiedEmail(userId, target); // throws EMAIL_ALREADY_USED
+    return this.users.toMeDto(user, await this.users.getRoles(userId));
+  }
+
+  /**
+   * Email login request. Always resolves (the controller answers 202):
+   * whether the address belongs to an account is never revealed. A code is
+   * sent only to an address VERIFIED on a non-deleted account.
+   */
+  async requestEmailLogin(email: string, ip: string | null): Promise<void> {
+    const target = normalizeEmail(email);
+    const owner = await this.users.findByVerifiedEmail(target);
+    if (!owner) return;
+    await this.otp.requestCode({ channel: 'email', target }, 'login', ip);
+  }
+
+  /** Email login: same session path as SMS login. Never creates an account. */
+  async verifyEmailAndLogin(email: string, code: string, meta: LoginMeta): Promise<LoginResultDto> {
+    const target = normalizeEmail(email);
+    await this.otp.verifyCode({ channel: 'email', target }, code, 'login', meta.ip); // throws OTP_INVALID / OTP_LOCKED
+    const owner = await this.users.findByVerifiedEmail(target);
+    if (!owner) {
+      throw new UnauthorizedException({ code: 'OTP_INVALID', message: 'Invalid or expired code.' });
+    }
+    return this.openSession(owner.id, meta);
+  }
+
+  // ── WhatsApp: the customer writes, DJAFAT replies with the code (FEAT-008) ──
+
+  /**
+   * WhatsApp login: the code was sent as a reply to the customer's own
+   * message (`WhatsappInboundService`). Proof of possession of the number,
+   * exactly like an SMS code: the account is found or created, the phone is
+   * marked verified, and the session opens through the shared path.
+   */
+  async verifyWhatsappAndLogin(
+    phone: string,
+    code: string,
+    meta: RequestMeta & { countryId: string | null },
+  ): Promise<LoginResultDto> {
+    await this.otp.verifyCode({ channel: 'whatsapp', target: phone }, code, 'login', meta.ip); // throws OTP_INVALID / OTP_LOCKED
+    const { userId } = await this.users.findOrCreateByPhone(phone, meta.countryId);
+    await this.users.markPhoneVerified(userId);
+    return this.openSession(userId, meta);
+  }
+
+  /** Shared by SMS, email and WhatsApp login: status gate, session, access token, audit. */
+  private async openSession(userId: string, meta: LoginMeta): Promise<LoginResultDto> {
     const user = await this.users.getByIdOrThrow(userId);
 
     if (user.status !== 'active') {

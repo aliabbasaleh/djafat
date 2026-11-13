@@ -45,6 +45,9 @@ export class MockPaymentProvider implements PaymentProvider {
       requiresPayerPhone: false,
       async: false, // synchronous by default — the skeleton needs no webhook
       currencies: ['XAF', 'XOF', 'EUR'],
+      // Accepts any payment and signs webhooks with a secret that is public in
+      // this repository: never reachable in production (FEAT-002).
+      sandboxOnly: true,
     };
   }
 

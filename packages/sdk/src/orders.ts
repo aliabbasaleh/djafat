@@ -53,8 +53,18 @@ export interface Order {
   readonly updatedAt: string;
 }
 
+/** Live map of an order (customer only): restaurant, home, courier while on it. */
+export interface OrderTracking {
+  readonly restaurant: { name: string; lat: number; lng: number } | null;
+  readonly dropoff: { label: string | null; lat: number; lng: number } | null;
+  readonly courier: { lat: number; lng: number; heading: number | null; at: string | null } | null;
+  readonly deliveryStatus: string | null;
+}
+
 export function createOrdersClient(http: ApiHttp) {
   return {
+    tracking: (orderId: string) =>
+      http.get<OrderTracking>(`/deliveries/tracking/order/${encodeURIComponent(orderId)}`),
     /**
      * Creates an order FROM the caller's own cart (docs/22 §9) — never a
      * client-supplied price/restaurant/items. `addressId` (Bloc 8, docs/29)

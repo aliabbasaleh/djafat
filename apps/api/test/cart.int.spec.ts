@@ -71,6 +71,13 @@ describe('full flow — add item with options -> quote -> create order (docs/22 
     const phone = `+2356600${Math.floor(1000 + Math.random() * 8999)}`;
     const customer = await loginViaOtp(phone);
     const auth = `Bearer ${customer.access}`;
+    // A delivery address is required to order since Bloc 8 (docs/29): the
+    // fresh customer adds one, as the app makes them do before checkout.
+    await request(server)
+      .post('/v1/users/me/addresses')
+      .set('Authorization', auth)
+      .send({ label: 'Domicile', quartier: 'Klemat', coordinates: { lat: 12.11, lng: 15.05 } })
+      .expect(201);
 
     // Empty cart to start.
     const empty = await request(server).get('/v1/carts').set('Authorization', auth).expect(200);

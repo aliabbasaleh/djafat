@@ -3,47 +3,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { useParams, useRouter } from 'next/navigation';
-import { ApiClientError, type Order, type OrderStatus } from '@djafat/sdk';
-import { Container, Heading, Text, Stack, Badge, ErrorState, Skeleton, cx } from '@djafat/ui';
-import type { BadgeTone } from '@djafat/ui';
+import { ApiClientError, type Order } from '@djafat/sdk';
+import { Container, Heading, Text, Stack, ErrorState, Skeleton, cx } from '@djafat/ui';
 import { Button } from '@/components/ui-client';
 import { api } from '@/lib/api';
 import { isAuthenticated, clearSession } from '@/lib/auth-storage';
 import { formatMoney } from '@/lib/format';
 import { useRoomRealtime } from '@/lib/realtime';
+import { OrderTracker } from '@/components/OrderTracker';
+import { PaymentPicker } from '@/components/PaymentPicker';
+import { LiveMap } from '@/components/LiveMap';
+import { DoorPayment } from '@/components/DoorPayment';
 import styles from './page.module.css';
-
-const STATUS_LABEL: Record<OrderStatus, string> = {
-  draft: 'Brouillon',
-  awaiting_payment: 'En attente de paiement',
-  placed: 'Commande reçue',
-  confirmed: 'Confirmée par le restaurant',
-  preparing: 'En préparation',
-  ready: 'Prête',
-  courier_assigned: 'Livreur assigné',
-  picked_up: 'Récupérée',
-  on_the_way: 'En route',
-  delivered: 'Livrée',
-  cancelled: 'Annulée',
-  rejected: 'Refusée',
-  expired: 'Expirée',
-};
-
-const STATUS_TONE: Record<OrderStatus, BadgeTone> = {
-  draft: 'neutral',
-  awaiting_payment: 'neutral',
-  placed: 'info',
-  confirmed: 'info',
-  preparing: 'info',
-  ready: 'info',
-  courier_assigned: 'info',
-  picked_up: 'info',
-  on_the_way: 'info',
-  delivered: 'success',
-  cancelled: 'danger',
-  rejected: 'danger',
-  expired: 'danger',
-};
 
 type LoadState = 'loading' | 'ready' | 'error' | 'not-found';
 
@@ -143,7 +114,20 @@ export default function OrderConfirmationPage() {
             Commande {order.code}
           </Text>
           <Heading level={1}>Merci pour votre commande !</Heading>
-          <Badge tone={STATUS_TONE[order.status]}>{STATUS_LABEL[order.status]}</Badge>
+        </Stack>
+
+        <OrderTracker status={order.status} />
+        {order.status === 'awaiting_payment' && (
+          <PaymentPicker orderId={order.id} onChanged={() => void loadOrder()} />
+        )}
+        {['courier_assigned', 'picked_up', 'on_the_way'].includes(order.status) && (
+          <DoorPayment orderId={order.id} />
+        )}
+        {['ready', 'courier_assigned', 'picked_up', 'on_the_way'].includes(order.status) && (
+          <LiveMap orderId={order.id} />
+        )}
+
+        <Stack gap="xs">
           {/*
             Honest about the transport: "en direct" when the socket is up,
             otherwise it says the page still updates — because it genuinely

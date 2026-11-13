@@ -1,0 +1,46 @@
+{
+  "$comment": "Pre-existing architecture debt, accepted explicitly. New violations are rejected. Remove an entry as soon as it is fixed (check-arch warns). See docs/pipeline/architecture-policy.md §Dette.",
+  "violations": [
+    {
+      "rule": "no-circular",
+      "from": "apps/api/src/modules/auth/decorators.ts",
+      "to": "apps/api/src/modules/auth/guards/ownership.guard.ts",
+      "cycle": [
+        "apps/api/src/modules/auth/guards/ownership.guard.ts",
+        "apps/api/src/modules/auth/decorators.ts"
+      ],
+      "reason": "Runtime cycle: decorators.ts composes the guard classes (UseGuards) while each guard reads its metadata key from decorators.ts. Works only because the keys are read lazily at request time. Fix (follow-up FU-ARCH-01): move the *_KEY constants to auth-metadata.constants.ts."
+    },
+    {
+      "rule": "no-circular",
+      "from": "apps/api/src/modules/auth/decorators.ts",
+      "to": "apps/api/src/modules/auth/guards/permissions.guard.ts",
+      "cycle": [
+        "apps/api/src/modules/auth/guards/permissions.guard.ts",
+        "apps/api/src/modules/auth/decorators.ts"
+      ],
+      "reason": "Runtime cycle: decorators.ts composes the guard classes (UseGuards) while each guard reads its metadata key from decorators.ts. Works only because the keys are read lazily at request time. Fix (follow-up FU-ARCH-01): move the *_KEY constants to auth-metadata.constants.ts."
+    },
+    {
+      "rule": "no-circular",
+      "from": "apps/api/src/modules/auth/decorators.ts",
+      "to": "apps/api/src/modules/auth/guards/roles.guard.ts",
+      "cycle": [
+        "apps/api/src/modules/auth/guards/roles.guard.ts",
+        "apps/api/src/modules/auth/decorators.ts"
+      ],
+      "reason": "Runtime cycle: decorators.ts composes the guard classes (UseGuards) while each guard reads its metadata key from decorators.ts. Works only because the keys are read lazily at request time. Fix (follow-up FU-ARCH-01): move the *_KEY constants to auth-metadata.constants.ts."
+    },
+    {
+      "rule": "no-circular",
+      "from": "apps/api/src/modules/auth/decorators.ts",
+      "to": "apps/api/src/modules/auth/guards/step-up.guard.ts",
+      "cycle": [
+        "apps/api/src/modules/auth/guards/step-up.guard.ts",
+        "apps/api/src/modules/auth/decorators.ts"
+      ],
+      "reason": "Runtime cycle: decorators.ts composes the guard classes (UseGuards) while each guard reads its metadata key from decorators.ts. Works only because the keys are read lazily at request time. Fix (follow-up FU-ARCH-01): move the *_KEY constants to auth-metadata.constants.ts."
+    }
+  ],
+  "unclassified": []
+}

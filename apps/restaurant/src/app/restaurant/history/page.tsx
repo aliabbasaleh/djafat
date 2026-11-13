@@ -50,6 +50,7 @@ export default function OrderHistoryPage() {
     void load(1, status);
     // intentionally run once on mount only — `status`/`load` changes are
     // driven by the filter form's own submit handler, not by this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only by design (see comment above)
   }, []);
 
   return (

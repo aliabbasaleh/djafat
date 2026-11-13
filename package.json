@@ -1,6 +1,6 @@
 {
   "name": "djafat",
-  "version": "0.0.0",
+  "version": "0.19.4",
   "private": true,
   "description": "DJAFAT — plateforme de livraison multi-plateforme (Tchad). Monorepo.",
   "engines": {
@@ -17,6 +17,13 @@
     "test": "turbo run test",
     "test:unit": "turbo run test:unit",
     "test:int": "turbo run test:int",
+    "verify": "node scripts/pipeline/verify.mjs --full",
+    "verify:fast": "node scripts/pipeline/verify.mjs --fast",
+    "check:arch": "node scripts/pipeline/check-arch.mjs",
+    "check:specs": "node scripts/pipeline/check-specs.mjs",
+    "check:hygiene": "node scripts/pipeline/check-hygiene.mjs",
+    "check:audit": "node scripts/pipeline/check-audit.mjs",
+    "check:pipeline": "node --test \"scripts/pipeline/test/*.test.mjs\"",
     "dev": "turbo run dev --parallel",
     "clean": "turbo run clean && rimraf node_modules",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
@@ -32,6 +39,8 @@
     "@changesets/cli": "2.27.11",
     "@commitlint/cli": "19.6.1",
     "@commitlint/config-conventional": "19.6.0",
+    "dependency-cruiser": "17.4.3",
+    "eslint": "9.17.0",
     "husky": "9.1.7",
     "lint-staged": "15.3.0",
     "prettier": "3.4.2",
@@ -49,6 +58,9 @@
     ]
   },
   "pnpm": {
+    "overrides": {
+      "node-forge": "^1.4.3"
+    },
     "peerDependencyRules": {
       "allowedVersions": {
         "react": "19",

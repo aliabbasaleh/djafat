@@ -14,6 +14,7 @@ import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { CurrentActor } from '../auth/current-actor.decorator';
 import { RequireAuth, RequirePermission, RequireRole } from '../auth/decorators';
 import { DeliveriesService } from './deliveries.service';
+import { OrderTrackingService } from './order-tracking.service';
 import { CancelDeliverySchema, type CancelDeliveryInput } from './dto/delivery-action.schema';
 import { CreateDeliverySchema, type CreateDeliveryInput } from './dto/create-delivery.schema';
 
@@ -37,7 +38,10 @@ function requireIdempotencyKey(idempotencyKey: string | undefined): string {
 @ApiTags('deliveries')
 @Controller('deliveries')
 export class DeliveriesController {
-  constructor(private readonly deliveries: DeliveriesService) {}
+  constructor(
+    private readonly deliveries: DeliveriesService,
+    private readonly orderTracking: OrderTrackingService,
+  ) {}
 
   /**
    * Tenant-scoped (BUG-10.1-AUTH): the owning customer, the courier currently
@@ -46,6 +50,14 @@ export class DeliveriesController {
    * ownership for every holder of `deliveries:read` — `courier` included, so
    * any courier could read any other courier's delivery.
    */
+  /** Live map of one of the customer's orders (restaurant, home, courier while on it). Declared before `:id`. */
+  @Get('tracking/order/:orderId')
+  @RequireAuth()
+  @RequireRole('customer')
+  tracking(@CurrentActor() actor: AuthenticatedActor, @Param('orderId') orderId: string) {
+    return this.orderTracking.getForCustomer(actor.userId, orderId);
+  }
+
   @Get(':id')
   @RequireAuth()
   get(@CurrentActor() actor: AuthenticatedActor, @Param('id') id: string) {

@@ -13,8 +13,23 @@ import { RolesGuard } from './guards/roles.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
 import { OwnershipGuard } from './guards/ownership.guard';
 import { StepUpGuard } from './guards/step-up.guard';
-import { OTP_DELIVERY_PORT } from './otp-delivery.token';
+import {
+  OTP_DELIVERY_PORT,
+  OTP_EMAIL_DELIVERY_PORT,
+  OTP_WHATSAPP_DELIVERY_PORT,
+} from './otp-delivery.token';
+import { WhatsappInboundService } from './whatsapp-inbound.service';
+import { WhatsappTextReplyService } from './whatsapp-text-reply.service';
+import { WhatsappWebhookController } from './whatsapp-webhook.controller';
+import { DisabledSmsOtpDeliveryProvider } from './providers/disabled-sms-otp-delivery.provider';
+import { MockWhatsappOtpDeliveryProvider } from './providers/mock-whatsapp-otp-delivery.provider';
+import { CloudWhatsappOtpDeliveryProvider } from './providers/cloud-whatsapp-otp-delivery.provider';
+import { SmtpEmailOtpDeliveryProvider } from './providers/smtp-email-otp-delivery.provider';
+import { MockEmailOtpDeliveryProvider } from './providers/mock-email-otp-delivery.provider';
 import { MockOtpDeliveryProvider } from './providers/mock-otp-delivery.provider';
+import { HttpSmsOtpDeliveryProvider } from './providers/http-sms-otp-delivery.provider';
+import { AppConfigService } from '../../common/config/config.service';
+import { RedisService } from '../../common/redis/redis.service';
 
 /**
  * Identity & Access (Bloc 1, docs/19). Depends only on `users` (docs/19 §43
@@ -26,7 +41,7 @@ import { MockOtpDeliveryProvider } from './providers/mock-otp-delivery.provider'
  */
 @Module({
   imports: [UsersModule],
-  controllers: [AuthController, MeController],
+  controllers: [AuthController, MeController, WhatsappWebhookController],
   providers: [
     AuthService,
     OtpService,
@@ -39,11 +54,45 @@ import { MockOtpDeliveryProvider } from './providers/mock-otp-delivery.provider'
     PermissionsGuard,
     OwnershipGuard,
     StepUpGuard,
-    // Only `mock` is wired at Bloc 1 (docs/19 §6) — a real `sms` provider is
-    // added the same way `MockPaymentProvider`/`CashPaymentProvider` were:
-    // a second class behind the same port, selected by `SMS_PROVIDER` env.
-    { provide: OTP_DELIVERY_PORT, useClass: MockOtpDeliveryProvider },
+    WhatsappInboundService,
+    WhatsappTextReplyService,
+    // FEAT-006: the OTP transport is chosen by `SMS_PROVIDER`. `loadApiEnv`
+    // already refuses `mock` in production and `http` without a URL, so this
+    // map can never wire a provider that silently sends nothing in prod.
+    {
+      provide: OTP_DELIVERY_PORT,
+      useFactory: (config: AppConfigService, redis: RedisService) =>
+        ({
+          mock: () => new MockOtpDeliveryProvider(redis, config),
+          http: () => new HttpSmsOtpDeliveryProvider(config),
+          disabled: () => new DisabledSmsOtpDeliveryProvider(), // FEAT-008: no paid SMS at launch
+        })[config.get('SMS_PROVIDER')](),
+      inject: [AppConfigService, RedisService],
+    },
+    // FEAT-007: email channel of the same port, chosen by `EMAIL_PROVIDER`.
+    // Optional feature: in production without SMTP the mock answers 503
+    // EMAIL_UNAVAILABLE instead of blocking boot (SMS login keeps working).
+    {
+      provide: OTP_EMAIL_DELIVERY_PORT,
+      useFactory: (config: AppConfigService, redis: RedisService) =>
+        ({
+          mock: () => new MockEmailOtpDeliveryProvider(redis, config),
+          smtp: () => new SmtpEmailOtpDeliveryProvider(config),
+        })[config.get('EMAIL_PROVIDER')](),
+      inject: [AppConfigService, RedisService],
+    },
+    // FEAT-008: WhatsApp channel, chosen by `WHATSAPP_PROVIDER`. `loadApiEnv`
+    // refuses `cloud` without its credentials; the mock answers 503 in production.
+    {
+      provide: OTP_WHATSAPP_DELIVERY_PORT,
+      useFactory: (config: AppConfigService, redis: RedisService) =>
+        ({
+          mock: () => new MockWhatsappOtpDeliveryProvider(redis, config),
+          cloud: () => new CloudWhatsappOtpDeliveryProvider(config),
+        })[config.get('WHATSAPP_PROVIDER')](),
+      inject: [AppConfigService, RedisService],
+    },
   ],
-  exports: [ActorResolverService, SessionService, TokenService],
+  exports: [ActorResolverService, SessionService, TokenService, WhatsappTextReplyService],
 })
 export class AuthModule {}
