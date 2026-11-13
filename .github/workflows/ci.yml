@@ -43,6 +43,21 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # Feature pipeline checks (docs/pipeline/README.md §5): graph-wide
+      # architecture, spec/test traceability, test/suppression hygiene, and the
+      # tests of that tooling. Same install/cache as above, no extra job.
+      - name: Spec & traceability check
+        run: pnpm check:specs
+
+      - name: Test & suppression hygiene
+        run: pnpm check:hygiene
+
+      - name: Architecture check
+        run: pnpm check:arch
+
+      - name: Pipeline tooling tests
+        run: pnpm check:pipeline
+
       - name: Unit tests
         run: pnpm test
 
@@ -92,6 +107,24 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @djafat/api run db:generate
+
+      # Identity secrets required by @djafat/config since Bloc 1 (docs/19):
+      # throwaway values generated per run — never versioned, never reused,
+      # nothing for gitleaks to find. Formats as documented in .env.example.
+      - name: Generate throwaway test secrets
+        run: |
+          for name in OTP_HASH_SECRET JWT_ACCESS_SECRET REFRESH_TOKEN_HASH_SECRET; do
+            echo "$name=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          done
+          for name in MFA_ENCRYPTION_KEY DELIVERY_CODE_ENCRYPTION_KEY; do
+            echo "$name=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+          done
+
+      # Workspace packages resolve to their dist/ (package.json exports):
+      # without this, `db:seed` fails on `Cannot find module @djafat/config`
+      # before any test runs. `^...` = the API's dependencies only.
+      - name: Build workspace packages used by the API
+        run: pnpm exec turbo run build --filter=@djafat/api^...
 
       - name: Apply migrations
         run: pnpm --filter @djafat/api run db:migrate

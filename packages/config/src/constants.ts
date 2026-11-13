@@ -11,6 +11,8 @@ export const LAUNCH_MARKET = {
   defaultLocale: 'fr',
   timezone: 'Africa/Ndjamena',
   dialCode: '+235',
+  /** Digits of a national number ("66 12 34 56"), used to normalise phone input — FEAT-005. */
+  nationalNumberLength: 8,
   citySlug: 'ndjamena',
   cityName: "N'Djamena",
 } as const;
@@ -45,6 +47,11 @@ export const PLATFORM_SETTINGS_DEFAULTS = {
   dispatch_radius_expansion_step_m: 2000,
   dispatch_max_waves: 3, // after this many radius expansions with no acceptance -> ops alert, stays searching_courier
   courier_location_stale_seconds: 120, // docs/09 A.2 — 2 min; older = not a dispatch candidate
+  courier_cash_ceiling_minor: 30_000, // FEAT-010 — XAF a courier may hold before being blocked from new offers
+  courier_payout_min_minor: 2_000, // FEAT-014 — smallest on-demand withdrawal, XAF
+  cod_cap_t1_minor: 10_000, // FEAT-015 — most a new customer may pay in cash at the door, XAF
+  cod_cap_t2_minor: 25_000, // FEAT-015
+  cod_cap_t3_minor: 60_000, // FEAT-015
 } as const;
 
 export const API_VERSION_PREFIX = 'v1';

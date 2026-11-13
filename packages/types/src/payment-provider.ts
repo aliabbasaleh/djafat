@@ -19,6 +19,23 @@ export interface ProviderCapabilities {
   /** `true` = confirmation arrives via webhook/poll; `false` = synchronous (cash, mock). */
   readonly async: boolean;
   readonly currencies: readonly string[];
+  /**
+   * `true` = a test/demo provider that must never be reachable in production
+   * (FEAT-002). The API does not register it when NODE_ENV=production and the
+   * seed does not activate it there. Absent = `false`.
+   */
+  readonly sandboxOnly?: boolean;
+  /**
+   * The money is collected when the order is delivered (cash) — FEAT-009.
+   * Such a payment does not gate the order: it is placed as soon as the
+   * payment intent exists, and the payment succeeds at delivery.
+   */
+  readonly collectedOnDelivery?: boolean;
+  /**
+   * Paid by a transfer to DJAFAT's merchant number, confirmed by matching a
+   * recorded transfer receipt (transaction number) — FEAT-009.
+   */
+  readonly matchedByTransferReceipt?: boolean;
   readonly minAmount?: Money;
   readonly maxAmount?: Money;
 }

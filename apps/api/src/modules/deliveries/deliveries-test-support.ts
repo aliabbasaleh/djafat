@@ -102,6 +102,13 @@ export function makeDeliveriesRaceDb() {
   const deliveries: DeliveryRow[] = [];
   const offers: OfferRow[] = [];
   const proofs: ProofRow[] = [];
+  const presets: Array<{
+    orderId: string;
+    valueHash: string;
+    reference: string;
+    createdBy: string;
+    createdAt: Date;
+  }> = [];
   const couriers: CourierRow[] = [];
   const ledgerGroups: LedgerGroupRow[] = [];
   const outboxEvents: Array<{
@@ -362,6 +369,21 @@ export function makeDeliveriesRaceDb() {
           Object.assign(row, args.data);
           return Promise.resolve(row);
         }),
+      },
+      // FEAT-012: codes chosen for phone orders (none unless a test presets one).
+      deliveryCodePreset: {
+        findUnique: vi.fn((args: { where: { orderId: string } }) =>
+          Promise.resolve(presets.find((x) => x.orderId === args.where.orderId) ?? null),
+        ),
+        create: vi.fn(
+          (args: {
+            data: { orderId: string; valueHash: string; reference: string; createdBy: string };
+          }) => {
+            const row = { ...args.data, createdAt: new Date() };
+            presets.push(row);
+            return Promise.resolve(row);
+          },
+        ),
       },
       deliveryProof: {
         create: vi.fn(
@@ -891,6 +913,7 @@ export function fakeOrderAmountPort(courierFeeInPool = true): OrderAmountPort {
     orderCode: 'DJ-0001',
     restaurantId: RESTAURANT_ID,
     customerId: CUSTOMER_ID,
+    customerIsNew: false,
     currency: 'XAF',
     courierFee: money(1200n, 'XAF'),
     courierFeeInPool,

@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedActor } from '@djafat/types';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
@@ -7,9 +18,13 @@ import { RequireAuth, RequireRole } from '../auth/decorators';
 import { AddressesService } from './addresses.service';
 import {
   CreateAddressSchema,
+  LandmarkQuerySchema,
   UpdateAddressSchema,
+  VoiceNoteSchema,
   type CreateAddressInput,
+  type LandmarkQuery,
   type UpdateAddressInput,
+  type VoiceNoteInput,
 } from './dto/addresses.schema';
 
 /**
@@ -79,5 +94,48 @@ export class AddressesController {
   @RequireRole('customer')
   async remove(@CurrentActor() actor: AuthenticatedActor, @Param('id') id: string) {
     await this.addresses.remove(actor.userId, id);
+  }
+
+  // FEAT-018 — a ≤ 10 s voice note for the courier ("le portail bleu après la boutique").
+  @Put(':id/voice-note')
+  @HttpCode(200)
+  @RequireAuth()
+  @RequireRole('customer')
+  setVoiceNote(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(VoiceNoteSchema)) body: VoiceNoteInput,
+  ) {
+    return this.addresses.setVoiceNote(actor.userId, id, body);
+  }
+
+  @Get(':id/voice-note')
+  @RequireAuth()
+  @RequireRole('customer')
+  async getVoiceNote(@CurrentActor() actor: AuthenticatedActor, @Param('id') id: string) {
+    const note = await this.addresses.getOwnVoiceNote(actor.userId, id);
+    return note
+      ? { mime: note.mime, durationMs: note.durationMs, dataBase64: note.data.toString('base64') }
+      : null;
+  }
+
+  @Delete(':id/voice-note')
+  @HttpCode(204)
+  @RequireAuth()
+  @RequireRole('customer')
+  async removeVoiceNote(@CurrentActor() actor: AuthenticatedActor, @Param('id') id: string) {
+    await this.addresses.removeVoiceNote(actor.userId, id);
+  }
+}
+
+/** FEAT-018 — shared landmarks (« Grande Mosquée », « Rond-point Hamama »…), public. */
+@ApiTags('users')
+@Controller('landmarks')
+export class LandmarksController {
+  constructor(private readonly addresses: AddressesService) {}
+
+  @Get()
+  search(@Query(new ZodValidationPipe(LandmarkQuerySchema)) query: LandmarkQuery) {
+    return this.addresses.searchLandmarks(query);
   }
 }

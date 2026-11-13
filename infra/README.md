@@ -14,7 +14,7 @@ Hetzner / AWS / Azure / GCP is an IaC + endpoint change, not a code change.
 | `docker/worker.Dockerfile` | Multi-stage build for `@djafat/worker`                                                                                   |
 | `mock-psp/`                | Deterministic mock PSP (HMAC-signed webhooks) — dev/CI only                                                              |
 | `mock-sms/`                | In-memory mock SMS gateway — lets tests read the OTP back                                                                |
-| `deploy/`                  | (placeholder) compose-prod / IaC — added before the staging deploy (condition H2)                                        |
+| `deploy/`                  | Production / demo stack on one server (Compose + Caddy HTTPS + backups) — see `deploy/README.md`                         |
 
 ## Usage
 

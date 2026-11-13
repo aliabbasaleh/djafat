@@ -1,5 +1,7 @@
 import type { MoneyJson, Role } from '@djafat/types';
 import type { ApiHttp } from './http.js';
+import type { Order } from './orders.js';
+import type { CourierPayout } from './payouts.js';
 
 /**
  * Bloc 9 — admin operations client bindings (docs/30). Every route here is
@@ -106,6 +108,34 @@ export interface Settlement {
   readonly reconciliationNotes: string | null;
 }
 
+/** FEAT-011: an order taken on the phone for a customer who called DJAFAT. */
+export interface PhoneOrderInput {
+  readonly customerPhone: string;
+  readonly customerName?: string;
+  readonly items: ReadonlyArray<{
+    readonly productId: string;
+    readonly quantity: number;
+    readonly selectedOptionIds?: readonly string[];
+  }>;
+  readonly address: {
+    readonly quartier: string;
+    readonly landmark: string;
+    readonly street?: string;
+    readonly instructions?: string;
+    readonly coordinates?: { readonly lat: number; readonly lng: number };
+  };
+  /** FEAT-012: cash on delivery (default), or Airtel/Tigo paid now to DJAFAT's number. */
+  readonly payment?:
+    | { readonly method: 'on_delivery' }
+    | {
+        readonly method: 'wallet';
+        readonly providerCode: string;
+        readonly transactionRef?: string;
+      };
+}
+
+export type PhoneTransferOutcome = 'paid' | 'pending' | 'amount_mismatch';
+
 export function createAdminClient(http: ApiHttp) {
   return {
     users: {
@@ -149,6 +179,37 @@ export function createAdminClient(http: ApiHttp) {
       list: (
         params: { status?: string; restaurantId?: string; page?: number; limit?: number } = {},
       ) => http.get<Paginated<AdminOrderSummary>>('/admin/orders', { query: { ...params } }),
+    },
+    payouts: {
+      /** FEAT-014: courier payouts (to send: `status: 'requested'`), with the courier's Airtel number. */
+      list: (status?: string) =>
+        http.get<
+          ReadonlyArray<
+            CourierPayout & {
+              readonly courier: { id: string; name: string | null; phone: string | null };
+            }
+          >
+        >('/admin/payouts', { query: status ? { status } : {} }),
+      prepareWeekly: () => http.post<{ created: number }>('/admin/payouts/weekly'),
+      markSent: (id: string, input: { transactionRef: string; airtelFeeMinor: number }) =>
+        http.post<CourierPayout>(`/admin/payouts/${encodeURIComponent(id)}/sent`, { body: input }),
+    },
+    phoneOrders: {
+      place: (idempotencyKey: string, input: PhoneOrderInput) =>
+        http.post<{
+          status: 'created' | 'replayed';
+          customer: { id: string; isNew: boolean };
+          order: Order;
+          payment: { method: 'on_delivery' | 'wallet'; instructions: string | null };
+          transfer?: PhoneTransferOutcome;
+          /** The code the caller gives the courier at the door (FEAT-012). */
+          deliveryCode: string;
+        }>('/admin/phone-orders', { body: input, idempotencyKey }),
+      confirmTransfer: (orderId: string, transactionRef: string) =>
+        http.post<{ transfer: PhoneTransferOutcome; order: Order }>(
+          `/admin/phone-orders/${encodeURIComponent(orderId)}/transfer`,
+          { body: { transactionRef } },
+        ),
     },
     finance: {
       balances: () => http.get<FinanceBalances>('/admin/finance/balances'),

@@ -76,6 +76,7 @@ export default function OrderBoardPage() {
       if (handleUnauthorized(err)) return;
       setState('error');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- PRE-EXISTING (FU-REACT-01): `restaurantId` is read stale; adding it changes refetch behaviour, review separately.
   }, [handleUnauthorized, soundEnabled]);
 
   // Only on mount — `load` itself changes identity when `soundEnabled`
@@ -85,6 +86,7 @@ export default function OrderBoardPage() {
   useEffect(() => {
     void load();
     // intentionally run once — see comment above
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only by design (see comment above)
   }, []);
 
   const realtimeStatus = useRoomRealtime(

@@ -1,0 +1,14 @@
+# FEAT-010 — Clarifications (grill-me)
+
+Cadre fixé par l'utilisateur le 2026-11-07. Aucune question bloquante n'est ouverte.
+
+| ID           | Question                                                    | Bloquant | Statut    | Décision (qui, quand)                                                                                                                                                | Specs       |
+| ------------ | ----------------------------------------------------------- | -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| FEAT-010-Q01 | Le code de livraison à 4 chiffres est-il à faire ?          | non      | tranchée  | Non : il existe déjà (`GET /v1/deliveries/:id/code`, preuve exigée par `deliver`), utilisé dans la démonstration de FEAT-009. (agent, 2026-11-07)                    | —           |
+| FEAT-010-Q02 | Caution, pièce d'identité, garant : dans le système ?       | non      | hypothèse | Formalités d'inscription faites hors système au lancement ; aucune donnée sensible ajoutée sans besoin.                                                              | —           |
+| FEAT-010-Q03 | Seuil : bloqué à partir de « atteint » ou « dépassé » ?     | non      | hypothèse | Atteint (`détenu ≥ plafond`). Le livreur peut donc détenir au plus le plafond plus le montant d'une commande : une livraison déjà acceptée n'est jamais retirée.     | SPEC-010-01 |
+| FEAT-010-Q04 | Que fait un livreur bloqué pendant une livraison en cours ? | non      | hypothèse | Il la termine normalement ; le blocage ne concerne que les nouvelles propositions.                                                                                   | SPEC-010-01 |
+| FEAT-010-Q05 | Reversement supérieur à l'argent détenu ?                   | non      | hypothèse | Refusé (409 `REMITTANCE_EXCEEDS_CASH_HELD`), le transfert reste non rapproché : l'équipe tranche (erreur de saisie, avance…). Le reversement partiel est accepté.    | SPEC-010-02 |
+| FEAT-010-Q06 | Écriture du reversement ?                                   | non      | hypothèse | Débit `PSP_CLEARING` (l'argent est sur le compte marchand), crédit `CASH_FLOAT:<livreur>`, groupe `cash_reconciliation`, clé d'idempotence `remittance:<transfert>`. | SPEC-010-02 |
+| FEAT-010-Q07 | Plafond par livreur ?                                       | non      | hypothèse | Un seul plafond global au lancement (réglage de plateforme). Un plafond par livreur (selon sa caution) viendra si besoin.                                            | SPEC-010-01 |
+| FEAT-010-Q08 | Le transfert doit-il venir du téléphone du livreur ?        | non      | hypothèse | Non exigé : l'équipe choisit le livreur à la main, après contrôle (même logique que le rapprochement manuel de FEAT-009).                                            | SPEC-010-02 |

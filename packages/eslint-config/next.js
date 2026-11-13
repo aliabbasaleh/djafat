@@ -1,10 +1,12 @@
 // @ts-check
 import globals from 'globals';
 import base from './base.js';
+import react from './react.js';
 
 /** Next.js apps (web, admin, restaurant). @type {import('typescript-eslint').ConfigArray} */
 export default [
   ...base,
+  ...react,
   {
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },

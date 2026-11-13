@@ -31,7 +31,9 @@ body {
   /* Reserve room for the fixed mobile bottom tab bar (`MobileNav`,
      @djafat/ui, hidden at the same `lg` breakpoint) so page content is
      never hidden behind it. */
-  padding-bottom: calc(var(--djafat-touch-target-primary, 48) * 1px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(
+    var(--djafat-touch-target-primary, 48) * 1px + env(safe-area-inset-bottom, 0px)
+  );
 }
 
 @media (min-width: 905px) {

@@ -57,3 +57,44 @@
   gap: calc(var(--djafat-space-2) * 1px);
   margin-top: calc(var(--djafat-space-2) * 1px);
 }
+
+/* FEAT-018 */
+.landmarkBox {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-1) * 1px);
+}
+
+.suggestions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.suggestion {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: calc(var(--djafat-space-3) * 1px);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--djafat-color-border-default);
+  font: inherit;
+  cursor: pointer;
+}
+
+.suggestion:hover,
+.suggestion:focus-visible {
+  background: var(--djafat-color-surface-subtle, rgba(0, 0, 0, 0.04));
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--djafat-space-2) * 1px);
+}

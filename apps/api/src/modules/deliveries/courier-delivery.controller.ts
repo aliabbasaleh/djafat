@@ -135,4 +135,12 @@ export class CourierDeliveryController {
   myDeliveries(@CurrentActor() actor: AuthenticatedActor) {
     return this.deliveries.listActiveForCourier(actor.userId);
   }
+
+  /** FEAT-018 — the customer's ≤ 10 s voice note, for the courier delivering it. */
+  @Get('couriers/me/deliveries/:id/voice-note')
+  @RequireAuth()
+  @RequireRole('courier')
+  voiceNote(@CurrentActor() actor: AuthenticatedActor, @Param('id') id: string) {
+    return this.deliveries.getVoiceNoteForCourier(id, actor.userId);
+  }
 }

@@ -1,3 +1,24 @@
 .main {
-  padding: calc(var(--djafat-space-10) * 1px) 0 calc(var(--djafat-space-10) * 1px);
+  padding: calc(var(--djafat-space-10) * 1px) 16px calc(var(--djafat-space-10) * 1px);
+}
+
+.methods {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-auto-flow: column;
+  gap: 8px;
+}
+.method {
+  padding: 12px 8px;
+  border-radius: 12px;
+  border: 2px solid var(--djafat-color-border-default);
+  background: var(--djafat-color-bg-surface);
+  color: var(--djafat-color-text-primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.methodActive {
+  border-color: var(--djafat-color-brand-primary);
+  background: var(--djafat-color-bg-surface-alt);
 }

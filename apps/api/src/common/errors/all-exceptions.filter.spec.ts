@@ -215,4 +215,31 @@ describe('AllExceptionsFilter — a malformed identifier is a 400, not a 500 (pi
     expect(getStatus()).toBe(500);
     expect(getBody().error.code).toBe('INTERNAL');
   });
+
+  // Found by the full customer-journey run: `Content-Type: application/json`
+  // with an empty body is a client error (Fastify FST_ERR_CTP_EMPTY_JSON_BODY,
+  // statusCode 400) — it used to surface as an opaque 500 INTERNAL.
+  it('a framework client error (Fastify statusCode 4xx) keeps its 4xx as VALIDATION_ERROR, never a 500', () => {
+    const { host, getBody, getStatus } = makeHost();
+    const err = Object.assign(
+      new Error("Body cannot be empty when content-type is set to 'application/json'"),
+      {
+        code: 'FST_ERR_CTP_EMPTY_JSON_BODY',
+        statusCode: 400,
+      },
+    );
+    new AllExceptionsFilter().catch(err, host);
+    expect(getStatus()).toBe(400);
+    expect(getBody().error.code).toBe('VALIDATION_ERROR');
+    expect(getBody().error.message).toContain('Body cannot be empty');
+
+    // a 5xx-looking framework error is still an opaque INTERNAL (no leak)
+    const other = makeHost();
+    new AllExceptionsFilter().catch(
+      Object.assign(new Error('boom'), { statusCode: 500 }),
+      other.host,
+    );
+    expect(other.getStatus()).toBe(500);
+    expect(other.getBody().error.code).toBe('INTERNAL');
+  });
 });

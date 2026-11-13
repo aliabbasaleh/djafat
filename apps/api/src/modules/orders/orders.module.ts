@@ -25,6 +25,6 @@ import { OrdersAdminController } from './orders-admin.controller';
   imports: [CatalogModule, PricingModule, CartsModule, AddressesModule, UsersModule, AuthModule],
   controllers: [OrdersController, OrdersAdminController],
   providers: [OrdersService, { provide: ORDER_AMOUNT_PORT, useExisting: OrdersService }],
-  exports: [ORDER_AMOUNT_PORT],
+  exports: [ORDER_AMOUNT_PORT, OrdersService],
 })
 export class OrdersModule {}

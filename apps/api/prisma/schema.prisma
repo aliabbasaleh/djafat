@@ -99,22 +99,22 @@ model PaymentProviderRow {
 }
 
 model PaymentProviderConfig {
-  id              String    @id @default(uuid()) @db.Uuid
-  providerCode    String    @map("provider_code")
-  countryId       String?   @map("country_id") @db.Uuid
-  cityId          String?   @map("city_id") @db.Uuid
-  restaurantId    String?   @map("restaurant_id") @db.Uuid
-  deliveryZoneId  String?   @map("delivery_zone_id") @db.Uuid
-  enabled         Boolean   @default(true)
-  priority        Int       @default(100)
-  currency        String?   @db.Char(3)
-  minAmountMinor  BigInt?   @map("min_amount_minor")
-  maxAmountMinor  BigInt?   @map("max_amount_minor")
+  id             String    @id @default(uuid()) @db.Uuid
+  providerCode   String    @map("provider_code")
+  countryId      String?   @map("country_id") @db.Uuid
+  cityId         String?   @map("city_id") @db.Uuid
+  restaurantId   String?   @map("restaurant_id") @db.Uuid
+  deliveryZoneId String?   @map("delivery_zone_id") @db.Uuid
+  enabled        Boolean   @default(true)
+  priority       Int       @default(100)
+  currency       String?   @db.Char(3)
+  minAmountMinor BigInt?   @map("min_amount_minor")
+  maxAmountMinor BigInt?   @map("max_amount_minor")
   /// PSP fee rate override at this scope (Bloc 5 — replaces the Bloc 0.5 hardcoded MOCK_PSP_FEE_BPS).
-  feeBps          Int?      @map("fee_bps")
-  configRef       String?   @map("config_ref")
-  validFrom       DateTime  @default(now()) @map("valid_from") @db.Timestamptz(6)
-  validTo         DateTime? @map("valid_to") @db.Timestamptz(6)
+  feeBps         Int?      @map("fee_bps")
+  configRef      String?   @map("config_ref")
+  validFrom      DateTime  @default(now()) @map("valid_from") @db.Timestamptz(6)
+  validTo        DateTime? @map("valid_to") @db.Timestamptz(6)
 
   @@map("payment_provider_configs")
 }
@@ -185,21 +185,54 @@ model User {
 /// SQL but is intentionally NOT modelled — same PostGIS convention as
 /// `Restaurant.geom` below.
 model Address {
-  id             String    @id @default(uuid()) @db.Uuid
-  userId         String    @map("user_id") @db.Uuid
-  label          String?
-  recipientPhone String?   @map("recipient_phone")
-  cityId         String?   @map("city_id") @db.Uuid
-  quartier       String?
-  street         String?
-  landmark       String?
-  instructions   String?
-  geocodeStatus  String    @default("pending") @map("geocode_status")
-  isDefault      Boolean   @default(false) @map("is_default")
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  label            String?
+  recipientPhone   String?   @map("recipient_phone")
+  cityId           String?   @map("city_id") @db.Uuid
+  quartier         String?
+  street           String?
+  landmark         String?
+  instructions     String?
+  geocodeStatus    String    @default("pending") @map("geocode_status")
+  isDefault        Boolean   @default(false) @map("is_default")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  /// FEAT-018 — landmark-relative address, door hint, learned point (geography columns via raw SQL).
+  landmarkId       String?   @map("landmark_id") @db.Uuid
+  landmarkRelation String?   @map("landmark_relation")
+  doorHint         String?   @map("door_hint")
+  gpsAccuracyM     Int?      @map("gps_accuracy_m")
+  geomSource       String    @default("user") @map("geom_source")
+  verifiedCount    Int       @default(0) @map("verified_count")
+  verifiedAt       DateTime? @map("verified_at") @db.Timestamptz(6)
 
   @@map("addresses")
+}
+
+/// FEAT-018 — shared landmarks of a city (`geom` via raw SQL).
+model Landmark {
+  id        String   @id @default(uuid()) @db.Uuid
+  cityId    String   @map("city_id") @db.Uuid
+  name      String
+  kind      String   @default("other")
+  aliases   String[] @default([])
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([cityId, name])
+  @@map("landmarks")
+}
+
+/// FEAT-018 — ≤ 10 s voice note for the courier, one per address.
+model AddressVoiceNote {
+  addressId  String   @id @map("address_id") @db.Uuid
+  mime       String
+  data       Bytes
+  durationMs Int      @map("duration_ms")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("address_voice_notes")
 }
 
 model Session {
@@ -242,9 +275,13 @@ model MfaTotpSecret {
   @@map("mfa_totp_secrets")
 }
 
+/// FEAT-007/FEAT-008 (migrations 0030, 0031): `target` is an E.164 phone
+/// (channel sms or whatsapp) or a lower-cased email (channel email) — one
+/// store, one security logic.
 model OtpCode {
   id         String    @id @default(uuid()) @db.Uuid
-  phone      String
+  target     String
+  channel    String    @default("sms")
   codeHash   String    @map("code_hash")
   purpose    String
   attempts   Int       @default(0)
@@ -255,13 +292,14 @@ model OtpCode {
   @@map("otp_codes")
 }
 
-model PhoneAuthLock {
-  phone       String    @id
+/// Durable brute-force lock per OTP target (phone or email) — migration 0030.
+model AuthTargetLock {
+  target      String    @id
   failedCount Int       @default(0) @map("failed_count")
   lockedUntil DateTime? @map("locked_until") @db.Timestamptz(6)
   updatedAt   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
 
-  @@map("phone_auth_locks")
+  @@map("auth_target_locks")
 }
 
 /// ─────────────────────────────────── system ─────────────────────────────────
@@ -393,28 +431,28 @@ enum PaymentStatus {
 }
 
 model Restaurant {
-  id            String    @id @default(uuid()) @db.Uuid
-  countryId     String    @map("country_id") @db.Uuid
-  cityId        String    @map("city_id") @db.Uuid
-  city          City      @relation(fields: [cityId], references: [id])
-  ownerUserId   String?   @map("owner_user_id") @db.Uuid
-  slug          String    @unique
+  id            String              @id @default(uuid()) @db.Uuid
+  countryId     String              @map("country_id") @db.Uuid
+  cityId        String              @map("city_id") @db.Uuid
+  city          City                @relation(fields: [cityId], references: [id])
+  ownerUserId   String?             @map("owner_user_id") @db.Uuid
+  slug          String              @unique
   name          String
   description   String?
   phone         String?
-  addressText   String?   @map("address_text")
-  logoUrl       String?   @map("logo_url")
-  coverUrl      String?   @map("cover_url")
-  currency      String    @db.Char(3)
+  addressText   String?             @map("address_text")
+  logoUrl       String?             @map("logo_url")
+  coverUrl      String?             @map("cover_url")
+  currency      String              @db.Char(3)
   /// draft | pending_review | active | paused | suspended | closed — docs/20 §6.
-  status        String    @default("draft")
+  status        String              @default("draft")
   /// Cache recomputed from `reviews` (Bloc 8+) — never written by the catalog module itself.
-  ratingAvg     Decimal   @default(0) @map("rating_avg") @db.Decimal(2, 1)
-  ratingCount   Int       @default(0) @map("rating_count")
-  prepTimeMin   Int       @default(20) @map("prep_time_min")
-  minOrderMinor BigInt    @default(0) @map("min_order_minor")
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  ratingAvg     Decimal             @default(0) @map("rating_avg") @db.Decimal(2, 1)
+  ratingCount   Int                 @default(0) @map("rating_count")
+  prepTimeMin   Int                 @default(20) @map("prep_time_min")
+  minOrderMinor BigInt              @default(0) @map("min_order_minor")
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime            @default(now()) @map("updated_at") @db.Timestamptz(6)
   products      Product[]
   categories    MenuCategory[]
   hours         RestaurantHours[]
@@ -430,39 +468,39 @@ model Restaurant {
 }
 
 model MenuCategory {
-  id           String    @id @default(uuid()) @db.Uuid
-  restaurantId String    @map("restaurant_id") @db.Uuid
+  id           String     @id @default(uuid()) @db.Uuid
+  restaurantId String     @map("restaurant_id") @db.Uuid
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
   name         String
   description  String?
-  imageUrl     String?   @map("image_url")
-  sortOrder    Int       @default(0) @map("sort_order")
-  isActive     Boolean   @default(true) @map("is_active")
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  imageUrl     String?    @map("image_url")
+  sortOrder    Int        @default(0) @map("sort_order")
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @default(now()) @map("updated_at") @db.Timestamptz(6)
   products     Product[]
 
   @@map("menu_categories")
 }
 
 model Product {
-  id           String        @id @default(uuid()) @db.Uuid
-  restaurantId String        @map("restaurant_id") @db.Uuid
-  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id])
-  categoryId   String?       @map("category_id") @db.Uuid
-  category     MenuCategory? @relation(fields: [categoryId], references: [id])
+  id           String               @id @default(uuid()) @db.Uuid
+  restaurantId String               @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant           @relation(fields: [restaurantId], references: [id])
+  categoryId   String?              @map("category_id") @db.Uuid
+  category     MenuCategory?        @relation(fields: [categoryId], references: [id])
   slug         String
   name         String
   description  String?
-  imageUrl     String?       @map("image_url")
-  priceMinor   BigInt        @map("price_minor")
-  currency     String        @db.Char(3)
-  sortOrder    Int           @default(0) @map("sort_order")
+  imageUrl     String?              @map("image_url")
+  priceMinor   BigInt               @map("price_minor")
+  currency     String               @db.Char(3)
+  sortOrder    Int                  @default(0) @map("sort_order")
   /// In the catalogue at all — distinct from `isAvailable` (docs/20 §19).
-  isActive     Boolean       @default(true) @map("is_active")
-  isAvailable  Boolean       @default(true) @map("is_available")
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime      @default(now()) @map("updated_at") @db.Timestamptz(6)
+  isActive     Boolean              @default(true) @map("is_active")
+  isAvailable  Boolean              @default(true) @map("is_available")
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
   optionGroups ProductOptionGroup[]
 
   @@unique([restaurantId, slug])
@@ -470,48 +508,48 @@ model Product {
 }
 
 model ProductOptionGroup {
-  id            String   @id @default(uuid()) @db.Uuid
-  productId     String   @map("product_id") @db.Uuid
-  product       Product  @relation(fields: [productId], references: [id])
+  id            String          @id @default(uuid()) @db.Uuid
+  productId     String          @map("product_id") @db.Uuid
+  product       Product         @relation(fields: [productId], references: [id])
   name          String
   /// single | multiple — docs/20 §16.
-  selectionType String   @default("single") @map("selection_type")
-  minSelections Int      @default(0) @map("min_selections")
-  maxSelections Int      @default(1) @map("max_selections")
-  isRequired    Boolean  @default(false) @map("is_required")
-  sortOrder     Int      @default(0) @map("sort_order")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  selectionType String          @default("single") @map("selection_type")
+  minSelections Int             @default(0) @map("min_selections")
+  maxSelections Int             @default(1) @map("max_selections")
+  isRequired    Boolean         @default(false) @map("is_required")
+  sortOrder     Int             @default(0) @map("sort_order")
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime        @default(now()) @map("updated_at") @db.Timestamptz(6)
   options       ProductOption[]
 
   @@map("product_option_groups")
 }
 
 model ProductOption {
-  id              String              @id @default(uuid()) @db.Uuid
-  optionGroupId   String              @map("option_group_id") @db.Uuid
-  optionGroup     ProductOptionGroup  @relation(fields: [optionGroupId], references: [id])
+  id              String             @id @default(uuid()) @db.Uuid
+  optionGroupId   String             @map("option_group_id") @db.Uuid
+  optionGroup     ProductOptionGroup @relation(fields: [optionGroupId], references: [id])
   name            String
-  priceDeltaMinor BigInt              @default(0) @map("price_delta_minor")
-  currency        String              @db.Char(3)
-  isAvailable     Boolean             @default(true) @map("is_available")
-  sortOrder       Int                 @default(0) @map("sort_order")
-  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime            @default(now()) @map("updated_at") @db.Timestamptz(6)
+  priceDeltaMinor BigInt             @default(0) @map("price_delta_minor")
+  currency        String             @db.Char(3)
+  isAvailable     Boolean            @default(true) @map("is_available")
+  sortOrder       Int                @default(0) @map("sort_order")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
 
   @@map("product_options")
 }
 
 model RestaurantHours {
-  id             String     @id @default(uuid()) @db.Uuid
-  restaurantId   String     @map("restaurant_id") @db.Uuid
-  restaurant     Restaurant @relation(fields: [restaurantId], references: [id])
+  id            String     @id @default(uuid()) @db.Uuid
+  restaurantId  String     @map("restaurant_id") @db.Uuid
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
   /// 0=Sunday..6=Saturday — matches JS `Date#getDay()` (docs/20 §20).
-  weekday        Int
+  weekday       Int
   /// Minutes since local midnight — plain int, not `@db.Time` (avoids
   /// Prisma's ambiguous Date<->Time serialisation; see migration 0018).
-  opensMinutes   Int        @map("opens_minutes")
-  closesMinutes  Int        @map("closes_minutes")
+  opensMinutes  Int        @map("opens_minutes")
+  closesMinutes Int        @map("closes_minutes")
 
   @@map("restaurant_hours")
 }
@@ -536,7 +574,7 @@ model Order {
   cityId                String      @map("city_id") @db.Uuid
   customerId            String      @map("customer_id") @db.Uuid
   restaurantId          String      @map("restaurant_id") @db.Uuid
-  restaurant             Restaurant  @relation(fields: [restaurantId], references: [id])
+  restaurant            Restaurant  @relation(fields: [restaurantId], references: [id])
   status                OrderStatus @default(draft)
   currency              String      @db.Char(3)
   subtotalMinor         BigInt      @default(0) @map("subtotal_minor")
@@ -562,6 +600,8 @@ model Order {
   dropoffInstructions   String?     @map("dropoff_instructions")
   dropoffRecipientPhone String?     @map("dropoff_recipient_phone")
   dropoffGeocodeStatus  String      @default("pending") @map("dropoff_geocode_status")
+  /// FEAT-018 — door hint frozen at order time ("portail bleu").
+  dropoffDoorHint       String?     @map("dropoff_door_hint")
   createdAt             DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime    @default(now()) @map("updated_at") @db.Timestamptz(6)
 
@@ -575,15 +615,15 @@ model Order {
 }
 
 model OrderItem {
-  id             String  @id @default(uuid()) @db.Uuid
-  orderId        String  @map("order_id") @db.Uuid
-  order          Order   @relation(fields: [orderId], references: [id])
-  productId      String? @map("product_id") @db.Uuid
-  nameSnapshot   String  @map("name_snapshot")
-  unitPriceMinor BigInt  @map("unit_price_minor")
+  id             String            @id @default(uuid()) @db.Uuid
+  orderId        String            @map("order_id") @db.Uuid
+  order          Order             @relation(fields: [orderId], references: [id])
+  productId      String?           @map("product_id") @db.Uuid
+  nameSnapshot   String            @map("name_snapshot")
+  unitPriceMinor BigInt            @map("unit_price_minor")
   quantity       Int
-  lineTotalMinor BigInt  @map("line_total_minor")
-  currency       String  @db.Char(3)
+  lineTotalMinor BigInt            @map("line_total_minor")
+  currency       String            @db.Char(3)
   options        OrderItemOption[]
 
   @@map("order_items")
@@ -690,6 +730,31 @@ model Payment {
   @@map("payments")
 }
 
+/// FEAT-009 (migration 0032): transfers received on DJAFAT's merchant phone,
+/// matched to a pending wallet payment. Unique (provider, transaction number)
+/// and unique payment_id are the double-spend guarantees.
+model MobileMoneyReceipt {
+  id             String    @id @default(uuid()) @db.Uuid
+  providerCode   String    @map("provider_code")
+  transactionRef String    @map("transaction_ref")
+  amountMinor    BigInt    @map("amount_minor")
+  currency       String    @db.Char(3)
+  senderPhone    String    @map("sender_phone")
+  receivedAt     DateTime  @map("received_at") @db.Timestamptz(6)
+  source         String    @default("manual")
+  status         String    @default("unmatched")
+  paymentId      String?   @unique @map("payment_id") @db.Uuid
+  /// FEAT-010: set when the transfer is a courier's cash remittance.
+  courierId      String?   @map("courier_id") @db.Uuid
+  matchedAt      DateTime? @map("matched_at") @db.Timestamptz(6)
+  recordedBy     String?   @map("recorded_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([providerCode, transactionRef], map: "mobile_money_receipts_ref_uk")
+  @@index([providerCode, status, receivedAt(sort: Desc)], map: "mobile_money_receipts_lookup_idx")
+  @@map("mobile_money_receipts")
+}
+
 model WebhookEvent {
   id             String    @id @default(uuid()) @db.Uuid
   providerCode   String    @map("provider_code")
@@ -711,33 +776,33 @@ model WebhookEvent {
 /// `geography(Point,4326)` exist in SQL, not modelled (PostGIS convention,
 /// same as `Restaurant.geom`).
 model Delivery {
-  id                  String    @id @default(uuid()) @db.Uuid
-  orderId             String    @unique @map("order_id") @db.Uuid
-  order               Order     @relation(fields: [orderId], references: [id])
+  id                 String    @id @default(uuid()) @db.Uuid
+  orderId            String    @unique @map("order_id") @db.Uuid
+  order              Order     @relation(fields: [orderId], references: [id])
   /// Null until a courier is assigned — never resolved at order creation
   /// (the Bloc 0.5 hack this bloc removes; docs/25 §2).
-  courierId           String?   @map("courier_id") @db.Uuid
-  status              String    @default("pending")
-  currency            String    @db.Char(3)
-  courierFeeMinor     BigInt    @default(0) @map("courier_fee_minor")
-  estimatedDistanceM  Decimal?  @map("estimated_distance_m")
-  actualDistanceM     Decimal?  @map("actual_distance_m")
-  dispatchRadiusM     Int?      @map("dispatch_radius_m")
-  dispatchAttempts    Int       @default(0) @map("dispatch_attempts")
-  searchingSince      DateTime? @map("searching_since") @db.Timestamptz(6)
-  assignedAt          DateTime? @map("assigned_at") @db.Timestamptz(6)
-  acceptedAt          DateTime? @map("accepted_at") @db.Timestamptz(6)
-  pickupArrivedAt     DateTime? @map("pickup_arrived_at") @db.Timestamptz(6)
-  pickedUpAt          DateTime? @map("picked_up_at") @db.Timestamptz(6)
-  onTheWayAt          DateTime? @map("on_the_way_at") @db.Timestamptz(6)
-  deliveredAt         DateTime? @map("delivered_at") @db.Timestamptz(6)
-  cancelledAt         DateTime? @map("cancelled_at") @db.Timestamptz(6)
-  cancelledReason     String?   @map("cancelled_reason")
-  cancelledBy         String?   @map("cancelled_by") @db.Uuid
-  failedAt            DateTime? @map("failed_at") @db.Timestamptz(6)
-  failedReason        String?   @map("failed_reason")
-  updatedAt           DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  courierId          String?   @map("courier_id") @db.Uuid
+  status             String    @default("pending")
+  currency           String    @db.Char(3)
+  courierFeeMinor    BigInt    @default(0) @map("courier_fee_minor")
+  estimatedDistanceM Decimal?  @map("estimated_distance_m")
+  actualDistanceM    Decimal?  @map("actual_distance_m")
+  dispatchRadiusM    Int?      @map("dispatch_radius_m")
+  dispatchAttempts   Int       @default(0) @map("dispatch_attempts")
+  searchingSince     DateTime? @map("searching_since") @db.Timestamptz(6)
+  assignedAt         DateTime? @map("assigned_at") @db.Timestamptz(6)
+  acceptedAt         DateTime? @map("accepted_at") @db.Timestamptz(6)
+  pickupArrivedAt    DateTime? @map("pickup_arrived_at") @db.Timestamptz(6)
+  pickedUpAt         DateTime? @map("picked_up_at") @db.Timestamptz(6)
+  onTheWayAt         DateTime? @map("on_the_way_at") @db.Timestamptz(6)
+  deliveredAt        DateTime? @map("delivered_at") @db.Timestamptz(6)
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelledReason    String?   @map("cancelled_reason")
+  cancelledBy        String?   @map("cancelled_by") @db.Uuid
+  failedAt           DateTime? @map("failed_at") @db.Timestamptz(6)
+  failedReason       String?   @map("failed_reason")
+  updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("deliveries")
 }
@@ -758,6 +823,9 @@ model Courier {
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
 
+  /// FEAT-010: courier holds cash at or above the ceiling; dispatch skips them.
+  cashBlockedAt DateTime? @map("cash_blocked_at") @db.Timestamptz(6)
+
   @@map("couriers")
 }
 
@@ -765,13 +833,13 @@ model Courier {
 /// from the delivery's own. Never durably assumed accepted: the delivery
 /// only moves to `courier_accepted` once the courier actually responds.
 model DeliveryOffer {
-  id           String    @id @default(uuid()) @db.Uuid
-  deliveryId   String    @map("delivery_id") @db.Uuid
-  courierId    String    @map("courier_id") @db.Uuid
-  status       String    @default("offered")
-  offeredAt    DateTime  @default(now()) @map("offered_at") @db.Timestamptz(6)
-  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
-  respondedAt  DateTime? @map("responded_at") @db.Timestamptz(6)
+  id          String    @id @default(uuid()) @db.Uuid
+  deliveryId  String    @map("delivery_id") @db.Uuid
+  courierId   String    @map("courier_id") @db.Uuid
+  status      String    @default("offered")
+  offeredAt   DateTime  @default(now()) @map("offered_at") @db.Timestamptz(6)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  respondedAt DateTime? @map("responded_at") @db.Timestamptz(6)
 
   @@map("delivery_offers")
 }
@@ -793,6 +861,19 @@ model DeliveryProof {
   failedAttempts Int       @default(0) @map("failed_attempts")
 
   @@map("delivery_proofs")
+}
+
+/// FEAT-012: a delivery code chosen when an operator takes an order on the
+/// phone (the customer has no app to read it). Copied into `delivery_proofs`
+/// at pickup instead of a random one. Hashed + encrypted, never raw.
+model DeliveryCodePreset {
+  orderId   String   @id @map("order_id") @db.Uuid
+  valueHash String   @map("value_hash")
+  reference String
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("delivery_code_presets")
 }
 
 /// ────────────────────── Bloc 5 — payment core (docs/24) ──────────────────────
@@ -844,17 +925,17 @@ model Settlement {
 /// produced this row — the unique constraint with `userId` is what makes
 /// at-least-once delivery produce exactly one notification per recipient.
 model Notification {
-  id                  String    @id @default(uuid()) @db.Uuid
-  userId              String    @map("user_id") @db.Uuid
-  type                String
-  titleKey            String    @map("title_key")
-  bodyKey             String    @map("body_key")
-  data                Json      @default("{}")
-  referenceAggregate  String?   @map("reference_aggregate")
-  referenceId         String?   @map("reference_id") @db.Uuid
-  dedupKey            String    @map("dedup_key")
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  readAt              DateTime? @map("read_at") @db.Timestamptz(6)
+  id                 String    @id @default(uuid()) @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  type               String
+  titleKey           String    @map("title_key")
+  bodyKey            String    @map("body_key")
+  data               Json      @default("{}")
+  referenceAggregate String?   @map("reference_aggregate")
+  referenceId        String?   @map("reference_id") @db.Uuid
+  dedupKey           String    @map("dedup_key")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  readAt             DateTime? @map("read_at") @db.Timestamptz(6)
 
   @@unique([userId, dedupKey])
   @@map("notifications")
@@ -875,4 +956,58 @@ model NotificationDevice {
 
   @@unique([pushToken])
   @@map("notification_devices")
+}
+
+/// FEAT-014: a courier's earnings paid to their Airtel Money (payments).
+model CourierPayout {
+  id             String    @id @default(uuid()) @db.Uuid
+  courierId      String    @map("courier_id") @db.Uuid
+  kind           String
+  status         String    @default("requested")
+  feePayer       String    @map("fee_payer")
+  currency       String    @db.Char(3)
+  requestedMinor BigInt    @map("requested_minor")
+  paidMinor      BigInt?   @map("paid_minor")
+  receivedMinor  BigInt?   @map("received_minor")
+  airtelFeeMinor BigInt?   @map("airtel_fee_minor")
+  periodStart    DateTime? @map("period_start") @db.Timestamptz(6)
+  transactionRef String?   @map("transaction_ref")
+  sentBy         String?   @map("sent_by") @db.Uuid
+  requestedAt    DateTime  @default(now()) @map("requested_at") @db.Timestamptz(6)
+  sentAt         DateTime? @map("sent_at") @db.Timestamptz(6)
+
+  @@map("courier_payouts")
+}
+
+/// FEAT-016: a merchant phone forwarding the operator's SMS (payments).
+model SmsGatewayDevice {
+  id               String    @id @default(uuid()) @db.Uuid
+  providerCode     String    @map("provider_code")
+  label            String
+  secretEnc        String    @map("secret_enc")
+  createdBy        String    @map("created_by") @db.Uuid
+  active           Boolean   @default(true)
+  lastSeq          BigInt    @default(0) @map("last_seq")
+  lastSeenAt       DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  lastBalanceMinor BigInt?   @map("last_balance_minor")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("sms_gateway_devices")
+}
+
+/// FEAT-016: every SMS a gateway forwarded, and what became of it.
+model MobileMoneySms {
+  id         String   @id @default(uuid()) @db.Uuid
+  deviceId   String   @map("device_id") @db.Uuid
+  seq        BigInt
+  sender     String
+  body       String
+  receivedAt DateTime @map("received_at") @db.Timestamptz(6)
+  outcome    String
+  template   String?
+  receiptId  String?  @map("receipt_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([deviceId, seq], map: "mobile_money_sms_seq_uk")
+  @@map("mobile_money_sms")
 }

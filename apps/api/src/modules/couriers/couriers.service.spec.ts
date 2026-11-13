@@ -54,6 +54,21 @@ function fakePrisma() {
         Object.assign(row, args.data);
         return Promise.resolve(row);
       }),
+      // Conditional write, like Prisma's: honours `status: { notIn }` in the filter.
+      updateMany: vi.fn(
+        (args: {
+          where: { userId: string; status?: { notIn: string[] } };
+          data: Record<string, unknown>;
+        }) => {
+          const row = couriers.find(
+            (c) =>
+              c.userId === args.where.userId &&
+              !(args.where.status?.notIn ?? []).includes(c.status),
+          );
+          if (row) Object.assign(row, args.data);
+          return Promise.resolve({ count: row ? 1 : 0 });
+        },
+      ),
       findMany: vi.fn((args: { where: { status?: string }; skip: number; take: number }) => {
         const matches = args.where.status
           ? couriers.filter((c) => c.status === args.where.status)

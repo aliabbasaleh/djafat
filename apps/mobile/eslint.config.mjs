@@ -1,7 +1,9 @@
 import base from '@djafat/eslint-config/base';
+import react from '@djafat/eslint-config/react';
 
 export default [
   ...base,
+  ...react,
   {
     ignores: ['.expo/**', 'expo-env.d.ts', 'babel.config.js', 'metro.config.js', '*.tsbuildinfo'],
   },

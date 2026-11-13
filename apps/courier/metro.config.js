@@ -13,6 +13,9 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
 ];
-config.resolver.disableHierarchicalLookup = true;
+// Hierarchical lookup stays ON: pnpm keeps each package's own dependencies
+// next to it (node_modules/.pnpm/<pkg>/node_modules), not hoisted to the root.
+// Turning it off made Metro miss them (e.g. react-native -> invariant), so the
+// app could not be bundled at all.
 
 module.exports = config;

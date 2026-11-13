@@ -7,6 +7,12 @@
 import { PrismaClient } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 import { LAUNCH_MARKET, PLATFORM_SETTINGS_DEFAULTS } from '@djafat/config';
+import { CashPaymentProvider } from '../src/modules/payments/providers/cash/cash-payment.provider';
+import { MockPaymentProvider } from '../src/modules/payments/providers/mock/mock-payment.provider';
+import {
+  sandboxOnlyCodes,
+  seedPaymentProviderPlan,
+} from '../src/modules/payments/payment-provider-selection';
 
 const prisma = new PrismaClient();
 
@@ -47,6 +53,43 @@ async function main(): Promise<void> {
       active: true,
     },
   });
+
+  // --- landmarks (FEAT-018) -----------------------------------------------------
+  // Well-known N'Djamena landmarks customers place their address against.
+  // Coordinates are APPROXIMATE (demo seed) and must be checked on the ground
+  // before launch; each delivery then refines the customer's own point.
+  const landmarks: Array<[string, string, string[], number, number]> = [
+    [
+      'Grande Mosquée Roi Fayçal',
+      'mosque',
+      ['grande mosquee', 'mosquee roi faycal'],
+      12.1066,
+      15.0436,
+    ],
+    ['Marché central', 'market', ['grand marche'], 12.1078, 15.0418],
+    ['Place de la Nation', 'administration', ['place de la nation'], 12.1101, 15.0486],
+    ['Rond-point Hamama', 'roundabout', ['hamama'], 12.1215, 15.0634],
+    ['Rond-point Kondolé', 'roundabout', ['kondole'], 12.14, 15.062],
+    ['Marché de Dembé', 'market', ['dembe'], 12.1102, 15.0785],
+    ['Hôpital de la Liberté', 'health', ['hopital liberte'], 12.1131, 15.0571],
+    ['Cathédrale Notre-Dame de la Paix', 'church', ['cathedrale'], 12.1068, 15.0505],
+    ['Stade Idriss Mahamat Ouya', 'other', ['stade omnisport', 'stade'], 12.1146, 15.0699],
+    [
+      'Université de N’Djamena (Ardep Djoumbal)',
+      'school',
+      ['universite', 'ardep djoumbal'],
+      12.1203,
+      15.0455,
+    ],
+  ];
+  for (const [name, kind, aliases, lat, lng] of landmarks) {
+    await prisma.$executeRaw`
+      INSERT INTO landmarks (city_id, name, kind, aliases, geom)
+      VALUES (${city.id}::uuid, ${name}, ${kind}, ${aliases}::text[],
+              ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography)
+      ON CONFLICT (city_id, name) DO NOTHING
+    `;
+  }
 
   // --- roles -----------------------------------------------------------------
   const roles: Array<{ code: string; label: string }> = [
@@ -187,10 +230,26 @@ async function main(): Promise<void> {
     await prisma.paymentMethod.upsert({ where: { code: m.code }, create: m, update: m });
   }
 
+  // FEAT-002: sandbox-only providers (read from their own capabilities, the
+  // same source the API registry uses) are never activated in production.
+  const providerPlan = seedPaymentProviderPlan({
+    isProduction: process.env['NODE_ENV'] === 'production',
+    sandboxCodes: sandboxOnlyCodes([new CashPaymentProvider(), new MockPaymentProvider()]),
+  });
   const providers = [
-    { code: 'cash', methodCode: 'cash_on_delivery', displayName: 'Espèces', active: true },
-    // Deterministic mock — permanent, dev/CI only. Enabled here for non-prod.
-    { code: 'mock', methodCode: 'mobile_money', displayName: 'Mock Payment (dev)', active: true },
+    {
+      code: 'cash',
+      methodCode: 'cash_on_delivery',
+      displayName: 'Espèces',
+      active: providerPlan.isActive('cash'),
+    },
+    // Deterministic mock — permanent, dev/CI only; inactive in production.
+    {
+      code: 'mock',
+      methodCode: 'mobile_money',
+      displayName: 'Mock Payment (dev)',
+      active: providerPlan.isActive('mock'),
+    },
     // Prepared but INACTIVE until API/contract access is verified (decision A1).
     {
       code: 'airtel_money',
@@ -204,6 +263,15 @@ async function main(): Promise<void> {
       displayName: 'Moov Money (Flooz)',
       active: false,
     },
+    // FEAT-009: paid to DJAFAT's merchant number, matched by transaction
+    // number. Activated by ops once the merchant number is configured
+    // (MOBILE_MONEY_WALLETS) — never by the seed.
+    {
+      code: 'tigo_cash',
+      methodCode: 'mobile_money',
+      displayName: 'Tigo Cash',
+      active: false,
+    },
   ];
   for (const p of providers) {
     await prisma.paymentProviderRow.upsert({
@@ -213,8 +281,8 @@ async function main(): Promise<void> {
     });
   }
 
-  // Availability for the launch market: cash + mock only.
-  for (const providerCode of ['cash', 'mock']) {
+  // Availability for the launch market: cash (+ mock outside production).
+  for (const providerCode of providerPlan.availabilityCodes) {
     const existing = await prisma.paymentProviderConfig.findFirst({
       where: { providerCode, countryId: country.id, cityId: city.id },
     });
@@ -229,6 +297,36 @@ async function main(): Promise<void> {
         },
       });
     }
+  }
+
+  // FEAT-009: launch-market availability for the merchant wallets, DISABLED,
+  // with an explicit 0 fee (unknown until the merchant contracts are signed —
+  // without a row the fee would fall back to the mock default). Ops enable it.
+  for (const providerCode of ['airtel_money', 'tigo_cash']) {
+    const existing = await prisma.paymentProviderConfig.findFirst({
+      where: { providerCode, countryId: country.id, cityId: city.id },
+    });
+    if (!existing) {
+      await prisma.paymentProviderConfig.create({
+        data: {
+          providerCode,
+          countryId: country.id,
+          cityId: city.id,
+          enabled: false,
+          priority: 50,
+          feeBps: 0,
+        },
+      });
+    }
+  }
+
+  // Re-seeding production over a dev-seeded base: switch off what the dev
+  // seed enabled for sandbox providers (SPEC-002-02 R3, FEAT-002).
+  if (providerPlan.configsToDisable.length > 0) {
+    await prisma.paymentProviderConfig.updateMany({
+      where: { providerCode: { in: [...providerPlan.configsToDisable] } },
+      data: { enabled: false },
+    });
   }
 
   // --- commission (country-level 20%) --------------------------------------
@@ -289,8 +387,15 @@ async function main(): Promise<void> {
   for (const key of ['mock_payment_provider', 'pwa_install_prompt']) {
     await prisma.featureFlag.upsert({
       where: { key },
-      create: { key, enabled: key === 'mock_payment_provider' },
-      update: {},
+      create: {
+        key,
+        enabled: key === 'mock_payment_provider' && providerPlan.mockPaymentFlagEnabled,
+      },
+      // Re-seeding production turns the mock flag off; elsewhere manual toggles are kept.
+      update:
+        key === 'mock_payment_provider' && !providerPlan.mockPaymentFlagEnabled
+          ? { enabled: false }
+          : {},
     });
   }
 
@@ -859,7 +964,10 @@ async function main(): Promise<void> {
 
   console.log(
     `Seed OK — market ${country.isoCode}/${city.slug}, ${currencies.length} currencies, ` +
-      `${providers.length} payment providers (cash+mock active), ${accounts.length} ledger accounts, ` +
+      `${providers.length} payment providers (active: ${providers
+        .filter((p) => p.active)
+        .map((p) => p.code)
+        .join('+')}), ${accounts.length} ledger accounts, ` +
       `${roles.length} roles, ${permissions.length} permissions. ` +
       `Identity fixtures: customer ${customerId}, courier ${courierId}, restaurant_owner ${restaurantOwnerId}, ` +
       `restaurant_staff ${restaurantStaffId}, support ${supportId}, finance ${financeId}, admin ${adminId}, ` +

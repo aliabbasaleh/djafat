@@ -20,6 +20,7 @@ function localWeekday(utc: Date, timezone: string): number {
 const hm = (h: number, m = 0): number => h * 60 + m;
 
 describe('computeRestaurantAvailability', () => {
+  // SPEC-001-02-SC01 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it("OPEN: active restaurant, within today's hours", () => {
     const now = new Date('2026-09-14T14:00:00Z'); // 15:00 in Ndjamena (UTC+1)
     const hours: RestaurantHoursLike[] = [
@@ -36,6 +37,7 @@ describe('computeRestaurantAvailability', () => {
     ).toBe('OPEN');
   });
 
+  // SPEC-001-02-SC01 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it("CLOSED: active restaurant, outside today's hours", () => {
     const now = new Date('2026-09-14T05:00:00Z'); // 06:00 in Ndjamena — before 11:00 opening
     const hours: RestaurantHoursLike[] = [
@@ -65,6 +67,7 @@ describe('computeRestaurantAvailability', () => {
     ).toBe('CLOSED');
   });
 
+  // SPEC-001-02-SC02 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it('overnight hours (18:00 -> 02:00): OPEN late at night, on the day the window opened', () => {
     const now = new Date('2026-09-14T22:30:00Z'); // 23:30 Ndjamena, same day the window opened
     const hours: RestaurantHoursLike[] = [
@@ -81,6 +84,7 @@ describe('computeRestaurantAvailability', () => {
     ).toBe('OPEN');
   });
 
+  // SPEC-001-02-SC02 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it('overnight hours (18:00 -> 02:00): OPEN just after midnight, the NEXT calendar day', () => {
     // The window is registered against MONDAY (opens Monday 18:00); at 01:00
     // Tuesday it must still read OPEN even though "today" is Tuesday.
@@ -101,6 +105,7 @@ describe('computeRestaurantAvailability', () => {
     ).toBe('OPEN');
   });
 
+  // SPEC-001-02-SC02 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it('overnight hours (18:00 -> 02:00): CLOSED once past 02:00 the next morning', () => {
     const mondayEvening = new Date('2026-09-14T18:00:00Z');
     const mondayWeekday = localWeekday(mondayEvening, NDJAMENA);
@@ -119,6 +124,7 @@ describe('computeRestaurantAvailability', () => {
     ).toBe('CLOSED');
   });
 
+  // SPEC-001-02-SC02 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it('timezone actually matters: the SAME UTC instant reads differently in two timezones', () => {
     // 2026-01-15T12:00:00Z: 13:00 in Ndjamena (UTC+1), but only 07:00 in New York (UTC-5 in January).
     const now = new Date('2026-01-15T12:00:00Z');
@@ -150,6 +156,7 @@ describe('computeRestaurantAvailability', () => {
     ).toBe('CLOSED'); // 07:00 local, before 11:00 opening — same restaurant hours, same instant, different timezone
   });
 
+  // SPEC-001-02-SC03 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it('CLOSED during an exceptional closure, even within normal opening hours', () => {
     const now = new Date('2026-12-25T10:00:00Z'); // 11:00 Ndjamena, a Friday — mid-lunch
     const hours: RestaurantHoursLike[] = [
@@ -188,6 +195,7 @@ describe('computeRestaurantAvailability', () => {
     ).toBe('OPEN');
   });
 
+  // SPEC-001-02-SC03 (docs/features/FEAT-001-restaurant-closed-order-guard)
   it('PAUSED overrides hours entirely, even during opening hours', () => {
     const now = new Date('2026-09-14T14:00:00Z');
     const hours: RestaurantHoursLike[] = [

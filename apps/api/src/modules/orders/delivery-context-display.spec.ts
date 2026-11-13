@@ -28,6 +28,7 @@ function build(row: Record<string, unknown> | null, hasPrepaidHistory: boolean) 
   const prisma = {
     $queryRaw: queryRaw,
     orderStatusHistory: { findFirst },
+    order: { count: vi.fn().mockResolvedValue(0) }, // FEAT-015: prior delivered orders
   } as unknown as PrismaService;
 
   const orders = new OrdersService(

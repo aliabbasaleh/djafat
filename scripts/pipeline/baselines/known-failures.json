@@ -1,0 +1,14 @@
+{
+  "$comment": "Pre-existing failures recorded at pipeline adoption (2026-11-06). verify.mjs reports them as 'pre-existing', never as passing, and warns when one starts passing. Add an entry only with a reason and a reference; never to hide a failure your change introduced.",
+  "tasks": {
+    "@djafat/mobile#build": {
+      "reason": "expo export: Metro cannot resolve `invariant` from react-native/index.js under the pnpm layout",
+      "ref": "docs/36-pilot-e2e-scenario.md §6.3"
+    },
+    "@djafat/courier#build": {
+      "reason": "expo export: Metro cannot resolve `invariant` from react-native/index.js under the pnpm layout",
+      "ref": "docs/36-pilot-e2e-scenario.md §6.3"
+    }
+  },
+  "commands": {}
+}

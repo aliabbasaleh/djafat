@@ -1,9 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { ApiClientError, type Address, type AddressInput } from '@djafat/sdk';
+import {
+  ApiClientError,
+  type Address,
+  type AddressInput,
+  type Landmark,
+  type LandmarkRelation,
+  type VoiceNote,
+} from '@djafat/sdk';
 import {
   Badge,
   Container,
@@ -15,7 +22,8 @@ import {
   Skeleton,
   cx,
 } from '@djafat/ui';
-import { Button, Input, Textarea, Alert } from '@/components/ui-client';
+import { Button, Input, Textarea, Alert, Select } from '@/components/ui-client';
+import { VoiceNoteRecorder } from '@/components/VoiceNoteRecorder';
 import { api } from '@/lib/api';
 import { isAuthenticated, clearSession } from '@/lib/auth-storage';
 import styles from './page.module.css';
@@ -29,6 +37,12 @@ interface FormValues {
   street: string;
   landmark: string;
   instructions: string;
+  // FEAT-018
+  landmarkId: string | null;
+  landmarkName: string;
+  landmarkRelation: LandmarkRelation;
+  doorHint: string;
+  coordinates: { lat: number; lng: number; accuracyM: number } | null;
 }
 
 const EMPTY_FORM: FormValues = {
@@ -38,10 +52,23 @@ const EMPTY_FORM: FormValues = {
   street: '',
   landmark: '',
   instructions: '',
+  landmarkId: null,
+  landmarkName: '',
+  landmarkRelation: 'near',
+  doorHint: '',
+  coordinates: null,
 };
 
+const RELATIONS: ReadonlyArray<[LandmarkRelation, string]> = [
+  ['behind', 'Derrière'],
+  ['in_front_of', 'Devant'],
+  ['next_to', 'À côté de'],
+  ['opposite', 'En face de'],
+  ['near', 'Près de'],
+];
+
 /** Built field-by-field — under `exactOptionalPropertyTypes`, a key present with value `undefined` is not the same as the key being absent. */
-function toInput(values: FormValues): AddressInput {
+function toInput(values: FormValues, editing: boolean): AddressInput {
   const input: { -readonly [K in keyof AddressInput]?: AddressInput[K] } = {};
   const label = values.label.trim();
   const recipientPhone = values.recipientPhone.trim();
@@ -55,6 +82,20 @@ function toInput(values: FormValues): AddressInput {
   if (street) input.street = street;
   if (landmark) input.landmark = landmark;
   if (instructions) input.instructions = instructions;
+  // FEAT-018
+  if (values.landmarkId) {
+    input.landmarkId = values.landmarkId;
+    input.landmarkRelation = values.landmarkRelation;
+  } else if (editing) {
+    input.landmarkId = null;
+  }
+  const doorHint = values.doorHint.trim().slice(0, 80);
+  if (doorHint) input.doorHint = doorHint;
+  else if (editing) input.doorHint = null;
+  if (values.coordinates) {
+    input.coordinates = { lat: values.coordinates.lat, lng: values.coordinates.lng };
+    input.gpsAccuracyM = Math.round(values.coordinates.accuracyM);
+  }
   return input;
 }
 
@@ -66,6 +107,11 @@ function toFormValues(address: Address): FormValues {
     street: address.street ?? '',
     landmark: address.landmark ?? '',
     instructions: address.instructions ?? '',
+    landmarkId: address.landmarkId ?? null,
+    landmarkName: address.landmarkName ?? '',
+    landmarkRelation: address.landmarkRelation ?? 'near',
+    doorHint: address.doorHint ?? '',
+    coordinates: null,
   };
 }
 
@@ -99,6 +145,13 @@ export default function AdressesPage() {
   const [values, setValues] = useState<FormValues>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // FEAT-018
+  const [suggestions, setSuggestions] = useState<Landmark[]>([]);
+  const [locating, setLocating] = useState(false);
+  const [locateMsg, setLocateMsg] = useState<string | null>(null);
+  const [pendingNote, setPendingNote] = useState<VoiceNote | null>(null);
+  const [editingHasNote, setEditingHasNote] = useState(false);
+  const searchSeq = useRef(0);
 
   const load = useCallback(async () => {
     if (!isAuthenticated()) {
@@ -124,10 +177,18 @@ export default function AdressesPage() {
     void load();
   }, [load]);
 
+  function resetExtras() {
+    setSuggestions([]);
+    setLocateMsg(null);
+    setPendingNote(null);
+  }
+
   function openCreate() {
     setEditingId(null);
     setValues(EMPTY_FORM);
     setFormError(null);
+    resetExtras();
+    setEditingHasNote(false);
     setFormOpen(true);
   }
 
@@ -135,7 +196,79 @@ export default function AdressesPage() {
     setEditingId(address.id);
     setValues(toFormValues(address));
     setFormError(null);
+    resetExtras();
+    setEditingHasNote(address.hasVoiceNote === true);
     setFormOpen(true);
+  }
+
+  /** FEAT-018 — landmark suggestions as the customer types. */
+  async function searchLandmarks(text: string) {
+    setValues((v) => ({ ...v, landmarkName: text, landmarkId: null }));
+    const seq = ++searchSeq.current;
+    if (text.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    try {
+      const found = await api.landmarks.search(text.trim());
+      if (seq === searchSeq.current) setSuggestions(found);
+    } catch {
+      if (seq === searchSeq.current) setSuggestions([]);
+    }
+  }
+
+  function pickLandmark(l: Landmark) {
+    setValues((v) => ({ ...v, landmarkId: l.id, landmarkName: l.name }));
+    setSuggestions([]);
+  }
+
+  function useMyPosition() {
+    setLocateMsg(null);
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setLocateMsg('Votre téléphone ne donne pas sa position.');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        setValues((v) => ({
+          ...v,
+          coordinates: {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracyM: pos.coords.accuracy,
+          },
+        }));
+        setLocateMsg(`Position enregistrée (précision ± ${Math.round(pos.coords.accuracy)} m).`);
+      },
+      () => {
+        setLocating(false);
+        setLocateMsg('Position refusée ou indisponible.');
+      },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
+    );
+  }
+
+  async function playSavedNote() {
+    if (!editingId) return;
+    try {
+      const note = await api.addresses.getVoiceNote(editingId);
+      if (note) void new Audio(`data:${note.mime};base64,${note.dataBase64}`).play();
+    } catch {
+      setFormError('Impossible de lire la note vocale.');
+    }
+  }
+
+  async function removeSavedNote() {
+    if (!editingId) return;
+    try {
+      await api.addresses.removeVoiceNote(editingId);
+      setEditingHasNote(false);
+      await load();
+    } catch {
+      setFormError('Impossible de supprimer la note vocale.');
+    }
   }
 
   function closeForm() {
@@ -147,10 +280,16 @@ export default function AdressesPage() {
     setSaving(true);
     setFormError(null);
     try {
-      if (editingId) {
-        await api.addresses.update(editingId, toInput(values));
-      } else {
-        await api.addresses.create(toInput(values));
+      const saved = editingId
+        ? await api.addresses.update(editingId, toInput(values, true))
+        : await api.addresses.create(toInput(values, false));
+      if (pendingNote) {
+        try {
+          await api.addresses.setVoiceNote(saved.id, pendingNote);
+        } catch {
+          setListError('Adresse enregistrée, mais la note vocale n’a pas pu être envoyée.');
+        }
+        setPendingNote(null);
       }
       setFormOpen(false);
       setEditingId(null);
@@ -264,11 +403,93 @@ export default function AdressesPage() {
                 value={values.street}
                 onChange={(e) => setValues((v) => ({ ...v, street: e.target.value }))}
               />
+              <div className={cx(styles['landmarkBox'])}>
+                <Input
+                  label="Repère proche"
+                  helpText="Tapez un lieu connu : mosquée, marché, rond-point…"
+                  value={values.landmarkName}
+                  onChange={(e) => void searchLandmarks(e.target.value)}
+                  autoComplete="off"
+                  aria-autocomplete="list"
+                  aria-controls="landmark-suggestions"
+                />
+                {suggestions.length > 0 && (
+                  <ul
+                    id="landmark-suggestions"
+                    className={cx(styles['suggestions'])}
+                    aria-label="Repères proposés"
+                  >
+                    {suggestions.map((l) => (
+                      <li key={l.id}>
+                        <button
+                          type="button"
+                          className={cx(styles['suggestion'])}
+                          onClick={() => pickLandmark(l)}
+                        >
+                          {l.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {values.landmarkId && (
+                  <Text size="small" tone="secondary">
+                    ✓ Repère choisi : {values.landmarkName}
+                  </Text>
+                )}
+              </div>
+              {values.landmarkId && (
+                <Select
+                  label="Votre maison par rapport au repère"
+                  value={values.landmarkRelation}
+                  onChange={(e) =>
+                    setValues((v) => ({
+                      ...v,
+                      landmarkRelation: e.target.value as LandmarkRelation,
+                    }))
+                  }
+                >
+                  {RELATIONS.map(([value, text]) => (
+                    <option key={value} value={value}>
+                      {text}
+                    </option>
+                  ))}
+                </Select>
+              )}
               <Input
-                label="Point de repère"
-                helpText="Un repère connu à proximité (ex. près du marché de Klemat)."
+                label="Indication pour le portail"
+                placeholder="ex. portail bleu"
+                value={values.doorHint}
+                maxLength={80}
+                onChange={(e) => setValues((v) => ({ ...v, doorHint: e.target.value }))}
+              />
+              <div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={locating}
+                  onClick={useMyPosition}
+                >
+                  📍 Utiliser ma position
+                </Button>
+                {locateMsg && (
+                  <Text size="small" tone="secondary" aria-live="polite">
+                    {locateMsg}
+                  </Text>
+                )}
+              </div>
+              <Input
+                label="Autre précision (facultatif)"
+                helpText="Ce que vous diriez au livreur au téléphone."
                 value={values.landmark}
                 onChange={(e) => setValues((v) => ({ ...v, landmark: e.target.value }))}
+              />
+              <VoiceNoteRecorder
+                hasSaved={editingHasNote}
+                pending={pendingNote}
+                onRecorded={setPendingNote}
+                onRemove={() => void removeSavedNote()}
+                onPlaySaved={() => void playSavedNote()}
               />
               <Textarea
                 label="Instructions de livraison"
@@ -311,10 +532,22 @@ export default function AdressesPage() {
                   <Text size="small" tone="secondary">
                     {details || 'Aucun détail de rue renseigné'}
                   </Text>
+                  {address.deliveryHint && <Text size="small">📍 {address.deliveryHint}</Text>}
                   {address.landmark && (
                     <Text size="small" tone="secondary">
                       Repère : {address.landmark}
                     </Text>
+                  )}
+                  {(address.learnedPoint || address.hasVoiceNote) && (
+                    <div className={cx(styles['badges'])}>
+                      {address.learnedPoint && (
+                        <Badge tone="success">
+                          Point confirmé par {address.learnedPoint.count} livraison
+                          {address.learnedPoint.count > 1 ? 's' : ''}
+                        </Badge>
+                      )}
+                      {address.hasVoiceNote && <Badge>🎙 Note vocale</Badge>}
+                    </div>
                   )}
                   <div className={cx(styles['itemActions'])}>
                     <Button

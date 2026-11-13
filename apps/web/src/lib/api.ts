@@ -1,7 +1,16 @@
 import { createApiClient } from '@djafat/sdk';
 import { getAccessToken } from './auth-storage';
 
-const baseUrl = process.env['NEXT_PUBLIC_API_BASE_URL'] ?? 'http://localhost:3001/v1';
+const publicBaseUrl = process.env['NEXT_PUBLIC_API_BASE_URL'] ?? 'http://localhost:3001/v1';
+/**
+ * Server-rendered pages call the API directly (`API_INTERNAL_BASE_URL`), while
+ * the browser may use a same-origin relative URL ("/v1") when the site and the
+ * API sit behind one domain / reverse proxy. Defaults keep the old behaviour.
+ */
+const baseUrl =
+  typeof window === 'undefined'
+    ? (process.env['API_INTERNAL_BASE_URL'] ?? publicBaseUrl)
+    : publicBaseUrl;
 
 /**
  * Frontend API access is ONLY through `@djafat/sdk` (HTTP). Client code never
