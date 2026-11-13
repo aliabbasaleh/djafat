@@ -605,7 +605,7 @@ export class PaymentsService {
     assertPositive(requested);
 
     const priorRows = await this.prisma.$queryRaw<Array<{ total: bigint }>>`
-      SELECT COALESCE(SUM(amount_minor), 0) AS total FROM refunds
+      SELECT COALESCE(SUM(amount_minor), 0)::bigint AS total FROM refunds
       WHERE payment_id = ${id}::uuid AND status = 'succeeded'
     `;
     const remaining = payment.amountMinor - priorRows[0]!.total;
@@ -741,7 +741,7 @@ export class PaymentsService {
       const payment = await tx.payment.findUniqueOrThrow({ where: { id: refund.payment_id } });
 
       const sumRows = await tx.$queryRaw<Array<{ total: bigint }>>`
-        SELECT COALESCE(SUM(amount_minor), 0) AS total FROM refunds
+        SELECT COALESCE(SUM(amount_minor), 0)::bigint AS total FROM refunds
         WHERE payment_id = ${refund.payment_id}::uuid AND status = 'succeeded'
       `;
       const totalRefunded = sumRows[0]!.total;
