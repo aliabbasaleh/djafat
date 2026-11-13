@@ -69,12 +69,10 @@ pnpm --filter @djafat/courier build:web
 
 ## 3. Faire une modification
 
-1. Partir de la branche à jour, puis créer la sienne. Tant que la _Pull
-   Request_ n°1 n'est pas fusionnée, le travail le plus récent est sur la
-   branche `claude/compassionate-franklin-k23vcj` (ensuite : `main`) :
+1. Partir de `main` à jour (la version de référence), puis créer sa branche :
 
 ```bash
-git checkout claude/compassionate-franklin-k23vcj && git pull
+git checkout main && git pull
 ```
 
 ```bash
@@ -97,7 +95,10 @@ git add -A && git commit -m "fix(web): libellé du bouton commander"
 git push -u origin prenom/ce-que-je-change
 ```
 
-4. Ouvrir une _Pull Request_ sur GitHub ; elle est relue avant d'être fusionnée.
+4. Ouvrir une _Pull Request_ vers `main` sur GitHub. Les contrôles
+   automatiques (Linux et Windows) tournent ; on ne fusionne **que si tout est
+   vert**, puis on supprime la branche. On ne travaille jamais directement sur
+   `main`.
 
 **À chaque version envoyée** : ajouter une ligne au journal de
 [`ROADMAP.md`](ROADMAP.md), cocher ce qui est fait, et augmenter `version` dans

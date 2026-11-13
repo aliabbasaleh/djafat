@@ -37,6 +37,12 @@ add its line to the journal in `docs/ROADMAP.md` and tick what is done there,
 in the same commit. `docs/ROADMAP.md` is the team's roadmap (read from home by
 everyone); `docs/TRAVAILLER-EN-LOCAL.md` is how a teammate runs the project.
 
+## Branches
+
+`main` is the reference version (what the server and teammates use). Work on a
+branch, open a pull request to `main`, merge only when every check (Linux and
+Windows) is green, then delete the branch. Never commit directly to `main`.
+
 ## Never
 
 - Weaken, skip (`.only`/`.skip`) or delete a test, or change an expected value, to get a check passing.
