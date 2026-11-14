@@ -37,21 +37,21 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-102 · Enforce provider enablement when creating a payment
 
-- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** In progress (fix `f0cbb09` on `fix/audit-blockers`, verified there; sync S-007)
+- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** Not started _(corrected 2026-11-14, sync S-008: S-007 put the refund fix `f0cbb09` here by mistake; it is T-103's)_
 - **Why:** [`PAY-01`](../FINDINGS.md#pay-01) · **Depends on:** —
 - **Done when:** a payment is refused unless an enabled, currently valid configuration covers the order's restaurant/city/amount; `methodCode` comes from the provider; the mock provider is not registered in production.
 - **Test:** integration tests for enabled, disabled, out-of-range amount, production mode.
 
 ### T-103 · Fix refund arithmetic
 
-- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** Not started
+- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** In progress — fix `f0cbb09` verified on `fix/audit-blockers` (version 0.20.4, pull request #4); done when merged _(sync S-008)_
 - **Why:** [`PAY-03`](../FINDINGS.md#pay-03) · **Depends on:** T-108 for the test
 - **Done when:** partial refund, remainder and over-refund behave as specified on PostgreSQL.
 - **Test:** integration test of the three cases; ledger groups balance.
 
 ### T-104 · Validate secrets at boot
 
-- **Area:** `packages/config` · **Priority:** Critical · **Status:** Not started
+- **Area:** `packages/config` · **Priority:** Critical · **Status:** In progress — fix `aa0d58d` verified on pull request #4 (0.20.6). It stops the boot in production only: elsewhere the API starts and lists the problems, because the local guide copies `.env.example` unchanged (`DOC-03`). Decide whether development should refuse too _(sync S-008)_
 - **Why:** [`SEC-01`](../FINDINGS.md#sec-01) · **Depends on:** —
 - **Done when:** placeholders, short secrets, identical secrets and wrong-length AES keys stop the boot with a readable message.
 - **Test:** `env.spec.ts` cases; manual boot with `.env.example` values fails.
@@ -65,6 +65,9 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Note (updated 2026-11-11, sync S-003):** target `next` ≥ 15.5.28, the highest patched version
   among its 17 critical and high advisories in the hosted audit of pull request #2. Pull request
   #1's audit baseline accepts the critical ones in the meantime ([`DEP-01`](../FINDINGS.md#dep-01)).
+- **Progress (updated 2026-11-14, sync S-008):** pull request #3 is re-based on `main` (0.20.3,
+  `69cd859`) and drops the 38 `next` entries of the audit baseline (115 → 77). Fastify 5 and
+  Nest 11 come next, on their own pull request.
 - **Progress (updated 2026-11-12, sync S-004):** the `next` step is done on a branch: pull request
   #3 upgrades `next` to 15.5.29, its hosted audit lists no `next` advisory (run 43154080538), and
   the browser comparison with `main` found no regression. Left: Fastify 5 and Nest 11 for the API
@@ -178,7 +181,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-208 · Delivery code in the customer apps
 
-- **Area:** `packages/sdk`, `apps/web`, `apps/mobile` · **Priority:** High · **Status:** Not started
+- **Area:** `packages/sdk`, `apps/web`, `apps/mobile` · **Priority:** High · **Status:** In progress — fix `70cfd3b` verified on pull request #4 (0.20.5): the browser test passes on the site; the mobile screen was not run on a device _(sync S-008)_
 - **Why:** [`FE-03`](../FINDINGS.md#fe-03) · **Depends on:** T-201
 - **Done when:** the code is shown from pickup to delivery.
 - **Test:** browser test.
@@ -465,4 +468,10 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Area:** repository root, `docs/` · **Priority:** Low · **Why:** [`DOC-01`](../FINDINGS.md#doc-01), [`DOC-02`](../FINDINGS.md#doc-02), [`OPS-04`](../FINDINGS.md#ops-04) · **Status:** Not started
 - **Done when:** the committed duplicates of the dossier are removed or justified; setup instructions name the Node version; the two `36-*` files are disambiguated.
 
-Last updated: 2026-11-11 (sync S-001)
+### T-608 · Working secrets in the local setup _(added 2026-11-14, sync S-008)_
+
+- **Area:** `docs/TRAVAILLER-EN-LOCAL.md`, `.env.example`, a small script · **Priority:** Medium · **Why:** [`DOC-03`](../FINDINGS.md#doc-03) · **Status:** Not started
+- **Done when:** following the guide on a fresh clone (macOS, Linux and Windows) gives five real secrets, and an order can be delivered end to end.
+- **Test:** the Windows workflow and a fresh local run follow the guide and finish a delivery.
+
+Last updated: 2026-11-14 (sync S-008)

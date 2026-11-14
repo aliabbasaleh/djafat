@@ -8,6 +8,29 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-14 — Sync S-008: our fixes for the delivery code and the secrets
+
+**Reviewed:** our own six commits on pull requests #3 and #4: two stacking merges with an empty
+combined diff, the version commits 0.20.3 and 0.20.4, and two fixes: `70cfd3b` (0.20.5, the
+customer sees the delivery code) and `aa0d58d` (0.20.6, production refuses weak secrets).
+
+**Verified (locally, before each push):** `verify:fast` all pass; API integration suite 94/94 on
+a fresh database; a browser journey for the delivery code; the built API started three ways for
+the secrets. Hosted: CI, Windows and Security green on `70cfd3b`; on `aa0d58d` Windows, Security
+and the integration job green, the lint/typecheck/test/build job still running at sync time.
+
+**Status changes:** `PAY-03`, `FE-03` and `SEC-01` (production only) have verified fixes on pull
+request #4; all three stay Open until it is merged. T-103, T-104 and T-208 in progress. Corrected:
+S-007 had put the refund fix on T-102 instead of T-103.
+
+**Newly discovered:** `DOC-03` (Medium, CODE): the local guide keeps the placeholder secrets of
+`.env.example`, so pickup fails locally and no delivery can be completed. 62 findings open.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-14 — Sync S-007: `main` holds the newest code
 
 **Reviewed:** pull request #1, merged into `main` by the owner on 2026-11-13 (`46d8cae`, DJAFAT

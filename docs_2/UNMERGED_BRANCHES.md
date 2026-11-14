@@ -46,6 +46,12 @@ _(updated 2026-11-14, sync S-007)_ `claude/compassionate-franklin-k23vcj` is mer
 reference branch. Our pull requests #2 and #3 and the branch `fix/audit-blockers` are stacked on
 it, to be merged in that order.
 
+_(updated 2026-11-14, sync S-008)_ The stack: #2 `docs/audit-sync` (0.20.2) → #3 `fix/next-15.5` (0.20.3, `69cd859`)
+→ #4 `fix/audit-blockers` (0.20.4 to 0.20.6, `aa0d58d`: `PAY-03`, `FE-03`, `SEC-01`). The merges
+`6b13d96` (`main` and #2 into #3) and `ab92c1a` (#3 into #4) add nothing of their own: their
+combined diff is empty. Merge #2, then #3, then #4; each one only after its Linux and Windows
+checks are green.
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |
@@ -94,6 +100,9 @@ _(updated 2026-11-12, sync S-005)_ `c616695` and `6cbbad4` were pushed by anothe
 working as the repository's user. Since `6cbbad4`, `.github/workflows/ci.yml` conflicts with pull
 request #1 as well: both add the same build step, and pull request #1 adds a throwaway-secrets step
 next to it, so take pull request #1's version.
+
+_(updated 2026-11-14, sync S-008)_ Re-based on `main`: `6b13d96` merges `main` and #2 in, `69cd859` makes the branch
+version 0.20.3. The audit baseline loses its 38 `next` entries (115 → 77).
 
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
 

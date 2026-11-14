@@ -10,6 +10,65 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-008 — 2026-11-14 — our own fixes on pull requests #3 and #4
+
+|                 |                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook, at the user's prompt, after our own pushes                               |
+| **Range**       | `origin/fix/next-15.5` `5122fd6..69cd859`; `origin/fix/audit-blockers` `f0cbb09..aa0d58d` |
+| **Size**        | 6 commits, all ours: 2 stacking merges, 4 version commits (0.20.3 to 0.20.6), 19 files    |
+| **Evidence**    | BRANCH + RUN — each fix run locally before its push; hosted checks as listed below        |
+| **Reviewed by** | Claude, in the session that wrote the commits                                             |
+
+### Added
+
+- `70cfd3b` (0.20.5): the customer sees the delivery code on the site and in the app (`FE-03`).
+- `aa0d58d` (0.20.6): production refuses placeholder, short, reused or malformed secrets
+  (`SEC-01`); development starts and lists them.
+- `69cd859` (0.20.3) and `8e59bd4` (0.20.4): the version commits of the `next` upgrade
+  (`5122fd6`) and of the refund fix (`f0cbb09`), both reviewed in S-007.
+- `6b13d96` (`main` and #2 into #3) and `ab92c1a` (#3 into #4): stacking merges; their combined
+  diff is empty, so they add nothing of their own.
+
+### Removed
+
+- none
+
+### Fixed
+
+- On `fix/audit-blockers` (pull request #4), not on `main`: `PAY-03`, `FE-03`, `SEC-01`
+  (production only), each verified there. All three stay Open until the pull request is merged.
+
+### Changed
+
+- Corrected an S-007 mistake: the refund fix's status had been written on T-102 (`PAY-01`)
+  instead of T-103 (`PAY-03`). T-102 is back to Not started.
+- `DEP-01`: pull request #3's baseline drops the 38 `next` entries (115 → 77), counted in both files.
+
+### New findings
+
+- `DOC-03` (Medium, CODE): the local guide keeps the five placeholder secrets of `.env.example`.
+  With the placeholder delivery-code key, pickup moves the delivery on its way and then fails, so
+  no local delivery can be completed. Found while writing the `SEC-01` fix.
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `UNMERGED_BRANCHES.md`,
+`history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+On `aa0d58d`, the hosted lint/typecheck/test/build job was still running at sync time (Windows,
+Security and the integration job had passed). The mobile delivery-code screen was not run on a
+device. `DOC-03` was read in the code and its key length computed; the failing pickup was not run.
+
+### Marker
+
+`fix/next-15.5` → `69cd859`; `fix/audit-blockers` → `aa0d58d`; `HEAD` → `aee9650`; the other
+lines unchanged.
+
+---
+
 ## S-007 — 2026-11-14 — pull request #1 merged into `main`; four commits on the owner's branch
 
 |                 |                                                                                                                      |
