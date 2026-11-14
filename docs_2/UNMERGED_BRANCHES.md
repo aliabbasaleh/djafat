@@ -41,6 +41,11 @@ _(updated 2026-11-12, sync S-004)_ Two branches of ours are also open against `m
 `docs/audit-sync` (pull request #2: this documentation and the gitleaks token) and `fix/next-15.5`
 (pull request #3, §2b).
 
+_(updated 2026-11-14, sync S-007)_ `claude/compassionate-franklin-k23vcj` is merged into `main`
+(pull request #1, `46d8cae`, DJAFAT 0.20.1), and the collaborator's guides now name `main` as the
+reference branch. Our pull requests #2 and #3 and the branch `fix/audit-blockers` are stacked on
+it, to be merged in that order.
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |
@@ -53,6 +58,21 @@ _(updated 2026-11-12, sync S-004)_ Two branches of ours are also open against `m
 `a68934d` also gives the integration job two throwaway base64 keys (`MFA_ENCRYPTION_KEY`,
 `DELIVERY_CODE_ENCRYPTION_KEY`), labelled as such in the file. The weekly gitleaks scan flags both,
 so they need an allowlist entry ([`CI-01`](FINDINGS.md#ci-01)) _(updated 2026-11-11, sync S-003)_.
+
+_(updated 2026-11-14, sync S-007)_ Four more commits by the owner (`kcerha`, dated 2026-11-09,
+fetched on 2026-11-14):
+
+- `1600bdb` binds `fetch` to the global object in the SDK (a second fix for `SDK-01`, already fixed
+  differently on `main`) and makes the login page report the real cause of an OTP failure.
+- `0d60445` ranks closed restaurants last and dims their photo.
+- `cb84077` asks placehold.co for PNG in the seed, which fixes [`FE-05`](FINDINGS.md#fe-05).
+- `92e8d52` adds `docs/DESIGN-SPEC-EXTRACT.md`.
+
+Merged into `main` now, the branch would conflict in 8 files: `payments.service.ts`, the
+integration tests and their configuration, `packages/sdk/src/http.ts`, the login page,
+`apps/api/package.json` and the lockfile. Its unique changes are better taken one at a time: the
+webhook order (`6cf7c9b`, [`PAY-05`](FINDINGS.md#pay-05)), the PNG seed, the login messages, the
+restaurant ranking, the design document.
 
 ## 2b. `fix/next-15.5`, pull request #3 (4 commits) _(added 2026-11-12, sync S-004; updated sync S-005)_
 
@@ -75,7 +95,7 @@ working as the repository's user. Since `6cbbad4`, `.github/workflows/ci.yml` co
 request #1 as well: both add the same build step, and pull request #1 adds a throwaway-secrets step
 next to it, so take pull request #1's version.
 
-## 3. `claude/compassionate-franklin-k23vcj` (41 commits)
+## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
 
 ### What it adds
 

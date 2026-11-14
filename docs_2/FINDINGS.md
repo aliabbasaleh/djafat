@@ -9,12 +9,13 @@ these IDs instead of repeating the detail.
   their production builds, HTTP scenarios with `curl`, the three web apps in headless Chrome, and
   the hosted CI logs. Environment details: [`TESTING_AND_QUALITY_ASSURANCE.md`](TESTING_AND_QUALITY_ASSURANCE.md) §1.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
-- **Counts:** 9 Critical · 22 High · 22 Medium · 13 Low = 66 open findings _(updated 2026-11-12,
-  sync S-004: `CI-03` and `FE-07` added; S-003 added `CI-02`)_.
-- **Last synced:** S-006, 2026-11-13 — pull request #1 at `4c756e0`, run locally end to end (S-005:
-  two commits on pull request #3; S-004: our `next` upgrade there; S-003: our CI fix on pull request
-  #2; S-001: four commits on `origin/claude/compassionate-franklin-k23vcj`); `main` unchanged since
-  the audit. Pull-by-pull history: [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
+- **Counts:** 6 Critical · 20 High · 22 Medium · 13 Low = 61 open findings, plus 5 resolved
+  _(updated 2026-11-14, sync S-007: `SDK-01`, `FE-01`, `PAY-02`, `TEST-01` and `CI-01` resolved on
+  `main`; S-004 added `CI-03` and `FE-07`; S-003 added `CI-02`)_.
+- **Last synced:** S-007, 2026-11-14 — pull request #1 merged into `main` as `46d8cae` (DJAFAT
+  0.20.1); `main` now holds the code run end to end in S-006. Earlier: S-005 two commits on pull
+  request #3, S-004 our `next` upgrade, S-003 our CI fix on pull request #2, S-001 four commits on
+  the collaborator's branch. Pull-by-pull history: [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
 
 An entry is never deleted. When fixed, set `Status: Resolved`, add the commit and how the fix was
 verified.
@@ -96,7 +97,7 @@ verified.
 
 ### SDK-01
 
-**Browser calls to the API fail in every web app** · Broken · Critical · LIVE · Status: Open
+**Browser calls to the API fail in every web app** · Broken · Critical · LIVE · Status: Resolved on `main` (`46d8cae`, sync S-007; verified 2026-11-13, see the S-006 note)
 
 - **Where:** `packages/sdk` → HTTP client. `packages/sdk/src/http.ts`, `ApiHttp` constructor and `request()`.
   Affects `apps/web`, `apps/admin`, `apps/restaurant`.
@@ -144,7 +145,7 @@ verified.
 
 ### PAY-02
 
-**Cash-on-delivery orders are never placed; they expire** · Broken · Critical · LIVE · Status: Open
+**Cash-on-delivery orders are never placed; they expire** · Broken · Critical · LIVE · Status: Resolved on `main` (`46d8cae`, sync S-007; verified 2026-11-13, see the S-006 note)
 
 - **Where:** `apps/api` → orders, payments; `apps/worker` → order-expiry. `orders.service.ts`
   `doCreateOrder` (always `status: 'awaiting_payment'`, L287); `cash-payment.provider.ts`;
@@ -173,7 +174,7 @@ verified.
 
 ### PAY-03
 
-**Every refund request crashes** · Broken · Critical · LIVE · Status: Open
+**Every refund request crashes** · Broken · Critical · LIVE · Status: Open; fix present on `fix/audit-blockers` (`f0cbb09`), verified there by a new integration test, red before and green after (sync S-007)
 
 - **Where:** `apps/api` → payments. `payments.service.ts` `doRefundPayment` (L554–558) and
   `finalizeRefundSuccess` (L690–695). Table `refunds`.
@@ -192,7 +193,7 @@ verified.
 
 ### FE-01
 
-**No customer screen or SDK call can pay for an order** · Not Implemented · Critical · LIVE · Status: Open
+**No customer screen or SDK call can pay for an order** · Not Implemented · Critical · LIVE · Status: Resolved on `main` (`46d8cae`, sync S-007; verified 2026-11-13, cash on delivery; see the S-006 note)
 
 - **Where:** `apps/web` (`src/app/panier/page.tsx` L125–128, `src/app/commandes/[id]/page.tsx`),
   `apps/mobile` (`app/(app)/cart.tsx`, `orders/[id].tsx`), `packages/sdk` (no `payments` binding).
@@ -317,7 +318,7 @@ verified.
 
 ### MOB-01
 
-**Neither Expo app can be bundled; root build and CI fail** · Broken · Critical · RUN · Status: Open
+**Neither Expo app can be bundled; root build and CI fail** · Broken · Critical · RUN · Status: Open; the CI export passes on `main` since `46d8cae`, no device build yet (sync S-007)
 
 - **Where:** `apps/mobile`, `apps/courier` (`package.json` `build` = `expo export`,
   `metro.config.js`); `.npmrc` (`node-linker=isolated`).
@@ -482,7 +483,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### TEST-01
 
-**The API integration suite (93 tests) cannot run** · Broken · High · RUN · Status: Open
+**The API integration suite (93 tests) cannot run** · Broken · High · RUN · Status: Resolved on `main` (`46d8cae`, sync S-007: hosted `integration` job green on the push; 94/94 locally on a fresh database with the new refund test)
 
 - **Where:** `apps/api/test/*.int.spec.ts`, `apps/api/test/vitest.int.config.ts`, `.github/workflows/ci.yml`.
 - **Observed:** with the environment the CI job declares: `ConfigValidationError …
@@ -519,7 +520,7 @@ properties of undefined (reading 'get')` in `new RedisService(undefined)` — Vi
 
 ### CI-01
 
-**Every CI workflow on `main` is red** · Broken · High · RUN · Status: Open
+**Every CI workflow on `main` is red** · Broken · High · RUN · Status: Resolved on `main` (`46d8cae`, sync S-007: CI and Security both green on the push; the weekly scan of other branches and the allowlist stay with T-109)
 
 - **Where:** `.github/workflows/ci.yml`, `.github/workflows/security.yml`.
 - **Observed (GitHub, head `d1439c6`):** `check` fails at **Build** (`MOB-01`); `integration` fails
@@ -936,7 +937,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### FE-05
 
-**Seeded restaurant and product images do not render** · Broken · Low · LIVE — `seed.ts` uses `placehold.co` URLs that return SVG; `/_next/image` answers 400. Use `.png` URLs in the seed. Development only.
+**Seeded restaurant and product images do not render** · Broken · Low · LIVE — `seed.ts` uses `placehold.co` URLs that return SVG; `/_next/image` answers 400. Use `.png` URLs in the seed. Development only. _Sync S-007 note (2026-11-14): fix present on `fix/payment-reliability-backlog` (`cb84077`: the seed asks placehold.co for PNG), not on `main` (BRANCH)._
 
 ### FE-06
 
@@ -988,4 +989,4 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ---
 
-Last updated: 2026-11-13 (sync S-006)
+Last updated: 2026-11-14 (sync S-007)
