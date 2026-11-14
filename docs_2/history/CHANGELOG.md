@@ -8,6 +8,26 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-14 — Sync S-007: `main` holds the newest code
+
+**Reviewed:** pull request #1, merged into `main` by the owner on 2026-11-13 (`46d8cae`, DJAFAT
+0.20.1), with three new commits (Windows workflow, `main` as the reference branch, a test wait),
+and four commits on `fix/payment-reliability-backlog`.
+
+**Verified:** CI and Security both green on `main` for the first time (push of `46d8cae`).
+
+**Status changes:** `SDK-01`, `FE-01` (cash), `PAY-02`, `TEST-01` and `CI-01` resolved on `main`;
+61 findings remain open. T-101, T-108 and T-202 moved to `COMPLETED_TASKS.md`.
+
+**Our pull requests:** #2 brought onto `main` (version 0.20.2). #3 and `fix/audit-blockers` are
+stacked on it.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`tasks/COMPLETED_TASKS.md`, `UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-13 — Sync S-006: the newest code run locally end to end
 
 **Reviewed:** `4c756e0` on `claude/compassionate-franklin-k23vcj` (pull request #1), which

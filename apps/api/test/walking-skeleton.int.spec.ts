@@ -272,7 +272,9 @@ describe('walking skeleton — full flow', () => {
       .expect(200)
       .expect({ status: 'ok' });
 
-    // ── 4. payment succeeded -> order placed (via the in-process event) ──
+    // ── 4. payment succeeded -> order placed (via the in-process event, which
+    //      runs just after the webhook response: wait for it, up to 5 s) ──
+    await orderStatus(orderId, 'placed');
     const paidOrder = await request(server)
       .get(`/v1/orders/${orderId}`)
       .set('Authorization', `Bearer ${customerAccess}`)
