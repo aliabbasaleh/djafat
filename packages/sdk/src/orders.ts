@@ -59,12 +59,24 @@ export interface OrderTracking {
   readonly dropoff: { label: string | null; lat: number; lng: number } | null;
   readonly courier: { lat: number; lng: number; heading: number | null; at: string | null } | null;
   readonly deliveryStatus: string | null;
+  /** The delivery behind the order, for `deliveryCode` (null until one exists). */
+  readonly deliveryId: string | null;
 }
 
 export function createOrdersClient(http: ApiHttp) {
   return {
     tracking: (orderId: string) =>
       http.get<OrderTracking>(`/deliveries/tracking/order/${encodeURIComponent(orderId)}`),
+    /**
+     * The customer's own delivery code, which the courier asks for at the door
+     * (audit finding FE-03). The API serves it to the order's customer only,
+     * from the courier's pickup until the handover; before, after or once
+     * expired it answers 404.
+     */
+    deliveryCode: (deliveryId: string) =>
+      http.get<{ code: string; expiresAt: string }>(
+        `/deliveries/${encodeURIComponent(deliveryId)}/code`,
+      ),
     /**
      * Creates an order FROM the caller's own cart (docs/22 §9) — never a
      * client-supplied price/restaurant/items. `addressId` (Bloc 8, docs/29)

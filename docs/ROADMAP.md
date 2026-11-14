@@ -1,6 +1,6 @@
 # Feuille de route DJAFAT
 
-> **Version actuelle : 0.20.4** — 14 nov. 2026
+> **Version actuelle : 0.20.5** — 14 nov. 2026
 > Ce fichier est la feuille de route de référence. Il est mis à jour **à chaque
 > version envoyée sur GitHub** (journal des versions en bas, cases cochées au fil
 > de l'eau). Toute l'équipe le lit ici, depuis n'importe où.
@@ -86,7 +86,8 @@ CORRECTIF pour une correction ou de la documentation).
 
 | Version | Date         | Contenu                                                                                                                                                                                 | Commit    |
 | ------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| 0.20.4  | 14 nov. 2026 | Remboursements réparés : ils plantaient tous (somme lue en `numeric`) ; test d'intégration ajouté                                                                                       | ce commit |
+| 0.20.5  | 14 nov. 2026 | Le client voit son code de livraison (site et app) : sans lui, le livreur ne pouvait pas terminer la livraison                                                                          | ce commit |
+| 0.20.4  | 14 nov. 2026 | Remboursements réparés : ils plantaient tous (somme lue en `numeric`) ; test d'intégration ajouté                                                                                       | `8e59bd4` |
 | 0.20.3  | 14 nov. 2026 | Sécurité : Next.js 15.1.3 → 15.5.29 (5 alertes critiques, dont 4 d'exécution de code à distance) ; tolérées 115 → 77                                                                    | `69cd859` |
 | 0.20.2  | 14 nov. 2026 | Audit du projet (`docs_2/` : état, constats, tâches) et rappel automatique après chaque pull                                                                                            | `5363dc7` |
 | 0.20.1  | 13 nov. 2026 | Test `walking-skeleton` stabilisé : attend que la commande passe « placée » après le paiement (événement traité juste après la réponse)                                                 | `c0487a2` |
