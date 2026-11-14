@@ -1,0 +1,70 @@
+name: Windows
+
+# Follows docs/TRAVAILLER-EN-LOCAL.md on a Windows machine, so a teammate on a
+# Windows PC can run the project. GitHub's Windows runners cannot run the
+# Linux containers of `pnpm infra:up` (PostgreSQL + PostGIS, Redis): that part
+# is covered on Linux by the CI workflow; everything else is checked here.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  local-setup:
+    name: local setup on Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: pnpm install (guide step 1)
+        run: pnpm install --frozen-lockfile
+
+      - name: copy .env.example .env (guide step 2)
+        shell: cmd
+        run: copy .env.example .env
+
+      - name: Generate Prisma client
+        run: pnpm --filter @djafat/api db:generate
+
+      - name: Unit tests
+        run: pnpm test:unit
+
+      - name: Build the three web apps (client, admin, restaurant)
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/v1
+        run: pnpm turbo run build --filter=@djafat/web --filter=@djafat/admin --filter=@djafat/restaurant --filter=@djafat/api
+
+      - name: Courier app for the browser
+        run: pnpm --filter @djafat/courier build:web
+
+      - name: The client site starts and answers
+        shell: pwsh
+        run: |
+          $web = Start-Process -FilePath "pnpm.cmd" -ArgumentList "--filter","@djafat/web","start" -PassThru -NoNewWindow
+          $ok = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            try {
+              $r = Invoke-WebRequest -Uri "http://localhost:3000/connexion" -UseBasicParsing -TimeoutSec 5
+              if ($r.StatusCode -eq 200 -and $r.Content -match "Connexion") { $ok = $true; break }
+            } catch { Start-Sleep -Seconds 2 }
+          }
+          Stop-Process -Id $web.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) { Write-Error "http://localhost:3000/connexion did not answer"; exit 1 }
+          Write-Output "OK: http://localhost:3000/connexion answers on Windows"

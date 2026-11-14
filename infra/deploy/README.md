@@ -84,11 +84,10 @@ Copier la ligne affichée (`ssh-ed25519 …`), puis sur GitHub :
 titre « serveur djafat », coller la clé, **ne pas** cocher « Allow write
 access » → **Add key**.
 
-**b) Télécharger le code** (remplacer la branche par `main` une fois la
-_Pull Request_ n°1 fusionnée) :
+**b) Télécharger le code** (branche `main`, la version de référence) :
 
 ```bash
-GIT_SSH_COMMAND="ssh -i ~/.ssh/djafat_deploy -o StrictHostKeyChecking=accept-new" git clone -b claude/compassionate-franklin-k23vcj git@github.com:aliabbasaleh/djafat.git && cd djafat && git config core.sshCommand "ssh -i ~/.ssh/djafat_deploy"
+GIT_SSH_COMMAND="ssh -i ~/.ssh/djafat_deploy -o StrictHostKeyChecking=accept-new" git clone -b main git@github.com:aliabbasaleh/djafat.git && cd djafat && git config core.sshCommand "ssh -i ~/.ssh/djafat_deploy"
 ```
 
 **c) Tout installer et démarrer** (Docker, pare-feu, clés secrètes,

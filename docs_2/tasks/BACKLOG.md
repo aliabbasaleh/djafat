@@ -28,7 +28,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-101 · Fix the SDK `fetch` binding
 
-- **Area:** `packages/sdk` · http · **Priority:** Critical · **Status:** Not started
+- **Area:** `packages/sdk` · http · **Priority:** Critical · **Status:** Done (2026-11-14, sync S-007; see [`COMPLETED_TASKS.md`](COMPLETED_TASKS.md))
 - **Why:** [`SDK-01`](../FINDINGS.md#sdk-01) · **Depends on:** — (exists on branch: prefer merging)
 - **Done when:** the three web apps log in from a real browser.
 - **Test:** unit test with a `this`-sensitive fetch stub; browser check of `POST /auth/otp/request` → 202.
@@ -37,7 +37,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-102 · Enforce provider enablement when creating a payment
 
-- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** Not started
+- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** In progress (fix `f0cbb09` on `fix/audit-blockers`, verified there; sync S-007)
 - **Why:** [`PAY-01`](../FINDINGS.md#pay-01) · **Depends on:** —
 - **Done when:** a payment is refused unless an enabled, currently valid configuration covers the order's restaurant/city/amount; `methodCode` comes from the provider; the mock provider is not registered in production.
 - **Test:** integration tests for enabled, disabled, out-of-range amount, production mode.
@@ -91,7 +91,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-108 · Make the API integration suite runnable
 
-- **Area:** `apps/api/test` · **Priority:** High · **Status:** Not started
+- **Area:** `apps/api/test` · **Priority:** High · **Status:** Done (2026-11-14, sync S-007; see [`COMPLETED_TASKS.md`](COMPLETED_TASKS.md))
 - **Why:** [`TEST-01`](../FINDINGS.md#test-01) · **Depends on:** — (exists on branches)
 - **Done when:** `pnpm --filter @djafat/api test:int` runs all 93 tests locally with one documented command.
 - **Test:** the command itself; failures are real failures, not harness errors.

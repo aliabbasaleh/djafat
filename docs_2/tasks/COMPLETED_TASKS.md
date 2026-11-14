@@ -20,6 +20,36 @@ test:int` — 96 passed"; "Chrome: login on :3000 → POST /auth/otp/request 202
 
 ## Completed
 
+### T-101 · Fix the SDK `fetch` binding
+
+- **Completed:** 2026-11-13 · **Commit:** on the collaborator's branch, merged into `main` as `46d8cae` (pull request #1)
+- **Resolves:** SDK-01
+- **What changed:** `packages/sdk/src/http.ts` calls `fetch` as a plain function, so browsers no longer throw "Illegal invocation".
+- **Files:** `packages/sdk/src/http.ts`
+- **Verified by:** Chrome on 2026-11-13 with the code at `4c756e0` (application code identical on `main`): login through the real pages in all four web apps, `POST /v1/auth/otp/request` 202, verify 200.
+- **Not verified:** WhatsApp and e-mail login.
+- **New issues found:** none
+
+### T-108 · Make the API integration suite runnable
+
+- **Completed:** 2026-11-13 · **Commit:** on the collaborator's branch, merged into `main` as `46d8cae` (pull request #1)
+- **Resolves:** TEST-01
+- **What changed:** SWC transform for the integration tests, workspace build before seeding, limiter and fixture-hours resets, a rewritten walking skeleton.
+- **Files:** `apps/api/test/**`, `.github/workflows/ci.yml`
+- **Verified by:** hosted `integration` job green on the push of `46d8cae`; locally 94/94 on a fresh database (2026-11-13, with the new refund test of `fix/audit-blockers`).
+- **Not verified:** —
+- **New issues found:** none
+
+### T-202 · Cash on delivery
+
+- **Completed:** 2026-11-13 · **Commit:** on the collaborator's branch, merged into `main` as `46d8cae` (pull request #1)
+- **Resolves:** PAY-02
+- **What changed:** a cash order is placed instead of expiring, within the customer's trust limit (FEAT-015), and settled at delivery.
+- **Files:** `apps/api/src/modules/{orders,payments,deliveries}/**`, `apps/worker`
+- **Verified by:** browser run on 2026-11-13: cash order placed, accepted, readied, delivered; payment `succeeded`; ledger balanced (restaurant 4 000, courier 1 000, revenue 1 000).
+- **Not verified:** the trust-limit refusals.
+- **New issues found:** none
+
 ### AUDIT-3 · After-pull reminder shared with the collaborator
 
 - **Completed:** 2026-11-11 · **Commit:** `5e379b3`, `7adfd6a` on branch `docs/audit-sync`, proposed to `main` in pull request [#2](https://github.com/aliabbasaleh/djafat/pull/2)

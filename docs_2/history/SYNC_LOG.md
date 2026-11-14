@@ -10,6 +10,64 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-007 — 2026-11-14 — pull request #1 merged into `main`; four commits on the owner's branch
+
+|                 |                                                                                                                      |
+| --------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook at the user's prompt, after the editor fetched                                                       |
+| **Range**       | `origin/main` `d1439c6..46d8cae`; `origin/fix/payment-reliability-backlog` `a68934d..92e8d52`; our own pull requests |
+| **Size**        | `main`: 3 commits after `4c756e0`, then the merge; the owner's branch: 4 commits, 12 files                           |
+| **Evidence**    | RUN — hosted runs on `main`; BRANCH for the owner's commits                                                          |
+| **Reviewed by** | Claude, in the audit session                                                                                         |
+
+### Added
+
+- On `main`: pull request #1, merged by the owner on 2026-11-13 as `46d8cae` ("DJAFAT 0.20.1"), with
+  three commits not yet reviewed. `b2f498b` adds a Windows workflow (install, unit tests, builds,
+  courier web export, customer site started; no Docker on Windows runners). `9072943` makes `main`
+  the reference branch in the guides and adds a branch rule to `CLAUDE.md`: work on a branch, open a
+  pull request to `main`, merge only when the Linux and Windows checks are green. `c0487a2` waits up
+  to 5 s for the order to be placed after the payment webhook (a flaky test).
+- On `fix/payment-reliability-backlog`: `1600bdb`, `0d60445`, `cb84077`, `92e8d52` (see
+  `UNMERGED_BRANCHES.md` §2).
+
+### Removed
+
+- none
+
+### Fixed
+
+- Resolved on `main`: `SDK-01`, `FE-01` (cash), `PAY-02`, `TEST-01` (verified in S-006 on
+  `4c756e0`; the merge adds only CI, documentation and test changes), and `CI-01` (CI and Security
+  green on the push of `46d8cae`).
+- On the owner's branch only: `FE-05` (PNG seed images).
+
+### Changed
+
+- Our pull requests: #2 re-based on `main` (version 0.20.2); #3 and `fix/audit-blockers` follow.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `tasks/COMPLETED_TASKS.md`,
+`UNMERGED_BRANCHES.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The owner's four commits were read, not run. The Windows workflow has not yet run on one of our
+pull requests.
+
+### Marker
+
+`origin/main` and the collaborator's branch → `46d8cae`; owner's branch → `92e8d52`;
+`fix/next-15.5` → `5122fd6`; `fix/audit-blockers` → `f0cbb09`; `HEAD` → this sync's version
+commit.
+
+---
+
 ## S-006 — 2026-11-13 — one commit on pull request #1, and the branch run end to end
 
 |                 |                                                                                                            |
