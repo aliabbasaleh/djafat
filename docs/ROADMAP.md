@@ -1,6 +1,6 @@
 # Feuille de route DJAFAT
 
-> **Version actuelle : 0.20.2** — 14 nov. 2026
+> **Version actuelle : 0.20.3** — 14 nov. 2026
 > Ce fichier est la feuille de route de référence. Il est mis à jour **à chaque
 > version envoyée sur GitHub** (journal des versions en bas, cases cochées au fil
 > de l'eau). Toute l'équipe le lit ici, depuis n'importe où.
@@ -86,7 +86,8 @@ CORRECTIF pour une correction ou de la documentation).
 
 | Version | Date         | Contenu                                                                                                                                                                                 | Commit    |
 | ------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| 0.20.2  | 14 nov. 2026 | Audit du projet (`docs_2/` : état, constats, tâches) et rappel automatique après chaque pull                                                                                            | ce commit |
+| 0.20.3  | 14 nov. 2026 | Sécurité : Next.js 15.1.3 → 15.5.29 (5 alertes critiques, dont 4 d'exécution de code à distance) ; tolérées 115 → 77                                                                    | ce commit |
+| 0.20.2  | 14 nov. 2026 | Audit du projet (`docs_2/` : état, constats, tâches) et rappel automatique après chaque pull                                                                                            | `5363dc7` |
 | 0.20.1  | 13 nov. 2026 | Test `walking-skeleton` stabilisé : attend que la commande passe « placée » après le paiement (événement traité juste après la réponse)                                                 | `c0487a2` |
 | 0.20.0  | 13 nov. 2026 | **Fusion dans `main`** : tout le travail (FEAT-002 à FEAT-018, installation serveur, tests 93/93, Windows) devient la version de référence ; guide et installation pointent vers `main` | `9072943` |
 | 0.19.4  | 13 nov. 2026 | Vérification Windows sur GitHub : installation, préparation, tests, construction des sites et démarrage du site sur une machine Windows                                                 | `b2f498b` |
