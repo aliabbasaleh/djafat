@@ -55,10 +55,13 @@ export class ApiHttp {
     if (typeof impl !== 'function') {
       throw new Error('No fetch implementation available — pass `fetchImpl`.');
     }
-    // Call fetch as a plain function, never as a method of this object:
-    // browsers throw "Illegal invocation" when fetch's receiver is not the
-    // global object (Node does not check, so only a real browser showed it).
-    this.doFetch = (input, init) => impl(input, init);
+    // `fetch` MUST keep the global object as its receiver: browsers brand-check
+    // it and throw "Illegal invocation" otherwise — both when it is called as a
+    // method of this object (`this.doFetch(...)`) AND when it is called bare
+    // (`impl(...)`, receiver `undefined`), which an arrow-function wrapper does
+    // not fix. Only binding does. Node does not brand-check, so every test
+    // passed while no browser could reach the API at all.
+    this.doFetch = impl.bind(globalThis);
   }
 
   get<T>(path: string, options?: RequestOptions): Promise<T> {
