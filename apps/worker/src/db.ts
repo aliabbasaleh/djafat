@@ -1,5 +1,5 @@
 import { Pool, type PoolClient } from 'pg';
-import { env } from './logger';
+import { env, logger } from './logger';
 
 /**
  * The worker talks to PostgreSQL with raw `pg` (no Prisma) — it only ever
@@ -11,6 +11,14 @@ import { env } from './logger';
  * pooling mode (docs/17 §12 note; docs/18 §9).
  */
 export const pool = new Pool({ connectionString: env.DATABASE_URL, max: 5 });
+
+// An idle client losing its connection (DB restart, network blip) emits 'error'
+// on the pool — with no listener, Node treats that as uncaught and kills the
+// process. `pg` discards the dead client and replaces it on the next checkout,
+// so logging here is all that's needed to keep the worker alive.
+pool.on('error', (err) => {
+  logger.error({ err }, 'pg pool idle client error');
+});
 
 /** Run `fn` inside one transaction; commits on success, rolls back on throw. */
 export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {

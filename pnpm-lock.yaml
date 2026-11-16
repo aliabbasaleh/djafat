@@ -335,6 +335,9 @@ importers:
       '@types/react':
         specifier: 19.0.2
         version: 19.0.2
+      babel-preset-expo:
+        specifier: ^13.2.5
+        version: 13.2.5(@babel/core@7.26.0)
       eslint:
         specifier: 9.17.0
         version: 9.17.0(jiti@2.6.1)
@@ -426,6 +429,9 @@ importers:
       '@types/react':
         specifier: 19.0.2
         version: 19.0.2
+      babel-preset-expo:
+        specifier: ^13.2.5
+        version: 13.2.5(@babel/core@7.26.0)
       eslint:
         specifier: 9.17.0
         version: 9.17.0(jiti@2.6.1)
