@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ApiClientError } from '@djafat/sdk';
 import { Container, Heading, Text, Stack, cx } from '@djafat/ui';
 import { Button, Input, Alert } from '@/components/ui-client';
 import { api } from '@/lib/api';
@@ -9,6 +10,28 @@ import { setSession, hasRestaurantAccess, clearSession } from '@/lib/auth-storag
 import styles from './page.module.css';
 
 type Step = 'phone' | 'code';
+
+/**
+ * A blanket "check the number format" message hid an unreachable API for two
+ * debugging sessions — the one failure it never was. Each cause now says what
+ * actually happened, so a network or server fault is never mistaken for a
+ * typo in the phone number.
+ */
+function loginError(err: unknown, fallback: string): string {
+  if (err instanceof ApiClientError) {
+    if (err.code === 'RATE_LIMITED') {
+      return 'Trop de codes demandés pour ce numéro. Réessayez dans quelques minutes.';
+    }
+    if (err.code === 'NETWORK') {
+      return `Connexion au serveur impossible (${err.message}). Vérifiez que l’API tourne, puis réessayez.`;
+    }
+    if (err.code === 'VALIDATION_ERROR' || err.status === 422) {
+      return 'Numéro invalide. Utilisez le format international, par exemple +23566000000.';
+    }
+    return `${err.message} (code ${err.code})`;
+  }
+  return fallback;
+}
 
 /**
  * Restaurant login (Bloc 10, docs/33 §login) — same bounded OTP flow as
@@ -33,8 +56,10 @@ export default function LoginPage() {
     try {
       await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
       setStep('code');
-    } catch {
-      setError("Impossible d'envoyer le code. Vérifiez le numéro (format +235XXXXXXXX).");
+    } catch (err) {
+      setError(
+        loginError(err, "Impossible d'envoyer le code. Vérifiez le numéro (format +235XXXXXXXX)."),
+      );
     } finally {
       setLoading(false);
     }
@@ -67,8 +92,8 @@ export default function LoginPage() {
         },
       });
       router.push('/restaurant');
-    } catch {
-      setError('Code invalide ou expiré.');
+    } catch (err) {
+      setError(loginError(err, 'Code invalide ou expiré.'));
     } finally {
       setLoading(false);
     }
