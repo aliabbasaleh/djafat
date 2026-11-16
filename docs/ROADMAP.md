@@ -1,6 +1,6 @@
 # Feuille de route DJAFAT
 
-> **Version actuelle : 0.20.1** — 13 nov. 2026
+> **Version actuelle : 0.20.2** — 16 nov. 2026
 > Ce fichier est la feuille de route de référence. Il est mis à jour **à chaque
 > version envoyée sur GitHub** (journal des versions en bas, cases cochées au fil
 > de l'eau). Toute l'équipe le lit ici, depuis n'importe où.
@@ -11,13 +11,13 @@ démonstration en ligne** sur djafat.com, puis le pilote à N'Djamena.
 
 ## Où on en est
 
-| Étape                                               | État                               |
-| --------------------------------------------------- | ---------------------------------- |
-| Fonctions du pilote (commande, paiement, livraison) | ✅ faites et vérifiées en vrai     |
-| Installation serveur (Docker, HTTPS, sauvegardes)   | ✅ prête, testée en local          |
-| Démo en ligne sur djafat.com                        | ⏳ attend le serveur et le domaine |
-| Comptes réels (SMS, Airtel, WhatsApp)               | ⏳ démarches en cours côté DJAFAT  |
-| Pilote à N'Djamena                                  | à venir                            |
+| Étape                                               | État                                            |
+| --------------------------------------------------- | ----------------------------------------------- |
+| Fonctions du pilote (commande, paiement, livraison) | ✅ faites et vérifiées en vrai                  |
+| Installation serveur (Docker, HTTPS, sauvegardes)   | ✅ prête, testée en local                       |
+| Démo en ligne sur djafat.com                        | ✅ en ligne (16 nov.), HTTPS sur les 6 adresses |
+| Comptes réels (SMS, Airtel, WhatsApp)               | ⏳ démarches en cours côté DJAFAT               |
+| Pilote à N'Djamena                                  | à venir                                         |
 
 ## Phase 1 — technique avant le pilote
 
@@ -29,7 +29,7 @@ démonstration en ligne** sur djafat.com, puis le pilote à N'Djamena.
 - [x] Repères, point de livraison appris, note vocale (FEAT-018)
 - [x] Installation serveur complète : `infra/deploy/` (Docker, HTTPS automatique, sauvegardes)
 - [x] Tests d'intégration : 93/93 au vert (étaient ~40), `walking-skeleton` réécrit sur le parcours actuel
-- [ ] Mettre la démo en ligne sur djafat.com
+- [x] Mettre la démo en ligne sur djafat.com (vérifié de l'extérieur le 16 nov. : site, API, admin, resto, livreur)
 - [ ] Alertes en cas de panne et suivi des journaux
 - [ ] Écran admin des téléphones passerelles SMS et des SMS mis de côté
 - [ ] Connecteur API Airtel Money (FEAT-019) — dès que l'accès API est obtenu
@@ -39,9 +39,9 @@ démonstration en ligne** sur djafat.com, puis le pilote à N'Djamena.
 
 - [x] Nom de domaine djafat.com (Namecheap)
 - [x] Numéros DJAFAT : WhatsApp/SMS 66 86 89 73, appel 30 10 90 90
-- [ ] Serveur Oracle Cloud « Always Free » (choisi) — guide pas à pas : `infra/deploy/README.md`
-- [ ] Clé de lecture GitHub (« Deploy key ») ajoutée pour le serveur
-- [ ] Les 6 enregistrements DNS chez Namecheap
+- [x] Serveur Oracle Cloud « Always Free » — guide pas à pas : `infra/deploy/README.md`
+- [x] Clé de lecture GitHub (« Deploy key ») ajoutée pour le serveur
+- [x] Les 6 enregistrements DNS chez Namecheap
 - [ ] Fournisseur SMS au Tchad (codes de connexion)
 - [ ] Comptes marchands Airtel Money et Moov Money, téléphone marchand dédié
 - [ ] WhatsApp Business (compte Meta vérifié) sur le 66 86 89 73
@@ -84,21 +84,22 @@ Chaque envoi sur GitHub ajoute une ligne ici et met à jour `version` dans le
 `package.json` racine (0.MINEUR.CORRECTIF : MINEUR pour une fonctionnalité,
 CORRECTIF pour une correction ou de la documentation).
 
-| Version | Date         | Contenu                                                                                                                                                                                 | Commit    |
-| ------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| 0.20.1  | 13 nov. 2026 | Test `walking-skeleton` stabilisé : attend que la commande passe « placée » après le paiement (événement traité juste après la réponse)                                                 | ce commit |
-| 0.20.0  | 13 nov. 2026 | **Fusion dans `main`** : tout le travail (FEAT-002 à FEAT-018, installation serveur, tests 93/93, Windows) devient la version de référence ; guide et installation pointent vers `main` | `9072943` |
-| 0.19.4  | 13 nov. 2026 | Vérification Windows sur GitHub : installation, préparation, tests, construction des sites et démarrage du site sur une machine Windows                                                 | `b2f498b` |
-| 0.19.3  | 12 nov. 2026 | Tests d'intégration **93/93** : `walking-skeleton` réécrit sur le parcours actuel (proposition, acceptation, retrait, livraison avec code)                                              | `4c756e0` |
-| 0.19.2  | 10 nov. 2026 | Sécurité : `node-forge` forcé en 1.4.3 (5 nouvelles alertes corrigées, 12 anciennes aussi : 127 → 115 tolérées)                                                                         | `804176f` |
-| 0.19.1  | 10 nov. 2026 | Mise en ligne Oracle : script `install.sh` (Docker, pare-feu, clés, démarrage), clé de lecture GitHub, images ARM vérifiées                                                             | `54d50b5` |
-| 0.19.0  | 10 nov. 2026 | Feuille de route versionnée ; guide « travailler en local » ; tests d'intégration 92/93 ; hébergement gratuit (ARM)                                                                     | `41296a8` |
-| 0.18.2  | 10 nov. 2026 | Tests d'intégration indépendants de l'heure et du limiteur (90/93)                                                                                                                      | `ef13704` |
-| 0.18.1  | 10 nov. 2026 | Installation serveur : Docker Compose, HTTPS (Caddy), sauvegardes, guide Namecheap                                                                                                      | `2a622a1` |
-| 0.18.0  | 10 nov. 2026 | FEAT-018 repères, point appris, note vocale                                                                                                                                             | `c7a4692` |
-| 0.17.0  | 9 nov. 2026  | FEAT-017 commande sans Internet (WhatsApp, SMS, appel)                                                                                                                                  | `00427ac` |
-| 0.16.0  | 9 nov. 2026  | FEAT-016 lecture des SMS du téléphone marchand                                                                                                                                          | `ec0ccf1` |
-| 0.15.0  | 9 nov. 2026  | FEAT-015 confiance client et plafond espèces                                                                                                                                            | `f878b45` |
-| 0.14.0  | 9 nov. 2026  | FEAT-014 gains et retraits du livreur                                                                                                                                                   | `edc8096` |
-| 0.13.0  | 9 nov. 2026  | FEAT-013 app livreur en version web                                                                                                                                                     | `06c2387` |
-| 0.12.0  | 9 nov. 2026  | FEAT-012 commande par téléphone payée par Airtel, code livreur                                                                                                                          | `f5b7fbf` |
+| Version | Date         | Contenu                                                                                                                                                                                 | Commit                       |
+| ------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| 0.20.2  | 16 nov. 2026 | Démo en ligne vérifiée ; photos de démonstration réparées (placehold.co en PNG : données de démo + migration 0038 pour le serveur)                                                      | ce commit                    |
+| 0.20.1  | 13 nov. 2026 | Test `walking-skeleton` stabilisé : attend que la commande passe « placée » après le paiement (événement traité juste après la réponse)                                                 | `c0487a2` (fusion `46d8cae`) |
+| 0.20.0  | 13 nov. 2026 | **Fusion dans `main`** : tout le travail (FEAT-002 à FEAT-018, installation serveur, tests 93/93, Windows) devient la version de référence ; guide et installation pointent vers `main` | `9072943`                    |
+| 0.19.4  | 13 nov. 2026 | Vérification Windows sur GitHub : installation, préparation, tests, construction des sites et démarrage du site sur une machine Windows                                                 | `b2f498b`                    |
+| 0.19.3  | 12 nov. 2026 | Tests d'intégration **93/93** : `walking-skeleton` réécrit sur le parcours actuel (proposition, acceptation, retrait, livraison avec code)                                              | `4c756e0`                    |
+| 0.19.2  | 10 nov. 2026 | Sécurité : `node-forge` forcé en 1.4.3 (5 nouvelles alertes corrigées, 12 anciennes aussi : 127 → 115 tolérées)                                                                         | `804176f`                    |
+| 0.19.1  | 10 nov. 2026 | Mise en ligne Oracle : script `install.sh` (Docker, pare-feu, clés, démarrage), clé de lecture GitHub, images ARM vérifiées                                                             | `54d50b5`                    |
+| 0.19.0  | 10 nov. 2026 | Feuille de route versionnée ; guide « travailler en local » ; tests d'intégration 92/93 ; hébergement gratuit (ARM)                                                                     | `41296a8`                    |
+| 0.18.2  | 10 nov. 2026 | Tests d'intégration indépendants de l'heure et du limiteur (90/93)                                                                                                                      | `ef13704`                    |
+| 0.18.1  | 10 nov. 2026 | Installation serveur : Docker Compose, HTTPS (Caddy), sauvegardes, guide Namecheap                                                                                                      | `2a622a1`                    |
+| 0.18.0  | 10 nov. 2026 | FEAT-018 repères, point appris, note vocale                                                                                                                                             | `c7a4692`                    |
+| 0.17.0  | 9 nov. 2026  | FEAT-017 commande sans Internet (WhatsApp, SMS, appel)                                                                                                                                  | `00427ac`                    |
+| 0.16.0  | 9 nov. 2026  | FEAT-016 lecture des SMS du téléphone marchand                                                                                                                                          | `ec0ccf1`                    |
+| 0.15.0  | 9 nov. 2026  | FEAT-015 confiance client et plafond espèces                                                                                                                                            | `f878b45`                    |
+| 0.14.0  | 9 nov. 2026  | FEAT-014 gains et retraits du livreur                                                                                                                                                   | `edc8096`                    |
+| 0.13.0  | 9 nov. 2026  | FEAT-013 app livreur en version web                                                                                                                                                     | `06c2387`                    |
+| 0.12.0  | 9 nov. 2026  | FEAT-012 commande par téléphone payée par Airtel, code livreur                                                                                                                          | `f5b7fbf`                    |
