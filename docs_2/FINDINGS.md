@@ -9,7 +9,8 @@ these IDs instead of repeating the detail.
   their production builds, HTTP scenarios with `curl`, the three web apps in headless Chrome, and
   the hosted CI logs. Environment details: [`TESTING_AND_QUALITY_ASSURANCE.md`](TESTING_AND_QUALITY_ASSURANCE.md) §1.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
-- **Counts:** 6 Critical · 20 High · 22 Medium · 13 Low = 61 open findings, plus 5 resolved
+- **Counts:** 6 Critical · 20 High · 23 Medium · 13 Low = 62 open findings, plus 5 resolved
+  _(updated 2026-11-14, sync S-008: new `DOC-03`)_
   _(updated 2026-11-14, sync S-007: `SDK-01`, `FE-01`, `PAY-02`, `TEST-01` and `CI-01` resolved on
   `main`; S-004 added `CI-03` and `FE-07`; S-003 added `CI-02`)_.
 - **Last synced:** S-007, 2026-11-14 — pull request #1 merged into `main` as `46d8cae` (DJAFAT
@@ -77,6 +78,7 @@ verified.
 | [FE-04](#fe-04)       | Customer web has no order history or profile page                                        | Not Implemented     | Medium   | LIVE     |
 | [PAY-08](#pay-08)     | Cash settlement posts ledger groups in the wrong order                                   | Needs Verification  | Medium   | CODE     |
 | [API-01](#api-01)     | Several client mistakes are answered with HTTP 500                                       | Needs Improvement   | Medium   | LIVE     |
+| [DOC-03](#doc-03)     | The local guide's placeholder secrets block local deliveries                             | Broken              | Medium   | CODE     |
 | [FE-05](#fe-05)       | Seeded restaurant and product images do not render                                       | Broken              | Low      | LIVE     |
 | [FE-06](#fe-06)       | Interface polish gaps                                                                    | Needs Improvement   | Low      | LIVE     |
 | [DB-01](#db-01)       | Schema hygiene: retention, indexes, a missing primary key, a reused column               | Needs Improvement   | Low      | LIVE     |
@@ -120,6 +122,12 @@ verified.
   (customer site by SMS code, restaurant console, admin console, courier app):
   `POST /v1/auth/otp/request` → 202, `verify` → 200. The branch's fix calls `fetch` as a plain
   function in `packages/sdk/src/http.ts`.
+- **Sync S-009 note (2026-11-17), CODE + RUN:** `07f2539` (0.20.2, pull request #5, by `kcerha`)
+  binds `fetch` to the global object instead of calling it through an arrow function. Its message
+  says no browser could reach the API with the arrow-function version; that was not reproduced
+  here: our browser runs on that version (S-006 on `4c756e0`, and the delivery-code journey of
+  2026-11-14 on a branch of `46d8cae`, both in Chrome) logged in, ordered and delivered. Binding is
+  correct in every browser, so the change is safe either way. Status unchanged.
 
 ### PAY-01
 
@@ -174,7 +182,7 @@ verified.
 
 ### PAY-03
 
-**Every refund request crashes** · Broken · Critical · LIVE · Status: Open; fix present on `fix/audit-blockers` (`f0cbb09`), verified there by a new integration test, red before and green after (sync S-007)
+**Every refund request crashes** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`f0cbb09`), verified there by a new integration test, red before and green after (sync S-007); version 0.20.4 of pull request #4 (`8e59bd4`, sync S-008)
 
 - **Where:** `apps/api` → payments. `payments.service.ts` `doRefundPayment` (L554–558) and
   `finalizeRefundSuccess` (L690–695). Table `refunds`.
@@ -230,7 +238,7 @@ verified.
 
 ### SEC-01
 
-**The API boots with the published placeholder secrets** · Broken · Critical · LIVE · Status: Open
+**The API boots with the published placeholder secrets** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`aa0d58d`, version 0.20.6, pull request #4), production only, verified there (sync S-008)
 
 - **Where:** `packages/config/src/env.ts` (`AuthSchema`, `OtpSchema`: secrets validated as
   non-empty strings only); `.env.example`.
@@ -246,6 +254,19 @@ verified.
   to exactly 32 bytes — at boot. Fail hard in production.
 - **Depends on:** nothing.
 - **Verify:** unit tests in `env.spec.ts`; booting with `.env.example` values exits with a readable error.
+- **Sync S-008 note (2026-11-14), BRANCH + RUN:** in production, `loadApiEnv` now refuses a
+  secret that still holds a placeholder (`REPLACE_ME`, `CHANGE_ME`), an HMAC secret under 32
+  characters, one value used for two secrets, and an AES key that does not decode to exactly
+  32 bytes (`SMS_GATEWAY_ENCRYPTION_KEY` included when set). Messages name the variable, never
+  its value (`aa0d58d`, version 0.20.6, pull request #4). Verified: six new tests in
+  `env.spec.ts`, five of which fail on the previous code; integration suite 94/94; the built API
+  started three times: production with the `.env.example` values exits with code 1 naming the
+  five secrets, production with generated secrets answers `/health`, development with the
+  `.env.example` values starts and logs a warning. Outside production nothing is refused, on
+  purpose: the local guide copies `.env.example` unchanged (`DOC-03`), and refusing there would
+  stop every teammate's API at the next pull. Whether development should refuse too is the
+  team's call. The shared test fixture had 20–24-character secrets and a 33-byte MFA key
+  (labelled 32): its inputs were corrected, no assertion changed.
 
 ### DEP-01
 
@@ -315,6 +336,11 @@ verified.
   - `postcss` (2 high, 8.5.18): `next` 15.5.29 itself pins 8.4.31.
   - `brace-expansion` (6 high), through React Native's tooling, `@fastify/static` and the ESLint
     plugins of `packages/eslint-config`.
+- **Sync S-008 note (2026-11-14), BRANCH:** pull request #3 is re-based on `main` as version
+  0.20.3 (`69cd859`, after the merge `6b13d96`, which adds nothing of its own). Its audit baseline
+  drops the 38 `next` entries pull request #1 had accepted (115 → 77 entries, counted in both
+  files), so the audit job fails again if a `next` advisory returns. Next step: Fastify 5 and
+  Nest 11, on their own pull request (T-105).
 
 ### MOB-01
 
@@ -343,6 +369,10 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   builds for the browser (`build:web`). Served locally, it logs in, shares its position, receives
   the offer, and completes pickup and delivery. Native builds were not tried.
 - **Verify:** `expo export` succeeds for both; the app runs on an Android device against a staging API.
+- **Sync S-009 note (2026-11-17), BRANCH:** `07f2539` declares `babel-preset-expo` in both Expo
+  apps; the commit reports that the courier web app could not be bundled without it (pnpm installed
+  it, Metro did not find it). Fix present, unverified by us: our local courier web export, built
+  before this change, did bundle, so the failure seems to depend on how the install is laid out.
 
 ---
 
@@ -466,7 +496,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### FE-03
 
-**The customer cannot see the delivery code in any app** · Not Implemented · High · CODE · Status: Open
+**The customer cannot see the delivery code in any app** · Not Implemented · High · CODE · Status: Open on `main`; fix present on `fix/audit-blockers` (`70cfd3b`, version 0.20.5, pull request #4), verified there in a browser (sync S-008)
 
 - **Where:** `GET /v1/deliveries/:id/code` exists and works (LIVE); no SDK binding, no screen in web or mobile.
 - **Why it matters:** the courier must enter the code to complete a delivery. Without it the only exit is "failed".
@@ -480,6 +510,13 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   returns it to the customer (HTTP 200), but no screen calls it, on the web or in the mobile app.
   The courier app refuses a delivery without the right code, so a real delivery cannot be completed
   from the screens alone; the test run fetched the code through the API.
+- **Sync S-008 note (2026-11-14), BRANCH + RUN:** order tracking now returns the delivery's id,
+  the SDK reads `GET /v1/deliveries/:id/code`, and both customer apps show « Votre code de
+  livraison » from pickup to handover, refreshed every 10 s (`70cfd3b`, version 0.20.5, pull
+  request #4). Verified on an isolated database: unit tests (API, SDK), integration suite 94/94,
+  and a browser journey: no code before pickup, a 4-digit code after it, the courier confirms
+  with that code, the order is delivered, the code is gone. Hosted CI, Windows and Security
+  checks green on that push. The mobile screen was type-checked and linted, not run on a device.
 
 ### TEST-01
 
@@ -602,6 +639,14 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   community build referenced by tag, not digest; there is still no monitoring or alerting (the
   branch's roadmap lists it as to do); a live server lacks reference data ([`OPS-05`](#ops-05)).
   Partly addressed on the branch, unverified.
+- **Sync S-009 note (2026-11-17), LIVE:** the one-server stack is deployed. The roadmap of 0.20.3
+  reports the demo online since 2026-11-16 (Oracle Cloud, HTTPS on six addresses, checked from
+  outside); on 2026-11-17 `djafat.com`, `api.djafat.com/v1/health` and the `admin.`, `resto.` and
+  `livreur.` addresses answered HTTP 200 (status codes only, nothing else requested). The server
+  runs in production mode with demo data, and its test SMS inbox is bound to the server's own
+  localhost (`docker-compose.prod.yml`), so login codes cannot be read from outside. The stack has
+  a backup service; monitoring, alerting and a restore drill are still not reported. Open, partly
+  addressed.
 
 ### SEC-02
 
@@ -620,6 +665,10 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Sync S-001 note (2026-11-11), branch only:** the branch's server stack runs the seed in demo mode
   only, and its seed still creates the eight fixture accounts unconditionally (`seed.ts` L477–533).
   The consequence for a live server is [`OPS-05`](#ops-05).
+- **Sync S-009 note (2026-11-17), CODE:** the live demo runs this seed (`SEED_DEMO=1`), so its
+  super-admin exists on the known number. Its login codes only reach the test inbox bound to the
+  server's localhost, so the number cannot be used from outside; anyone with a shell on the server
+  can. With `MODE=live` the seed does not run ([`OPS-05`](#ops-05)).
 
 ### ADM-01
 
@@ -931,13 +980,34 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Fix:** map Fastify client errors by `statusCode`; translate Prisma `P2003`/`P2002` where the cause is input.
 - **Verify:** each case returns 4xx with the standard envelope.
 
+### DOC-03
+
+**The local guide's placeholder secrets block local deliveries** · Broken · Medium · CODE · Status: Open _(added 2026-11-14, sync S-008)_
+
+- **Where:** `docs/TRAVAILLER-EN-LOCAL.md` §2 (`cp .env.example .env`, nothing about the secrets);
+  `.env.example`; `deliveries.service.ts` `doMarkPickedUp` → `issueDeliveryCode`;
+  `common/crypto/at-rest.ts` `keyOf`; `auth/crypto.util.ts` `encryptMfaSecret`.
+- **Observed (CODE, not run):** the five secrets of `.env.example` are placeholders and the guide
+  never says to replace them (`docs/36-pilot-e2e-scenario.md` does). The placeholder of
+  `DELIVERY_CODE_ENCRYPTION_KEY` decodes to 22 bytes (computed with Node's decoder) and `keyOf`
+  throws unless the key is 32 bytes. Pickup first moves the delivery to `on_the_way`, then issues the
+  code; the encryption throws there, so the delivery stays on its way with no code and
+  `confirmDelivered` can never succeed. MFA enrolment fails the same way on `MFA_ENCRYPTION_KEY`.
+- **Why it matters:** a teammate who follows the guide cannot finish a delivery locally, and the
+  failure appears mid-flow, not at start. Since 0.20.6 (pull request #4, `SEC-01`) the API at least
+  lists the five placeholders in a warning at boot.
+- **Fix:** make the guide produce real values (a small cross-platform script that fills `.env` from
+  `.env.example` with random secrets, or one documented command per secret); consider making
+  pickup and code issuance one transaction, so a failure cannot leave a delivery without a code.
+- **Verify:** follow the guide on a fresh clone and deliver an order end to end.
+
 ---
 
 ## Low
 
 ### FE-05
 
-**Seeded restaurant and product images do not render** · Broken · Low · LIVE — `seed.ts` uses `placehold.co` URLs that return SVG; `/_next/image` answers 400. Use `.png` URLs in the seed. Development only. _Sync S-007 note (2026-11-14): fix present on `fix/payment-reliability-backlog` (`cb84077`: the seed asks placehold.co for PNG), not on `main` (BRANCH)._
+**Seeded restaurant and product images do not render** · Broken · Low · LIVE — `seed.ts` uses `placehold.co` URLs that return SVG; `/_next/image` answers 400. Use `.png` URLs in the seed. Development only. _Sync S-007 note (2026-11-14): fix present on `fix/payment-reliability-backlog` (`cb84077`: the seed asks placehold.co for PNG), not on `main` (BRANCH)._ _Sync S-009 note (2026-11-17): fix present on `main` (`c804526`, 0.20.3): the seed's 21 addresses ask for `.png`, and migration 0038 rewrites the stored `placehold.co` ones (all old ones carry the query string its pattern needs). The commit reports the live image optimizer answering 200 `image/png`; not re-checked by us (CODE)._
 
 ### FE-06
 

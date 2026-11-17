@@ -3,13 +3,13 @@
 **The single source of truth for where DJAFAT stands.** Update it with every meaningful change
 (rules in [`README.md`](README.md)). Details live in the linked documents; this page points.
 
-|                        |                                                                                                                                                                                                                                                                   |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Last updated**       | 2026-11-14                                                                                                                                                                                                                                                        |
-| **Branch described**   | `main` @ `46d8cae` (DJAFAT 0.20.1) — pull request #1 merged on 2026-11-13                                                                                                                                                                                         |
-| **Evidence collected** | 2026-11-10 for the old `main`; 2026-11-13 end-to-end run of the code now on `main`; hosted CI                                                                                                                                                                     |
-| **Last synced**        | S-007, 2026-11-14 — pull request #1 merged into `main` (`46d8cae`); S-006 its branch run end to end; S-005 two commits on #3; S-004 our `next` upgrade; S-003 our CI fix on #2; S-001 the collaborator's 4 commits ([`history/SYNC_LOG.md`](history/SYNC_LOG.md)) |
-| **Updated by**         | Initial full audit; syncs S-001 to S-007                                                                                                                                                                                                                          |
+|                        |                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Last updated**       | 2026-11-17                                                                                                                                                                                                                                                                                                                                                                                             |
+| **Branch described**   | `main` @ `9058e33` (DJAFAT 0.20.3) — pull requests #5 and #6 merged on 2026-11-16 _(sync S-009)_                                                                                                                                                                                                                                                                                                       |
+| **Evidence collected** | 2026-11-10 for the old `main`; 2026-11-13 end-to-end run of the code now on `main`; hosted CI                                                                                                                                                                                                                                                                                                          |
+| **Last synced**        | S-009, 2026-11-17 — pull requests #5 and #6 on `main`, the demo online; S-008 our fixes for `FE-03` and `SEC-01` on pull request #4, new `DOC-03`; S-007 pull request #1 merged into `main` (`46d8cae`); S-006 its branch run end to end; S-005 two commits on #3; S-004 our `next` upgrade; S-003 our CI fix on #2; S-001 the collaborator's 4 commits ([`history/SYNC_LOG.md`](history/SYNC_LOG.md)) |
+| **Updated by**         | Initial full audit; syncs S-001 to S-009                                                                                                                                                                                                                                                                                                                                                               |
 
 ---
 
@@ -41,7 +41,10 @@ already fixes some of these and adds much more _(updated 2026-11-11, sync S-001:
 
 | Open findings | Critical | High | Medium | Low |
 | ------------- | -------- | ---- | ------ | --- |
-| 61            | 6        | 20   | 22     | 13  |
+| 62            | 6        | 20   | 23     | 13  |
+
+_(updated 2026-11-14, sync S-008)_ One new Medium finding, from writing the `SEC-01` fix: the local guide keeps the
+placeholder secrets, so a delivery cannot be completed locally ([`DOC-03`](FINDINGS.md#doc-03)).
 
 Sync S-001 added one High finding, on the active branch only: a live server deployed from it would start without roles, permissions or ledger accounts ([`OPS-05`](FINDINGS.md#ops-05)). The other changes it brought are summarised in [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
 
@@ -54,6 +57,15 @@ _(updated 2026-11-12, sync S-005)_ Two more commits on pull request #3 copy fixe
 _(updated 2026-11-13, sync S-006)_ The collaborator's branch (pull request #1, `4c756e0`) was run locally end to end, through the real screens. A customer logged in, ordered and paid cash; the restaurant accepted and readied the order; the courier received the offer, picked up and delivered; the ledger balanced. On that branch this verifies the fixes for [`SDK-01`](FINDINGS.md#sdk-01), [`FE-01`](FINDINGS.md#fe-01) (cash) and [`PAY-02`](FINDINGS.md#pay-02), and its CI is fully green, the integration suite included ([`TEST-01`](FINDINGS.md#test-01)). One gap remains there: the customer cannot see the delivery code ([`FE-03`](FINDINGS.md#fe-03)), and the courier cannot deliver without it. None of this is on `main` until pull request #1 is merged.
 
 _(updated 2026-11-14, sync S-007)_ **Pull request #1 was merged into `main` on 2026-11-13 (`46d8cae`, DJAFAT 0.20.1), and both workflows are green on `main` for the first time.** Resolved on `main`: [`SDK-01`](FINDINGS.md#sdk-01), [`FE-01`](FINDINGS.md#fe-01) (cash), [`PAY-02`](FINDINGS.md#pay-02), [`TEST-01`](FINDINGS.md#test-01), [`CI-01`](FINDINGS.md#ci-01). Still open there: no screen shows the delivery code ([`FE-03`](FINDINGS.md#fe-03)), refunds crash ([`PAY-03`](FINDINGS.md#pay-03), fix waiting in a branch), placeholder secrets accepted ([`SEC-01`](FINDINGS.md#sec-01)), webhooks stored before their signature check ([`PAY-05`](FINDINGS.md#pay-05)), disabled providers usable ([`PAY-01`](FINDINGS.md#pay-01)), vulnerable dependencies ([`DEP-01`](FINDINGS.md#dep-01)), no device build of the Expo apps ([`MOB-01`](FINDINGS.md#mob-01)).
+
+_(updated 2026-11-17, sync S-009)_ **The demo is online.** `main` is at `9058e33` (DJAFAT 0.20.3): pull request #5
+(`07f2539`: the SDK's `fetch` bound to the global object, clearer login errors, a worker that
+survives a database blip) and pull request #6 (`c804526`: demo photos as PNG) were merged on
+2026-11-16, and the roadmap reports the demo online at djafat.com since that day. On 2026-11-17
+its five addresses answered HTTP 200 ([`OPS-02`](FINDINGS.md#ops-02)). Our pull requests #2, #3
+and #4 are still open and now conflict with `main`: the versions they carry (0.20.2 to 0.20.6)
+overlap the two `main` has used, so they are renumbered from 0.20.4 when brought onto it
+([`UNMERGED_BRANCHES.md`](UNMERGED_BRANCHES.md) §1).
 
 ## 2. Current development phase
 
@@ -155,8 +167,8 @@ Full list with acceptance criteria: [`tasks/BACKLOG.md`](tasks/BACKLOG.md). Orde
 
 - [x] `SDK-01` Browser calls fail in all web apps → T-101 (resolved on `main` `46d8cae`; _sync S-007_)
 - [ ] `PAY-01` Free orders through a disabled provider → T-102
-- [ ] `PAY-03` Refunds crash → T-103
-- [ ] `SEC-01` Boots with published placeholder secrets → T-104
+- [ ] `PAY-03` Refunds crash → T-103 (fix verified on pull request #4, not merged; _sync S-008_)
+- [ ] `SEC-01` Boots with published placeholder secrets → T-104 (production refuses them on pull request #4, not merged; _sync S-008_)
 - [ ] `DEP-01` Critical dependency vulnerabilities → T-105 (the `next` part is fixed on pull request #3, not merged; _updated 2026-11-12, sync S-004_)
 - [ ] `MOB-01` Expo apps cannot be bundled → T-106, T-210
 - [x] `PAY-02` Cash on delivery never places an order → T-202 (resolved on `main` `46d8cae`; _sync S-007_)
@@ -199,8 +211,8 @@ Nothing is in progress. The audit made no change to application code.
 reminded automatically (shared hook in `.claude/settings.json`) when the code has moved past
 [`history/LAST_REVIEWED_COMMIT`](history/LAST_REVIEWED_COMMIT).
 
-1. **Bring over what is left on `fix/payment-reliability-backlog`** (T-001). The larger branch is merged (pull request #1, `46d8cae`, _sync S-007_). The owner's branch now conflicts with `main` in 8 files, so take its unique changes one by one rather than merging it: webhook signature first (`PAY-05`), PNG seed images (`FE-05`), clearer login errors, closed restaurants ranked last.
-2. **Phase 1, in order:** T-101 (SDK), T-102 (payment enablement), T-103 (refund crash), T-104 (secret validation), T-107 (webhook order), T-108/T-109 (runnable tests, green CI), T-110 (`infra:up`), T-105 (dependency upgrades), T-106 (unblock the build).
+1. **Bring over what is left on `fix/payment-reliability-backlog`** (T-001). The larger branch is merged (pull request #1, `46d8cae`, _sync S-007_). The owner's branch now conflicts with `main` in 8 files, so take its unique changes one by one rather than merging it: webhook signature first (`PAY-05`), PNG seed images (`FE-05`), clearer login errors, closed restaurants ranked last. _(sync S-009: its PNG seed fix `cb84077` is superseded by `c804526` on `main`.)_
+2. **Phase 1, in order:** T-101 (SDK), T-102 (payment enablement), T-103 (refund crash), T-104 (secret validation), T-107 (webhook order), T-108/T-109 (runnable tests, green CI), T-110 (`infra:up`), T-105 (dependency upgrades), T-106 (unblock the build). _(updated 2026-11-14, sync S-008)_ On pull request #4: T-103, T-104 and T-208 are done and verified, waiting for merge; T-107 and T-102 come next there.
 3. **Take the three product decisions** that gate Phase 2: cash limits, refund policy, SMS provider.
 
 ## 12. Change log
@@ -209,6 +221,8 @@ Recent entries; full history in [`history/CHANGELOG.md`](history/CHANGELOG.md).
 
 | Date       | Change                                                                                                                                                                                                              | Verified                                                                                                               |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-17 | Sync S-009: pull requests #5 (SDK `fetch` binding) and #6 (demo photos) merged into `main` (`9058e33`, 0.20.3); the demo is online                                                                                  | Demo addresses HTTP 200; the commits read, not run                                                                     |
+| 2026-11-14 | Sync S-008: our fixes on pull request #4 — `PAY-03` (0.20.4), `FE-03` (0.20.5), `SEC-01` (0.20.6, production); #3 re-based (0.20.3); new `DOC-03`; T-102/T-103 statuses corrected                                   | Locally: unit, integration 94/94, browser, API boots; hosted checks green except one job still running                 |
 | 2026-11-14 | Sync S-007: pull request #1 merged into `main` (`46d8cae`, 0.20.1); 4 commits on `fix/payment-reliability-backlog`; our pull requests re-based on `main`                                                            | Hosted CI and Security green on `main`; 5 findings resolved there                                                      |
 | 2026-11-13 | Sync S-006: `4c756e0` on pull request #1 (integration test rewrite); the branch run locally end to end (order, cash payment, restaurant, courier, delivery)                                                         | Local browser run without workaround; ledger balanced; hosted run 43212219986 all green; `FE-03` still open there      |
 | 2026-11-12 | Sync S-005: `c616695` (Expo bundling) and `6cbbad4` (build before seed) on pull request #3, copied from #1; local run re-verified with a generated `.env`                                                           | Hosted run 43156964436: `check` passes, `integration` reaches the tests; local API login, 29-page browser walk         |
