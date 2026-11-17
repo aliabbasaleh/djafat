@@ -100,6 +100,29 @@ export class PaymentsService {
       });
     }
 
+    // Registered is not enabled (audit finding PAY-01; the same rule as the
+    // owner's `6cf7c9b`). `registry.has()` only says the class is wired up; a
+    // `payment_provider_configs` row must also enable the provider for this
+    // order's restaurant, city, currency and amount, and its `payment_providers`
+    // row must be active. That was checked by the payment screen only, so a
+    // disabled provider could still be paid with — the mock one gave free
+    // orders. Same resolver as the screen, so the two cannot drift apart; before
+    // any row, event or provider call, so a refusal leaves no trace.
+    const enabled = (
+      await this.listAvailablePaymentMethods({
+        cityId: context.cityId,
+        restaurantId: context.restaurantId,
+        amountMinor: amount.minor,
+        currency: amount.currency,
+      })
+    ).find((m) => m.providerCode === input.providerCode);
+    if (!enabled) {
+      throw new ConflictException({
+        code: 'PAYMENT_METHOD_UNAVAILABLE',
+        message: `Provider "${input.providerCode}" is not enabled for this order.`,
+      });
+    }
+
     // FEAT-015: cash on delivery only for customers trusted for this amount.
     if (
       this.codTrust &&
@@ -113,7 +136,10 @@ export class PaymentsService {
         data: {
           orderId: input.orderId,
           providerCode: input.providerCode,
-          methodCode: input.methodCode,
+          // The provider's own method (PAY-01), never the client's `methodCode`,
+          // which used to be stored as sent: a wrong one was recorded, an unknown
+          // one broke the foreign key (HTTP 500).
+          methodCode: enabled.methodCode,
           status: 'pending',
           amountMinor: amount.minor,
           currency: amount.currency,

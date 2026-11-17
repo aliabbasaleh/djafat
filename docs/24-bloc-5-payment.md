@@ -125,6 +125,8 @@ Contrôleur séparé (`PaymentMethodsConfigController`, `@Controller('config')`)
 
 Un provider n'apparaît que si **à la fois** (a) sa classe est enregistrée dans `PaymentProviderRegistry` **et** (b) une ligne `payment_provider_configs` l'active pour ce contexte (ville/restaurant/devise, la plus spécifique gagnant) — jamais une liste codée en dur (docs/15 AD-03). Filtre optionnel par montant (`min/maxAmountMinor`).
 
+Depuis 0.20.10, la **création** d'un paiement (`POST /v1/payments`) applique la même règle, avec la même fonction : un provider absent de cette liste pour la commande est refusé (`409 PAYMENT_METHOD_UNAVAILABLE`), et la méthode enregistrée est celle du provider, plus celle envoyée par le client. Avant, seule la liste appliquait la règle : un provider désactivé restait utilisable par l'API (constat d'audit PAY-01).
+
 ---
 
 ## 10. D-15 — IDOR corrigé
