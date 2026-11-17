@@ -10,6 +10,50 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-017 — 2026-11-17 — the logo file renamed
+
+|                 |                                                                     |
+| --------------- | ------------------------------------------------------------------- |
+| **Trigger**     | Our own commit, at the user's request                               |
+| **Range**       | `chore/brand-assets` (pull request #10), one commit after `3d2a55d` |
+| **Size**        | 1 rename, version files                                             |
+| **Evidence**    | CODE — same file content under the new name                         |
+| **Reviewed by** | Claude, in the session that wrote the commit                        |
+
+### Added
+
+- none
+
+### Removed
+
+- none
+
+### Fixed
+
+- none
+
+### Changed
+
+- `djafat/ogo.png` renamed `djafat/logo.png` (version 0.20.16); S-016 names the file as it was then.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`PROJECT_STATUS.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- nothing
+
+### Marker
+
+`HEAD` and `origin/chore/brand-assets` → this sync's version commit.
+
+---
+
 ## S-016 — 2026-11-17 — the owner's branch brings in `main`; our brand assets
 
 |                 |                                                                                                |

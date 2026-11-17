@@ -8,6 +8,17 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-17 — Sync S-017: the logo file renamed
+
+**Reviewed:** our own rename on pull request #10 (0.20.16): `djafat/ogo.png` → `djafat/logo.png`, same
+content (a typo in the first name).
+
+**Status changes:** none.
+
+**Documents changed:** `PROJECT_STATUS.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-016: the owner's branch brings in `main`; our brand assets
 
 **Reviewed:** `6198a89` by `kcerha`, merging `main` (`75db772`, the audit's fixes) into
