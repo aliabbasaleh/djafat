@@ -10,6 +10,98 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-017 — 2026-11-17 — the logo file renamed
+
+|                 |                                                                     |
+| --------------- | ------------------------------------------------------------------- |
+| **Trigger**     | Our own commit, at the user's request                               |
+| **Range**       | `chore/brand-assets` (pull request #10), one commit after `3d2a55d` |
+| **Size**        | 1 rename, version files                                             |
+| **Evidence**    | CODE — same file content under the new name                         |
+| **Reviewed by** | Claude, in the session that wrote the commit                        |
+
+### Added
+
+- none
+
+### Removed
+
+- none
+
+### Fixed
+
+- none
+
+### Changed
+
+- `djafat/ogo.png` renamed `djafat/logo.png` (version 0.20.16); S-016 names the file as it was then.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`PROJECT_STATUS.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- nothing
+
+### Marker
+
+`HEAD` and `origin/chore/brand-assets` → this sync's version commit.
+
+---
+
+## S-016 — 2026-11-17 — the owner's branch brings in `main`; our brand assets
+
+|                 |                                                                                                |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook, after a fetch and our own push                                                |
+| **Range**       | `origin/feat/welcome-greeting` `cabf058..6198a89`; `origin/chore/brand-assets` (new) `155b946` |
+| **Size**        | 1 merge by `kcerha` (38 files from `main`); 1 commit of ours (10 images, version files)        |
+| **Evidence**    | CODE — combined diff of the merge; our commit's content                                        |
+| **Reviewed by** | Claude, in the audit session                                                                   |
+
+### Added
+
+- `155b946` (0.20.14, pull request #10): brand files in `djafat/` (`ogo.png`, four "D" icons,
+  `posters/1-5.png`).
+
+### Removed
+
+- none
+
+### Fixed
+
+- none
+
+### Changed
+
+- `feat/welcome-greeting` now contains `main`; the merge resolves only the roadmap journal and keeps
+  0.21.0. Pull request #8 mergeable; merge it after #9 and #10.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+Pull request #8's checks (still running at sync time).
+
+### Marker
+
+`origin/feat/welcome-greeting` → `6198a89`; new line `origin/chore/brand-assets` → this sync's
+version commit; `HEAD` → the same.
+
+---
+
 ## S-015 — 2026-11-17 — `main` green after the merges; a correction on shutdown
 
 |                 |                                                                                       |
