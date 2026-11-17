@@ -37,21 +37,21 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-102 · Enforce provider enablement when creating a payment
 
-- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** Not started _(corrected 2026-11-14, sync S-008: S-007 put the refund fix `f0cbb09` here by mistake; it is T-103's)_
+- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** In progress — fix `a017f48` verified on pull request #4 (0.20.10); done when merged _(sync S-011; corrected in S-008: S-007 had put the refund fix `f0cbb09` here by mistake)_
 - **Why:** [`PAY-01`](../FINDINGS.md#pay-01) · **Depends on:** —
 - **Done when:** a payment is refused unless an enabled, currently valid configuration covers the order's restaurant/city/amount; `methodCode` comes from the provider; the mock provider is not registered in production.
 - **Test:** integration tests for enabled, disabled, out-of-range amount, production mode.
 
 ### T-103 · Fix refund arithmetic
 
-- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** In progress — fix `f0cbb09` verified on `fix/audit-blockers` (version 0.20.4, pull request #4); done when merged _(sync S-008)_
+- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** In progress — fix `f0cbb09` verified on `fix/audit-blockers` (version 0.20.6, pull request #4; 0.20.4 until sync S-010); done when merged _(sync S-008)_
 - **Why:** [`PAY-03`](../FINDINGS.md#pay-03) · **Depends on:** T-108 for the test
 - **Done when:** partial refund, remainder and over-refund behave as specified on PostgreSQL.
 - **Test:** integration test of the three cases; ledger groups balance.
 
 ### T-104 · Validate secrets at boot
 
-- **Area:** `packages/config` · **Priority:** Critical · **Status:** In progress — fix `aa0d58d` verified on pull request #4 (0.20.6). It stops the boot in production only: elsewhere the API starts and lists the problems, because the local guide copies `.env.example` unchanged (`DOC-03`). Decide whether development should refuse too _(sync S-008)_
+- **Area:** `packages/config` · **Priority:** Critical · **Status:** In progress — fix `aa0d58d` verified on pull request #4 (0.20.8; 0.20.6 until sync S-010). It stops the boot in production only: elsewhere the API starts and lists the problems, because the local guide copies `.env.example` unchanged (`DOC-03`). Decide whether development should refuse too _(sync S-008)_
 - **Why:** [`SEC-01`](../FINDINGS.md#sec-01) · **Depends on:** —
 - **Done when:** placeholders, short secrets, identical secrets and wrong-length AES keys stop the boot with a readable message.
 - **Test:** `env.spec.ts` cases; manual boot with `.env.example` values fails.
@@ -65,6 +65,9 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Note (updated 2026-11-11, sync S-003):** target `next` ≥ 15.5.28, the highest patched version
   among its 17 critical and high advisories in the hosted audit of pull request #2. Pull request
   #1's audit baseline accepts the critical ones in the meantime ([`DEP-01`](../FINDINGS.md#dep-01)).
+- **Progress (updated 2026-11-17, sync S-012):** the API step is done on `fix/api-nest11-fastify5`
+  (0.20.11): NestJS 11 and Fastify 5; production advisories 73 → 36, none left in the API. Left: the
+  Expo tool chain, `postcss` through `next`, `zod` 4.
 - **Progress (updated 2026-11-14, sync S-008):** pull request #3 is re-based on `main` (0.20.3,
   `69cd859`) and drops the 38 `next` entries of the audit baseline (115 → 77). Fastify 5 and
   Nest 11 come next, on their own pull request.
@@ -87,7 +90,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-107 · Verify the webhook signature before recording the event
 
-- **Area:** `apps/api` · payments · **Priority:** High · **Status:** Not started
+- **Area:** `apps/api` · payments · **Priority:** High · **Status:** In progress — fix `2319186` verified on pull request #4 (0.20.9): the audit's two requests replayed on PostgreSQL; done when merged _(sync S-010)_
 - **Why:** [`PAY-05`](../FINDINGS.md#pay-05) · **Depends on:** — (exists on `fix/payment-reliability-backlog`)
 - **Done when:** an invalid-signature request leaves no row that can shadow a genuine event.
 - **Test:** integration test replaying the audit's two-request scenario.
@@ -181,7 +184,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-208 · Delivery code in the customer apps
 
-- **Area:** `packages/sdk`, `apps/web`, `apps/mobile` · **Priority:** High · **Status:** In progress — fix `70cfd3b` verified on pull request #4 (0.20.5): the browser test passes on the site; the mobile screen was not run on a device _(sync S-008)_
+- **Area:** `packages/sdk`, `apps/web`, `apps/mobile` · **Priority:** High · **Status:** In progress — fix `70cfd3b` verified on pull request #4 (0.20.7; 0.20.5 until sync S-010): the browser test passes on the site; the mobile screen was not run on a device _(sync S-008)_
 - **Why:** [`FE-03`](../FINDINGS.md#fe-03) · **Depends on:** T-201
 - **Done when:** the code is shown from pickup to delivery.
 - **Test:** browser test.
@@ -474,4 +477,11 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Done when:** following the guide on a fresh clone (macOS, Linux and Windows) gives five real secrets, and an order can be delivered end to end.
 - **Test:** the Windows workflow and a fresh local run follow the guide and finish a delivery.
 
-Last updated: 2026-11-14 (sync S-008)
+### T-609 · Find the intermittent integration failures _(added 2026-11-17, sync S-011)_
+
+- **Area:** `apps/api/test`, deliveries dispatch · **Priority:** Medium · **Why:** [`TEST-04`](../FINDINGS.md#test-04) · **Status:** Not started
+- **Done when:** the two failure modes are explained and fixed, or shown to come from the test environment.
+- **Lead _(updated 2026-11-17, sync S-012)_:** port collisions between the test app (IPv6 wildcard) and 127.0.0.1-only listeners such as Prisma's binary query engine; try `app.listen(0, '127.0.0.1')` in the integration bootstrap ([`TEST-04`](../FINDINGS.md#test-04)).
+- **Test:** 20 consecutive full runs of the integration suite pass locally.
+
+Last updated: 2026-11-17 (sync S-011)

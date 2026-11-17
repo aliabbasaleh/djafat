@@ -57,6 +57,17 @@ conflicts with it on `package.json` and `docs/ROADMAP.md`, because `main` used 0
 0.20.3 too: bring `main` into #2 first, then renumber the stack from 0.20.4.
 `fix/browser-fetch-and-local-dev` (#5) was deleted after its merge.
 
+_(updated 2026-11-17, sync S-010)_ Done: `main` merged into #2 (`c1abcba`), version 0.20.4 (`d366f12`); #2 into #3
+(`0c61784`), 0.20.5 (`c715ae2`); #3 into #4 (`7452ec4`, its three versions renumbered 0.20.6 to
+0.20.8, same commits), then `PAY-05` as 0.20.9 (`2319186`). Merge order unchanged: #2, #3, #4.
+
+_(updated 2026-11-17, sync S-011)_ #4 gains `PAY-01` as 0.20.10 (`a017f48`): it now holds all five blocking fixes
+(`PAY-03`, `FE-03`, `SEC-01`, `PAY-05`, `PAY-01`).
+
+_(updated 2026-11-17, sync S-012)_ New branch `fix/api-nest11-fastify5`, stacked on #4: `862ad24` (0.20.11) moves the API
+to NestJS 11 and Fastify 5, bounds Prisma's disconnect on shutdown, and trims the audit baseline. Merge
+it after #4.
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |
