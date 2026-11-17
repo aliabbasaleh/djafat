@@ -201,13 +201,29 @@ export class PaymentsService {
     const provider = this.registry.get(providerCode);
     const parsed = await provider.verifyAndParseWebhook(rawReq);
 
+    // Authenticate BEFORE recording anything (audit finding PAY-05; the same
+    // fix as the owner's `6cf7c9b`). `(provider_code, event_id)` in
+    // `webhook_events` is the idempotency key, and `eventId` comes from the
+    // body of an unauthenticated request: a forged event that was stored used to
+    // reserve the genuine event's id, so the real webhook was answered
+    // 'duplicate' and the payment stayed pending. A rejected request leaves no
+    // row; it is only logged.
+    if (!parsed.signatureValid) {
+      this.logger.warn(`Invalid webhook signature (${providerCode}/${parsed.eventId})`);
+      throw new UnauthorizedException({
+        code: 'UNAUTHENTICATED',
+        message: 'Invalid webhook signature.',
+      });
+    }
+
     const bodyText =
       typeof rawReq.rawBody === 'string'
         ? rawReq.rawBody
         : Buffer.from(rawReq.rawBody).toString('utf8');
     const payloadHash = createHash('sha256').update(bodyText).digest('hex');
 
-    // Durable idempotency (docs/08 §8.6): a replayed/duplicated webhook is a no-op.
+    // Durable idempotency (docs/08 §8.6): a replayed/duplicated webhook is a
+    // no-op. Only authenticated events reach this point.
     const inserted = await this.prisma.$queryRaw<Array<{ id: string }>>`
       INSERT INTO webhook_events (provider_code, event_id, provider_ref, payload_hash, signature_valid, status)
       VALUES (${providerCode}, ${parsed.eventId}, ${parsed.providerRef || null}, ${payloadHash}, ${parsed.signatureValid}, 'received')
@@ -219,18 +235,6 @@ export class PaymentsService {
       return { status: 'duplicate' };
     }
     const webhookEventId = inserted[0].id;
-
-    if (!parsed.signatureValid) {
-      await this.prisma.webhookEvent.update({
-        where: { id: webhookEventId },
-        data: { status: 'ignored' },
-      });
-      this.logger.warn(`Invalid webhook signature (${providerCode}/${parsed.eventId})`);
-      throw new UnauthorizedException({
-        code: 'UNAUTHENTICATED',
-        message: 'Invalid webhook signature.',
-      });
-    }
 
     const payment = await this.prisma.payment.findFirst({
       where: { providerCode, providerRef: parsed.providerRef },
