@@ -8,6 +8,22 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-17 — Sync S-015: `main` green after the merges; a correction on shutdown
+
+**Verified:** CI and Security both green on `main` at `75db772`, the merge of pull request #7. The
+user's local run (`/Users/mac/projects/djafat-latest`) now follows `main`: migration 0038 applied to
+its database, seed re-run, the six apps started; checks: `/v1/ready` 200, a 2 MB body answers 413,
+Helmet headers present, phone login works, `/v1/me` 200, restaurants listed, no error in the API log.
+
+**Corrected:** S-012 said NestJS 10 was not affected by the shutdown hang. An old API process
+(NestJS 10) that had run for three days ignored SIGTERM for 10 s and had to be force-stopped. Noted on
+`OPS-02`; `main` bounds Prisma's disconnect since 0.20.11.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-014: the owner's new branch `feat/welcome-greeting`
 
 **Reviewed:** `cabf058` by `kcerha`, from an older `main` (`e82eb80`): a greeting on the four apps,

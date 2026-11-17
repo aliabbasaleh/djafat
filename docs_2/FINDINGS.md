@@ -690,6 +690,12 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   Oracle Cloud **free trial** on x86 (the ARM "Always Free" offer was unavailable), so its life is
   limited unless migrated or paid; and object storage (photos) is blocked by the MinIO image above.
   Not checked by us.
+- **Sync S-015 note (2026-11-17), RUN: shutdown.** On `main` since 0.20.11 the API exits about 2 s
+  after SIGTERM (Prisma's disconnect is bounded, see S-012). Correction to S-012, which said NestJS
+  10 was not affected: an old API process (NestJS 10, code of `4c756e0`) that had run for three days
+  on the user's machine ignored SIGTERM for 10 s and had to be force-stopped. A deployment should
+  still give the API a stop timeout and check that it exits; the cause in that old process was not
+  investigated.
 
 ### SEC-02
 

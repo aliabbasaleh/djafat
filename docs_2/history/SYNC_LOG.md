@@ -10,6 +10,54 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-015 — 2026-11-17 — `main` green after the merges; a correction on shutdown
+
+|                 |                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------- |
+| **Trigger**     | The end of the day's work: hosted runs on `main` finished; the user's local run moved |
+| **Range**       | no new commit on GitHub besides ours                                                  |
+| **Size**        | —                                                                                     |
+| **Evidence**    | RUN — hosted CI and Security on `main`; HTTP checks on the local run                  |
+| **Reviewed by** | Claude, in the audit session                                                          |
+
+### Added
+
+- none
+
+### Removed
+
+- none
+
+### Fixed
+
+- none
+
+### Changed
+
+- S-013's "not verified" is now verified: CI and Security green on `main` at `75db772`.
+- The user's local run follows `main` (0.20.11): migration 0038 applied, seed re-run, six apps up;
+  `/v1/ready` 200, 413 on a 2 MB body, Helmet headers, phone login, `/v1/me` 200, no API log error.
+- Correction to S-012: NestJS 10 is not immune to a shutdown hang either (an old process ignored
+  SIGTERM for 10 s); note on `OPS-02`.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The cause of the old process's hang; the pull request #9 merge itself (after this entry).
+
+### Marker
+
+`HEAD` → this sync's version commit; the other lines unchanged.
+
+---
+
 ## S-014 — 2026-11-17 — the owner's new branch `feat/welcome-greeting`
 
 |                 |                                                    |
