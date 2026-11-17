@@ -35,12 +35,22 @@ export function tool(root, name) {
 }
 
 export function runTool(cmd, args, { cwd, timeoutMs = 60_000 } = {}) {
-  const r = spawnSync(cmd, args, {
+  // Windows: neither the bare `pnpm` on PATH (a `.CMD` shim) nor pnpm's own
+  // `node_modules/.bin/<tool>` (a shebang script, no native .exe/.CMD) is
+  // directly spawnable — spawnSync needs a shell to resolve either, which
+  // Node's own PATHEXT search does not provide. Without it, spawnSync fails
+  // ENOENT and this reports a silent, output-less non-zero exit, which looks
+  // exactly like a real failure. `cmd` (but not `args`) must be quoted by
+  // hand for that shell: unquoted, cmd.exe splits an absolute path with
+  // spaces (e.g. `C:\Program Files\nodejs\node.exe`) at the first space.
+  const useShell = process.platform === 'win32';
+  const r = spawnSync(useShell && cmd.includes(' ') ? `"${cmd}"` : cmd, args, {
     cwd,
     encoding: 'utf8',
     timeout: timeoutMs,
     maxBuffer: 32 * 1024 * 1024,
     env: { ...process.env, FORCE_COLOR: '0' },
+    shell: useShell,
   });
   return {
     ok: r.status === 0,
