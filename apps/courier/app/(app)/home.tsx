@@ -16,6 +16,13 @@ import { secondsRemaining, formatCountdown, formatMoney } from '../../lib/format
 
 type LoadState = 'loading' | 'ready' | 'error';
 
+function salutation(): string {
+  const hour = new Date().getHours();
+  if (hour < 5) return 'Bonne nuit';
+  if (hour < 18) return 'Bonjour';
+  return 'Bonsoir';
+}
+
 /**
  * Home — online/offline (giant toggle) + incoming offer (docs/04 §4.7). One
  * primary action at a time: offline → "go online"; online & idle → "go
@@ -126,7 +133,10 @@ export default function HomeScreen() {
   return (
     <Screen scroll={false}>
       <View style={styles.header}>
-        <Text style={styles.greeting}>Bonjour{user?.fullName ? `, ${user.fullName}` : ''}</Text>
+        <Text style={styles.greeting}>
+          {salutation()}
+          {user?.fullName ? `, ${user.fullName}` : ''} 👋
+        </Text>
         <BigButton label="Déconnexion" variant="ghost" onPress={() => void signOut()} />
       </View>
 

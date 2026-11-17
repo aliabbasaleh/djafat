@@ -3,11 +3,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, type RestaurantOrderSummary } from '@djafat/sdk';
-import { Heading, Text, Badge, EmptyState, ErrorState, Skeleton, Stack, cx } from '@djafat/ui';
+import {
+  Heading,
+  Text,
+  Badge,
+  EmptyState,
+  ErrorState,
+  Skeleton,
+  Stack,
+  Greeting,
+  cx,
+} from '@djafat/ui';
 import { Button } from '@/components/ui-client';
 import { OrderBoard } from '@/components/OrderBoard';
 import { api } from '@/lib/api';
-import { clearSession } from '@/lib/auth-storage';
+import { clearSession, getStoredUser } from '@/lib/auth-storage';
 import { useRoomRealtime } from '@/lib/realtime';
 import { playNewOrderChime, primeSound } from '@/lib/sound';
 import styles from './page.module.css';
@@ -36,9 +46,11 @@ export default function OrderBoardPage() {
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [orders, setOrders] = useState<RestaurantOrderSummary[]>([]);
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [ownerName, setOwnerName] = useState<string | null>(null);
   const knownOrderIds = useRef<Set<string> | null>(null);
 
   useEffect(() => setSoundEnabled(readSoundPref()), []);
+  useEffect(() => setOwnerName(getStoredUser()?.fullName ?? null), []);
 
   const handleUnauthorized = useCallback(
     (err: unknown) => {
@@ -120,6 +132,11 @@ export default function OrderBoardPage() {
 
   return (
     <Stack gap="lg">
+      <Greeting
+        name={ownerName}
+        message="Voici les commandes de votre établissement, mises à jour en direct."
+      />
+
       <div className={cx(styles['header'])}>
         <Heading level={1}>Commandes</Heading>
         <Stack gap="xs" align="end">
