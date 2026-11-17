@@ -9,8 +9,8 @@ these IDs instead of repeating the detail.
   their production builds, HTTP scenarios with `curl`, the three web apps in headless Chrome, and
   the hosted CI logs. Environment details: [`TESTING_AND_QUALITY_ASSURANCE.md`](TESTING_AND_QUALITY_ASSURANCE.md) §1.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
-- **Counts:** 6 Critical · 20 High · 23 Medium · 13 Low = 62 open findings, plus 5 resolved
-  _(updated 2026-11-14, sync S-008: new `DOC-03`)_
+- **Counts:** 6 Critical · 20 High · 24 Medium · 13 Low = 63 open findings, plus 5 resolved
+  _(updated 2026-11-14, sync S-008: new `DOC-03`; 2026-11-17, sync S-011: new `TEST-04`)_
   _(updated 2026-11-14, sync S-007: `SDK-01`, `FE-01`, `PAY-02`, `TEST-01` and `CI-01` resolved on
   `main`; S-004 added `CI-03` and `FE-07`; S-003 added `CI-02`)_.
 - **Last synced:** S-007, 2026-11-14 — pull request #1 merged into `main` as `46d8cae` (DJAFAT
@@ -79,6 +79,7 @@ verified.
 | [PAY-08](#pay-08)     | Cash settlement posts ledger groups in the wrong order                                   | Needs Verification  | Medium   | CODE     |
 | [API-01](#api-01)     | Several client mistakes are answered with HTTP 500                                       | Needs Improvement   | Medium   | LIVE     |
 | [DOC-03](#doc-03)     | The local guide's placeholder secrets block local deliveries                             | Broken              | Medium   | CODE     |
+| [TEST-04](#test-04)   | The API integration suite fails intermittently on a local machine                        | Needs Improvement   | Medium   | RUN      |
 | [FE-05](#fe-05)       | Seeded restaurant and product images do not render                                       | Broken              | Low      | LIVE     |
 | [FE-06](#fe-06)       | Interface polish gaps                                                                    | Needs Improvement   | Low      | LIVE     |
 | [DB-01](#db-01)       | Schema hygiene: retention, indexes, a missing primary key, a reused column               | Needs Improvement   | Low      | LIVE     |
@@ -131,7 +132,7 @@ verified.
 
 ### PAY-01
 
-**A disabled payment provider can still be charged — free orders** · Broken · Critical · LIVE · Status: Open
+**A disabled payment provider can still be charged — free orders** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`a017f48`, version 0.20.10, pull request #4), verified there (sync S-011)
 
 - **Where:** `apps/api` → payments. `payments.service.ts` `doCreatePayment` (L72–155);
   `payment-provider.registry.ts`; `providers/mock/mock-payment.provider.ts`. Table `payment_provider_configs`.
@@ -150,6 +151,15 @@ verified.
 - **Depends on:** nothing.
 - **Verify:** disable the row, repeat the call → 409 and the order stays `awaiting_payment`.
   Integration test for both the enabled and disabled case.
+- **Sync S-011 note (2026-11-17), BRANCH + RUN:** payment creation now resolves
+  `listAvailablePaymentMethods`, the payment screen's own rule, and refuses anything else with
+  `409 PAYMENT_METHOD_UNAVAILABLE` before writing; the stored method is the provider's, not the
+  client's `methodCode` (`a017f48`, version 0.20.10, pull request #4; same rule as the owner's
+  `6cf7c9b`). Production already lacked `mock` (FEAT-002); there the gap was a cash or wallet method
+  switched off by an operator. Verified: the Verify step above on PostgreSQL
+  (`payment-enablement.int.spec.ts`: disabled row → 409, order still `awaiting_payment`, no payment
+  row; enabled again → 201), plus an unknown `methodCode`, which gave HTTP 500, now stored as the
+  provider's. Both fail on the previous code, as do 12 of 14 unit tests.
 
 ### PAY-02
 
@@ -182,7 +192,7 @@ verified.
 
 ### PAY-03
 
-**Every refund request crashes** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`f0cbb09`), verified there by a new integration test, red before and green after (sync S-007); version 0.20.4 of pull request #4 (`8e59bd4`, sync S-008)
+**Every refund request crashes** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`f0cbb09`), verified there by a new integration test, red before and green after (sync S-007); version 0.20.6 of pull request #4 (`8e59bd4`, sync S-008; numbered 0.20.4 until S-010)
 
 - **Where:** `apps/api` → payments. `payments.service.ts` `doRefundPayment` (L554–558) and
   `finalizeRefundSuccess` (L690–695). Table `refunds`.
@@ -238,7 +248,7 @@ verified.
 
 ### SEC-01
 
-**The API boots with the published placeholder secrets** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`aa0d58d`, version 0.20.6, pull request #4), production only, verified there (sync S-008)
+**The API boots with the published placeholder secrets** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`aa0d58d`, version 0.20.8, pull request #4), production only, verified there (sync S-008; numbered 0.20.6 until S-010)
 
 - **Where:** `packages/config/src/env.ts` (`AuthSchema`, `OtpSchema`: secrets validated as
   non-empty strings only); `.env.example`.
@@ -341,6 +351,14 @@ verified.
   drops the 38 `next` entries pull request #1 had accepted (115 → 77 entries, counted in both
   files), so the audit job fails again if a `next` advisory returns. Next step: Fastify 5 and
   Nest 11, on their own pull request (T-105).
+- **Sync S-012 note (2026-11-17), BRANCH + RUN:** the API step is done on a branch:
+  `fix/api-nest11-fastify5` (`862ad24`, version 0.20.11, stacked on pull request #4) moves the API to
+  NestJS 11.2.10 and Fastify 5.12.8 (with `@fastify/middie` 9.3.4, `@fastify/cors` 11, `@fastify/helmet`
+  13, `@fastify/static` 10, `@nestjs/swagger` 11). `pnpm audit --prod`: 73 advisories → 36, critical
+  3 → 1, and none left in the API's stack; the baseline drops the 36 entries that no longer exist,
+  nothing new appears. NestJS 12 was not chosen: its packages are ESM-only and its tooling wants
+  TypeScript 6, for the same Fastify. What remains is mostly the Expo tool chain, `postcss` through
+  `next`, and `zod` (fixed only in version 4). Status stays Open until merged.
 
 ### MOB-01
 
@@ -398,7 +416,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### PAY-05
 
-**An unauthenticated request can make a genuine payment webhook be ignored** · Broken · High · LIVE · Status: Open
+**An unauthenticated request can make a genuine payment webhook be ignored** · Broken · High · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`2319186`, version 0.20.9, pull request #4), verified there (sync S-010)
 
 - **Where:** `payments.service.ts` `handleWebhook` (insert at L179–184, signature check at L191–201). Table `webhook_events`.
 - **Observed:** a request with an invalid signature and event id `X` got 401 but its row was
@@ -410,6 +428,15 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   under a key that cannot collide). Already implemented on `fix/payment-reliability-backlog`.
 - **Depends on:** nothing.
 - **Verify:** repeat the two requests; the second must process the payment.
+- **Sync S-010 note (2026-11-17), BRANCH + RUN:** the signature is now checked before the
+  `webhook_events` row is written; a rejected request leaves nothing and is only logged (`2319186`,
+  version 0.20.9, pull request #4: the owner's `6cf7c9b` re-applied on `main`'s code). Verified:
+  the two requests above replayed on real PostgreSQL (`webhook-forgery.int.spec.ts`): the forgery
+  gets 401 and leaves no row, the genuine webhook then answers `ok`, the payment succeeds, the
+  order is placed, and a replay answers `duplicate`. That test and three unit tests fail on the
+  previous code; integration suite 95/95 on a fresh database. The unit tests also showed that,
+  before the fix, every later forgery carrying the same id got HTTP 200 `duplicate`, not 401.
+  `docs/24-bloc-5-payment.md`, which described the stored `ignored` row as the rule, is updated.
 
 ### PAY-06
 
@@ -496,7 +523,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### FE-03
 
-**The customer cannot see the delivery code in any app** · Not Implemented · High · CODE · Status: Open on `main`; fix present on `fix/audit-blockers` (`70cfd3b`, version 0.20.5, pull request #4), verified there in a browser (sync S-008)
+**The customer cannot see the delivery code in any app** · Not Implemented · High · CODE · Status: Open on `main`; fix present on `fix/audit-blockers` (`70cfd3b`, version 0.20.7, pull request #4), verified there in a browser (sync S-008; numbered 0.20.5 until S-010)
 
 - **Where:** `GET /v1/deliveries/:id/code` exists and works (LIVE); no SDK binding, no screen in web or mobile.
 - **Why it matters:** the courier must enter the code to complete a delivery. Without it the only exit is "failed".
@@ -979,6 +1006,8 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Observed:** `Content-Type: application/json` with an empty body → 500; a 2 MB body → 500 (should be 413); an unknown `methodCode` → 500 (foreign-key violation). A simultaneous first login for one phone would also 500 (code).
 - **Fix:** map Fastify client errors by `statusCode`; translate Prisma `P2003`/`P2002` where the cause is input.
 - **Verify:** each case returns 4xx with the standard envelope.
+- **Sync S-012 note (2026-11-17), BRANCH + RUN:** on the NestJS 11 / Fastify 5 branch (`862ad24`), a
+  2 MB body now answers 413 (checked on the built API); the other cases were not re-run.
 
 ### DOC-03
 
@@ -1000,6 +1029,34 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   `.env.example` with random secrets, or one documented command per secret); consider making
   pickup and code issuance one transaction, so a failure cannot leave a delivery without a code.
 - **Verify:** follow the guide on a fresh clone and deliver an order end to end.
+
+### TEST-04
+
+**The API integration suite fails intermittently on a local machine** · Needs Improvement · Medium · RUN · Status: Open _(added 2026-11-17, sync S-011)_
+
+- **Where:** `apps/api/test` (`walking-skeleton`, `identity`, `webhook-forgery`); dispatch in
+  `deliveries.service.ts` (`onOrderReady` → `createAndDispatch` → `runDispatchWave`).
+- **Observed (RUN, 2026-11-17, fresh test database each run, same file order):** with pull request
+  #4's code, 2 of 9 full runs failed. Once, `POST /v1/orders` in `webhook-forgery` never answered
+  (30 s timeout). Once, `walking-skeleton`'s pickup answered 404 just after a successful accept, then
+  `identity`'s order creation answered 404 (same customer). Pickup answers 404 only when the delivery is
+  missing or no longer names that courier. No database session waited on a lock during that run
+  (sampled every second). Four runs with diagnostics did not reproduce; the suite without pull request
+  #4 passed 4 of 4; GitHub's CI has been green on every push. The failing requests' log lines were
+  lost: the test process exits before its buffered log is written.
+- **Why it matters:** an intermittent red build costs reruns and trust; the pickup 404 may hide a real
+  race (a second `order.ready` dispatch wave changing the courier around the accept).
+- **Fix:** capture the error codes (response body printed on failure, or synchronous logging in
+  tests); check whether one order can trigger two dispatch waves.
+- **Verify:** 20 consecutive full runs pass.
+- **Sync S-012 note (2026-11-17), RUN + CODE: likely cause.** Every failure is a 404 (or no answer) on
+  a route that exists, and the API never logged the request: a third case, `GET /v1/restaurants?search=`
+  in `catalog`, did the same on the upgrade branch. Supertest opens the app on the IPv6 wildcard with a
+  random port and then connects to `127.0.0.1`; on this machine several programs listen on random
+  127.0.0.1-only ports, among them Prisma's query engine (`engineType = "binary"`, an HTTP server)
+  started by every test file. macOS lets both binds coexist, so a request can reach the engine instead
+  of the app; Linux refuses the second bind, which fits a CI that never fails. Not proven yet. Fix to
+  try: start the test app with `app.listen(0, '127.0.0.1')` and point supertest at that address.
 
 ---
 

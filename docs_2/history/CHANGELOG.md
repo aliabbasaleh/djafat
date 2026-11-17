@@ -8,6 +8,68 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-17 — Sync S-012: the API on NestJS 11 and Fastify 5
+
+**Reviewed:** our own `862ad24` (0.20.11) on the new branch `fix/api-nest11-fastify5`, stacked on
+pull request #4: NestJS 10.4 → 11.2.10, Fastify 4.29 → 5.12.8 and their plugins; a bounded Prisma
+disconnect on shutdown; the lint package pinned to the workspace's TypeScript; the audit baseline
+trimmed.
+
+**Verified:** `verify:fast` all pass; `pnpm audit --prod` 73 → 36 advisories, critical 3 → 1, none
+in the API's stack, nothing new; integration suite 97/97 in 2 of 3 runs; the built API booted in
+development and production mode (health, Helmet, CORS, Swagger, webhook, 413 on 2 MB, exit after
+SIGTERM).
+
+**Found on the way:** with NestJS 11 the API no longer stopped on SIGTERM: Prisma 6.2's
+`$disconnect()` never settles when called a moment after the signal, and NestJS 11 calls it last.
+Fixed on the same branch (2 s bound). `TEST-04`: a likely cause found (port collisions on macOS
+with 127.0.0.1-only listeners such as Prisma's query engine); not yet proven.
+
+**Status changes:** `DEP-01` API part fixed on a branch; `API-01` 413 case fixed there.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
+## 2026-11-17 — Sync S-011: `PAY-01` fixed on #4; new `TEST-04`
+
+**Reviewed:** our own `a017f48` (0.20.10): payment creation applies the payment screen's rule
+(enabled configuration, active provider) and stores the provider's own method.
+
+**Verified:** `verify:fast` all pass; API unit tests 899/899; the finding's Verify step on
+PostgreSQL. The full integration suite passed 97/97 in 7 of 9 local runs; the 2 others failed
+intermittently outside this change, and the suite without pull request #4 passed 4 of 4.
+
+**Status changes:** `PAY-01` has a verified fix on pull request #4 (Open until merged); T-102 in
+progress. All five blocking fixes are now on #4.
+
+**Newly discovered:** `TEST-04` (Medium, RUN): intermittent local integration failures, cause not
+found. 63 findings open.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
+## 2026-11-17 — Sync S-010: our stack renumbered on `main`; `PAY-05` fixed on #4
+
+**Reviewed:** our own commits: `main` brought into #2 (`c1abcba`, 0.20.4 `d366f12`), #2 into #3
+(`0c61784`, 0.20.5 `c715ae2`), #3 into #4 (`7452ec4`, its versions renumbered 0.20.6 to 0.20.8),
+and `2319186` (0.20.9): the webhook signature is checked before anything is stored (`PAY-05`).
+
+**Verified:** `verify:fast` all pass on each branch (lint, typecheck, unit 24/24 on #3 and #4);
+`pnpm install --frozen-lockfile` passes on the merged lockfile of #3; API integration suite 95/95
+on a fresh database, including a new test that replays the audit's two webhook requests.
+
+**Status changes:** `PAY-05` has a verified fix on pull request #4 (Open until merged); T-107 in
+progress. The version numbers quoted for `PAY-03`, `FE-03`, `SEC-01` and their tasks updated.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-009: the demo is online; two pull requests merged into `main`
 
 **Reviewed:** pull request #5 (`07f2539` by `kcerha`, merged as `e82eb80`) and pull request #6
