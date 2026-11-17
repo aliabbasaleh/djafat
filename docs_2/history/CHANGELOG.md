@@ -8,6 +8,25 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-17 — Sync S-013: the audit's fixes are on `main`
+
+**Reviewed:** the merges of pull requests #2 (`05ecacc`), #3 (`f9a8f41`), #4 (`44ae073`) and #7
+(`75db772`) into `main`, in that order, at the user's request. None adds anything of its own: each
+merge's tree is its pull request's head, and `main`'s final tree is identical to #7's verified head.
+
+**Verified:** every check green on each pull request before its merge (Linux CI with the integration
+job, Windows, Security).
+
+**Status changes:** `PAY-01`, `PAY-03`, `SEC-01`, `FE-03` and `PAY-05` resolved on `main` (58
+findings open, 10 resolved); T-102, T-103, T-104, T-107 and T-208 moved to `COMPLETED_TASKS.md`.
+`DEP-01` down to the Expo tool chain, `postcss` and `zod`.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`tasks/COMPLETED_TASKS.md`, `UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-012: the API on NestJS 11 and Fastify 5
 
 **Reviewed:** our own `862ad24` (0.20.11) on the new branch `fix/api-nest11-fastify5`, stacked on

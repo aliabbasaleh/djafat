@@ -10,6 +10,54 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-013 — 2026-11-17 — pull requests #2, #3, #4 and #7 merged into `main`
+
+|                 |                                                                                     |
+| --------------- | ----------------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook, after the merges (made at the user's request)                      |
+| **Range**       | `origin/main` `9058e33..75db772`                                                    |
+| **Size**        | 4 merge commits, none with changes of its own                                       |
+| **Evidence**    | RUN — the checks of each pull request; `main`'s tree equals the verified head of #7 |
+| **Reviewed by** | Claude, in the audit session                                                        |
+
+### Added
+
+- On `main`: the audit (`docs_2/`, pull request #2), Next.js 15.5.29 (#3), the five fixes (#4) and
+  NestJS 11 / Fastify 5 (#7). DJAFAT 0.20.11.
+
+### Removed
+
+- The branches `docs/audit-sync`, `fix/next-15.5`, `fix/audit-blockers` and
+  `fix/api-nest11-fastify5`, deleted after their merges.
+
+### Fixed
+
+- Resolved on `main`: `PAY-01`, `PAY-03`, `SEC-01` (production), `FE-03`, `PAY-05`.
+
+### Changed
+
+- `DEP-01`: the `next` and API parts are on `main`; left: the Expo tool chain, `postcss`, `zod`.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `tasks/COMPLETED_TASKS.md`,
+`UNMERGED_BRANCHES.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+`main`'s own CI and Security runs on `75db772` were still running when this entry was written.
+
+### Marker
+
+`origin/main` → `75db772`; the lines of the four deleted branches removed; `HEAD` → this sync's
+version commit.
+
+---
+
 ## S-012 — 2026-11-17 — the API on NestJS 11 and Fastify 5
 
 |                 |                                                                                       |

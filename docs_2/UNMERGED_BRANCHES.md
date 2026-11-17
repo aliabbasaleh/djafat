@@ -68,6 +68,11 @@ _(updated 2026-11-17, sync S-012)_ New branch `fix/api-nest11-fastify5`, stacked
 to NestJS 11 and Fastify 5, bounds Prisma's disconnect on shutdown, and trims the audit baseline. Merge
 it after #4.
 
+_(updated 2026-11-17, sync S-013)_ **The stack is merged.** #2 (`05ecacc`), #3 (`f9a8f41`), #4 (`44ae073`) and #7 (`75db772`)
+went into `main` in that order, each with every check green, and their branches were deleted.
+Left on GitHub: `claude/compassionate-franklin-k23vcj` (at `9058e33`, already in `main`) and the
+owner's `fix/payment-reliability-backlog` (§2).
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |
@@ -96,7 +101,7 @@ integration tests and their configuration, `packages/sdk/src/http.ts`, the login
 webhook order (`6cf7c9b`, [`PAY-05`](FINDINGS.md#pay-05)), the PNG seed, the login messages, the
 restaurant ranking, the design document.
 
-## 2b. `fix/next-15.5`, pull request #3 (4 commits) _(added 2026-11-12, sync S-004; updated sync S-005)_
+## 2b. `fix/next-15.5`, pull request #3 (4 commits) _(added 2026-11-12, sync S-004; updated sync S-005)_ — merged into `main` on 2026-11-17 (`f9a8f41`, sync S-013)
 
 Our own branch, from `main` `d1439c6`, made at the user's request.
 

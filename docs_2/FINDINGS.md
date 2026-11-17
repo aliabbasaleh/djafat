@@ -9,12 +9,14 @@ these IDs instead of repeating the detail.
   their production builds, HTTP scenarios with `curl`, the three web apps in headless Chrome, and
   the hosted CI logs. Environment details: [`TESTING_AND_QUALITY_ASSURANCE.md`](TESTING_AND_QUALITY_ASSURANCE.md) §1.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
-- **Counts:** 6 Critical · 20 High · 24 Medium · 13 Low = 63 open findings, plus 5 resolved
-  _(updated 2026-11-14, sync S-008: new `DOC-03`; 2026-11-17, sync S-011: new `TEST-04`)_
+- **Counts:** 3 Critical · 18 High · 24 Medium · 13 Low = 58 open findings, plus 10 resolved
+  _(updated 2026-11-14, sync S-008: new `DOC-03`; 2026-11-17, sync S-011: new `TEST-04`; sync
+  S-013: `PAY-01`, `PAY-03`, `SEC-01`, `FE-03` and `PAY-05` resolved on `main`)_
   _(updated 2026-11-14, sync S-007: `SDK-01`, `FE-01`, `PAY-02`, `TEST-01` and `CI-01` resolved on
   `main`; S-004 added `CI-03` and `FE-07`; S-003 added `CI-02`)_.
-- **Last synced:** S-007, 2026-11-14 — pull request #1 merged into `main` as `46d8cae` (DJAFAT
-  0.20.1); `main` now holds the code run end to end in S-006. Earlier: S-005 two commits on pull
+- **Last synced:** S-013, 2026-11-17 — pull requests #2, #3, #4 and #7 merged into `main`
+  (`75db772`, DJAFAT 0.20.11): five findings resolved. Earlier: S-007, 2026-11-14 — pull request #1
+  merged into `main` as `46d8cae` (DJAFAT 0.20.1); `main` now holds the code run end to end in S-006. Earlier: S-005 two commits on pull
   request #3, S-004 our `next` upgrade, S-003 our CI fix on pull request #2, S-001 four commits on
   the collaborator's branch. Pull-by-pull history: [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
 
@@ -132,7 +134,7 @@ verified.
 
 ### PAY-01
 
-**A disabled payment provider can still be charged — free orders** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`a017f48`, version 0.20.10, pull request #4), verified there (sync S-011)
+**A disabled payment provider can still be charged — free orders** · Broken · Critical · LIVE · Status: Resolved on `main` (pull request #4, merged into `main` as `44ae073` on 2026-11-17, sync S-013; `main`'s code is identical to the verified branch head); fix on `fix/audit-blockers` (`a017f48`, version 0.20.10, pull request #4), verified there (sync S-011)
 
 - **Where:** `apps/api` → payments. `payments.service.ts` `doCreatePayment` (L72–155);
   `payment-provider.registry.ts`; `providers/mock/mock-payment.provider.ts`. Table `payment_provider_configs`.
@@ -192,7 +194,7 @@ verified.
 
 ### PAY-03
 
-**Every refund request crashes** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`f0cbb09`), verified there by a new integration test, red before and green after (sync S-007); version 0.20.6 of pull request #4 (`8e59bd4`, sync S-008; numbered 0.20.4 until S-010)
+**Every refund request crashes** · Broken · Critical · LIVE · Status: Resolved on `main` (pull request #4, merged into `main` as `44ae073` on 2026-11-17, sync S-013; `main`'s code is identical to the verified branch head); fix on `fix/audit-blockers` (`f0cbb09`), verified there by a new integration test, red before and green after (sync S-007); version 0.20.6 of pull request #4 (`8e59bd4`, sync S-008; numbered 0.20.4 until S-010)
 
 - **Where:** `apps/api` → payments. `payments.service.ts` `doRefundPayment` (L554–558) and
   `finalizeRefundSuccess` (L690–695). Table `refunds`.
@@ -248,7 +250,7 @@ verified.
 
 ### SEC-01
 
-**The API boots with the published placeholder secrets** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`aa0d58d`, version 0.20.8, pull request #4), production only, verified there (sync S-008; numbered 0.20.6 until S-010)
+**The API boots with the published placeholder secrets** · Broken · Critical · LIVE · Status: Resolved on `main` (pull request #4, merged into `main` as `44ae073` on 2026-11-17, sync S-013; `main`'s code is identical to the verified branch head); fix on `fix/audit-blockers` (`aa0d58d`, version 0.20.8, pull request #4), production only, verified there (sync S-008; numbered 0.20.6 until S-010)
 
 - **Where:** `packages/config/src/env.ts` (`AuthSchema`, `OtpSchema`: secrets validated as
   non-empty strings only); `.env.example`.
@@ -359,6 +361,11 @@ verified.
   nothing new appears. NestJS 12 was not chosen: its packages are ESM-only and its tooling wants
   TypeScript 6, for the same Fastify. What remains is mostly the Expo tool chain, `postcss` through
   `next`, and `zod` (fixed only in version 4). Status stays Open until merged.
+- **Sync S-013 note (2026-11-17), RUN:** both steps are on `main`: `next` 15.5.29 (pull request #3,
+  merged as `f9a8f41`) and NestJS 11 / Fastify 5 (pull request #7, merged as `75db772`), whose tree
+  is identical to the branch head that was verified. `pnpm audit --prod` on that lockfile: 36
+  advisories, 1 critical, none in the API's stack. Open: the Expo tool chain, `postcss` through
+  `next`, `zod` (fixed only in version 4).
 
 ### MOB-01
 
@@ -416,7 +423,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### PAY-05
 
-**An unauthenticated request can make a genuine payment webhook be ignored** · Broken · High · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`2319186`, version 0.20.9, pull request #4), verified there (sync S-010)
+**An unauthenticated request can make a genuine payment webhook be ignored** · Broken · High · LIVE · Status: Resolved on `main` (pull request #4, merged into `main` as `44ae073` on 2026-11-17, sync S-013; `main`'s code is identical to the verified branch head); fix on `fix/audit-blockers` (`2319186`, version 0.20.9, pull request #4), verified there (sync S-010)
 
 - **Where:** `payments.service.ts` `handleWebhook` (insert at L179–184, signature check at L191–201). Table `webhook_events`.
 - **Observed:** a request with an invalid signature and event id `X` got 401 but its row was
@@ -523,7 +530,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### FE-03
 
-**The customer cannot see the delivery code in any app** · Not Implemented · High · CODE · Status: Open on `main`; fix present on `fix/audit-blockers` (`70cfd3b`, version 0.20.7, pull request #4), verified there in a browser (sync S-008; numbered 0.20.5 until S-010)
+**The customer cannot see the delivery code in any app** · Not Implemented · High · CODE · Status: Resolved on `main` (pull request #4, merged into `main` as `44ae073` on 2026-11-17, sync S-013; `main`'s code is identical to the verified branch head); fix on `fix/audit-blockers` (`70cfd3b`, version 0.20.7, pull request #4), verified there in a browser (sync S-008; numbered 0.20.5 until S-010)
 
 - **Where:** `GET /v1/deliveries/:id/code` exists and works (LIVE); no SDK binding, no screen in web or mobile.
 - **Why it matters:** the courier must enter the code to complete a delivery. Without it the only exit is "failed".
@@ -1008,6 +1015,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Verify:** each case returns 4xx with the standard envelope.
 - **Sync S-012 note (2026-11-17), BRANCH + RUN:** on the NestJS 11 / Fastify 5 branch (`862ad24`), a
   2 MB body now answers 413 (checked on the built API); the other cases were not re-run.
+- **Sync S-013 note (2026-11-17):** the 413 case is on `main` (pull request #7, `75db772`).
 
 ### DOC-03
 
