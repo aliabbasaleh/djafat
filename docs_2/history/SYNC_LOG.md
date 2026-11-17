@@ -70,7 +70,8 @@ Migration 0038's pattern was checked against the old seed's addresses only.
 
 ### Marker
 
-`origin/main` and the collaborator's branch → `9058e33`; the other lines unchanged.
+`origin/main` and the collaborator's branch → `9058e33`; `HEAD` → `d366f12`, the version commit that
+brings `main` into pull request #2 (0.20.4, renumbered from 0.20.2); the other lines unchanged.
 
 ---
 

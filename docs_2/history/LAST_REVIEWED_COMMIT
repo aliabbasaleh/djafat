@@ -6,7 +6,7 @@
 # and name the sync below.
 # Commits that change only docs_2/ are never reported, so recording a review is silent.
 # Last sync: S-009 (2026-11-17)
-aee96501a04ca41669d8d85a13660bf38ebc9938 HEAD
+d366f12fafc8a8a5073714419edd77a3b388a7b1 HEAD
 9058e335a90a3ed6ba89b94ec5b6bec7cf236bd1 origin/main
 9058e335a90a3ed6ba89b94ec5b6bec7cf236bd1 origin/claude/compassionate-franklin-k23vcj
 92e8d52553cb3630060202d7fa02d21a6e38f55b origin/fix/payment-reliability-backlog
