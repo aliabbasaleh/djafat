@@ -122,6 +122,12 @@ verified.
   (customer site by SMS code, restaurant console, admin console, courier app):
   `POST /v1/auth/otp/request` → 202, `verify` → 200. The branch's fix calls `fetch` as a plain
   function in `packages/sdk/src/http.ts`.
+- **Sync S-009 note (2026-11-17), CODE + RUN:** `07f2539` (0.20.2, pull request #5, by `kcerha`)
+  binds `fetch` to the global object instead of calling it through an arrow function. Its message
+  says no browser could reach the API with the arrow-function version; that was not reproduced
+  here: our browser runs on that version (S-006 on `4c756e0`, and the delivery-code journey of
+  2026-11-14 on a branch of `46d8cae`, both in Chrome) logged in, ordered and delivered. Binding is
+  correct in every browser, so the change is safe either way. Status unchanged.
 
 ### PAY-01
 
@@ -363,6 +369,10 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   builds for the browser (`build:web`). Served locally, it logs in, shares its position, receives
   the offer, and completes pickup and delivery. Native builds were not tried.
 - **Verify:** `expo export` succeeds for both; the app runs on an Android device against a staging API.
+- **Sync S-009 note (2026-11-17), BRANCH:** `07f2539` declares `babel-preset-expo` in both Expo
+  apps; the commit reports that the courier web app could not be bundled without it (pnpm installed
+  it, Metro did not find it). Fix present, unverified by us: our local courier web export, built
+  before this change, did bundle, so the failure seems to depend on how the install is laid out.
 
 ---
 
@@ -629,6 +639,14 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   community build referenced by tag, not digest; there is still no monitoring or alerting (the
   branch's roadmap lists it as to do); a live server lacks reference data ([`OPS-05`](#ops-05)).
   Partly addressed on the branch, unverified.
+- **Sync S-009 note (2026-11-17), LIVE:** the one-server stack is deployed. The roadmap of 0.20.3
+  reports the demo online since 2026-11-16 (Oracle Cloud, HTTPS on six addresses, checked from
+  outside); on 2026-11-17 `djafat.com`, `api.djafat.com/v1/health` and the `admin.`, `resto.` and
+  `livreur.` addresses answered HTTP 200 (status codes only, nothing else requested). The server
+  runs in production mode with demo data, and its test SMS inbox is bound to the server's own
+  localhost (`docker-compose.prod.yml`), so login codes cannot be read from outside. The stack has
+  a backup service; monitoring, alerting and a restore drill are still not reported. Open, partly
+  addressed.
 
 ### SEC-02
 
@@ -647,6 +665,10 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Sync S-001 note (2026-11-11), branch only:** the branch's server stack runs the seed in demo mode
   only, and its seed still creates the eight fixture accounts unconditionally (`seed.ts` L477–533).
   The consequence for a live server is [`OPS-05`](#ops-05).
+- **Sync S-009 note (2026-11-17), CODE:** the live demo runs this seed (`SEED_DEMO=1`), so its
+  super-admin exists on the known number. Its login codes only reach the test inbox bound to the
+  server's localhost, so the number cannot be used from outside; anyone with a shell on the server
+  can. With `MODE=live` the seed does not run ([`OPS-05`](#ops-05)).
 
 ### ADM-01
 
@@ -985,7 +1007,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### FE-05
 
-**Seeded restaurant and product images do not render** · Broken · Low · LIVE — `seed.ts` uses `placehold.co` URLs that return SVG; `/_next/image` answers 400. Use `.png` URLs in the seed. Development only. _Sync S-007 note (2026-11-14): fix present on `fix/payment-reliability-backlog` (`cb84077`: the seed asks placehold.co for PNG), not on `main` (BRANCH)._
+**Seeded restaurant and product images do not render** · Broken · Low · LIVE — `seed.ts` uses `placehold.co` URLs that return SVG; `/_next/image` answers 400. Use `.png` URLs in the seed. Development only. _Sync S-007 note (2026-11-14): fix present on `fix/payment-reliability-backlog` (`cb84077`: the seed asks placehold.co for PNG), not on `main` (BRANCH)._ _Sync S-009 note (2026-11-17): fix present on `main` (`c804526`, 0.20.3): the seed's 21 addresses ask for `.png`, and migration 0038 rewrites the stored `placehold.co` ones (all old ones carry the query string its pattern needs). The commit reports the live image optimizer answering 200 `image/png`; not re-checked by us (CODE)._
 
 ### FE-06
 

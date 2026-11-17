@@ -401,7 +401,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-501 · Interface polish
 
-- **Area:** web apps, seed · **Priority:** Low · **Why:** [`FE-05`](../FINDINGS.md#fe-05), [`FE-06`](../FINDINGS.md#fe-06) · **Status:** Not started
+- **Area:** web apps, seed · **Priority:** Low · **Why:** [`FE-05`](../FINDINGS.md#fe-05), [`FE-06`](../FINDINGS.md#fe-06) · **Status:** Not started (the `FE-05` part is on `main`, `c804526`, unverified; _sync S-009_)
 - **Test:** visual check at 390 px and 1280 px.
 
 ### T-502 · Notification inbox and real push

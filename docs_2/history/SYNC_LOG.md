@@ -10,6 +10,70 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-009 — 2026-11-17 — pull requests #5 and #6 merged into `main`; the demo is online
+
+|                 |                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------- |
+| **Trigger**     | A fetch at the user's prompt, three days after S-008                                  |
+| **Range**       | `origin/main` `46d8cae..9058e33` (also `origin/claude/compassionate-franklin-k23vcj`) |
+| **Size**        | 5 commits: `07f2539`, `c804526` and 3 merges; 16 files outside `docs_2/`              |
+| **Evidence**    | CODE for the commits; LIVE for the demo's addresses (HTTP status only)                |
+| **Reviewed by** | Claude, in the audit session                                                          |
+
+### Added
+
+- `07f2539` (0.20.2, pull request #5, by `kcerha` with Claude Sonnet 5): the SDK binds `fetch`
+  to the global object; the web and restaurant login pages show the real cause of a failure;
+  `babel-preset-expo` declared in both Expo apps; the worker logs an idle database client's error
+  instead of crashing; the pipeline scripts quote Windows paths containing spaces; a
+  troubleshooting section in `docs/TRAVAILLER-EN-LOCAL.md` (login codes, stale bundles, courier
+  positions older than 120 s, mobile money needing both enablement flags, the courier web app's
+  port in `API_CORS_ORIGINS`). It says nothing about the placeholder secrets (`DOC-03` stays open).
+- `c804526` (0.20.3, pull request #6, commit author "Claude"): the seed asks `placehold.co` for
+  PNG; migration 0038 rewrites the stored `placehold.co` addresses (only those, idempotent); the
+  roadmap records the demo online since 2026-11-16.
+- Merges by `aliabbasaleh`: `e82eb80` and `9058e33` add nothing of their own; `b9a6d8c` only
+  renumbers the version (0.20.2 → 0.20.3) in `package.json` and `docs/ROADMAP.md`.
+
+### Removed
+
+- The branch `fix/browser-fetch-and-local-dev`, deleted after its merge.
+
+### Fixed
+
+- `FE-05` on `main` (`c804526`): fix present, unverified by us.
+
+### Changed
+
+- `OPS-02`: the one-server stack is deployed (five addresses answer HTTP 200); monitoring,
+  alerting and a restore drill are still not reported. Partly addressed.
+- `MOB-01`: `babel-preset-expo` declared in both Expo apps (fix present, unverified).
+- `SEC-02`: the live demo runs the seed with its known super-admin number; the codes only reach a
+  server-local inbox (CODE).
+- `SDK-01`: unchanged. The commit says no browser could reach the API with the previous version;
+  our browser runs on that version did (S-006, 2026-11-14).
+- Our pull requests #2 to #4 now conflict with `main` on the version: 0.20.2 and 0.20.3 are taken.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `UNMERGED_BRANCHES.md`,
+`history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The commits were read, not run. Of the demo, only the HTTP status of five addresses was checked.
+Migration 0038's pattern was checked against the old seed's addresses only.
+
+### Marker
+
+`origin/main` and the collaborator's branch → `9058e33`; the other lines unchanged.
+
+---
+
 ## S-008 — 2026-11-14 — our own fixes on pull requests #3 and #4
 
 |                 |                                                                                           |

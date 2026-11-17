@@ -8,6 +8,27 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-17 — Sync S-009: the demo is online; two pull requests merged into `main`
+
+**Reviewed:** pull request #5 (`07f2539` by `kcerha`, merged as `e82eb80`) and pull request #6
+(`c804526`, merged as `9058e33`); `main` is at DJAFAT 0.20.3. Of the three merges, two add nothing
+of their own and `b9a6d8c` only renumbers the version.
+
+**Verified:** the five demo addresses (site, API health, admin, restaurant, courier) answered
+HTTP 200 on 2026-11-17. The commits were read, not run.
+
+**Status changes:** `FE-05` fix present on `main`, unverified; `MOB-01` and `OPS-02` partly
+addressed; `SEC-02` noted for the live demo; `SDK-01` unchanged: the commit's statement that no
+browser could reach the API was not reproduced in our earlier browser runs. 62 findings open.
+
+**Consequence for our work:** pull requests #2 to #4 overlap `main`'s version numbers and are
+renumbered from 0.20.4.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-14 — Sync S-008: our fixes for the delivery code and the secrets
 
 **Reviewed:** our own six commits on pull requests #3 and #4: two stacking merges with an empty

@@ -52,6 +52,11 @@ _(updated 2026-11-14, sync S-008)_ The stack: #2 `docs/audit-sync` (0.20.2) → 
 combined diff is empty. Merge #2, then #3, then #4; each one only after its Linux and Windows
 checks are green.
 
+_(updated 2026-11-17, sync S-009)_ `main` moved to `9058e33` (0.20.3) with pull requests #5 and #6. The stack now
+conflicts with it on `package.json` and `docs/ROADMAP.md`, because `main` used 0.20.2 and
+0.20.3 too: bring `main` into #2 first, then renumber the stack from 0.20.4.
+`fix/browser-fetch-and-local-dev` (#5) was deleted after its merge.
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |
@@ -71,7 +76,7 @@ fetched on 2026-11-14):
 - `1600bdb` binds `fetch` to the global object in the SDK (a second fix for `SDK-01`, already fixed
   differently on `main`) and makes the login page report the real cause of an OTP failure.
 - `0d60445` ranks closed restaurants last and dims their photo.
-- `cb84077` asks placehold.co for PNG in the seed, which fixes [`FE-05`](FINDINGS.md#fe-05).
+- `cb84077` asks placehold.co for PNG in the seed, which fixes [`FE-05`](FINDINGS.md#fe-05). _(sync S-009: superseded by `c804526` on `main`.)_
 - `92e8d52` adds `docs/DESIGN-SPEC-EXTRACT.md`.
 
 Merged into `main` now, the branch would conflict in 8 files: `payments.service.ts`, the
