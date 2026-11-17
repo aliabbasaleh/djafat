@@ -276,9 +276,71 @@ export function apiEnvConsistencyIssues(env: ApiEnv): string[] {
   return issues;
 }
 
+/** HMAC secrets (docs/19 §7, §12–§14): random strings, one per purpose. */
+const HMAC_SECRET_NAMES = [
+  'JWT_ACCESS_SECRET',
+  'REFRESH_TOKEN_HASH_SECRET',
+  'OTP_HASH_SECRET',
+] as const;
+const MIN_HMAC_SECRET_LENGTH = 32;
+/** AES-256-GCM keys, 32 raw bytes in base64. The SMS gateway key may stay empty (FEAT-016). */
+const AES_KEY_NAMES = [
+  'MFA_ENCRYPTION_KEY',
+  'DELIVERY_CODE_ENCRYPTION_KEY',
+  'SMS_GATEWAY_ENCRYPTION_KEY',
+] as const;
+const AES_256_KEY_BYTES = 32;
+/** The markers of the placeholders published in `.env.example` and the docs. */
+const PLACEHOLDER_MARKER = /REPLACE_ME|CHANGE_ME/i;
+
+/**
+ * Secrets production must never run with (audit finding SEC-01): a placeholder
+ * from `.env.example` — anyone who reads the repository could sign a
+ * `super_admin` token with it —, an HMAC secret too short to resist guessing,
+ * one value reused for two purposes, or an AES key that would otherwise only
+ * fail at its first use. Each issue names the variable, never its value.
+ * `loadApiEnv` refuses them in production; elsewhere the API logs them at boot.
+ */
+export function apiEnvSecretIssues(env: ApiEnv): string[] {
+  const issues: string[] = [];
+  for (const name of HMAC_SECRET_NAMES) {
+    const value = env[name];
+    if (PLACEHOLDER_MARKER.test(value)) {
+      issues.push(`${name}: still a placeholder — set a random value (openssl rand -hex 32)`);
+    } else if (value.length < MIN_HMAC_SECRET_LENGTH) {
+      issues.push(
+        `${name}: too short — at least ${MIN_HMAC_SECRET_LENGTH} characters (openssl rand -hex 32)`,
+      );
+    }
+  }
+  for (const name of AES_KEY_NAMES) {
+    const value = env[name];
+    if (name === 'SMS_GATEWAY_ENCRYPTION_KEY' && value === '') continue;
+    if (PLACEHOLDER_MARKER.test(value)) {
+      issues.push(`${name}: still a placeholder — set a random key (openssl rand -base64 32)`);
+    } else if (Buffer.from(value, 'base64').length !== AES_256_KEY_BYTES) {
+      // Same decoding as the encryption code, so boot refuses exactly what would fail later.
+      issues.push(
+        `${name}: must decode to exactly ${AES_256_KEY_BYTES} bytes (openssl rand -base64 32)`,
+      );
+    }
+  }
+  const firstUse = new Map<string, string>();
+  for (const name of [...HMAC_SECRET_NAMES, ...AES_KEY_NAMES]) {
+    const value = env[name];
+    // Placeholders are already reported above; replacing each one fixes the reuse too.
+    if (value === '' || PLACEHOLDER_MARKER.test(value)) continue;
+    const earlier = firstUse.get(value);
+    if (earlier) issues.push(`${name}: same value as ${earlier} — each secret must be its own`);
+    else firstUse.set(value, name);
+  }
+  return issues;
+}
+
 export const loadApiEnv = (src?: Record<string, string | undefined>): ApiEnv => {
   const env = loadEnv(ApiEnvSchema, src);
   const issues = apiEnvConsistencyIssues(env);
+  if (env.NODE_ENV === 'production') issues.push(...apiEnvSecretIssues(env));
   if (issues.length > 0) throw new ConfigValidationError(issues);
   return env;
 };

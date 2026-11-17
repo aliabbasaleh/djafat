@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
 import { MOCK_PSP_FEE_BPS } from './accrual-entries';
+import { MockPaymentProvider } from './providers/mock/mock-payment.provider';
 import {
   buildPaymentsService,
   makePaymentsRaceDb,
@@ -349,6 +350,94 @@ describe('PaymentsService.handleWebhook — out-of-order / replay safety (docs/0
       }),
     ).rejects.toMatchObject({ response: { code: 'UNAUTHENTICATED' } });
     expect(payment.status).toBe('pending');
+  });
+
+  // Audit finding PAY-05 (the owner's BUG-PAY-1, tests ported from `6cf7c9b`).
+  // The idempotency row used to be claimed BEFORE the signature was checked, so
+  // an unauthenticated caller could burn a genuine event id: the forged event was
+  // stored as 'ignored', and the real webhook that followed hit `ON CONFLICT DO
+  // NOTHING`, answered 'duplicate' and left the payment pending.
+  it('PAY-05: a forged webhook never consumes the event id of the genuine one', async () => {
+    const { db, payments: rows, ledgerGroups } = makePaymentsRaceDb();
+    const payment = seedPayment(rows, {
+      status: 'pending',
+      providerCode: 'mock',
+      providerRef: 'mock-ref-5',
+    });
+    const { payments } = buildPaymentsService(db, ledgerGroups);
+    // The event id is read from the request body, so the attacker chooses it.
+    const body = JSON.stringify({
+      eventId: 'EVT-123',
+      providerRef: 'mock-ref-5',
+      status: 'succeeded',
+    });
+
+    await expect(
+      payments.handleWebhook('mock', {
+        headers: { 'x-mock-signature': 'not-a-real-signature' },
+        rawBody: Buffer.from(body),
+      }),
+    ).rejects.toMatchObject({ response: { code: 'UNAUTHENTICATED' } });
+    const genuine = await payments.handleWebhook('mock', {
+      headers: { 'x-mock-signature': MockPaymentProvider.sign(body) },
+      rawBody: Buffer.from(body),
+    });
+
+    expect(genuine.status).toBe('ok'); // not 'duplicate'
+    expect(payment.status).toBe('succeeded');
+    expect(ledgerGroups).toHaveLength(1);
+  });
+
+  it('PAY-05: a forged webhook leaves no idempotency row behind', async () => {
+    const { db, payments: rows, ledgerGroups, webhookEvents } = makePaymentsRaceDb();
+    seedPayment(rows, { status: 'pending', providerCode: 'mock', providerRef: 'mock-ref-6' });
+    const { payments } = buildPaymentsService(db, ledgerGroups);
+    const body = JSON.stringify({
+      eventId: 'EVT-456',
+      providerRef: 'mock-ref-6',
+      status: 'succeeded',
+    });
+
+    await expect(
+      payments.handleWebhook('mock', {
+        headers: { 'x-mock-signature': 'forged' },
+        rawBody: Buffer.from(body),
+      }),
+    ).rejects.toMatchObject({ response: { code: 'UNAUTHENTICATED' } });
+
+    expect(webhookEvents.filter((w) => w.eventId === 'EVT-456')).toHaveLength(0);
+  });
+
+  it('PAY-05: repeated forgeries still never block the genuine event', async () => {
+    const { db, payments: rows, ledgerGroups } = makePaymentsRaceDb();
+    const payment = seedPayment(rows, {
+      status: 'pending',
+      providerCode: 'mock',
+      providerRef: 'mock-ref-7',
+    });
+    const { payments } = buildPaymentsService(db, ledgerGroups);
+    const body = JSON.stringify({
+      eventId: 'EVT-789',
+      providerRef: 'mock-ref-7',
+      status: 'succeeded',
+    });
+
+    for (let i = 0; i < 5; i++) {
+      await expect(
+        payments.handleWebhook('mock', {
+          headers: { 'x-mock-signature': `forged-${i}` },
+          rawBody: Buffer.from(body),
+        }),
+      ).rejects.toMatchObject({ response: { code: 'UNAUTHENTICATED' } });
+    }
+    const genuine = await payments.handleWebhook('mock', {
+      headers: { 'x-mock-signature': MockPaymentProvider.sign(body) },
+      rawBody: Buffer.from(body),
+    });
+
+    expect(genuine.status).toBe('ok');
+    expect(payment.status).toBe('succeeded');
+    expect(ledgerGroups).toHaveLength(1);
   });
 });
 

@@ -1,5 +1,8 @@
+import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ConfigValidationError, loadApiEnv } from './env.js';
+import { ConfigValidationError, apiEnvSecretIssues, loadApiEnv } from './env.js';
 import { PLATFORM_SETTINGS_DEFAULTS, LAUNCH_MARKET } from './constants.js';
 
 const baseEnv = {
@@ -14,10 +17,11 @@ const baseEnv = {
   OBJECT_STORAGE_SECRET_ACCESS_KEY: 'minioadmin',
   API_PUBLIC_URL: 'http://localhost:3001',
   PAYMENT_WEBHOOK_BASE_URL: 'http://localhost:3001/v1/payments/webhook',
-  OTP_HASH_SECRET: 'test-otp-hash-secret',
-  JWT_ACCESS_SECRET: 'test-jwt-access-secret',
-  REFRESH_TOKEN_HASH_SECRET: 'test-refresh-hash-secret',
-  MFA_ENCRYPTION_KEY: 'dGVzdC1tZmEtZW5jcnlwdGlvbi1rZXktMzJieXRlcyEh', // base64, 32 bytes (test-only)
+  // 32+ characters and 32-byte keys: production refuses less (audit finding SEC-01).
+  OTP_HASH_SECRET: 'test-otp-hash-secret'.padEnd(32, '-'),
+  JWT_ACCESS_SECRET: 'test-jwt-access-secret'.padEnd(32, '-'),
+  REFRESH_TOKEN_HASH_SECRET: 'test-refresh-hash-secret'.padEnd(32, '-'),
+  MFA_ENCRYPTION_KEY: Buffer.from('test-mfa-encryption-key-32bytes!').toString('base64'), // 32 bytes (test-only)
   DELIVERY_CODE_ENCRYPTION_KEY: 'dGVzdC1kZWxpdmVyeS1jb2RlLWtleS0zMmJ5dGVzISE=', // base64, 32 bytes (test-only)
 };
 
@@ -212,5 +216,112 @@ describe('SPEC-009-02 — merchant wallets configuration', () => {
     ).toThrowError(/MOBILE_MONEY_WALLETS/);
     expect(loadApiEnv(baseEnv).MOBILE_MONEY_WALLETS).toEqual([]);
     expect(loadApiEnv({ ...baseEnv, MOBILE_MONEY_WALLETS: '' }).MOBILE_MONEY_WALLETS).toEqual([]);
+  });
+});
+
+// Audit finding SEC-01 (docs_2/FINDINGS.md): an API started in production with
+// the placeholders of `.env.example` booted, and accepted a `super_admin` token
+// signed offline with the public placeholder.
+describe('SEC-01 — production refuses placeholder, short, reused or malformed secrets', () => {
+  const SECRET_NAMES = [
+    'JWT_ACCESS_SECRET',
+    'REFRESH_TOKEN_HASH_SECRET',
+    'OTP_HASH_SECRET',
+    'MFA_ENCRYPTION_KEY',
+    'DELIVERY_CODE_ENCRYPTION_KEY',
+  ] as const;
+
+  /** The five secrets exactly as published in the repository's `.env.example`. */
+  const exampleSecrets = (): Record<string, string> => {
+    const text = readFileSync(join(__dirname, '../../../.env.example'), 'utf8');
+    const values: Record<string, string> = {};
+    for (const line of text.split('\n')) {
+      const m = /^([A-Z0-9_]+)=(\S*)/.exec(line);
+      if (m && (SECRET_NAMES as readonly string[]).includes(m[1]!)) values[m[1]!] = m[2]!;
+    }
+    expect(Object.keys(values).sort()).toEqual([...SECRET_NAMES].sort());
+    return values;
+  };
+
+  /** Production, with secrets shaped as `infra/deploy/gen-secrets.sh` writes them. */
+  const productionEnv = () => ({
+    ...baseEnv,
+    NODE_ENV: 'production',
+    SMS_PROVIDER: 'http',
+    SMS_HTTP_URL: 'https://sms.example.test/send',
+    JWT_ACCESS_SECRET: randomBytes(32).toString('hex'),
+    REFRESH_TOKEN_HASH_SECRET: randomBytes(32).toString('hex'),
+    OTP_HASH_SECRET: randomBytes(32).toString('hex'),
+    MFA_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
+    DELIVERY_CODE_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
+    SMS_GATEWAY_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
+  });
+
+  it('accepts secrets as the server install generates them', () => {
+    expect(loadApiEnv(productionEnv()).NODE_ENV).toBe('production');
+  });
+
+  it('refuses the .env.example placeholders, naming each variable but never its value', () => {
+    const example = exampleSecrets();
+    try {
+      loadApiEnv({ ...productionEnv(), ...example });
+      expect.unreachable();
+    } catch (e) {
+      expect(e).toBeInstanceOf(ConfigValidationError);
+      const { message, issues } = e as ConfigValidationError;
+      for (const name of SECRET_NAMES) {
+        expect(issues).toContainEqual(expect.stringMatching(`^${name}: still a placeholder`));
+      }
+      for (const value of Object.values(example)) expect(message).not.toContain(value);
+    }
+    const changeMe = 'CHANGE_ME'.padEnd(40, '-');
+    expect(() => loadApiEnv({ ...productionEnv(), JWT_ACCESS_SECRET: changeMe })).toThrowError(
+      /JWT_ACCESS_SECRET: still a placeholder/,
+    );
+  });
+
+  it('refuses an HMAC secret shorter than 32 characters', () => {
+    const env = productionEnv();
+    expect(() => loadApiEnv({ ...env, OTP_HASH_SECRET: 'a'.repeat(31) })).toThrowError(
+      /OTP_HASH_SECRET: too short/,
+    );
+    expect(loadApiEnv({ ...env, OTP_HASH_SECRET: 'a'.repeat(32) }).OTP_HASH_SECRET).toHaveLength(
+      32,
+    );
+  });
+
+  it('refuses one value used for two secrets', () => {
+    const env = productionEnv();
+    expect(() =>
+      loadApiEnv({ ...env, REFRESH_TOKEN_HASH_SECRET: env.JWT_ACCESS_SECRET }),
+    ).toThrowError(/REFRESH_TOKEN_HASH_SECRET: same value as JWT_ACCESS_SECRET/);
+    expect(() =>
+      loadApiEnv({ ...env, DELIVERY_CODE_ENCRYPTION_KEY: env.MFA_ENCRYPTION_KEY }),
+    ).toThrowError(/DELIVERY_CODE_ENCRYPTION_KEY: same value as MFA_ENCRYPTION_KEY/);
+  });
+
+  it('refuses an AES key that does not decode to exactly 32 bytes; the SMS gateway key may stay empty', () => {
+    const env = productionEnv();
+    for (const bytes of [16, 31, 33]) {
+      const key = randomBytes(bytes).toString('base64');
+      expect(() => loadApiEnv({ ...env, MFA_ENCRYPTION_KEY: key })).toThrowError(
+        /MFA_ENCRYPTION_KEY: must decode to exactly 32 bytes/,
+      );
+    }
+    expect(() => loadApiEnv({ ...env, SMS_GATEWAY_ENCRYPTION_KEY: 'not-a-key' })).toThrowError(
+      /SMS_GATEWAY_ENCRYPTION_KEY: must decode to exactly 32 bytes/,
+    );
+    expect(loadApiEnv({ ...env, SMS_GATEWAY_ENCRYPTION_KEY: '' }).SMS_GATEWAY_ENCRYPTION_KEY).toBe(
+      '',
+    );
+  });
+
+  it('outside production the placeholders still load, and are reported for the boot warning', () => {
+    const example = exampleSecrets();
+    for (const NODE_ENV of ['development', 'test']) {
+      const env = loadApiEnv({ ...baseEnv, ...example, NODE_ENV });
+      expect(apiEnvSecretIssues(env)).toHaveLength(SECRET_NAMES.length);
+    }
+    expect(apiEnvSecretIssues(loadApiEnv(productionEnv()))).toEqual([]);
   });
 });

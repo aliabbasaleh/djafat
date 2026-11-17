@@ -99,7 +99,49 @@ export function makePaymentsRaceDb() {
     eventType: string;
     payload: unknown;
   }> = [];
-  const providerConfigs: PaymentProviderConfigRow[] = [];
+  // A correctly configured environment is the baseline (audit finding PAY-01;
+  // after the owner's `6cf7c9b`): each provider the tests use has an enabled,
+  // global, currently valid config row, an active `payment_providers` row and
+  // an active `payment_methods` row, because payment creation now requires
+  // them. `feeBps` stays null so the PSP-fee tests, which ask for
+  // `feeBps: { not: null }`, still see only the rows they add. Tests that
+  // prove a refusal switch these rows off.
+  const enabledEverywhere = (providerCode: string): PaymentProviderConfigRow => ({
+    id: `cfg-default-${providerCode}`,
+    providerCode,
+    countryId: null,
+    cityId: null,
+    restaurantId: null,
+    currency: null,
+    minAmountMinor: null,
+    maxAmountMinor: null,
+    feeBps: null,
+    enabled: true,
+    priority: 0,
+    validFrom: new Date('2020-01-01T00:00:00Z'),
+    validTo: null,
+  });
+  const providerConfigs: PaymentProviderConfigRow[] = [
+    'mock',
+    'cash',
+    'airtel_money',
+    'tigo_cash',
+  ].map(enabledEverywhere);
+  const providerRows: Array<{
+    code: string;
+    methodCode: string;
+    displayName: string;
+    active: boolean;
+  }> = [
+    { code: 'mock', methodCode: 'mobile_money', displayName: 'Mock Payment (dev)', active: true },
+    { code: 'cash', methodCode: 'cash_on_delivery', displayName: 'Espèces', active: true },
+    { code: 'airtel_money', methodCode: 'mobile_money', displayName: 'Airtel Money', active: true },
+    { code: 'tigo_cash', methodCode: 'mobile_money', displayName: 'Tigo Cash', active: true },
+  ];
+  const paymentMethods: Array<{ code: string; active: boolean }> = [
+    { code: 'mobile_money', active: true },
+    { code: 'cash_on_delivery', active: true },
+  ];
   const idempotencyKeys = new Map<
     string,
     { fingerprint: string; response: unknown; status: 'reserved' | 'completed' }
@@ -309,23 +351,62 @@ export function makePaymentsRaceDb() {
       },
       paymentProviderConfig: {
         findMany: vi.fn((args: { where: Record<string, unknown> }) => {
-          // Minimal, deliberately permissive matcher — good enough for the fee-bps
-          // resolution tests; the exhaustive geo-scoping logic is exercised by
-          // reading `PaymentsService.resolveProviderFeeBps`'s own JS filter, not
-          // re-implemented here.
-          const where = args.where as { providerCode?: string; enabled?: boolean };
+          // Honours the clauses the service actually sends, as Prisma would:
+          // payment creation now reads this table for ENABLEMENT (PAY-01), where
+          // a null `fee_bps` is normal, so the fee filter applies only when the
+          // caller asks for it, and the validity window and the scope clauses
+          // (`{ OR: [{ field: value }, { field: null }] }` or `{ field: null }`)
+          // are checked instead of ignored.
+          const where = args.where as {
+            providerCode?: string;
+            enabled?: boolean;
+            feeBps?: { not: null };
+            validFrom?: { lte: Date };
+            OR?: unknown[];
+            AND?: Array<Record<string, unknown>>;
+          };
+          const now = where.validFrom?.lte ?? new Date();
+          const inScope = (clause: Record<string, unknown>, row: PaymentProviderConfigRow) => {
+            const alternatives = (clause['OR'] as Array<Record<string, unknown>> | undefined) ?? [
+              clause,
+            ];
+            return alternatives.some((alt) =>
+              Object.entries(alt).every(
+                ([field, expected]) =>
+                  (row as unknown as Record<string, unknown>)[field] === expected,
+              ),
+            );
+          };
           return Promise.resolve(
-            providerConfigs.filter(
-              (c) =>
-                (!where.providerCode || c.providerCode === where.providerCode) &&
-                (where.enabled === undefined || c.enabled === where.enabled) &&
-                c.feeBps !== null,
-            ),
+            providerConfigs.filter((c) => {
+              if (where.providerCode && c.providerCode !== where.providerCode) return false;
+              if (where.enabled !== undefined && c.enabled !== where.enabled) return false;
+              if (where.feeBps !== undefined && c.feeBps === null) return false;
+              if (where.validFrom && c.validFrom > now) return false;
+              if (where.OR && c.validTo !== null && c.validTo <= now) return false; // validTo null or > now
+              return (where.AND ?? []).every((clause) => inScope(clause, c));
+            }),
           );
         }),
       },
-      paymentProviderRow: { findMany: vi.fn(() => Promise.resolve([])) },
-      paymentMethod: { findMany: vi.fn(() => Promise.resolve([])) },
+      paymentProviderRow: {
+        findMany: vi.fn((args?: { where?: { active?: boolean } }) =>
+          Promise.resolve(
+            providerRows.filter(
+              (p) => args?.where?.active === undefined || p.active === args.where.active,
+            ),
+          ),
+        ),
+      },
+      paymentMethod: {
+        findMany: vi.fn((args?: { where?: { active?: boolean } }) =>
+          Promise.resolve(
+            paymentMethods.filter(
+              (m) => args?.where?.active === undefined || m.active === args.where.active,
+            ),
+          ),
+        ),
+      },
       outbox: {
         create: vi.fn((args: { data: Record<string, unknown> }) => {
           outboxEvents.push(args.data as never);
@@ -436,6 +517,8 @@ export function makePaymentsRaceDb() {
     ledgerGroups,
     outboxEvents,
     providerConfigs,
+    providerRows,
+    paymentMethods,
     idempotencyKeys,
   };
 }

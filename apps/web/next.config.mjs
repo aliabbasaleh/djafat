@@ -11,9 +11,8 @@ const nextConfig = {
     '@djafat/types',
     '@djafat/ui',
   ],
-  experimental: {
-    typedRoutes: true,
-  },
+  // Stable since Next.js 15.5 (was `experimental.typedRoutes`).
+  typedRoutes: true,
   images: {
     // Seed fixtures only (docs/20 §47) — real restaurant photos go through
     // the ObjectStorage-backed upload path prepared (not built) in Bloc 2
