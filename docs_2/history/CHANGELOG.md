@@ -8,6 +8,33 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-17 — Sync S-017: the logo file renamed
+
+**Reviewed:** our own rename on pull request #10 (0.20.16): `djafat/ogo.png` → `djafat/logo.png`, same
+content (a typo in the first name).
+
+**Status changes:** none.
+
+**Documents changed:** `PROJECT_STATUS.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
+## 2026-11-17 — Sync S-016: the owner's branch brings in `main`; our brand assets
+
+**Reviewed:** `6198a89` by `kcerha`, merging `main` (`75db772`, the audit's fixes) into
+`feat/welcome-greeting` (pull request #8): its only hand-made change is the roadmap journal; the
+branch stays at 0.21.0. Our `155b946` (0.20.14, pull request #10): the DJAFAT logo, four icons and
+five posters in `djafat/`, PNG only.
+
+**Verified:** the merge's combined diff (only `docs/ROADMAP.md`); `verify:fast` all pass on #10.
+
+**Status changes:** none. Merge order to keep versions ascending: #9, #10, then #8.
+
+**Documents changed:** `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-015: `main` green after the merges; a correction on shutdown
 
 **Verified:** CI and Security both green on `main` at `75db772`, the merge of pull request #7. The
