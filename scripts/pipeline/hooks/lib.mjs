@@ -40,11 +40,16 @@ export function runTool(cmd, args, { cwd, timeoutMs = 60_000 } = {}) {
   // directly spawnable — spawnSync needs a shell to resolve either, which
   // Node's own PATHEXT search does not provide. Without it, spawnSync fails
   // ENOENT and this reports a silent, output-less non-zero exit, which looks
-  // exactly like a real failure. `cmd` (but not `args`) must be quoted by
-  // hand for that shell: unquoted, cmd.exe splits an absolute path with
-  // spaces (e.g. `C:\Program Files\nodejs\node.exe`) at the first space.
+  // exactly like a real failure. `cmd` and each `args` entry must be quoted
+  // by hand for that shell: unquoted, cmd.exe splits an absolute path with
+  // spaces (e.g. `C:\Program Files\nodejs\node.exe`) at the first space, and
+  // treats `(`/`)`/`&`/`|`/`^`/`<`/`>` as its own syntax anywhere outside
+  // quotes — e.g. a route group directory like `app/(app)/home.tsx`
+  // (Next.js/Expo Router's own naming convention).
   const useShell = process.platform === 'win32';
-  const r = spawnSync(useShell && cmd.includes(' ') ? `"${cmd}"` : cmd, args, {
+  const shellQuote = (s) => (/[\s()&|^<>]/.test(s) ? `"${s}"` : s);
+  const quotedArgs = useShell ? args.map(shellQuote) : args;
+  const r = spawnSync(useShell ? shellQuote(cmd) : cmd, quotedArgs, {
     cwd,
     encoding: 'utf8',
     timeout: timeoutMs,

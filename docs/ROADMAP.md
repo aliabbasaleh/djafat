@@ -1,6 +1,6 @@
 # Feuille de route DJAFAT
 
-> **Version actuelle : 0.20.17** — 17 nov. 2026
+> **Version actuelle : 0.21.0** — 17 nov. 2026
 > Ce fichier est la feuille de route de référence. Il est mis à jour **à chaque
 > version envoyée sur GitHub** (journal des versions en bas, cases cochées au fil
 > de l'eau). Toute l'équipe le lit ici, depuis n'importe où.
@@ -11,13 +11,26 @@ démonstration en ligne** sur djafat.com, puis le pilote à N'Djamena.
 
 ## Où on en est
 
-| Étape                                               | État                                            |
-| --------------------------------------------------- | ----------------------------------------------- |
-| Fonctions du pilote (commande, paiement, livraison) | ✅ faites et vérifiées en vrai                  |
-| Installation serveur (Docker, HTTPS, sauvegardes)   | ✅ prête, testée en local                       |
-| Démo en ligne sur djafat.com                        | ✅ en ligne (16 nov.), HTTPS sur les 6 adresses |
-| Comptes réels (SMS, Airtel, WhatsApp)               | ⏳ démarches en cours côté DJAFAT               |
-| Pilote à N'Djamena                                  | à venir                                         |
+| Étape                                                    | État                                                                                      |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Fonctions du pilote (commande, paiement, livraison)      | ✅ faites et vérifiées en vrai                                                            |
+| Installation serveur (Docker, HTTPS, sauvegardes)        | ✅ prête, **en ligne** sur djafat.com                                                     |
+| Démo en ligne sur djafat.com                             | ✅ en ligne depuis le 16 nov., vérifiée de l'extérieur (site, API, admin, resto, livreur) |
+| Espèces, Airtel Money, Tigo Cash, Moov Money             | ✅ actifs en démo (numéros marchands **factices**)                                        |
+| Sécurité du paiement (webhook forgé, méthode désactivée) | ✅ corrigée (audit PAY-01/PAY-05, 17 nov.)                                                |
+| Comptes réels (SMS, Airtel/Tigo/Moov, WhatsApp, S3)      | ⏳ démarches en cours côté DJAFAT — seul vrai blocage restant                             |
+| Pilote à N'Djamena                                       | à venir                                                                                   |
+
+### Pour que l'API tourne à 100 % (pas juste en démo)
+
+Techniquement terminé ; chaque ligne n'attend plus qu'un accès externe (aucun code à écrire) :
+
+- [ ] **Numéros marchands réels** Airtel Money / Tigo Cash / Moov Money — remplacer les factices (`+23560000010/20/30`) dans `MOBILE_MONEY_WALLETS` de `.env.prod`. Un changement de configuration, zéro ligne de code (même mécanisme générique, prouvé ce soir avec les 3 opérateurs).
+- [ ] **Fournisseur SMS réel** (Tchad) — `SMS_PROVIDER=http` + `SMS_HTTP_URL`/`SMS_HTTP_API_KEY` dans `.env.prod`. Aujourd'hui les codes arrivent dans une boîte de test interne au serveur (mode démo), jamais par vrai SMS.
+- [ ] **WhatsApp Business réel** (compte Meta vérifié sur le 66 86 89 73) — `WHATSAPP_PROVIDER=cloud` + les identifiants Meta. Le code existe déjà en entier (FEAT-008) ; **désactivé volontairement en production tant qu'il n'y a pas de vrai compte**, pour ne jamais proposer un bouton qui n'enverrait rien.
+- [ ] **E-mail réel** (SMTP) — `EMAIL_PROVIDER=smtp` + les identifiants. Même raison que WhatsApp : désactivé en production sans un vrai expéditeur.
+- [ ] **Stockage objet (photos)** — l'image MinIO (`quay.io/minio/minio`) a verrouillé son registre public mi-novembre : plus aucune version ne se télécharge, même en local. Il faut soit un autre registre MinIO (compte), soit une alternative compatible S3 (ex. Garage, SeaweedFS) dans `docker-compose.prod.yml`. Sans ça, l'upload de vraies photos de restaurants/plats ne fonctionne pas — actuellement hors périmètre démo.
+- [ ] **Connecteur API Airtel Money officiel (FEAT-019)** — une fois l'accès obtenu, remplacerait le rapprochement manuel actuel (déjà fonctionnel, juste manuel) par une confirmation automatique.
 
 ## Phase 1 — technique avant le pilote
 
@@ -29,22 +42,26 @@ démonstration en ligne** sur djafat.com, puis le pilote à N'Djamena.
 - [x] Repères, point de livraison appris, note vocale (FEAT-018)
 - [x] Installation serveur complète : `infra/deploy/` (Docker, HTTPS automatique, sauvegardes)
 - [x] Tests d'intégration : 93/93 au vert (étaient ~40), `walking-skeleton` réécrit sur le parcours actuel
-- [x] Mettre la démo en ligne sur djafat.com (vérifié de l'extérieur le 16 nov. : site, API, admin, resto, livreur)
+- [x] Démo en ligne sur djafat.com (serveur Oracle Cloud, HTTPS, les 5 sous-domaines, vérifiée de l'extérieur le 16 nov. : site, API, admin, resto, livreur)
+- [x] Bug critique « Illegal invocation » corrigé — aucun navigateur ne pouvait se connecter avant ce correctif
+- [x] Messages de bienvenue personnalisés sur les 4 interfaces (client, restaurant, admin, livreur)
+- [x] Tigo Cash et Moov Money activés en démo (même mécanisme générique qu'Airtel Money, zéro code)
+- [x] Audit de sécurité des paiements (webhook forgé, idempotence, méthode désactivée) corrigé
 - [ ] Alertes en cas de panne et suivi des journaux
 - [ ] Écran admin des téléphones passerelles SMS et des SMS mis de côté
 - [ ] Connecteur API Airtel Money (FEAT-019) — dès que l'accès API est obtenu
-- [ ] Vraies photos des restaurants et des plats
+- [ ] Vraies photos des restaurants et des plats — bloqué par le registre MinIO verrouillé (voir ci-dessus)
 
 ## Phase 1 — à faire côté DJAFAT
 
 - [x] Nom de domaine djafat.com (Namecheap)
 - [x] Numéros DJAFAT : WhatsApp/SMS 66 86 89 73, appel 30 10 90 90
-- [x] Serveur Oracle Cloud « Always Free » — guide pas à pas : `infra/deploy/README.md`
+- [x] Serveur Oracle Cloud (essai gratuit, x86 — l'offre ARM « Always Free » restait indisponible par pénurie ; migration possible plus tard) — guide pas à pas : `infra/deploy/README.md`
 - [x] Clé de lecture GitHub (« Deploy key ») ajoutée pour le serveur
 - [x] Les 6 enregistrements DNS chez Namecheap
-- [ ] Fournisseur SMS au Tchad (codes de connexion)
-- [ ] Comptes marchands Airtel Money et Moov Money, téléphone marchand dédié
-- [ ] WhatsApp Business (compte Meta vérifié) sur le 66 86 89 73
+- [ ] Fournisseur SMS au Tchad (codes de connexion) — en démo, codes dans une boîte de test interne, jamais envoyés
+- [ ] Comptes marchands Airtel Money, Tigo Cash et Moov Money, téléphones marchands dédiés — en démo, numéros factices
+- [ ] WhatsApp Business (compte Meta vérifié) sur le 66 86 89 73 — code déjà prêt, juste les identifiants manquent
 - [ ] Contrats restaurants et livreurs relus par un avocat au Tchad
 - [ ] Signer 5 à 10 restaurants pilotes, recruter 10 à 15 livreurs
 - [ ] Relever les vraies positions GPS des repères (FEAT-018-Q01)
@@ -86,8 +103,8 @@ CORRECTIF pour une correction ou de la documentation).
 
 | Version | Date         | Contenu                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Commit                       |
 | ------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| 0.20.17 | 17 nov. 2026 | Audit : PR #9 et #10 sur `main` ; suivi de la branche du message de bienvenue (#8)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | ce commit                    |
-| 0.20.16 | 17 nov. 2026 | Identité visuelle : le logo s'appelle `logo.png` (et non plus `ogo.png`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `07abbac` (fusion `29d3d04`) |
+| 0.21.0  | 17 nov. 2026 | **Démo mise en ligne sur djafat.com** (serveur Oracle, HTTPS, 5 sous-domaines) ; Tigo Cash et Moov Money activés en plus d'Airtel Money (même mécanisme générique, zéro code) ; message de bienvenue personnalisé sur les 4 interfaces (client, restaurant, admin, livreur) ; import manquant corrigé sur l'admin ; pipeline Windows : un chemin contenant des parenthèses (`app/(app)/`, convention Next.js/Expo Router) cassait l'appel shell, corrigé ; fusion de l'audit sécurité de main                                                                                                                              | ce commit                    |
+| 0.20.16 | 17 nov. 2026 | Identité visuelle : le logo s'appelle `logo.png` (et non plus `ogo.png`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `07abbac`                    |
 | 0.20.15 | 17 nov. 2026 | Audit : suivi de la branche du message de bienvenue (#8) et des fichiers d'identité visuelle                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `3d2a55d`                    |
 | 0.20.14 | 17 nov. 2026 | Identité visuelle dans le dépôt : logo, 4 icônes « D » et 5 affiches (dossier `djafat/`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `155b946`                    |
 | 0.20.13 | 17 nov. 2026 | Audit : CI de `main` verte après les fusions ; note corrigée sur l'arrêt de l'API (SIGTERM)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `9fb6fdc`                    |

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui-client';
 import { api } from '@/lib/api';
 import { SearchForm } from '@/components/SearchForm';
 import { CategoryChipRow } from '@/components/CategoryChipRow';
+import { HomeGreeting } from '@/components/HomeGreeting';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +48,7 @@ export default async function HomePage() {
   return (
     <Container as="main" className={cx(styles['main'])}>
       <Stack as="section" gap="md" className={cx(styles['hero'])}>
+        <HomeGreeting />
         <Heading level={1} size="display">
           Vos restaurants préférés, livrés à N&rsquo;Djamena
         </Heading>

@@ -48,11 +48,15 @@ function run(cmd, argv, { timeoutMs = 20 * 60_000, env = {} } = {}) {
   // Windows: a bare `pnpm`/`node_modules/.bin/<tool>` is not directly
   // spawnable (see scripts/pipeline/hooks/lib.mjs's runTool) — without a
   // shell, spawnSync fails ENOENT and this looks exactly like a real failure.
-  // `cmd` (but not `argv`) must be quoted by hand for that shell: unquoted,
-  // cmd.exe splits an absolute path with spaces (e.g. a Program Files
-  // `node.exe`) at the first space.
+  // `cmd` and each `argv` entry must be quoted by hand for that shell:
+  // unquoted, cmd.exe splits an absolute path with spaces (e.g. a Program
+  // Files `node.exe`) at the first space, and treats `(`/`)`/`&`/`|`/`^`/`<`/`>`
+  // as its own syntax anywhere outside quotes — e.g. a route group directory
+  // like `app/(app)/home.tsx` (Next.js/Expo Router's own naming convention).
   const useShell = process.platform === 'win32';
-  const r = spawnSync(useShell && cmd.includes(' ') ? `"${cmd}"` : cmd, argv, {
+  const shellQuote = (s) => (/[\s()&|^<>]/.test(s) ? `"${s}"` : s);
+  const quotedArgv = useShell ? argv.map(shellQuote) : argv;
+  const r = spawnSync(useShell ? shellQuote(cmd) : cmd, quotedArgv, {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],

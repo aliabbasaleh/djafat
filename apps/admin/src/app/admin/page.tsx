@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Heading, Text, Stack, Grid, cx } from '@djafat/ui';
+import { Stack, Grid, Greeting, Text, cx } from '@djafat/ui';
 import { Button } from '@/components/ui-client';
 import { getStoredUser, type StoredAdminUser } from '@/lib/auth-storage';
 import styles from './page.module.css';
@@ -27,12 +27,10 @@ export default function AdminDashboardPage() {
 
   return (
     <Stack gap="lg">
-      <Stack gap="xs">
-        <Heading level={1}>Tableau de bord</Heading>
-        <Text tone="secondary">
-          {user ? `Connecté en tant que ${user.fullName ?? user.phone}.` : ' '}
-        </Text>
-      </Stack>
+      <Greeting
+        name={user?.fullName ?? null}
+        message="Ravi de vous revoir — voici un aperçu de DJAFAT aujourd'hui."
+      />
       <Grid minItemWidth={220} gap="md">
         {SECTIONS.map((s) => (
           <div key={s.href} className={cx(styles['card'])}>
