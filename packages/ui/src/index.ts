@@ -25,6 +25,7 @@ export * from './form/Textarea.js';
 
 // Feedback
 export * from './feedback/Alert.js';
+export * from './feedback/Greeting.js';
 export * from './feedback/Badge.js';
 export * from './feedback/EmptyState.js';
 export * from './feedback/ErrorState.js';

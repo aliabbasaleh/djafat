@@ -1,3 +1,22 @@
+/* ---------- Greeting ---------- */
+.greeting {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-1) * 1px);
+}
+.greetingHello {
+  margin: 0;
+  font-family: var(--djafat-type-family-display, inherit);
+  font-weight: 700;
+  font-size: calc(var(--djafat-type-size-h1) * 1px);
+  color: var(--djafat-color-text-primary);
+}
+.greetingMessage {
+  margin: 0;
+  font-size: calc(var(--djafat-type-size-body) * 1px);
+  color: var(--djafat-color-text-secondary);
+}
+
 /* ---------- Spinner ---------- */
 .spinner {
   display: inline-block;
