@@ -351,6 +351,14 @@ verified.
   drops the 38 `next` entries pull request #1 had accepted (115 → 77 entries, counted in both
   files), so the audit job fails again if a `next` advisory returns. Next step: Fastify 5 and
   Nest 11, on their own pull request (T-105).
+- **Sync S-012 note (2026-11-17), BRANCH + RUN:** the API step is done on a branch:
+  `fix/api-nest11-fastify5` (`862ad24`, version 0.20.11, stacked on pull request #4) moves the API to
+  NestJS 11.2.10 and Fastify 5.12.8 (with `@fastify/middie` 9.3.4, `@fastify/cors` 11, `@fastify/helmet`
+  13, `@fastify/static` 10, `@nestjs/swagger` 11). `pnpm audit --prod`: 73 advisories → 36, critical
+  3 → 1, and none left in the API's stack; the baseline drops the 36 entries that no longer exist,
+  nothing new appears. NestJS 12 was not chosen: its packages are ESM-only and its tooling wants
+  TypeScript 6, for the same Fastify. What remains is mostly the Expo tool chain, `postcss` through
+  `next`, and `zod` (fixed only in version 4). Status stays Open until merged.
 
 ### MOB-01
 
@@ -998,6 +1006,8 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Observed:** `Content-Type: application/json` with an empty body → 500; a 2 MB body → 500 (should be 413); an unknown `methodCode` → 500 (foreign-key violation). A simultaneous first login for one phone would also 500 (code).
 - **Fix:** map Fastify client errors by `statusCode`; translate Prisma `P2003`/`P2002` where the cause is input.
 - **Verify:** each case returns 4xx with the standard envelope.
+- **Sync S-012 note (2026-11-17), BRANCH + RUN:** on the NestJS 11 / Fastify 5 branch (`862ad24`), a
+  2 MB body now answers 413 (checked on the built API); the other cases were not re-run.
 
 ### DOC-03
 
@@ -1039,6 +1049,14 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Fix:** capture the error codes (response body printed on failure, or synchronous logging in
   tests); check whether one order can trigger two dispatch waves.
 - **Verify:** 20 consecutive full runs pass.
+- **Sync S-012 note (2026-11-17), RUN + CODE: likely cause.** Every failure is a 404 (or no answer) on
+  a route that exists, and the API never logged the request: a third case, `GET /v1/restaurants?search=`
+  in `catalog`, did the same on the upgrade branch. Supertest opens the app on the IPv6 wildcard with a
+  random port and then connects to `127.0.0.1`; on this machine several programs listen on random
+  127.0.0.1-only ports, among them Prisma's query engine (`engineType = "binary"`, an HTTP server)
+  started by every test file. macOS lets both binds coexist, so a request can reach the engine instead
+  of the app; Linux refuses the second bind, which fits a CI that never fails. Not proven yet. Fix to
+  try: start the test app with `app.listen(0, '127.0.0.1')` and point supertest at that address.
 
 ---
 

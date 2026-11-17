@@ -10,6 +10,60 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-012 — 2026-11-17 — the API on NestJS 11 and Fastify 5
+
+|                 |                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------- |
+| **Trigger**     | Our own commit, before its push                                                       |
+| **Range**       | `fix/api-nest11-fastify5` `a017f48..862ad24` (new branch, stacked on pull request #4) |
+| **Size**        | 1 commit, ours, 8 files                                                               |
+| **Evidence**    | BRANCH + RUN                                                                          |
+| **Reviewed by** | Claude, in the session that wrote the commit                                          |
+
+### Added
+
+- `862ad24` (0.20.11): NestJS 11.2.10 and Fastify 5.12.8 in the API with their plugins; Prisma's
+  disconnect bounded to 2 s on shutdown (three unit tests); `typescript` 5.7.3 declared by the lint
+  package; 36 obsolete entries removed from the audit baseline.
+
+### Removed
+
+- none
+
+### Fixed
+
+- On the new branch, not on `main`: the API part of `DEP-01` (no advisory left in the API's stack);
+  the 413 case of `API-01`.
+- Found and fixed there: NestJS 11 calls Prisma's disconnect last on shutdown, and Prisma 6.2's
+  `$disconnect()` never settles a moment after SIGTERM, so the API kept serving after SIGTERM.
+  Reproduced outside NestJS (at once it returns, 300 ms later it hangs). `main` (NestJS 10) calls it
+  first and is not affected.
+
+### Changed
+
+- `TEST-04`: a third failure of the same shape (`GET /v1/restaurants?search=` → 404, never logged by
+  the API); likely cause recorded (port collisions with 127.0.0.1-only listeners on macOS).
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `UNMERGED_BRANCHES.md`,
+`history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The hosted checks of the new branch (still to come); the `TEST-04` cause; a browser run against the
+upgraded API.
+
+### Marker
+
+New line `origin/fix/api-nest11-fastify5` → `862ad24`; the other lines unchanged.
+
+---
+
 ## S-011 — 2026-11-17 — `PAY-01` fixed on #4; new `TEST-04`
 
 |                 |                                                |

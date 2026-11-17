@@ -65,6 +65,9 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Note (updated 2026-11-11, sync S-003):** target `next` ≥ 15.5.28, the highest patched version
   among its 17 critical and high advisories in the hosted audit of pull request #2. Pull request
   #1's audit baseline accepts the critical ones in the meantime ([`DEP-01`](../FINDINGS.md#dep-01)).
+- **Progress (updated 2026-11-17, sync S-012):** the API step is done on `fix/api-nest11-fastify5`
+  (0.20.11): NestJS 11 and Fastify 5; production advisories 73 → 36, none left in the API. Left: the
+  Expo tool chain, `postcss` through `next`, `zod` 4.
 - **Progress (updated 2026-11-14, sync S-008):** pull request #3 is re-based on `main` (0.20.3,
   `69cd859`) and drops the 38 `next` entries of the audit baseline (115 → 77). Fastify 5 and
   Nest 11 come next, on their own pull request.
@@ -478,6 +481,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 - **Area:** `apps/api/test`, deliveries dispatch · **Priority:** Medium · **Why:** [`TEST-04`](../FINDINGS.md#test-04) · **Status:** Not started
 - **Done when:** the two failure modes are explained and fixed, or shown to come from the test environment.
+- **Lead _(updated 2026-11-17, sync S-012)_:** port collisions between the test app (IPv6 wildcard) and 127.0.0.1-only listeners such as Prisma's binary query engine; try `app.listen(0, '127.0.0.1')` in the integration bootstrap ([`TEST-04`](../FINDINGS.md#test-04)).
 - **Test:** 20 consecutive full runs of the integration suite pass locally.
 
 Last updated: 2026-11-17 (sync S-011)

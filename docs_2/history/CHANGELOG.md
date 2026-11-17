@@ -8,6 +8,30 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-17 — Sync S-012: the API on NestJS 11 and Fastify 5
+
+**Reviewed:** our own `862ad24` (0.20.11) on the new branch `fix/api-nest11-fastify5`, stacked on
+pull request #4: NestJS 10.4 → 11.2.10, Fastify 4.29 → 5.12.8 and their plugins; a bounded Prisma
+disconnect on shutdown; the lint package pinned to the workspace's TypeScript; the audit baseline
+trimmed.
+
+**Verified:** `verify:fast` all pass; `pnpm audit --prod` 73 → 36 advisories, critical 3 → 1, none
+in the API's stack, nothing new; integration suite 97/97 in 2 of 3 runs; the built API booted in
+development and production mode (health, Helmet, CORS, Swagger, webhook, 413 on 2 MB, exit after
+SIGTERM).
+
+**Found on the way:** with NestJS 11 the API no longer stopped on SIGTERM: Prisma 6.2's
+`$disconnect()` never settles when called a moment after the signal, and NestJS 11 calls it last.
+Fixed on the same branch (2 s bound). `TEST-04`: a likely cause found (port collisions on macOS
+with 127.0.0.1-only listeners such as Prisma's query engine); not yet proven.
+
+**Status changes:** `DEP-01` API part fixed on a branch; `API-01` 413 case fixed there.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-011: `PAY-01` fixed on #4; new `TEST-04`
 
 **Reviewed:** our own `a017f48` (0.20.10): payment creation applies the payment screen's rule
