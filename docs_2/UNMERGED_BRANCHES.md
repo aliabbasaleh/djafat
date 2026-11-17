@@ -143,6 +143,12 @@ stack). It makes the branch version 0.21.0.
 Merging (tested with `git merge-tree`): conflicts with `main` only in `package.json` and
 `docs/ROADMAP.md` (version and journal); bring `main` in first. 0.21.0 stays above `main`'s 0.20.12.
 
+_(updated 2026-11-17, sync S-016)_ `6198a89` (`kcerha`) merges `main` (`75db772`) into the branch: the only file resolved
+by hand is the roadmap journal (0.21.0 on top of our 0.20.6–0.20.11 rows); the version stays 0.21.0.
+Pull request #8 is mergeable. To keep the versions ascending, merge it after #9 (0.20.12, 0.20.13)
+and #10 (0.20.14, 0.20.15); `TEST-05` still applies. Our new branch `chore/brand-assets` (#10, on
+top of #9) adds the brand files in `djafat/`: logo, four icons, five posters, PNG only.
+
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
 
 ### What it adds
