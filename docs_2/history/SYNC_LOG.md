@@ -10,6 +10,56 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-014 — 2026-11-17 — the owner's new branch `feat/welcome-greeting`
+
+|                 |                                                    |
+| --------------- | -------------------------------------------------- |
+| **Trigger**     | The shared hook, after a fetch (new remote branch) |
+| **Range**       | `origin/feat/welcome-greeting` `e82eb80..cabf058`  |
+| **Size**        | 1 commit by `kcerha`, 13 files                     |
+| **Evidence**    | BRANCH; one RUN (mobile typecheck on `main`)       |
+| **Reviewed by** | Claude, in the audit session                       |
+
+### Added
+
+- `<Greeting>` (`@djafat/ui`) on the client home page (signed in), the restaurant board, the admin
+  dashboard and the courier home; Windows quoting of every argument in `scripts/pipeline`; the
+  mobile typecheck recorded as a known failure; roadmap: demo online, Tigo Cash and Moov Money
+  active in demo with fictitious merchant numbers, a "100 % API" checklist; version 0.21.0.
+
+### Removed
+
+- none
+
+### Fixed
+
+- none of the findings (the admin import fixes a break the same commit introduced)
+
+### Changed
+
+- `DOC-02`, `OPS-01`, `OPS-02`: notes on the roadmap's claims (see `FINDINGS.md`).
+
+### New findings
+
+- `TEST-05` (Low, BRANCH): `@djafat/mobile#typecheck` silenced through `known-failures.json`; it
+  passes on `main` and in CI, and fails only where Expo generated its typed routes.
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `UNMERGED_BRANCHES.md`,
+`history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The greeting in a browser; the branch's builds and checks (it has no pull request yet); the MinIO
+and trial-server claims.
+
+### Marker
+
+New line `origin/feat/welcome-greeting` → `cabf058`.
+
+---
+
 ## S-013 — 2026-11-17 — pull requests #2, #3, #4 and #7 merged into `main`
 
 |                 |                                                                                     |

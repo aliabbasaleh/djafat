@@ -484,4 +484,10 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Lead _(updated 2026-11-17, sync S-012)_:** port collisions between the test app (IPv6 wildcard) and 127.0.0.1-only listeners such as Prisma's binary query engine; try `app.listen(0, '127.0.0.1')` in the integration bootstrap ([`TEST-04`](../FINDINGS.md#test-04)).
 - **Test:** 20 consecutive full runs of the integration suite pass locally.
 
-Last updated: 2026-11-17 (sync S-011)
+### T-610 · Keep the mobile typecheck honest _(added 2026-11-17, sync S-014)_
+
+- **Area:** `apps/mobile`, `scripts/pipeline/baselines/known-failures.json` · **Priority:** Low · **Why:** [`TEST-05`](../FINDINGS.md#test-05) · **Status:** Not started
+- **Done when:** the app's navigation calls type-check with Expo's generated typed routes, and no known-failure entry covers `@djafat/mobile#typecheck`.
+- **Test:** generate `.expo/types`, then `pnpm --filter @djafat/mobile typecheck` passes.
+
+Last updated: 2026-11-17 (sync S-014)

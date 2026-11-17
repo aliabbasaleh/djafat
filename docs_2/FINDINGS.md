@@ -9,9 +9,9 @@ these IDs instead of repeating the detail.
   their production builds, HTTP scenarios with `curl`, the three web apps in headless Chrome, and
   the hosted CI logs. Environment details: [`TESTING_AND_QUALITY_ASSURANCE.md`](TESTING_AND_QUALITY_ASSURANCE.md) §1.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
-- **Counts:** 3 Critical · 18 High · 24 Medium · 13 Low = 58 open findings, plus 10 resolved
+- **Counts:** 3 Critical · 18 High · 24 Medium · 14 Low = 59 open findings, plus 10 resolved
   _(updated 2026-11-14, sync S-008: new `DOC-03`; 2026-11-17, sync S-011: new `TEST-04`; sync
-  S-013: `PAY-01`, `PAY-03`, `SEC-01`, `FE-03` and `PAY-05` resolved on `main`)_
+  S-013: `PAY-01`, `PAY-03`, `SEC-01`, `FE-03` and `PAY-05` resolved on `main`; sync S-014: new `TEST-05`)_
   _(updated 2026-11-14, sync S-007: `SDK-01`, `FE-01`, `PAY-02`, `TEST-01` and `CI-01` resolved on
   `main`; S-004 added `CI-03` and `FE-07`; S-003 added `CI-02`)_.
 - **Last synced:** S-013, 2026-11-17 — pull requests #2, #3, #4 and #7 merged into `main`
@@ -95,6 +95,7 @@ verified.
 | [CI-03](#ci-03)       | The pre-commit hook cannot run ESLint on `main`                                          | Broken              | Low      | RUN      |
 | [FE-07](#fe-07)       | Typed routes are configured but never checked                                            | Broken              | Low      | RUN      |
 | [PAY-09](#pay-09)     | Payment idempotency scope is global; attempt counter never moves                         | Needs Improvement   | Low      | CODE     |
+| [TEST-05](#test-05)   | The owner's branch silences the mobile typecheck                                         | Needs Improvement   | Low      | BRANCH   |
 
 ---
 
@@ -650,6 +651,10 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Sync S-001 note (2026-11-11), branch only:** the branch's **production** stack now picks a
   community multi-arch PostGIS image on ARM servers; its **development** compose file is unchanged,
   and its new local guide (`docs/TRAVAILLER-EN-LOCAL.md`) still starts with `pnpm infra:up`. Open.
+- **Sync S-014 note (2026-11-17), CLAIM:** the owner's roadmap (`cabf058`, branch
+  `feat/welcome-greeting`) says the `quay.io/minio/minio` image can no longer be downloaded (registry
+  locked in mid-November), even locally; the local guide's troubleshooting already starts the stack
+  without MinIO. Not checked by us.
 
 ### OPS-02
 
@@ -681,6 +686,10 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   localhost (`docker-compose.prod.yml`), so login codes cannot be read from outside. The stack has
   a backup service; monitoring, alerting and a restore drill are still not reported. Open, partly
   addressed.
+- **Sync S-014 note (2026-11-17), CLAIM:** per the owner's roadmap (`cabf058`), the demo server is an
+  Oracle Cloud **free trial** on x86 (the ARM "Always Free" offer was unavailable), so its life is
+  limited unless migrated or paid; and object storage (photos) is blocked by the MinIO image above.
+  Not checked by us.
 
 ### SEC-02
 
@@ -1088,7 +1097,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### DOC-02
 
-**Earlier "GO" verdicts covered the API only** · Needs Improvement · Low · LIVE — `docs/36-bloc-13-hardening.md` concludes "GO" for a pilot and `docs/36-pilot-e2e-scenario.md` reports 19/19. Both runs drove the API with `curl`; the same journey fails in a browser (`SDK-01`, `FE-01`), and the cited integration tests cannot run (`TEST-01`). _Sync S-001 note (2026-11-11): the active branch's new `docs/ROADMAP.md` makes the same kind of claim — pilot functions "faites et vérifiées en vrai", integration tests 92/93 — which this audit has not been able to verify (BRANCH)._ _Sync S-006 note (2026-11-13): run locally on `4c756e0`, the customer, restaurant, courier and admin journeys work end to end, with one gap the roadmap does not mention: the customer cannot see the delivery code (`FE-03`) (RUN)._
+**Earlier "GO" verdicts covered the API only** · Needs Improvement · Low · LIVE — `docs/36-bloc-13-hardening.md` concludes "GO" for a pilot and `docs/36-pilot-e2e-scenario.md` reports 19/19. Both runs drove the API with `curl`; the same journey fails in a browser (`SDK-01`, `FE-01`), and the cited integration tests cannot run (`TEST-01`). _Sync S-001 note (2026-11-11): the active branch's new `docs/ROADMAP.md` makes the same kind of claim — pilot functions "faites et vérifiées en vrai", integration tests 92/93 — which this audit has not been able to verify (BRANCH)._ _Sync S-006 note (2026-11-13): run locally on `4c756e0`, the customer, restaurant, courier and admin journeys work end to end, with one gap the roadmap does not mention: the customer cannot see the delivery code (`FE-03`) (RUN)._ _Sync S-014 note (2026-11-17), BRANCH: the owner's roadmap on `feat/welcome-greeting` (`cabf058`) says the API is "techniquement terminé" and that every remaining item only waits for an external account, "aucun code à écrire". The audit still lists open findings that need code, among them `PAY-04` (no refund when a paid order is rejected or cancelled), `PAY-06` (no payouts), `ORD-01` (no cancellation), `ORD-02` (no confirmation timeout), `FE-02` (no token refresh), `ARCH-01` and `TEST-04`._
 
 ### OPS-04
 
@@ -1122,6 +1131,10 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 **Payment idempotency details** · Needs Improvement · Low · CODE — the idempotency scope for payments, cancels and refunds is global rather than per user; `payments.attempt_no` is never incremented; a stale `reserved` key (process died mid-request) blocks its key forever.
 
+### TEST-05
+
+**The owner's branch silences the mobile typecheck** · Needs Improvement · Low · BRANCH · Status: Open _(added 2026-11-17, sync S-014)_ — `cabf058` on `feat/welcome-greeting` records `@djafat/mobile#typecheck` in `scripts/pipeline/baselines/known-failures.json` as pre-existing ("expo-router's generated route-literal type is stale…"). On `main` it passes (RUN, 2026-11-17: `turbo run typecheck --filter=@djafat/mobile`, and in every `verify:fast` run that day; CI green): it fails only where Expo has generated its typed routes (`.expo/types`, gitignored), against calls such as `router.push(`/orders/${id}`)`. Once the entry is in, any real mobile type error is reported as pre-existing on every machine. Fix: write those calls in typed-route form (or regenerate the types) and drop the entry. Verify: with `.expo/types` generated, `pnpm --filter @djafat/mobile typecheck` passes.
+
 ---
 
-Last updated: 2026-11-14 (sync S-007)
+Last updated: 2026-11-17 (sync S-014)

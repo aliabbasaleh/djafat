@@ -73,6 +73,8 @@ went into `main` in that order, each with every check green, and their branches 
 Left on GitHub: `claude/compassionate-franklin-k23vcj` (at `9058e33`, already in `main`) and the
 owner's `fix/payment-reliability-backlog` (§2).
 
+_(updated 2026-11-17, sync S-014)_ New: the owner's `feat/welcome-greeting` (§2c).
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |
@@ -124,6 +126,22 @@ next to it, so take pull request #1's version.
 
 _(updated 2026-11-14, sync S-008)_ Re-based on `main`: `6b13d96` merges `main` and #2 in, `69cd859` makes the branch
 version 0.20.3. The audit baseline loses its 38 `next` entries (115 → 77).
+
+## 2c. `feat/welcome-greeting` (1 commit, the owner) _(added 2026-11-17, sync S-014)_
+
+`cabf058` by `kcerha` (2026-11-17), from `main` as of `e82eb80` (before pull request #6 and our
+stack). It makes the branch version 0.21.0.
+
+| What                                                                     | Effect on the audit                                                      |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| `<Greeting>` in `@djafat/ui`, used by the four apps                      | New UI only; the name comes from the stored session and React escapes it |
+| Admin: `Text` import restored                                            | Fixes a typecheck break the greeting had introduced                      |
+| Windows quoting of every argument in `scripts/pipeline`                  | Tooling only (route-group paths such as `app/(app)/…`)                   |
+| `@djafat/mobile#typecheck` in `known-failures.json`                      | New [`TEST-05`](FINDINGS.md#test-05): passes on `main` and in CI         |
+| Roadmap: demo online, Tigo Cash and Moov Money in demo, "100 % API" list | Claims; see notes on `DOC-02`, `OPS-01`, `OPS-02`                        |
+
+Merging (tested with `git merge-tree`): conflicts with `main` only in `package.json` and
+`docs/ROADMAP.md` (version and journal); bring `main` in first. 0.21.0 stays above `main`'s 0.20.12.
 
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
 

@@ -8,6 +8,26 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-17 — Sync S-014: the owner's new branch `feat/welcome-greeting`
+
+**Reviewed:** `cabf058` by `kcerha`, from an older `main` (`e82eb80`): a greeting on the four apps,
+a restored admin import, Windows quoting for every argument in the pipeline scripts, the mobile
+typecheck recorded as a known failure, and a roadmap update (demo online, Tigo Cash and Moov Money
+in demo, a "100 % API" list).
+
+**Verified:** the mobile typecheck passes on `main` (no generated typed routes there); the branch
+conflicts with `main` only on the version and the journal (`git merge-tree`). The rest was read, not
+run.
+
+**Newly discovered:** `TEST-05` (Low, BRANCH): the known-failure entry would hide real mobile type
+errors. Notes on `DOC-02` (the roadmap's "no code left to write" against open findings that need
+code), `OPS-01` and `OPS-02` (MinIO image, trial server). 59 findings open.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-013: the audit's fixes are on `main`
 
 **Reviewed:** the merges of pull requests #2 (`05ecacc`), #3 (`f9a8f41`), #4 (`44ae073`) and #7
