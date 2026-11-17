@@ -149,6 +149,11 @@ Pull request #8 is mergeable. To keep the versions ascending, merge it after #9 
 and #10 (0.20.14, 0.20.15); `TEST-05` still applies. Our new branch `chore/brand-assets` (#10, on
 top of #9) adds the brand files in `djafat/`: logo, four icons, five posters, PNG only.
 
+_(updated 2026-11-17, sync S-018)_ #9 (`5d4befd`) and #10 (`29d3d04`) are merged into `main` (0.20.16) and their branches
+deleted. `7cfeaa6` (`kcerha`) brings `main` up to #9 into `feat/welcome-greeting`, resolving only the
+roadmap journal (0.21.0 kept); #10 is not in it yet, so pull request #8 conflicts again on
+`package.json` and `docs/ROADMAP.md`: bring `main` in once more before merging. `TEST-05` still applies.
+
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
 
 ### What it adds

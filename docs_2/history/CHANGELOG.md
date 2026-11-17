@@ -8,6 +8,21 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-17 — Sync S-018: pull requests #9 and #10 on `main`
+
+**Reviewed:** the merges of #9 (`5d4befd`, the audit update) and #10 (`29d3d04`, the brand files and
+the logo rename) into `main`, at the user's request, each after every check passed; neither adds
+anything of its own. `7cfeaa6` by `kcerha` brings `main` (up to #9) into `feat/welcome-greeting`: only
+the roadmap journal resolved by hand, version 0.21.0 kept.
+
+**Status changes:** none. Pull request #8 conflicts with `main` again (version and journal) until it
+brings in #10.
+
+**Documents changed:** `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-017: the logo file renamed
 
 **Reviewed:** our own rename on pull request #10 (0.20.16): `djafat/ogo.png` → `djafat/logo.png`, same

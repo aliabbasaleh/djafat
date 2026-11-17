@@ -10,6 +10,52 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-018 — 2026-11-17 — pull requests #9 and #10 on `main`; #8 brings in `main` again
+
+|                 |                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook, after the merges and a fetch                                            |
+| **Range**       | `origin/main` `75db772..29d3d04`; `origin/feat/welcome-greeting` `6198a89..7cfeaa6`      |
+| **Size**        | 2 merges on `main` (no changes of their own); 1 merge by `kcerha` (roadmap journal only) |
+| **Evidence**    | RUN — the checks of #9 and #10; CODE — combined diffs                                    |
+| **Reviewed by** | Claude, in the audit session                                                             |
+
+### Added
+
+- On `main`: the audit update (#9, 0.20.12–0.20.13) and the brand files (#10, 0.20.14–0.20.16).
+
+### Removed
+
+- The branches `docs/audit-s013` and `chore/brand-assets`, deleted after their merges.
+
+### Fixed
+
+- none
+
+### Changed
+
+- `feat/welcome-greeting` brings in `main` up to #9 (`7cfeaa6`); it conflicts again with `main`
+  on the version and the journal until it brings in #10.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- Pull request #8's checks.
+
+### Marker
+
+`origin/main` → `29d3d04`; `origin/feat/welcome-greeting` → `7cfeaa6`; the line of
+`chore/brand-assets` removed; `HEAD` → this sync's version commit.
+
+---
+
 ## S-017 — 2026-11-17 — the logo file renamed
 
 |                 |                                                                     |
