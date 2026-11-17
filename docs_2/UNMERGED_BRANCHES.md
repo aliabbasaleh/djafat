@@ -127,7 +127,7 @@ next to it, so take pull request #1's version.
 _(updated 2026-11-14, sync S-008)_ Re-based on `main`: `6b13d96` merges `main` and #2 in, `69cd859` makes the branch
 version 0.20.3. The audit baseline loses its 38 `next` entries (115 → 77).
 
-## 2c. `feat/welcome-greeting` (1 commit, the owner) _(added 2026-11-17, sync S-014)_
+## 2c. `feat/welcome-greeting` (1 commit, the owner) _(added 2026-11-17, sync S-014)_ — merged into `main` on 2026-11-17 (`57120ed`, sync S-019)
 
 `cabf058` by `kcerha` (2026-11-17), from `main` as of `e82eb80` (before pull request #6 and our
 stack). It makes the branch version 0.21.0.
@@ -153,6 +153,11 @@ _(updated 2026-11-17, sync S-018)_ #9 (`5d4befd`) and #10 (`29d3d04`) are merged
 deleted. `7cfeaa6` (`kcerha`) brings `main` up to #9 into `feat/welcome-greeting`, resolving only the
 roadmap journal (0.21.0 kept); #10 is not in it yet, so pull request #8 conflicts again on
 `package.json` and `docs/ROADMAP.md`: bring `main` in once more before merging. `TEST-05` still applies.
+
+_(updated 2026-11-17, sync S-019)_ `7d2c5a2` (`kcerha`) brought in #10 too (roadmap journal only), and `aliabbasaleh`
+merged pull request #8 into `main` as `57120ed` (0.21.0); the branch was deleted. Left on GitHub:
+`claude/compassionate-franklin-k23vcj` (already in `main`) and the owner's
+`fix/payment-reliability-backlog`.
 
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
 

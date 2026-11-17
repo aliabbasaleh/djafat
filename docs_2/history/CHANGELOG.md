@@ -8,6 +8,23 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-17 — Sync S-019: the owner's greeting on `main` (0.21.0)
+
+**Reviewed:** `7d2c5a2` by `kcerha` (brings #10 into `feat/welcome-greeting`; roadmap journal only)
+and the merge of pull request #8 into `main` by `aliabbasaleh` (`57120ed`, 0.21.0), which adds nothing
+beyond the branch: the greeting on the four apps, Windows quoting in the pipeline scripts, the
+roadmap updates, and the known-failure entry for the mobile typecheck.
+
+**Verified:** CI and Security green on `57120ed`; the merge's combined diff is empty.
+
+**Status changes:** `TEST-05` is now on `main` (evidence CODE). Our audit entry S-018 is renumbered
+0.21.1 with this one (it was 0.20.17, below `main`'s 0.21.0).
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-018: pull requests #9 and #10 on `main`
 
 **Reviewed:** the merges of #9 (`5d4befd`, the audit update) and #10 (`29d3d04`, the brand files and

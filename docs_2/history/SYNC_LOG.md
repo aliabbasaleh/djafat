@@ -10,6 +10,55 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-019 — 2026-11-17 — the owner's pull request #8 merged into `main`
+
+|                 |                                                                                                |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook, after a fetch                                                                 |
+| **Range**       | `origin/main` `29d3d04..57120ed`                                                               |
+| **Size**        | `7d2c5a2` (merge by `kcerha`, roadmap journal only) and the merge of #8 (no change of its own) |
+| **Evidence**    | RUN — CI and Security on `57120ed`; CODE — combined diffs                                      |
+| **Reviewed by** | Claude, in the audit session                                                                   |
+
+### Added
+
+- On `main`: the greeting (`<Greeting>` in `@djafat/ui`, the four apps), Windows quoting of every
+  argument in `scripts/pipeline`, the roadmap updates (demo online, Tigo Cash and Moov Money in demo,
+  the "100 % API" list), and `@djafat/mobile#typecheck` in `known-failures.json`. DJAFAT 0.21.0.
+
+### Removed
+
+- The branch `feat/welcome-greeting`, deleted after its merge.
+
+### Fixed
+
+- none
+
+### Changed
+
+- `TEST-05` applies to `main` now; evidence CODE.
+- Our S-018 entry is renumbered 0.21.1 together with this one (pushed first as 0.20.17).
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `UNMERGED_BRANCHES.md`,
+`history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The greeting in a browser.
+
+### Marker
+
+`origin/main` → `57120ed`; the line of `feat/welcome-greeting` removed; `HEAD` → this sync's
+version commit.
+
+---
+
 ## S-018 — 2026-11-17 — pull requests #9 and #10 on `main`; #8 brings in `main` again
 
 |                 |                                                                                          |
