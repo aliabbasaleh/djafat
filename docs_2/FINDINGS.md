@@ -9,8 +9,8 @@ these IDs instead of repeating the detail.
   their production builds, HTTP scenarios with `curl`, the three web apps in headless Chrome, and
   the hosted CI logs. Environment details: [`TESTING_AND_QUALITY_ASSURANCE.md`](TESTING_AND_QUALITY_ASSURANCE.md) §1.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
-- **Counts:** 6 Critical · 20 High · 23 Medium · 13 Low = 62 open findings, plus 5 resolved
-  _(updated 2026-11-14, sync S-008: new `DOC-03`)_
+- **Counts:** 6 Critical · 20 High · 24 Medium · 13 Low = 63 open findings, plus 5 resolved
+  _(updated 2026-11-14, sync S-008: new `DOC-03`; 2026-11-17, sync S-011: new `TEST-04`)_
   _(updated 2026-11-14, sync S-007: `SDK-01`, `FE-01`, `PAY-02`, `TEST-01` and `CI-01` resolved on
   `main`; S-004 added `CI-03` and `FE-07`; S-003 added `CI-02`)_.
 - **Last synced:** S-007, 2026-11-14 — pull request #1 merged into `main` as `46d8cae` (DJAFAT
@@ -79,6 +79,7 @@ verified.
 | [PAY-08](#pay-08)     | Cash settlement posts ledger groups in the wrong order                                   | Needs Verification  | Medium   | CODE     |
 | [API-01](#api-01)     | Several client mistakes are answered with HTTP 500                                       | Needs Improvement   | Medium   | LIVE     |
 | [DOC-03](#doc-03)     | The local guide's placeholder secrets block local deliveries                             | Broken              | Medium   | CODE     |
+| [TEST-04](#test-04)   | The API integration suite fails intermittently on a local machine                        | Needs Improvement   | Medium   | RUN      |
 | [FE-05](#fe-05)       | Seeded restaurant and product images do not render                                       | Broken              | Low      | LIVE     |
 | [FE-06](#fe-06)       | Interface polish gaps                                                                    | Needs Improvement   | Low      | LIVE     |
 | [DB-01](#db-01)       | Schema hygiene: retention, indexes, a missing primary key, a reused column               | Needs Improvement   | Low      | LIVE     |
@@ -131,7 +132,7 @@ verified.
 
 ### PAY-01
 
-**A disabled payment provider can still be charged — free orders** · Broken · Critical · LIVE · Status: Open
+**A disabled payment provider can still be charged — free orders** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`a017f48`, version 0.20.10, pull request #4), verified there (sync S-011)
 
 - **Where:** `apps/api` → payments. `payments.service.ts` `doCreatePayment` (L72–155);
   `payment-provider.registry.ts`; `providers/mock/mock-payment.provider.ts`. Table `payment_provider_configs`.
@@ -150,6 +151,15 @@ verified.
 - **Depends on:** nothing.
 - **Verify:** disable the row, repeat the call → 409 and the order stays `awaiting_payment`.
   Integration test for both the enabled and disabled case.
+- **Sync S-011 note (2026-11-17), BRANCH + RUN:** payment creation now resolves
+  `listAvailablePaymentMethods`, the payment screen's own rule, and refuses anything else with
+  `409 PAYMENT_METHOD_UNAVAILABLE` before writing; the stored method is the provider's, not the
+  client's `methodCode` (`a017f48`, version 0.20.10, pull request #4; same rule as the owner's
+  `6cf7c9b`). Production already lacked `mock` (FEAT-002); there the gap was a cash or wallet method
+  switched off by an operator. Verified: the Verify step above on PostgreSQL
+  (`payment-enablement.int.spec.ts`: disabled row → 409, order still `awaiting_payment`, no payment
+  row; enabled again → 201), plus an unknown `methodCode`, which gave HTTP 500, now stored as the
+  provider's. Both fail on the previous code, as do 12 of 14 unit tests.
 
 ### PAY-02
 
@@ -1009,6 +1019,26 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   `.env.example` with random secrets, or one documented command per secret); consider making
   pickup and code issuance one transaction, so a failure cannot leave a delivery without a code.
 - **Verify:** follow the guide on a fresh clone and deliver an order end to end.
+
+### TEST-04
+
+**The API integration suite fails intermittently on a local machine** · Needs Improvement · Medium · RUN · Status: Open _(added 2026-11-17, sync S-011)_
+
+- **Where:** `apps/api/test` (`walking-skeleton`, `identity`, `webhook-forgery`); dispatch in
+  `deliveries.service.ts` (`onOrderReady` → `createAndDispatch` → `runDispatchWave`).
+- **Observed (RUN, 2026-11-17, fresh test database each run, same file order):** with pull request
+  #4's code, 2 of 9 full runs failed. Once, `POST /v1/orders` in `webhook-forgery` never answered
+  (30 s timeout). Once, `walking-skeleton`'s pickup answered 404 just after a successful accept, then
+  `identity`'s order creation answered 404 (same customer). Pickup answers 404 only when the delivery is
+  missing or no longer names that courier. No database session waited on a lock during that run
+  (sampled every second). Four runs with diagnostics did not reproduce; the suite without pull request
+  #4 passed 4 of 4; GitHub's CI has been green on every push. The failing requests' log lines were
+  lost: the test process exits before its buffered log is written.
+- **Why it matters:** an intermittent red build costs reruns and trust; the pickup 404 may hide a real
+  race (a second `order.ready` dispatch wave changing the courier around the accept).
+- **Fix:** capture the error codes (response body printed on failure, or synchronous logging in
+  tests); check whether one order can trigger two dispatch waves.
+- **Verify:** 20 consecutive full runs pass.
 
 ---
 

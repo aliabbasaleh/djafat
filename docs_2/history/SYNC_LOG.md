@@ -10,6 +10,57 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-011 — 2026-11-17 — `PAY-01` fixed on #4; new `TEST-04`
+
+|                 |                                                |
+| --------------- | ---------------------------------------------- |
+| **Trigger**     | The shared hook, after our own push            |
+| **Range**       | `origin/fix/audit-blockers` `2319186..a017f48` |
+| **Size**        | 1 commit, ours, 7 files                        |
+| **Evidence**    | BRANCH + RUN                                   |
+| **Reviewed by** | Claude, in the session that wrote the commit   |
+
+### Added
+
+- `a017f48` (0.20.10): payment creation refuses a provider the payment screen would not list for the
+  order (`409 PAYMENT_METHOD_UNAVAILABLE`) and stores the provider's own method. The unit test
+  harness starts from an enabled configuration and filters configs as Prisma does. New tests:
+  `payments-provider-enablement.spec.ts` (14), `payment-enablement.int.spec.ts` (2).
+  `docs/24-bloc-5-payment.md` says the rule now covers creation.
+
+### Removed
+
+- none
+
+### Fixed
+
+- On `fix/audit-blockers` (pull request #4), not on `main`: `PAY-01`, verified there.
+
+### Changed
+
+- none
+
+### New findings
+
+- `TEST-04` (Medium, RUN): the integration suite failed intermittently in 2 of 9 local runs of pull
+  request #4 (a 30 s hang in `POST /v1/orders`; a pickup 404 after a successful accept, then an
+  order 404). Not reproduced in 4 instrumented runs; 4 of 4 runs without pull request #4 passed.
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `UNMERGED_BRANCHES.md`,
+`history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The cause of `TEST-04`. The hosted checks of `a017f48` were still to come.
+
+### Marker
+
+`fix/audit-blockers` → `a017f48`; the other lines unchanged.
+
+---
+
 ## S-010 — 2026-11-17 — our stack renumbered on `main`; `PAY-05` fixed on #4
 
 |                 |                                                                                           |

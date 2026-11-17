@@ -61,6 +61,9 @@ _(updated 2026-11-17, sync S-010)_ Done: `main` merged into #2 (`c1abcba`), vers
 (`0c61784`), 0.20.5 (`c715ae2`); #3 into #4 (`7452ec4`, its three versions renumbered 0.20.6 to
 0.20.8, same commits), then `PAY-05` as 0.20.9 (`2319186`). Merge order unchanged: #2, #3, #4.
 
+_(updated 2026-11-17, sync S-011)_ #4 gains `PAY-01` as 0.20.10 (`a017f48`): it now holds all five blocking fixes
+(`PAY-03`, `FE-03`, `SEC-01`, `PAY-05`, `PAY-01`).
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |

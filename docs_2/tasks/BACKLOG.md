@@ -37,7 +37,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-102 · Enforce provider enablement when creating a payment
 
-- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** Not started _(corrected 2026-11-14, sync S-008: S-007 put the refund fix `f0cbb09` here by mistake; it is T-103's)_
+- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** In progress — fix `a017f48` verified on pull request #4 (0.20.10); done when merged _(sync S-011; corrected in S-008: S-007 had put the refund fix `f0cbb09` here by mistake)_
 - **Why:** [`PAY-01`](../FINDINGS.md#pay-01) · **Depends on:** —
 - **Done when:** a payment is refused unless an enabled, currently valid configuration covers the order's restaurant/city/amount; `methodCode` comes from the provider; the mock provider is not registered in production.
 - **Test:** integration tests for enabled, disabled, out-of-range amount, production mode.
@@ -474,4 +474,10 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Done when:** following the guide on a fresh clone (macOS, Linux and Windows) gives five real secrets, and an order can be delivered end to end.
 - **Test:** the Windows workflow and a fresh local run follow the guide and finish a delivery.
 
-Last updated: 2026-11-14 (sync S-008)
+### T-609 · Find the intermittent integration failures _(added 2026-11-17, sync S-011)_
+
+- **Area:** `apps/api/test`, deliveries dispatch · **Priority:** Medium · **Why:** [`TEST-04`](../FINDINGS.md#test-04) · **Status:** Not started
+- **Done when:** the two failure modes are explained and fixed, or shown to come from the test environment.
+- **Test:** 20 consecutive full runs of the integration suite pass locally.
+
+Last updated: 2026-11-17 (sync S-011)

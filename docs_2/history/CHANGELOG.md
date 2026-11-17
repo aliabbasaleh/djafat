@@ -8,6 +8,26 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-17 — Sync S-011: `PAY-01` fixed on #4; new `TEST-04`
+
+**Reviewed:** our own `a017f48` (0.20.10): payment creation applies the payment screen's rule
+(enabled configuration, active provider) and stores the provider's own method.
+
+**Verified:** `verify:fast` all pass; API unit tests 899/899; the finding's Verify step on
+PostgreSQL. The full integration suite passed 97/97 in 7 of 9 local runs; the 2 others failed
+intermittently outside this change, and the suite without pull request #4 passed 4 of 4.
+
+**Status changes:** `PAY-01` has a verified fix on pull request #4 (Open until merged); T-102 in
+progress. All five blocking fixes are now on #4.
+
+**Newly discovered:** `TEST-04` (Medium, RUN): intermittent local integration failures, cause not
+found. 63 findings open.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-010: our stack renumbered on `main`; `PAY-05` fixed on #4
 
 **Reviewed:** our own commits: `main` brought into #2 (`c1abcba`, 0.20.4 `d366f12`), #2 into #3
