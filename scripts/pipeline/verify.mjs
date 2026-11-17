@@ -45,12 +45,20 @@ function git(argv) {
 
 function run(cmd, argv, { timeoutMs = 20 * 60_000, env = {} } = {}) {
   const started = Date.now();
-  const r = spawnSync(cmd, argv, {
+  // Windows: a bare `pnpm`/`node_modules/.bin/<tool>` is not directly
+  // spawnable (see scripts/pipeline/hooks/lib.mjs's runTool) — without a
+  // shell, spawnSync fails ENOENT and this looks exactly like a real failure.
+  // `cmd` (but not `argv`) must be quoted by hand for that shell: unquoted,
+  // cmd.exe splits an absolute path with spaces (e.g. a Program Files
+  // `node.exe`) at the first space.
+  const useShell = process.platform === 'win32';
+  const r = spawnSync(useShell && cmd.includes(' ') ? `"${cmd}"` : cmd, argv, {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: timeoutMs,
     maxBuffer: 256 * 1024 * 1024,
+    shell: useShell,
     env: {
       ...process.env,
       TURBO_TELEMETRY_DISABLED: '1',

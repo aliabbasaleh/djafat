@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ApiClientError } from '@djafat/sdk';
 import { Container, Heading, Text, Stack, cx } from '@djafat/ui';
 import { Button, Input, Alert } from '@/components/ui-client';
 import { api } from '@/lib/api';
@@ -11,6 +12,28 @@ import styles from './page.module.css';
 
 type Step = 'start' | 'code';
 type Method = 'whatsapp' | 'sms' | 'email';
+
+/**
+ * A blanket "check the number" message hid an unreachable API for two
+ * debugging sessions — the one failure it never was. Each cause now says what
+ * actually happened, so a network or server fault is never mistaken for a
+ * typo in the phone number.
+ */
+function loginError(err: unknown, fallback: string): string {
+  if (err instanceof ApiClientError) {
+    if (err.code === 'RATE_LIMITED') {
+      return 'Trop de codes demandés pour ce numéro. Réessayez dans quelques minutes.';
+    }
+    if (err.code === 'NETWORK') {
+      return `Connexion au serveur impossible (${err.message}). Vérifiez que l’API tourne, puis réessayez.`;
+    }
+    if (err.code === 'VALIDATION_ERROR' || err.status === 422) {
+      return 'Identifiant invalide. Vérifiez le numéro ou l’adresse e-mail saisie.';
+    }
+    return `${err.message} (code ${err.code})`;
+  }
+  return fallback;
+}
 
 /**
  * Login (docs/22 §17.3, FEAT-007, FEAT-008): the customer picks how to get a
@@ -74,11 +97,14 @@ function ConnexionForm() {
         await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
       }
       setStep('code');
-    } catch {
+    } catch (err) {
       setError(
-        method === 'email'
-          ? "Impossible d'envoyer le code. Vérifiez l'adresse e-mail."
-          : "Impossible d'envoyer le code. Vérifiez le numéro (ex. 66 12 34 56).",
+        loginError(
+          err,
+          method === 'email'
+            ? "Impossible d'envoyer le code. Vérifiez l'adresse e-mail."
+            : "Impossible d'envoyer le code. Vérifiez le numéro (ex. 66 12 34 56).",
+        ),
       );
     } finally {
       setLoading(false);
@@ -113,8 +139,8 @@ function ConnexionForm() {
         },
       });
       router.push(redirectTo as Route);
-    } catch {
-      setError('Code invalide ou expiré.');
+    } catch (err) {
+      setError(loginError(err, 'Code invalide ou expiré.'));
     } finally {
       setLoading(false);
     }
