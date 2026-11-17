@@ -5,11 +5,9 @@
 # Change these lines ONLY as the last step of an incremental audit sync (docs_2/README.md §3),
 # and name the sync below.
 # Commits that change only docs_2/ are never reported, so recording a review is silent.
-# Last sync: S-012 (2026-11-17)
-d366f12fafc8a8a5073714419edd77a3b388a7b1 HEAD
-9058e335a90a3ed6ba89b94ec5b6bec7cf236bd1 origin/main
+# Last sync: S-014 (2026-11-17)
+daeda7dbb239cc0ead2cbe284419234883648109 HEAD
+75db77288b3b228183d063a431bc7c4138913232 origin/main
 9058e335a90a3ed6ba89b94ec5b6bec7cf236bd1 origin/claude/compassionate-franklin-k23vcj
 92e8d52553cb3630060202d7fa02d21a6e38f55b origin/fix/payment-reliability-backlog
-c715ae292118698ae504d97127199881920d1dc9 origin/fix/next-15.5
-a017f48d661fa4e213bb8f4fe34bae2012bef320 origin/fix/audit-blockers
-862ad24f507b0c84302b156cea684df58844f655 origin/fix/api-nest11-fastify5
+cabf0584e03ee1f156986bad5cf0d4d46abe8cc4 origin/feat/welcome-greeting
