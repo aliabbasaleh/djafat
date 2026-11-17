@@ -10,6 +10,58 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-010 — 2026-11-17 — our stack renumbered on `main`; `PAY-05` fixed on #4
+
+|                 |                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook, after our own pushes                                                     |
+| **Range**       | `origin/fix/next-15.5` `69cd859..c715ae2`; `origin/fix/audit-blockers` `aa0d58d..2319186` |
+| **Size**        | 5 commits, all ours: 3 merges, 2 version commits, 1 fix                                   |
+| **Evidence**    | BRANCH + RUN — each push verified locally first; hosted checks not read in this entry     |
+| **Reviewed by** | Claude, in the session that wrote the commits                                             |
+
+### Added
+
+- `2319186` (0.20.9): the payment webhook checks the signature before writing its idempotency row;
+  a rejected request leaves nothing (`PAY-05`). New integration test `webhook-forgery.int.spec.ts`;
+  three unit tests from the owner's `6cf7c9b`. `docs/24-bloc-5-payment.md` updated to match.
+- Re-stack merges: `c1abcba` (`main` into #2), `0c61784` (#2 into #3), `7452ec4` (#3 into #4).
+  They resolve only `package.json` and `docs/ROADMAP.md`; `pnpm-lock.yaml` merged without conflict
+  on #3 and passes `pnpm install --frozen-lockfile`.
+- Version commits `d366f12` (#2, 0.20.4) and `c715ae2` (#3, 0.20.5).
+
+### Removed
+
+- none
+
+### Fixed
+
+- On `fix/audit-blockers` (pull request #4), not on `main`: `PAY-05`, verified there.
+
+### Changed
+
+- Our versions renumbered, same commits: #2 0.20.2 → 0.20.4; #3 0.20.3 → 0.20.5; #4's `PAY-03`
+  0.20.4 → 0.20.6, `FE-03` 0.20.5 → 0.20.7, `SEC-01` 0.20.6 → 0.20.8.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `UNMERGED_BRANCHES.md`,
+`history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The hosted checks of the three pushes were still to come when this entry was written.
+
+### Marker
+
+`fix/next-15.5` → `c715ae2`; `fix/audit-blockers` → `2319186`; the other lines unchanged.
+
+---
+
 ## S-009 — 2026-11-17 — pull requests #5 and #6 merged into `main`; the demo is online
 
 |                 |                                                                                       |

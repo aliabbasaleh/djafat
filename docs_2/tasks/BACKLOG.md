@@ -44,14 +44,14 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-103 · Fix refund arithmetic
 
-- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** In progress — fix `f0cbb09` verified on `fix/audit-blockers` (version 0.20.4, pull request #4); done when merged _(sync S-008)_
+- **Area:** `apps/api` · payments · **Priority:** Critical · **Status:** In progress — fix `f0cbb09` verified on `fix/audit-blockers` (version 0.20.6, pull request #4; 0.20.4 until sync S-010); done when merged _(sync S-008)_
 - **Why:** [`PAY-03`](../FINDINGS.md#pay-03) · **Depends on:** T-108 for the test
 - **Done when:** partial refund, remainder and over-refund behave as specified on PostgreSQL.
 - **Test:** integration test of the three cases; ledger groups balance.
 
 ### T-104 · Validate secrets at boot
 
-- **Area:** `packages/config` · **Priority:** Critical · **Status:** In progress — fix `aa0d58d` verified on pull request #4 (0.20.6). It stops the boot in production only: elsewhere the API starts and lists the problems, because the local guide copies `.env.example` unchanged (`DOC-03`). Decide whether development should refuse too _(sync S-008)_
+- **Area:** `packages/config` · **Priority:** Critical · **Status:** In progress — fix `aa0d58d` verified on pull request #4 (0.20.8; 0.20.6 until sync S-010). It stops the boot in production only: elsewhere the API starts and lists the problems, because the local guide copies `.env.example` unchanged (`DOC-03`). Decide whether development should refuse too _(sync S-008)_
 - **Why:** [`SEC-01`](../FINDINGS.md#sec-01) · **Depends on:** —
 - **Done when:** placeholders, short secrets, identical secrets and wrong-length AES keys stop the boot with a readable message.
 - **Test:** `env.spec.ts` cases; manual boot with `.env.example` values fails.
@@ -87,7 +87,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-107 · Verify the webhook signature before recording the event
 
-- **Area:** `apps/api` · payments · **Priority:** High · **Status:** Not started
+- **Area:** `apps/api` · payments · **Priority:** High · **Status:** In progress — fix `2319186` verified on pull request #4 (0.20.9): the audit's two requests replayed on PostgreSQL; done when merged _(sync S-010)_
 - **Why:** [`PAY-05`](../FINDINGS.md#pay-05) · **Depends on:** — (exists on `fix/payment-reliability-backlog`)
 - **Done when:** an invalid-signature request leaves no row that can shadow a genuine event.
 - **Test:** integration test replaying the audit's two-request scenario.
@@ -181,7 +181,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-208 · Delivery code in the customer apps
 
-- **Area:** `packages/sdk`, `apps/web`, `apps/mobile` · **Priority:** High · **Status:** In progress — fix `70cfd3b` verified on pull request #4 (0.20.5): the browser test passes on the site; the mobile screen was not run on a device _(sync S-008)_
+- **Area:** `packages/sdk`, `apps/web`, `apps/mobile` · **Priority:** High · **Status:** In progress — fix `70cfd3b` verified on pull request #4 (0.20.7; 0.20.5 until sync S-010): the browser test passes on the site; the mobile screen was not run on a device _(sync S-008)_
 - **Why:** [`FE-03`](../FINDINGS.md#fe-03) · **Depends on:** T-201
 - **Done when:** the code is shown from pickup to delivery.
 - **Test:** browser test.

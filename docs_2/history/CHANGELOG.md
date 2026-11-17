@@ -8,6 +8,24 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-17 — Sync S-010: our stack renumbered on `main`; `PAY-05` fixed on #4
+
+**Reviewed:** our own commits: `main` brought into #2 (`c1abcba`, 0.20.4 `d366f12`), #2 into #3
+(`0c61784`, 0.20.5 `c715ae2`), #3 into #4 (`7452ec4`, its versions renumbered 0.20.6 to 0.20.8),
+and `2319186` (0.20.9): the webhook signature is checked before anything is stored (`PAY-05`).
+
+**Verified:** `verify:fast` all pass on each branch (lint, typecheck, unit 24/24 on #3 and #4);
+`pnpm install --frozen-lockfile` passes on the merged lockfile of #3; API integration suite 95/95
+on a fresh database, including a new test that replays the audit's two webhook requests.
+
+**Status changes:** `PAY-05` has a verified fix on pull request #4 (Open until merged); T-107 in
+progress. The version numbers quoted for `PAY-03`, `FE-03`, `SEC-01` and their tasks updated.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-009: the demo is online; two pull requests merged into `main`
 
 **Reviewed:** pull request #5 (`07f2539` by `kcerha`, merged as `e82eb80`) and pull request #6

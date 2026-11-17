@@ -57,6 +57,10 @@ conflicts with it on `package.json` and `docs/ROADMAP.md`, because `main` used 0
 0.20.3 too: bring `main` into #2 first, then renumber the stack from 0.20.4.
 `fix/browser-fetch-and-local-dev` (#5) was deleted after its merge.
 
+_(updated 2026-11-17, sync S-010)_ Done: `main` merged into #2 (`c1abcba`), version 0.20.4 (`d366f12`); #2 into #3
+(`0c61784`), 0.20.5 (`c715ae2`); #3 into #4 (`7452ec4`, its three versions renumbered 0.20.6 to
+0.20.8, same commits), then `PAY-05` as 0.20.9 (`2319186`). Merge order unchanged: #2, #3, #4.
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |

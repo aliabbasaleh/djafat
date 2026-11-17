@@ -182,7 +182,7 @@ verified.
 
 ### PAY-03
 
-**Every refund request crashes** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`f0cbb09`), verified there by a new integration test, red before and green after (sync S-007); version 0.20.4 of pull request #4 (`8e59bd4`, sync S-008)
+**Every refund request crashes** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`f0cbb09`), verified there by a new integration test, red before and green after (sync S-007); version 0.20.6 of pull request #4 (`8e59bd4`, sync S-008; numbered 0.20.4 until S-010)
 
 - **Where:** `apps/api` → payments. `payments.service.ts` `doRefundPayment` (L554–558) and
   `finalizeRefundSuccess` (L690–695). Table `refunds`.
@@ -238,7 +238,7 @@ verified.
 
 ### SEC-01
 
-**The API boots with the published placeholder secrets** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`aa0d58d`, version 0.20.6, pull request #4), production only, verified there (sync S-008)
+**The API boots with the published placeholder secrets** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`aa0d58d`, version 0.20.8, pull request #4), production only, verified there (sync S-008; numbered 0.20.6 until S-010)
 
 - **Where:** `packages/config/src/env.ts` (`AuthSchema`, `OtpSchema`: secrets validated as
   non-empty strings only); `.env.example`.
@@ -398,7 +398,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### PAY-05
 
-**An unauthenticated request can make a genuine payment webhook be ignored** · Broken · High · LIVE · Status: Open
+**An unauthenticated request can make a genuine payment webhook be ignored** · Broken · High · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`2319186`, version 0.20.9, pull request #4), verified there (sync S-010)
 
 - **Where:** `payments.service.ts` `handleWebhook` (insert at L179–184, signature check at L191–201). Table `webhook_events`.
 - **Observed:** a request with an invalid signature and event id `X` got 401 but its row was
@@ -410,6 +410,15 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   under a key that cannot collide). Already implemented on `fix/payment-reliability-backlog`.
 - **Depends on:** nothing.
 - **Verify:** repeat the two requests; the second must process the payment.
+- **Sync S-010 note (2026-11-17), BRANCH + RUN:** the signature is now checked before the
+  `webhook_events` row is written; a rejected request leaves nothing and is only logged (`2319186`,
+  version 0.20.9, pull request #4: the owner's `6cf7c9b` re-applied on `main`'s code). Verified:
+  the two requests above replayed on real PostgreSQL (`webhook-forgery.int.spec.ts`): the forgery
+  gets 401 and leaves no row, the genuine webhook then answers `ok`, the payment succeeds, the
+  order is placed, and a replay answers `duplicate`. That test and three unit tests fail on the
+  previous code; integration suite 95/95 on a fresh database. The unit tests also showed that,
+  before the fix, every later forgery carrying the same id got HTTP 200 `duplicate`, not 401.
+  `docs/24-bloc-5-payment.md`, which described the stored `ignored` row as the rule, is updated.
 
 ### PAY-06
 
@@ -496,7 +505,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### FE-03
 
-**The customer cannot see the delivery code in any app** · Not Implemented · High · CODE · Status: Open on `main`; fix present on `fix/audit-blockers` (`70cfd3b`, version 0.20.5, pull request #4), verified there in a browser (sync S-008)
+**The customer cannot see the delivery code in any app** · Not Implemented · High · CODE · Status: Open on `main`; fix present on `fix/audit-blockers` (`70cfd3b`, version 0.20.7, pull request #4), verified there in a browser (sync S-008; numbered 0.20.5 until S-010)
 
 - **Where:** `GET /v1/deliveries/:id/code` exists and works (LIVE); no SDK binding, no screen in web or mobile.
 - **Why it matters:** the courier must enter the code to complete a delivery. Without it the only exit is "failed".
