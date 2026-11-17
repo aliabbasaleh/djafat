@@ -100,6 +100,29 @@ export class PaymentsService {
       });
     }
 
+    // Registered is not enabled (audit finding PAY-01; the same rule as the
+    // owner's `6cf7c9b`). `registry.has()` only says the class is wired up; a
+    // `payment_provider_configs` row must also enable the provider for this
+    // order's restaurant, city, currency and amount, and its `payment_providers`
+    // row must be active. That was checked by the payment screen only, so a
+    // disabled provider could still be paid with — the mock one gave free
+    // orders. Same resolver as the screen, so the two cannot drift apart; before
+    // any row, event or provider call, so a refusal leaves no trace.
+    const enabled = (
+      await this.listAvailablePaymentMethods({
+        cityId: context.cityId,
+        restaurantId: context.restaurantId,
+        amountMinor: amount.minor,
+        currency: amount.currency,
+      })
+    ).find((m) => m.providerCode === input.providerCode);
+    if (!enabled) {
+      throw new ConflictException({
+        code: 'PAYMENT_METHOD_UNAVAILABLE',
+        message: `Provider "${input.providerCode}" is not enabled for this order.`,
+      });
+    }
+
     // FEAT-015: cash on delivery only for customers trusted for this amount.
     if (
       this.codTrust &&
@@ -113,7 +136,10 @@ export class PaymentsService {
         data: {
           orderId: input.orderId,
           providerCode: input.providerCode,
-          methodCode: input.methodCode,
+          // The provider's own method (PAY-01), never the client's `methodCode`,
+          // which used to be stored as sent: a wrong one was recorded, an unknown
+          // one broke the foreign key (HTTP 500).
+          methodCode: enabled.methodCode,
           status: 'pending',
           amountMinor: amount.minor,
           currency: amount.currency,
@@ -201,13 +227,29 @@ export class PaymentsService {
     const provider = this.registry.get(providerCode);
     const parsed = await provider.verifyAndParseWebhook(rawReq);
 
+    // Authenticate BEFORE recording anything (audit finding PAY-05; the same
+    // fix as the owner's `6cf7c9b`). `(provider_code, event_id)` in
+    // `webhook_events` is the idempotency key, and `eventId` comes from the
+    // body of an unauthenticated request: a forged event that was stored used to
+    // reserve the genuine event's id, so the real webhook was answered
+    // 'duplicate' and the payment stayed pending. A rejected request leaves no
+    // row; it is only logged.
+    if (!parsed.signatureValid) {
+      this.logger.warn(`Invalid webhook signature (${providerCode}/${parsed.eventId})`);
+      throw new UnauthorizedException({
+        code: 'UNAUTHENTICATED',
+        message: 'Invalid webhook signature.',
+      });
+    }
+
     const bodyText =
       typeof rawReq.rawBody === 'string'
         ? rawReq.rawBody
         : Buffer.from(rawReq.rawBody).toString('utf8');
     const payloadHash = createHash('sha256').update(bodyText).digest('hex');
 
-    // Durable idempotency (docs/08 §8.6): a replayed/duplicated webhook is a no-op.
+    // Durable idempotency (docs/08 §8.6): a replayed/duplicated webhook is a
+    // no-op. Only authenticated events reach this point.
     const inserted = await this.prisma.$queryRaw<Array<{ id: string }>>`
       INSERT INTO webhook_events (provider_code, event_id, provider_ref, payload_hash, signature_valid, status)
       VALUES (${providerCode}, ${parsed.eventId}, ${parsed.providerRef || null}, ${payloadHash}, ${parsed.signatureValid}, 'received')
@@ -219,18 +261,6 @@ export class PaymentsService {
       return { status: 'duplicate' };
     }
     const webhookEventId = inserted[0].id;
-
-    if (!parsed.signatureValid) {
-      await this.prisma.webhookEvent.update({
-        where: { id: webhookEventId },
-        data: { status: 'ignored' },
-      });
-      this.logger.warn(`Invalid webhook signature (${providerCode}/${parsed.eventId})`);
-      throw new UnauthorizedException({
-        code: 'UNAUTHENTICATED',
-        message: 'Invalid webhook signature.',
-      });
-    }
 
     const payment = await this.prisma.payment.findFirst({
       where: { providerCode, providerRef: parsed.providerRef },
@@ -605,7 +635,7 @@ export class PaymentsService {
     assertPositive(requested);
 
     const priorRows = await this.prisma.$queryRaw<Array<{ total: bigint }>>`
-      SELECT COALESCE(SUM(amount_minor), 0) AS total FROM refunds
+      SELECT COALESCE(SUM(amount_minor), 0)::bigint AS total FROM refunds
       WHERE payment_id = ${id}::uuid AND status = 'succeeded'
     `;
     const remaining = payment.amountMinor - priorRows[0]!.total;
@@ -741,7 +771,7 @@ export class PaymentsService {
       const payment = await tx.payment.findUniqueOrThrow({ where: { id: refund.payment_id } });
 
       const sumRows = await tx.$queryRaw<Array<{ total: bigint }>>`
-        SELECT COALESCE(SUM(amount_minor), 0) AS total FROM refunds
+        SELECT COALESCE(SUM(amount_minor), 0)::bigint AS total FROM refunds
         WHERE payment_id = ${refund.payment_id}::uuid AND status = 'succeeded'
       `;
       const totalRefunded = sumRows[0]!.total;

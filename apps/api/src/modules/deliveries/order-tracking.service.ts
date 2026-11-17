@@ -18,6 +18,13 @@ export interface OrderTrackingDto {
   readonly dropoff: { label: string | null; lat: number; lng: number } | null;
   readonly courier: { lat: number; lng: number; heading: number | null; at: string | null } | null;
   readonly deliveryStatus: string | null;
+  /**
+   * The delivery behind the order, so the customer's app can fetch the
+   * customer's own delivery code (`GET /deliveries/:id/code`, owner only) and
+   * show it from pickup to handover (audit finding FE-03). Not a secret: the
+   * code route checks ownership itself.
+   */
+  readonly deliveryId: string | null;
 }
 
 /**
@@ -44,7 +51,7 @@ export class OrderTrackingService {
     const delivery = await this.prisma.delivery.findFirst({
       where: { orderId },
       orderBy: { createdAt: 'desc' },
-      select: { status: true, courierId: true },
+      select: { id: true, status: true, courierId: true },
     });
     const courier =
       delivery?.courierId && COURIER_VISIBLE.has(delivery.status)
@@ -63,6 +70,7 @@ export class OrderTrackingService {
         : null,
       courier,
       deliveryStatus: delivery?.status ?? null,
+      deliveryId: delivery?.id ?? null,
     };
   }
 }

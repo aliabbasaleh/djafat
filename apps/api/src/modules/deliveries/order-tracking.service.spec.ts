@@ -27,7 +27,11 @@ function build(opts: {
       findFirst: vi.fn(async () =>
         opts.deliveryStatus === null
           ? null
-          : { status: opts.deliveryStatus ?? 'on_the_way', courierId: opts.courierId ?? 'cour-1' },
+          : {
+              id: 'del-1',
+              status: opts.deliveryStatus ?? 'on_the_way',
+              courierId: opts.courierId ?? 'cour-1',
+            },
       ),
     },
   } as unknown as PrismaService;
@@ -50,7 +54,16 @@ describe('OrderTrackingService.getForCustomer', () => {
       dropoff: { label: 'Domicile', lat: 12.12, lng: 15.04 },
       courier: { lat: 12.13, lng: 15.05, heading: 90, at: '2026-11-08T07:00:00.000Z' },
       deliveryStatus: 'on_the_way',
+      deliveryId: 'del-1',
     });
+  });
+
+  // FE-03: the customer's app needs the delivery id to fetch the customer's own code.
+  it('gives the delivery id once a delivery exists, null before', async () => {
+    const { service } = build({ deliveryStatus: 'searching_courier' });
+    expect((await service.getForCustomer('cust-1', 'ord-1')).deliveryId).toBe('del-1');
+    const none = build({ deliveryStatus: null });
+    expect((await none.service.getForCustomer('cust-1', 'ord-1')).deliveryId).toBeNull();
   });
 
   it('another customer gets 404, and no position is ever read', async () => {

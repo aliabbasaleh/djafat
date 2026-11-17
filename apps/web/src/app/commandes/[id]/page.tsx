@@ -14,6 +14,7 @@ import { OrderTracker } from '@/components/OrderTracker';
 import { PaymentPicker } from '@/components/PaymentPicker';
 import { LiveMap } from '@/components/LiveMap';
 import { DoorPayment } from '@/components/DoorPayment';
+import { DeliveryCode } from '@/components/DeliveryCode';
 import styles from './page.module.css';
 
 type LoadState = 'loading' | 'ready' | 'error' | 'not-found';
@@ -117,6 +118,7 @@ export default function OrderConfirmationPage() {
         </Stack>
 
         <OrderTracker status={order.status} />
+        {['picked_up', 'on_the_way'].includes(order.status) && <DeliveryCode orderId={order.id} />}
         {order.status === 'awaiting_payment' && (
           <PaymentPicker orderId={order.id} onChanged={() => void loadOrder()} />
         )}

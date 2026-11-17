@@ -29,6 +29,47 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 type LoadState = 'loading' | 'ready' | 'error' | 'not-found';
 
 /**
+ * The customer's delivery code (audit finding FE-03): the courier asks for it
+ * at the door and cannot finish the delivery without it. The API serves it to
+ * the order's customer only, from the courier's pickup until the handover;
+ * the screen shows it while the order is on its way.
+ */
+function DeliveryCodeCard({ orderId }: { orderId: string }) {
+  const [code, setCode] = useState<string | null>(null);
+  useEffect(() => {
+    let stop = false;
+    let deliveryId: string | null = null;
+    const tick = async () => {
+      try {
+        deliveryId ??= (await api.orders.tracking(orderId)).deliveryId;
+        if (!deliveryId) return;
+        const res = await api.orders.deliveryCode(deliveryId);
+        if (!stop) setCode(res.code);
+      } catch (err) {
+        // 404: no code yet, already used or expired. Anything else: keep the screen as is.
+        if (!stop && err instanceof ApiClientError && err.status === 404) setCode(null);
+      }
+    };
+    void tick();
+    const id = setInterval(() => void tick(), 10_000);
+    return () => {
+      stop = true;
+      clearInterval(id);
+    };
+  }, [orderId]);
+  if (!code) return null;
+  return (
+    <View style={styles.deliveryCode} accessibilityLabel="Code de livraison">
+      <Text style={styles.deliveryCodeLabel}>Votre code de livraison</Text>
+      <Text style={styles.deliveryCodeValue}>{code}</Text>
+      <Text style={styles.deliveryCodeHint}>
+        Donnez-le au livreur à son arrivée, et à personne d’autre.
+      </Text>
+    </View>
+  );
+}
+
+/**
  * `/(app)/orders/[id]` — order confirmation + tracking (Bloc 12, docs/22 §9,
  * docs/27 §9/§18). Same discipline as `apps/web`'s `/commandes/[id]`: the
  * REST read is the ONE source of truth; `order:{id}` realtime is only ever a
@@ -112,6 +153,9 @@ export default function OrderTrackingScreen() {
           ? 'Suivi en direct activé'
           : 'Suivi en direct indisponible — tirez pour rafraîchir'}
       </Text>
+      {(order.status === 'picked_up' || order.status === 'on_the_way') && (
+        <DeliveryCodeCard orderId={order.id} />
+      )}
 
       {order.items.map((item, index) => (
         <View key={index} style={styles.item}>
@@ -182,6 +226,32 @@ const styles = StyleSheet.create({
     fontSize: tokens.type.size.caption,
     color: tokens.color.text.muted,
     marginTop: tokens.space['2'],
+  },
+  deliveryCode: {
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: tokens.color.brand.primary,
+    backgroundColor: tokens.color.bg.surface,
+    borderRadius: tokens.radius.md,
+    padding: tokens.space['4'],
+    marginTop: tokens.space['4'],
+    gap: tokens.space['1'],
+  },
+  deliveryCodeLabel: {
+    fontSize: tokens.type.size.small,
+    fontWeight: '600',
+    color: tokens.color.text.secondary,
+  },
+  deliveryCodeValue: {
+    fontSize: tokens.type.size.display,
+    fontWeight: '800',
+    letterSpacing: 8,
+    color: tokens.color.text.primary,
+  },
+  deliveryCodeHint: {
+    fontSize: tokens.type.size.small,
+    color: tokens.color.text.secondary,
+    textAlign: 'center',
   },
   item: {
     backgroundColor: tokens.color.bg.surface,

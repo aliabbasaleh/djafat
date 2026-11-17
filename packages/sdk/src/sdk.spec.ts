@@ -213,4 +213,25 @@ describe('FEAT-018 — landmarks, voice notes', () => {
       },
     ]);
   });
+
+  // FE-03: the customer delivery code, fetched by delivery id.
+  it('fetches the customer delivery code from /deliveries/:id/code', async () => {
+    let seen = { url: '', method: '' };
+    const client = createApiClient({
+      baseUrl: 'http://api.test/v1',
+      fetchImpl: mockFetch((url, init) => {
+        seen = { url, method: init.method ?? 'GET' };
+        return new Response(
+          JSON.stringify({ code: '4821', expiresAt: '2026-11-14T12:00:00.000Z' }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        );
+      }),
+    });
+    const res = await client.orders.deliveryCode('del 1');
+    expect(seen).toEqual({ url: 'http://api.test/v1/deliveries/del%201/code', method: 'GET' });
+    expect(res.code).toBe('4821');
+  });
 });
