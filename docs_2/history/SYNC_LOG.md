@@ -10,6 +10,152 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-015 — 2026-11-17 — `main` green after the merges; a correction on shutdown
+
+|                 |                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------- |
+| **Trigger**     | The end of the day's work: hosted runs on `main` finished; the user's local run moved |
+| **Range**       | no new commit on GitHub besides ours                                                  |
+| **Size**        | —                                                                                     |
+| **Evidence**    | RUN — hosted CI and Security on `main`; HTTP checks on the local run                  |
+| **Reviewed by** | Claude, in the audit session                                                          |
+
+### Added
+
+- none
+
+### Removed
+
+- none
+
+### Fixed
+
+- none
+
+### Changed
+
+- S-013's "not verified" is now verified: CI and Security green on `main` at `75db772`.
+- The user's local run follows `main` (0.20.11): migration 0038 applied, seed re-run, six apps up;
+  `/v1/ready` 200, 413 on a 2 MB body, Helmet headers, phone login, `/v1/me` 200, no API log error.
+- Correction to S-012: NestJS 10 is not immune to a shutdown hang either (an old process ignored
+  SIGTERM for 10 s); note on `OPS-02`.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The cause of the old process's hang; the pull request #9 merge itself (after this entry).
+
+### Marker
+
+`HEAD` → this sync's version commit; the other lines unchanged.
+
+---
+
+## S-014 — 2026-11-17 — the owner's new branch `feat/welcome-greeting`
+
+|                 |                                                    |
+| --------------- | -------------------------------------------------- |
+| **Trigger**     | The shared hook, after a fetch (new remote branch) |
+| **Range**       | `origin/feat/welcome-greeting` `e82eb80..cabf058`  |
+| **Size**        | 1 commit by `kcerha`, 13 files                     |
+| **Evidence**    | BRANCH; one RUN (mobile typecheck on `main`)       |
+| **Reviewed by** | Claude, in the audit session                       |
+
+### Added
+
+- `<Greeting>` (`@djafat/ui`) on the client home page (signed in), the restaurant board, the admin
+  dashboard and the courier home; Windows quoting of every argument in `scripts/pipeline`; the
+  mobile typecheck recorded as a known failure; roadmap: demo online, Tigo Cash and Moov Money
+  active in demo with fictitious merchant numbers, a "100 % API" checklist; version 0.21.0.
+
+### Removed
+
+- none
+
+### Fixed
+
+- none of the findings (the admin import fixes a break the same commit introduced)
+
+### Changed
+
+- `DOC-02`, `OPS-01`, `OPS-02`: notes on the roadmap's claims (see `FINDINGS.md`).
+
+### New findings
+
+- `TEST-05` (Low, BRANCH): `@djafat/mobile#typecheck` silenced through `known-failures.json`; it
+  passes on `main` and in CI, and fails only where Expo generated its typed routes.
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `UNMERGED_BRANCHES.md`,
+`history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The greeting in a browser; the branch's builds and checks (it has no pull request yet); the MinIO
+and trial-server claims.
+
+### Marker
+
+New line `origin/feat/welcome-greeting` → `cabf058`.
+
+---
+
+## S-013 — 2026-11-17 — pull requests #2, #3, #4 and #7 merged into `main`
+
+|                 |                                                                                     |
+| --------------- | ----------------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook, after the merges (made at the user's request)                      |
+| **Range**       | `origin/main` `9058e33..75db772`                                                    |
+| **Size**        | 4 merge commits, none with changes of its own                                       |
+| **Evidence**    | RUN — the checks of each pull request; `main`'s tree equals the verified head of #7 |
+| **Reviewed by** | Claude, in the audit session                                                        |
+
+### Added
+
+- On `main`: the audit (`docs_2/`, pull request #2), Next.js 15.5.29 (#3), the five fixes (#4) and
+  NestJS 11 / Fastify 5 (#7). DJAFAT 0.20.11.
+
+### Removed
+
+- The branches `docs/audit-sync`, `fix/next-15.5`, `fix/audit-blockers` and
+  `fix/api-nest11-fastify5`, deleted after their merges.
+
+### Fixed
+
+- Resolved on `main`: `PAY-01`, `PAY-03`, `SEC-01` (production), `FE-03`, `PAY-05`.
+
+### Changed
+
+- `DEP-01`: the `next` and API parts are on `main`; left: the Expo tool chain, `postcss`, `zod`.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `tasks/COMPLETED_TASKS.md`,
+`UNMERGED_BRANCHES.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+`main`'s own CI and Security runs on `75db772` were still running when this entry was written.
+
+### Marker
+
+`origin/main` → `75db772`; the lines of the four deleted branches removed; `HEAD` → this sync's
+version commit.
+
+---
+
 ## S-012 — 2026-11-17 — the API on NestJS 11 and Fastify 5
 
 |                 |                                                                                       |

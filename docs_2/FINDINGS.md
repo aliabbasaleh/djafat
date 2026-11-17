@@ -9,12 +9,14 @@ these IDs instead of repeating the detail.
   their production builds, HTTP scenarios with `curl`, the three web apps in headless Chrome, and
   the hosted CI logs. Environment details: [`TESTING_AND_QUALITY_ASSURANCE.md`](TESTING_AND_QUALITY_ASSURANCE.md) §1.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
-- **Counts:** 6 Critical · 20 High · 24 Medium · 13 Low = 63 open findings, plus 5 resolved
-  _(updated 2026-11-14, sync S-008: new `DOC-03`; 2026-11-17, sync S-011: new `TEST-04`)_
+- **Counts:** 3 Critical · 18 High · 24 Medium · 14 Low = 59 open findings, plus 10 resolved
+  _(updated 2026-11-14, sync S-008: new `DOC-03`; 2026-11-17, sync S-011: new `TEST-04`; sync
+  S-013: `PAY-01`, `PAY-03`, `SEC-01`, `FE-03` and `PAY-05` resolved on `main`; sync S-014: new `TEST-05`)_
   _(updated 2026-11-14, sync S-007: `SDK-01`, `FE-01`, `PAY-02`, `TEST-01` and `CI-01` resolved on
   `main`; S-004 added `CI-03` and `FE-07`; S-003 added `CI-02`)_.
-- **Last synced:** S-007, 2026-11-14 — pull request #1 merged into `main` as `46d8cae` (DJAFAT
-  0.20.1); `main` now holds the code run end to end in S-006. Earlier: S-005 two commits on pull
+- **Last synced:** S-013, 2026-11-17 — pull requests #2, #3, #4 and #7 merged into `main`
+  (`75db772`, DJAFAT 0.20.11): five findings resolved. Earlier: S-007, 2026-11-14 — pull request #1
+  merged into `main` as `46d8cae` (DJAFAT 0.20.1); `main` now holds the code run end to end in S-006. Earlier: S-005 two commits on pull
   request #3, S-004 our `next` upgrade, S-003 our CI fix on pull request #2, S-001 four commits on
   the collaborator's branch. Pull-by-pull history: [`history/SYNC_LOG.md`](history/SYNC_LOG.md).
 
@@ -93,6 +95,7 @@ verified.
 | [CI-03](#ci-03)       | The pre-commit hook cannot run ESLint on `main`                                          | Broken              | Low      | RUN      |
 | [FE-07](#fe-07)       | Typed routes are configured but never checked                                            | Broken              | Low      | RUN      |
 | [PAY-09](#pay-09)     | Payment idempotency scope is global; attempt counter never moves                         | Needs Improvement   | Low      | CODE     |
+| [TEST-05](#test-05)   | The owner's branch silences the mobile typecheck                                         | Needs Improvement   | Low      | BRANCH   |
 
 ---
 
@@ -132,7 +135,7 @@ verified.
 
 ### PAY-01
 
-**A disabled payment provider can still be charged — free orders** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`a017f48`, version 0.20.10, pull request #4), verified there (sync S-011)
+**A disabled payment provider can still be charged — free orders** · Broken · Critical · LIVE · Status: Resolved on `main` (pull request #4, merged into `main` as `44ae073` on 2026-11-17, sync S-013; `main`'s code is identical to the verified branch head); fix on `fix/audit-blockers` (`a017f48`, version 0.20.10, pull request #4), verified there (sync S-011)
 
 - **Where:** `apps/api` → payments. `payments.service.ts` `doCreatePayment` (L72–155);
   `payment-provider.registry.ts`; `providers/mock/mock-payment.provider.ts`. Table `payment_provider_configs`.
@@ -192,7 +195,7 @@ verified.
 
 ### PAY-03
 
-**Every refund request crashes** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`f0cbb09`), verified there by a new integration test, red before and green after (sync S-007); version 0.20.6 of pull request #4 (`8e59bd4`, sync S-008; numbered 0.20.4 until S-010)
+**Every refund request crashes** · Broken · Critical · LIVE · Status: Resolved on `main` (pull request #4, merged into `main` as `44ae073` on 2026-11-17, sync S-013; `main`'s code is identical to the verified branch head); fix on `fix/audit-blockers` (`f0cbb09`), verified there by a new integration test, red before and green after (sync S-007); version 0.20.6 of pull request #4 (`8e59bd4`, sync S-008; numbered 0.20.4 until S-010)
 
 - **Where:** `apps/api` → payments. `payments.service.ts` `doRefundPayment` (L554–558) and
   `finalizeRefundSuccess` (L690–695). Table `refunds`.
@@ -248,7 +251,7 @@ verified.
 
 ### SEC-01
 
-**The API boots with the published placeholder secrets** · Broken · Critical · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`aa0d58d`, version 0.20.8, pull request #4), production only, verified there (sync S-008; numbered 0.20.6 until S-010)
+**The API boots with the published placeholder secrets** · Broken · Critical · LIVE · Status: Resolved on `main` (pull request #4, merged into `main` as `44ae073` on 2026-11-17, sync S-013; `main`'s code is identical to the verified branch head); fix on `fix/audit-blockers` (`aa0d58d`, version 0.20.8, pull request #4), production only, verified there (sync S-008; numbered 0.20.6 until S-010)
 
 - **Where:** `packages/config/src/env.ts` (`AuthSchema`, `OtpSchema`: secrets validated as
   non-empty strings only); `.env.example`.
@@ -359,6 +362,11 @@ verified.
   nothing new appears. NestJS 12 was not chosen: its packages are ESM-only and its tooling wants
   TypeScript 6, for the same Fastify. What remains is mostly the Expo tool chain, `postcss` through
   `next`, and `zod` (fixed only in version 4). Status stays Open until merged.
+- **Sync S-013 note (2026-11-17), RUN:** both steps are on `main`: `next` 15.5.29 (pull request #3,
+  merged as `f9a8f41`) and NestJS 11 / Fastify 5 (pull request #7, merged as `75db772`), whose tree
+  is identical to the branch head that was verified. `pnpm audit --prod` on that lockfile: 36
+  advisories, 1 critical, none in the API's stack. Open: the Expo tool chain, `postcss` through
+  `next`, `zod` (fixed only in version 4).
 
 ### MOB-01
 
@@ -416,7 +424,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### PAY-05
 
-**An unauthenticated request can make a genuine payment webhook be ignored** · Broken · High · LIVE · Status: Open on `main`; fix present on `fix/audit-blockers` (`2319186`, version 0.20.9, pull request #4), verified there (sync S-010)
+**An unauthenticated request can make a genuine payment webhook be ignored** · Broken · High · LIVE · Status: Resolved on `main` (pull request #4, merged into `main` as `44ae073` on 2026-11-17, sync S-013; `main`'s code is identical to the verified branch head); fix on `fix/audit-blockers` (`2319186`, version 0.20.9, pull request #4), verified there (sync S-010)
 
 - **Where:** `payments.service.ts` `handleWebhook` (insert at L179–184, signature check at L191–201). Table `webhook_events`.
 - **Observed:** a request with an invalid signature and event id `X` got 401 but its row was
@@ -523,7 +531,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### FE-03
 
-**The customer cannot see the delivery code in any app** · Not Implemented · High · CODE · Status: Open on `main`; fix present on `fix/audit-blockers` (`70cfd3b`, version 0.20.7, pull request #4), verified there in a browser (sync S-008; numbered 0.20.5 until S-010)
+**The customer cannot see the delivery code in any app** · Not Implemented · High · CODE · Status: Resolved on `main` (pull request #4, merged into `main` as `44ae073` on 2026-11-17, sync S-013; `main`'s code is identical to the verified branch head); fix on `fix/audit-blockers` (`70cfd3b`, version 0.20.7, pull request #4), verified there in a browser (sync S-008; numbered 0.20.5 until S-010)
 
 - **Where:** `GET /v1/deliveries/:id/code` exists and works (LIVE); no SDK binding, no screen in web or mobile.
 - **Why it matters:** the courier must enter the code to complete a delivery. Without it the only exit is "failed".
@@ -643,6 +651,10 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Sync S-001 note (2026-11-11), branch only:** the branch's **production** stack now picks a
   community multi-arch PostGIS image on ARM servers; its **development** compose file is unchanged,
   and its new local guide (`docs/TRAVAILLER-EN-LOCAL.md`) still starts with `pnpm infra:up`. Open.
+- **Sync S-014 note (2026-11-17), CLAIM:** the owner's roadmap (`cabf058`, branch
+  `feat/welcome-greeting`) says the `quay.io/minio/minio` image can no longer be downloaded (registry
+  locked in mid-November), even locally; the local guide's troubleshooting already starts the stack
+  without MinIO. Not checked by us.
 
 ### OPS-02
 
@@ -674,6 +686,16 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   localhost (`docker-compose.prod.yml`), so login codes cannot be read from outside. The stack has
   a backup service; monitoring, alerting and a restore drill are still not reported. Open, partly
   addressed.
+- **Sync S-014 note (2026-11-17), CLAIM:** per the owner's roadmap (`cabf058`), the demo server is an
+  Oracle Cloud **free trial** on x86 (the ARM "Always Free" offer was unavailable), so its life is
+  limited unless migrated or paid; and object storage (photos) is blocked by the MinIO image above.
+  Not checked by us.
+- **Sync S-015 note (2026-11-17), RUN: shutdown.** On `main` since 0.20.11 the API exits about 2 s
+  after SIGTERM (Prisma's disconnect is bounded, see S-012). Correction to S-012, which said NestJS
+  10 was not affected: an old API process (NestJS 10, code of `4c756e0`) that had run for three days
+  on the user's machine ignored SIGTERM for 10 s and had to be force-stopped. A deployment should
+  still give the API a stop timeout and check that it exits; the cause in that old process was not
+  investigated.
 
 ### SEC-02
 
@@ -1008,6 +1030,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Verify:** each case returns 4xx with the standard envelope.
 - **Sync S-012 note (2026-11-17), BRANCH + RUN:** on the NestJS 11 / Fastify 5 branch (`862ad24`), a
   2 MB body now answers 413 (checked on the built API); the other cases were not re-run.
+- **Sync S-013 note (2026-11-17):** the 413 case is on `main` (pull request #7, `75db772`).
 
 ### DOC-03
 
@@ -1080,7 +1103,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### DOC-02
 
-**Earlier "GO" verdicts covered the API only** · Needs Improvement · Low · LIVE — `docs/36-bloc-13-hardening.md` concludes "GO" for a pilot and `docs/36-pilot-e2e-scenario.md` reports 19/19. Both runs drove the API with `curl`; the same journey fails in a browser (`SDK-01`, `FE-01`), and the cited integration tests cannot run (`TEST-01`). _Sync S-001 note (2026-11-11): the active branch's new `docs/ROADMAP.md` makes the same kind of claim — pilot functions "faites et vérifiées en vrai", integration tests 92/93 — which this audit has not been able to verify (BRANCH)._ _Sync S-006 note (2026-11-13): run locally on `4c756e0`, the customer, restaurant, courier and admin journeys work end to end, with one gap the roadmap does not mention: the customer cannot see the delivery code (`FE-03`) (RUN)._
+**Earlier "GO" verdicts covered the API only** · Needs Improvement · Low · LIVE — `docs/36-bloc-13-hardening.md` concludes "GO" for a pilot and `docs/36-pilot-e2e-scenario.md` reports 19/19. Both runs drove the API with `curl`; the same journey fails in a browser (`SDK-01`, `FE-01`), and the cited integration tests cannot run (`TEST-01`). _Sync S-001 note (2026-11-11): the active branch's new `docs/ROADMAP.md` makes the same kind of claim — pilot functions "faites et vérifiées en vrai", integration tests 92/93 — which this audit has not been able to verify (BRANCH)._ _Sync S-006 note (2026-11-13): run locally on `4c756e0`, the customer, restaurant, courier and admin journeys work end to end, with one gap the roadmap does not mention: the customer cannot see the delivery code (`FE-03`) (RUN)._ _Sync S-014 note (2026-11-17), BRANCH: the owner's roadmap on `feat/welcome-greeting` (`cabf058`) says the API is "techniquement terminé" and that every remaining item only waits for an external account, "aucun code à écrire". The audit still lists open findings that need code, among them `PAY-04` (no refund when a paid order is rejected or cancelled), `PAY-06` (no payouts), `ORD-01` (no cancellation), `ORD-02` (no confirmation timeout), `FE-02` (no token refresh), `ARCH-01` and `TEST-04`._
 
 ### OPS-04
 
@@ -1114,6 +1137,10 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 **Payment idempotency details** · Needs Improvement · Low · CODE — the idempotency scope for payments, cancels and refunds is global rather than per user; `payments.attempt_no` is never incremented; a stale `reserved` key (process died mid-request) blocks its key forever.
 
+### TEST-05
+
+**The owner's branch silences the mobile typecheck** · Needs Improvement · Low · BRANCH · Status: Open _(added 2026-11-17, sync S-014)_ — `cabf058` on `feat/welcome-greeting` records `@djafat/mobile#typecheck` in `scripts/pipeline/baselines/known-failures.json` as pre-existing ("expo-router's generated route-literal type is stale…"). On `main` it passes (RUN, 2026-11-17: `turbo run typecheck --filter=@djafat/mobile`, and in every `verify:fast` run that day; CI green): it fails only where Expo has generated its typed routes (`.expo/types`, gitignored), against calls such as `router.push(`/orders/${id}`)`. Once the entry is in, any real mobile type error is reported as pre-existing on every machine. Fix: write those calls in typed-route form (or regenerate the types) and drop the entry. Verify: with `.expo/types` generated, `pnpm --filter @djafat/mobile typecheck` passes.
+
 ---
 
-Last updated: 2026-11-14 (sync S-007)
+Last updated: 2026-11-17 (sync S-014)

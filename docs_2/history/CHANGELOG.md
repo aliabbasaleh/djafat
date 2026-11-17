@@ -8,6 +8,61 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-17 — Sync S-015: `main` green after the merges; a correction on shutdown
+
+**Verified:** CI and Security both green on `main` at `75db772`, the merge of pull request #7. The
+user's local run (`/Users/mac/projects/djafat-latest`) now follows `main`: migration 0038 applied to
+its database, seed re-run, the six apps started; checks: `/v1/ready` 200, a 2 MB body answers 413,
+Helmet headers present, phone login works, `/v1/me` 200, restaurants listed, no error in the API log.
+
+**Corrected:** S-012 said NestJS 10 was not affected by the shutdown hang. An old API process
+(NestJS 10) that had run for three days ignored SIGTERM for 10 s and had to be force-stopped. Noted on
+`OPS-02`; `main` bounds Prisma's disconnect since 0.20.11.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+---
+
+## 2026-11-17 — Sync S-014: the owner's new branch `feat/welcome-greeting`
+
+**Reviewed:** `cabf058` by `kcerha`, from an older `main` (`e82eb80`): a greeting on the four apps,
+a restored admin import, Windows quoting for every argument in the pipeline scripts, the mobile
+typecheck recorded as a known failure, and a roadmap update (demo online, Tigo Cash and Moov Money
+in demo, a "100 % API" list).
+
+**Verified:** the mobile typecheck passes on `main` (no generated typed routes there); the branch
+conflicts with `main` only on the version and the journal (`git merge-tree`). The rest was read, not
+run.
+
+**Newly discovered:** `TEST-05` (Low, BRANCH): the known-failure entry would hide real mobile type
+errors. Notes on `DOC-02` (the roadmap's "no code left to write" against open findings that need
+code), `OPS-01` and `OPS-02` (MinIO image, trial server). 59 findings open.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
+## 2026-11-17 — Sync S-013: the audit's fixes are on `main`
+
+**Reviewed:** the merges of pull requests #2 (`05ecacc`), #3 (`f9a8f41`), #4 (`44ae073`) and #7
+(`75db772`) into `main`, in that order, at the user's request. None adds anything of its own: each
+merge's tree is its pull request's head, and `main`'s final tree is identical to #7's verified head.
+
+**Verified:** every check green on each pull request before its merge (Linux CI with the integration
+job, Windows, Security).
+
+**Status changes:** `PAY-01`, `PAY-03`, `SEC-01`, `FE-03` and `PAY-05` resolved on `main` (58
+findings open, 10 resolved); T-102, T-103, T-104, T-107 and T-208 moved to `COMPLETED_TASKS.md`.
+`DEP-01` down to the Expo tool chain, `postcss` and `zod`.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`tasks/COMPLETED_TASKS.md`, `UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-012: the API on NestJS 11 and Fastify 5
 
 **Reviewed:** our own `862ad24` (0.20.11) on the new branch `fix/api-nest11-fastify5`, stacked on

@@ -117,3 +117,53 @@ Recorded in the French block reports (`docs/17` → `docs/36`) and the Git histo
 assumed verified.
 
 Last updated: 2026-11-11 (AUDIT-3)
+
+### T-103 · Fix refund arithmetic
+
+- **Completed:** 2026-11-17 · **Commit:** `f0cbb09` (version `8e59bd4`), merged into `main` with pull request #4 (`44ae073`)
+- **Resolves:** PAY-03
+- **What changed:** both `SUM(amount_minor)` refund queries cast to `::bigint`, so the refund arithmetic no longer mixes a Decimal with bigints.
+- **Files:** `apps/api/src/modules/payments/payments.service.ts`, `apps/api/test/refunds.int.spec.ts`
+- **Verified by:** new integration test on PostgreSQL (partial refund → `partially_refunded`, excess → 409, remainder → `refunded`, ledger balanced), red before the fix and green after; integration suite 94/94 then; hosted `integration` job green on pull request #4.
+- **Not verified:** refunds through the admin screens (the route needs a TOTP step-up).
+- **New issues found:** none
+
+### T-208 · Delivery code in the customer apps
+
+- **Completed:** 2026-11-17 · **Commit:** `70cfd3b`, merged into `main` with pull request #4 (`44ae073`)
+- **Resolves:** FE-03
+- **What changed:** order tracking returns the delivery id; the SDK reads `GET /v1/deliveries/:id/code`; the site and the app show « Votre code de livraison » from pickup to handover.
+- **Files:** `apps/api/src/modules/deliveries/order-tracking.service.ts`, `packages/sdk/src/orders.ts`, `apps/web/src/components/DeliveryCode.tsx`, `apps/web/src/app/commandes/[id]/page.tsx`, `apps/mobile/app/(app)/orders/[id].tsx`
+- **Verified by:** unit tests (API, SDK); integration suite 94/94; Chrome on an isolated database: no code before pickup, a 4-digit code after it, the courier confirms with it, the order is delivered, the code is gone.
+- **Not verified:** the mobile screen on a device (type-checked and linted only).
+- **New issues found:** none
+
+### T-104 · Validate secrets at boot
+
+- **Completed:** 2026-11-17 · **Commit:** `aa0d58d`, merged into `main` with pull request #4 (`44ae073`)
+- **Resolves:** SEC-01
+- **What changed:** in production `loadApiEnv` refuses placeholder, short (under 32 characters), reused or malformed (not 32-byte AES) secrets, naming the variable and never its value; elsewhere the API starts and logs them.
+- **Files:** `packages/config/src/env.ts`, `packages/config/src/env.spec.ts`, `apps/api/src/common/config/config.service.ts`, `.env.example`
+- **Verified by:** six unit tests (five fail on the previous code); the built API started three ways: production with the `.env.example` values exits with code 1 naming the five secrets, production with generated secrets answers `/health`, development starts and warns.
+- **Not verified:** whether development should refuse too: a decision for the team (`DOC-03`).
+- **New issues found:** `DOC-03`
+
+### T-107 · Verify the webhook signature before recording the event
+
+- **Completed:** 2026-11-17 · **Commit:** `2319186`, merged into `main` with pull request #4 (`44ae073`)
+- **Resolves:** PAY-05
+- **What changed:** the payment webhook checks the signature before writing its `webhook_events` idempotency row; a rejected request leaves nothing and is logged.
+- **Files:** `apps/api/src/modules/payments/payments.service.ts`, `apps/api/test/webhook-forgery.int.spec.ts`, `docs/24-bloc-5-payment.md`
+- **Verified by:** the audit's two requests replayed on PostgreSQL (forgery → 401 and no row; the genuine webhook → `ok`, payment succeeded, order placed; replay → `duplicate`); that test and three unit tests fail on the previous code; integration suite 95/95.
+- **Not verified:** —
+- **New issues found:** none
+
+### T-102 · Enforce provider enablement when creating a payment
+
+- **Completed:** 2026-11-17 · **Commit:** `a017f48`, merged into `main` with pull request #4 (`44ae073`)
+- **Resolves:** PAY-01
+- **What changed:** payment creation applies the payment screen's rule (`listAvailablePaymentMethods`: enabled configuration for the order's restaurant, city, currency and amount; active provider) and refuses anything else with 409 before writing; the stored method is the provider's.
+- **Files:** `apps/api/src/modules/payments/payments.service.ts`, `apps/api/src/modules/payments/payments-test-support.ts`, `apps/api/src/modules/payments/payments-provider-enablement.spec.ts`, `apps/api/test/payment-enablement.int.spec.ts`
+- **Verified by:** the finding's Verify step on PostgreSQL (disabled row → 409, order still `awaiting_payment`, no payment row; enabled → 201) and an unknown `methodCode`, which gave HTTP 500, now stored as the provider's; 12 of 14 unit tests fail on the previous code; API unit tests 899/899.
+- **Not verified:** the mock provider in production is not registered since FEAT-002 (not re-checked here).
+- **New issues found:** `TEST-04`

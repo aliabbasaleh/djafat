@@ -68,6 +68,13 @@ _(updated 2026-11-17, sync S-012)_ New branch `fix/api-nest11-fastify5`, stacked
 to NestJS 11 and Fastify 5, bounds Prisma's disconnect on shutdown, and trims the audit baseline. Merge
 it after #4.
 
+_(updated 2026-11-17, sync S-013)_ **The stack is merged.** #2 (`05ecacc`), #3 (`f9a8f41`), #4 (`44ae073`) and #7 (`75db772`)
+went into `main` in that order, each with every check green, and their branches were deleted.
+Left on GitHub: `claude/compassionate-franklin-k23vcj` (at `9058e33`, already in `main`) and the
+owner's `fix/payment-reliability-backlog` (§2).
+
+_(updated 2026-11-17, sync S-014)_ New: the owner's `feat/welcome-greeting` (§2c).
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |
@@ -96,7 +103,7 @@ integration tests and their configuration, `packages/sdk/src/http.ts`, the login
 webhook order (`6cf7c9b`, [`PAY-05`](FINDINGS.md#pay-05)), the PNG seed, the login messages, the
 restaurant ranking, the design document.
 
-## 2b. `fix/next-15.5`, pull request #3 (4 commits) _(added 2026-11-12, sync S-004; updated sync S-005)_
+## 2b. `fix/next-15.5`, pull request #3 (4 commits) _(added 2026-11-12, sync S-004; updated sync S-005)_ — merged into `main` on 2026-11-17 (`f9a8f41`, sync S-013)
 
 Our own branch, from `main` `d1439c6`, made at the user's request.
 
@@ -119,6 +126,22 @@ next to it, so take pull request #1's version.
 
 _(updated 2026-11-14, sync S-008)_ Re-based on `main`: `6b13d96` merges `main` and #2 in, `69cd859` makes the branch
 version 0.20.3. The audit baseline loses its 38 `next` entries (115 → 77).
+
+## 2c. `feat/welcome-greeting` (1 commit, the owner) _(added 2026-11-17, sync S-014)_
+
+`cabf058` by `kcerha` (2026-11-17), from `main` as of `e82eb80` (before pull request #6 and our
+stack). It makes the branch version 0.21.0.
+
+| What                                                                     | Effect on the audit                                                      |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| `<Greeting>` in `@djafat/ui`, used by the four apps                      | New UI only; the name comes from the stored session and React escapes it |
+| Admin: `Text` import restored                                            | Fixes a typecheck break the greeting had introduced                      |
+| Windows quoting of every argument in `scripts/pipeline`                  | Tooling only (route-group paths such as `app/(app)/…`)                   |
+| `@djafat/mobile#typecheck` in `known-failures.json`                      | New [`TEST-05`](FINDINGS.md#test-05): passes on `main` and in CI         |
+| Roadmap: demo online, Tigo Cash and Moov Money in demo, "100 % API" list | Claims; see notes on `DOC-02`, `OPS-01`, `OPS-02`                        |
+
+Merging (tested with `git merge-tree`): conflicts with `main` only in `package.json` and
+`docs/ROADMAP.md` (version and journal); bring `main` in first. 0.21.0 stays above `main`'s 0.20.12.
 
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
 
