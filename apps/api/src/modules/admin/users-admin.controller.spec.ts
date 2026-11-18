@@ -74,11 +74,20 @@ describe('UsersAdminController — MFA_REQUIRED_ROLES is actually enforced (Bloc
     },
   );
 
+  // Until ADM-03 these three were deliberately NOT gated (no step-up prompt in
+  // the console, so a 428 would have broken a working button). The console now
+  // asks for the TOTP code, so they are gated like role changes (ADM-02).
   it.each(['suspend', 'block', 'reactivate'] as const)(
-    '%s is deliberately NOT step-up-gated — already wired into the live Admin UI with no step-up flow (docs/31 §mfa-effective)',
+    '%s is step-up-gated with the REAL MFA_REQUIRED_ROLES, after the role and permission checks (audit ADM-02)',
     (method) => {
       const handler = UsersAdminController.prototype[method];
-      expect(Reflect.getMetadata(REQUIRE_STEP_UP_KEY, handler)).toBeUndefined();
+      expect(Reflect.getMetadata(REQUIRE_STEP_UP_KEY, handler)).toBe(MFA_REQUIRED_ROLES);
+      const names = (Reflect.getMetadata(GUARDS_METADATA, handler) as Array<{ name: string }>).map(
+        (g) => g.name,
+      );
+      expect(names.indexOf('StepUpGuard')).toBeGreaterThan(-1);
+      expect(names.indexOf('RolesGuard')).toBeLessThan(names.indexOf('StepUpGuard'));
+      expect(names.indexOf('PermissionsGuard')).toBeLessThan(names.indexOf('StepUpGuard'));
     },
   );
 });

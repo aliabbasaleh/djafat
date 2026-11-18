@@ -326,6 +326,7 @@ describe('Balance self-service routes never accept a client-supplied identity (P
 const FRESH_FINANCE_PHONE = '+23566000095';
 const STATUS_TARGET_PHONE = '+23566000094';
 const GATE_TARGET_PHONE = '+23566000093';
+const STATUS_ADMIN_PHONE = '+23566000090';
 
 describe('finance can unlock its own step-up actions (audit ADM-01)', () => {
   let finance: { access: string; refresh: string; userId: string };
@@ -355,17 +356,50 @@ describe('finance can unlock its own step-up actions (audit ADM-01)', () => {
   });
 
   it('finance enrols and verifies MFA (was 403), then gets past the step-up: 404 for an unknown payment, not 428', async () => {
+    const status = () =>
+      request(server)
+        .get('/v1/auth/mfa/status')
+        .set('Authorization', `Bearer ${finance.access}`)
+        .expect(200);
+    expect((await status()).body).toEqual({ enabled: false, stepUpValidUntil: null });
     await enrollAndStepUp(finance.access);
+    const after = (await status()).body as { enabled: boolean; stepUpValidUntil: string };
+    expect(after.enabled).toBe(true);
+    expect(Date.parse(after.stepUpValidUntil)).toBeGreaterThan(Date.now());
     const res = await refundUnknownPayment(finance.access).expect(404);
     expect(res.body.error.code).toBe('NOT_FOUND');
   });
 });
 
 describe('who may suspend, block or reactivate whom (audit ADM-02)', () => {
+  // A fresh admin of this block's own: status changes need a step-up now, and
+  // the seeded admin's MFA is enrolled by identity.int.spec.ts.
+  let staff: { access: string; userId: string };
+
+  beforeAll(async () => {
+    const created = await loginViaOtp(STATUS_ADMIN_PHONE);
+    await request(server)
+      .post(`/v1/admin/users/${created.userId}/roles`)
+      .set('Authorization', `Bearer ${tokens.superAdmin}`) // stepped up earlier in this file
+      .send({ role: 'admin' })
+      .expect(201);
+    staff = await loginViaOtp(STATUS_ADMIN_PHONE); // roles are a login-time claim
+  }, 30_000);
+
+  it('without a step-up, an admin cannot change a status: 428 STEP_UP_REQUIRED, then it can', async () => {
+    const res = await request(server)
+      .post(`/v1/admin/users/${userIds.customer}/suspend`)
+      .set('Authorization', `Bearer ${staff.access}`)
+      .send({ reason: 'ADM-02 check' })
+      .expect(428);
+    expect(res.body.error.code).toBe('STEP_UP_REQUIRED');
+    await enrollAndStepUp(staff.access);
+  });
+
   it('an admin cannot block the super_admin: 403, and the super_admin keeps working', async () => {
     const res = await request(server)
       .post(`/v1/admin/users/${userIds.superAdmin}/block`)
-      .set('Authorization', `Bearer ${tokens.admin}`)
+      .set('Authorization', `Bearer ${staff.access}`)
       .send({ reason: 'ADM-02 check' })
       .expect(403);
     expect(res.body.error.code).toBe('FORBIDDEN');
@@ -377,8 +411,8 @@ describe('who may suspend, block or reactivate whom (audit ADM-02)', () => {
 
   it('an admin cannot block its own account', async () => {
     await request(server)
-      .post(`/v1/admin/users/${userIds.admin}/block`)
-      .set('Authorization', `Bearer ${tokens.admin}`)
+      .post(`/v1/admin/users/${staff.userId}/block`)
+      .set('Authorization', `Bearer ${staff.access}`)
       .send({ reason: 'ADM-02 check' })
       .expect(403);
   });
@@ -387,14 +421,14 @@ describe('who may suspend, block or reactivate whom (audit ADM-02)', () => {
     const target = await loginViaOtp(STATUS_TARGET_PHONE);
     await request(server)
       .post(`/v1/admin/users/${target.userId}/block`)
-      .set('Authorization', `Bearer ${tokens.admin}`)
+      .set('Authorization', `Bearer ${staff.access}`)
       .send({ reason: 'ADM-02 check' })
       .expect(200);
     await request(server).post('/v1/auth/refresh').send({ refresh: target.refresh }).expect(401);
 
     await request(server)
       .post(`/v1/admin/users/${target.userId}/reactivate`)
-      .set('Authorization', `Bearer ${tokens.admin}`)
+      .set('Authorization', `Bearer ${staff.access}`)
       .send({ reason: 'ADM-02 check done' })
       .expect(200);
     await request(server).post('/v1/auth/refresh').send({ refresh: target.refresh }).expect(401);

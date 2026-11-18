@@ -197,7 +197,8 @@ export function createAdminClient(http: ApiHttp) {
         params: { status?: string; restaurantId?: string; page?: number; limit?: number } = {},
       ) => http.get<Paginated<AdminOrderSummary>>('/admin/orders', { query: { ...params } }),
       /**
-       * ORD-01: staff cancel an order, up to `courier_assigned`; the delivery
+       * ORD-01: staff cancel an order (awaiting payment, or up to
+       * `courier_assigned`); the delivery
        * stops and a paid order is refunded (PAY-04). Needs a recent MFA
        * step-up (428 `STEP_UP_REQUIRED` otherwise).
        */

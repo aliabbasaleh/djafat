@@ -143,6 +143,18 @@ export class AuthController {
   }
 
   /**
+   * ADM-03: is MFA enabled for me, and until when does this session's step-up
+   * last? Lets the admin console show the state and ask for a code only when
+   * needed.
+   */
+  @Get('mfa/status')
+  @RequireAuth()
+  @RequireRole(...MFA_ENROLLABLE_ROLES)
+  mfaStatus(@CurrentActor() actor: AuthenticatedActor) {
+    return this.auth.mfaStatus(actor.userId, actor.sessionId);
+  }
+
+  /**
    * TOTP enrollment (docs/07 §"Auth") for every role that faces a step-up:
    * admin, super_admin and finance (`MFA_ENROLLABLE_ROLES`, audit ADM-01).
    */

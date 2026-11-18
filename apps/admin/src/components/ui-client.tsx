@@ -6,4 +6,4 @@
  * living INSIDE an external transpiled workspace package once a page is
  * statically prerendered).
  */
-export { Button, Input, Select, Checkbox, Alert, Textarea } from '@djafat/ui';
+export { Button, Input, Select, Checkbox, Alert, Textarea, Modal } from '@djafat/ui';

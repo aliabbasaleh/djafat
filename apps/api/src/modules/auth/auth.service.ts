@@ -252,6 +252,12 @@ export class AuthService {
     return this.mfa.setup(userId);
   }
 
+  /** ADM-03: MFA enabled? step-up valid until? (this session) */
+  async mfaStatus(userId: string, sessionId: string) {
+    const session = await this.sessions.getActiveSession(sessionId);
+    return this.mfa.status(userId, session?.stepUpVerifiedAt ?? null);
+  }
+
   async mfaVerify(
     userId: string,
     sessionId: string,

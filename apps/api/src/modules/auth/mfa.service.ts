@@ -40,6 +40,25 @@ export class MfaService {
   }
 
   /**
+   * ADM-03: whether MFA is enabled, and until when the session's step-up
+   * lasts, for the admin console to say so instead of guessing from a 428.
+   */
+  async status(
+    userId: string,
+    stepUpVerifiedAt: Date | null,
+  ): Promise<{ enabled: boolean; stepUpValidUntil: string | null }> {
+    const row = await this.prisma.mfaTotpSecret.findUnique({ where: { userId } });
+    const until =
+      stepUpVerifiedAt === null
+        ? null
+        : new Date(stepUpVerifiedAt.getTime() + this.config.get('STEP_UP_WINDOW_SECONDS') * 1000);
+    return {
+      enabled: row?.enabled === true,
+      stepUpValidUntil: until !== null && until.getTime() > Date.now() ? until.toISOString() : null,
+    };
+  }
+
+  /**
    * First-time enrollment only. Re-enrollment (changing device) must go
    * through `disable()` first — `disable` is step-up-gated at the guard
    * level, so a hijacked-but-not-yet-step-up session can never silently

@@ -175,7 +175,7 @@ GET   /v1/admin/dashboard                                        200  admin
 GET   /v1/admin/orders            ?status&restaurant&courier&from&to&cursor   200  admin
 GET   /v1/admin/orders/:id                                       200  admin
 POST  /v1/admin/orders/:id/cancel            {reason}            200  admin+stepup   (si commande payée)
-      # 0.22.0 (docs/37) : de placed à courier_assigned ; livraison arrêtée ; remboursement automatique
+      # 0.22.0 (docs/37) : awaiting_payment, puis de placed à courier_assigned ; livraison arrêtée ; remboursement automatique
 POST  /v1/admin/orders/:id/reassign-courier  {courierId}         200  admin
 GET/POST/PATCH /v1/admin/restaurants                                  200/201/200  admin
 POST  /v1/admin/restaurants/:id/suspend|activate                 200  admin+stepup

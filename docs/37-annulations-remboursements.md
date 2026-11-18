@@ -12,12 +12,12 @@
 La machine à états des commandes (`packages/core/src/order/state-machine.ts`) décidait déjà ces
 règles ; il manquait les routes.
 
-| Qui                     | Route                                                       | Depuis quels statuts                                      |
-| ----------------------- | ----------------------------------------------------------- | --------------------------------------------------------- |
-| Le client (sa commande) | `POST /v1/orders/:id/cancel` `{reason?}`                    | `awaiting_payment`, `placed`, `confirmed`                 |
-| Admin, super_admin      | `POST /v1/admin/orders/:id/cancel` `{reason}` + step-up MFA | `placed` à `courier_assigned` (jamais après récupération) |
-| Le restaurant           | `POST /v1/orders/:id/reject` (existait)                     | `placed`                                                  |
-| Le système (worker)     | job `order-confirmation-timeout`                            | `placed` non confirmée après le délai (§3)                |
+| Qui                     | Route                                                       | Depuis quels statuts                                                               |
+| ----------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Le client (sa commande) | `POST /v1/orders/:id/cancel` `{reason?}`                    | `awaiting_payment`, `placed`, `confirmed`                                          |
+| Admin, super_admin      | `POST /v1/admin/orders/:id/cancel` `{reason}` + step-up MFA | `awaiting_payment`, puis `placed` à `courier_assigned` (jamais après récupération) |
+| Le restaurant           | `POST /v1/orders/:id/reject` (existait)                     | `placed`                                                                           |
+| Le système (worker)     | job `order-confirmation-timeout`                            | `placed` non confirmée après le délai (§3)                                         |
 
 Hors de ces statuts, la réponse est 409 `ORDER_INVALID_TRANSITION`. La commande d'un autre client
 répond 404, comme un identifiant inconnu. Le site client et l'app mobile affichent un bouton
@@ -63,7 +63,7 @@ commande terminée avant). Sinon, la règle « DJAFAT absorbe » s'applique.
   remboursement passe alors `succeeded` et l'écriture comptable est passée. Un remboursement
   refusé par un fournisseur passe `failed` avec l'erreur, dans la même liste.
 
-Il n'y a pas encore d'écran pour cette liste dans la console admin (constat ADM-03).
+_(0.23.0, ADM-03)_ La console admin a maintenant la page « Remboursements » pour cette liste, et un bouton « Annuler » sur la liste des commandes ; les deux demandent le code de double authentification.
 
 ### Sûreté
 
@@ -118,5 +118,5 @@ contrepassation), index des remboursements ouverts.
 - Un paiement mobile money qui réussit **après** l'annulation (virement en vol) n'est pas
   rattaché : il apparaît comme reçu non apparié, à traiter par les opérations (même situation
   qu'une commande expirée).
-- Pas d'écran console pour les remboursements à faire à la main ni pour l'annulation admin
-  (ADM-03).
+- ~~Pas d'écran console pour les remboursements à faire à la main ni pour l'annulation admin
+  (ADM-03).~~ Fait en 0.23.0.
