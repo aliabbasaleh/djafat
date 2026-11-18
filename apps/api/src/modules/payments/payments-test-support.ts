@@ -597,6 +597,15 @@ export function fakeOrderAmountPort(): OrderAmountPort {
       pickup: { lat: 12.1348, lng: 15.0557 },
       dropoff: { lat: 12.14, lng: 15.06 },
     }),
+    // PAY-04: an order still in progress unless a test says otherwise.
+    getCancellationFacts: vi.fn().mockResolvedValue({
+      orderId: ORDER_ID,
+      orderCode: 'DJ-0001',
+      status: 'placed',
+      reachedPreparation: false,
+      endedByRole: null,
+      endReason: null,
+    }),
   };
 }
 

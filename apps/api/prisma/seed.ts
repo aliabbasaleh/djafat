@@ -344,6 +344,10 @@ async function main(): Promise<void> {
   const settings: Array<{ key: string; value: Prisma.InputJsonValue }> = [
     { key: 'unpaid_order_ttl_seconds', value: PLATFORM_SETTINGS_DEFAULTS.unpaid_order_ttl_seconds },
     { key: 'offer_timeout_seconds', value: PLATFORM_SETTINGS_DEFAULTS.offer_timeout_seconds },
+    {
+      key: 'order_confirmation_timeout_seconds',
+      value: PLATFORM_SETTINGS_DEFAULTS.order_confirmation_timeout_seconds,
+    },
     { key: 'psp_fee_policy', value: PLATFORM_SETTINGS_DEFAULTS.psp_fee_policy },
     { key: 'funds_release_policy', value: PLATFORM_SETTINGS_DEFAULTS.funds_release_policy },
     {

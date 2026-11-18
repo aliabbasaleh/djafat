@@ -8,6 +8,24 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-027: cancelling an order, and the money that follows
+
+**Verified:** `pnpm verify:fast` all pass; API integration suite 111/111 on a fresh database (8 new
+scenarios in `order-cancellation.int.spec.ts`); the built worker job run against the test database.
+
+**Learned:** the API design already specified both cancel routes and "refund auto si payé" (`docs/07`);
+only the ledger split was undecided. A rejected order emits `order.cancelled` (there is no
+`order.rejected` event), and the customer is already notified on it. `getPaymentContext` answers only
+for an order awaiting payment (caught by the new test of the refund list).
+
+**Status changes:** `ORD-01`, `PAY-04`, `ORD-02` fixes present on `fix/order-cancel-refund` (0.22.0).
+T-204, T-205, T-206 in progress.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`; outside `docs_2/`: `docs/37` (new), `docs/07`, `docs/36`, `docs/ROADMAP.md`.
+
+---
+
 ## 2026-11-18 — Sync S-026: finance can unlock its step-up; staff cannot act on their superiors
 
 **Verified:** `pnpm verify:fast` all pass; the API integration suite 103/103 on a fresh database (6 new

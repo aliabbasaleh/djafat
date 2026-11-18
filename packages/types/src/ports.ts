@@ -1,3 +1,4 @@
+import type { OrderStatus } from './enums.js';
 import type { Money } from './money.js';
 import type { PostEntryGroupInput, PostedEntryGroup, WalletBalance } from './ledger.js';
 
@@ -63,6 +64,28 @@ export interface OrderAmountPort {
   getDropoffVoiceNote(
     orderId: string,
   ): Promise<{ mime: string; dataBase64: string; durationMs: number } | null>;
+  /**
+   * PAY-04 — how an order ended, for `payments` to settle its money when it
+   * ends without a delivery (rejected or cancelled). Read only. Throws
+   * `NotFound` if the order doesn't exist.
+   */
+  getCancellationFacts(orderId: string): Promise<OrderCancellationFacts>;
+}
+
+/** PAY-04 — the facts the refund of an order that ended without delivery depends on. */
+export interface OrderCancellationFacts {
+  readonly orderId: string;
+  readonly orderCode: string;
+  readonly status: OrderStatus;
+  /**
+   * The order reached `preparing` at some point: the restaurant started
+   * cooking. Before that, nobody has done any work for it.
+   */
+  readonly reachedPreparation: boolean;
+  /** Who made it terminal (`customer`, `admin`, `restaurant_staff`, `system`…), if recorded. */
+  readonly endedByRole: string | null;
+  /** The reason recorded with that last transition, if any. */
+  readonly endReason: string | null;
 }
 
 /** FEAT-015 — order-history facts about a customer (no time-of-day: the caller knows "now"). */

@@ -156,21 +156,21 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-204 · Order cancellation for customers and staff
 
-- **Area:** `apps/api` orders, SDK, web, admin · **Priority:** High · **Status:** Not started
+- **Area:** `apps/api` orders, SDK, web, admin · **Priority:** High · **Status:** In progress — API, SDK, web and mobile buttons on `fix/order-cancel-refund` (0.22.0); console screen waits for T-214 _(sync S-027)_
 - **Why:** [`ORD-01`](../FINDINGS.md#ord-01) · **Depends on:** T-205
 - **Done when:** the transitions already in the state machine are reachable, with the right roles, and visible in the apps.
 - **Test:** integration tests per status and role.
 
 ### T-205 · Automatic refund and ledger reversal
 
-- **Area:** `apps/api` payments/ledger/orders · **Priority:** High · **Status:** Blocked (refund policy)
+- **Area:** `apps/api` payments/ledger/orders · **Priority:** High · **Status:** In progress — on `fix/order-cancel-refund` (0.22.0) with the policy of `docs/37`, for DJAFAT to confirm; done when merged _(sync S-027)_
 - **Why:** [`PAY-04`](../FINDINGS.md#pay-04) · **Depends on:** T-103, policy decision
 - **Done when:** a paid order that ends rejected, cancelled or failed is refunded and its accrual reversed, per the policy.
 - **Test:** integration tests for each terminal path; ledger balanced, payables zero.
 
 ### T-206 · Restaurant confirmation timeout
 
-- **Area:** `apps/worker`, `apps/api` · **Priority:** High · **Status:** Not started
+- **Area:** `apps/worker`, `apps/api` · **Priority:** High · **Status:** In progress — job on `fix/order-cancel-refund` (0.22.0), 15 min default to confirm _(sync S-027)_
 - **Why:** [`ORD-02`](../FINDINGS.md#ord-02) · **Depends on:** T-204, T-205
 - **Done when:** an unconfirmed paid order is cancelled and refunded after a configurable delay; customer and operations are told.
 - **Test:** worker integration test with a shortened delay.

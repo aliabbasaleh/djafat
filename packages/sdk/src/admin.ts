@@ -136,6 +136,23 @@ export interface PhoneOrderInput {
 
 export type PhoneTransferOutcome = 'paid' | 'pending' | 'amount_mismatch';
 
+/** PAY-04: a refund operations still have to send or finish (`GET /admin/refunds`). */
+export interface OpenRefund {
+  readonly id: string;
+  readonly paymentId: string;
+  readonly amount: MoneyJson;
+  readonly reason: string;
+  readonly status: 'pending' | 'failed';
+  readonly orderId: string;
+  readonly orderCode: string | null;
+  readonly providerCode: string;
+  /** The number the customer paid from, when the payment recorded it. */
+  readonly payerPhone: string | null;
+  readonly automatic: boolean;
+  readonly lastError: string | null;
+  readonly createdAt: string;
+}
+
 export function createAdminClient(http: ApiHttp) {
   return {
     users: {
@@ -179,6 +196,23 @@ export function createAdminClient(http: ApiHttp) {
       list: (
         params: { status?: string; restaurantId?: string; page?: number; limit?: number } = {},
       ) => http.get<Paginated<AdminOrderSummary>>('/admin/orders', { query: { ...params } }),
+      /**
+       * ORD-01: staff cancel an order, up to `courier_assigned`; the delivery
+       * stops and a paid order is refunded (PAY-04). Needs a recent MFA
+       * step-up (428 `STEP_UP_REQUIRED` otherwise).
+       */
+      cancel: (orderId: string, reason: string) =>
+        http.post(`/admin/orders/${encodeURIComponent(orderId)}/cancel`, { body: { reason } }),
+    },
+    refunds: {
+      /** PAY-04: refunds still to send by hand or that the provider refused, oldest first. */
+      listOpen: () => http.get<ReadonlyArray<OpenRefund>>('/admin/refunds'),
+      /** PAY-04: the money was sent back by hand; `providerRef` is the transfer reference. Step-up. */
+      complete: (refundId: string, providerRef: string) =>
+        http.post<{ id: string; status: string }>(
+          `/admin/refunds/${encodeURIComponent(refundId)}/complete`,
+          { body: { providerRef } },
+        ),
     },
     payouts: {
       /** FEAT-014: courier payouts (to send: `status: 'requested'`), with the courier's Airtel number. */

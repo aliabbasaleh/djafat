@@ -15,6 +15,7 @@ import { PaymentPicker } from '@/components/PaymentPicker';
 import { LiveMap } from '@/components/LiveMap';
 import { DoorPayment } from '@/components/DoorPayment';
 import { DeliveryCode } from '@/components/DeliveryCode';
+import { CancelOrder } from '@/components/CancelOrder';
 import styles from './page.module.css';
 
 type LoadState = 'loading' | 'ready' | 'error' | 'not-found';
@@ -128,6 +129,15 @@ export default function OrderConfirmationPage() {
         {['ready', 'courier_assigned', 'picked_up', 'on_the_way'].includes(order.status) && (
           <LiveMap orderId={order.id} />
         )}
+        {['cancelled', 'rejected'].includes(order.status) && (
+          <Text tone="secondary">
+            {order.status === 'rejected'
+              ? 'Le restaurant n’a pas pu accepter votre commande.'
+              : 'Cette commande est annulée.'}{' '}
+            Si vous l’aviez payée, le remboursement est automatique : par mobile money, il est
+            envoyé sur le numéro qui a payé.
+          </Text>
+        )}
 
         <Stack gap="xs">
           {/*
@@ -177,6 +187,8 @@ export default function OrderConfirmationPage() {
             </Text>
           </div>
         </div>
+
+        <CancelOrder orderId={order.id} status={order.status} onChanged={() => void loadOrder()} />
 
         <Button href="/restaurants" fullWidth variant="secondary">
           Continuer mes achats

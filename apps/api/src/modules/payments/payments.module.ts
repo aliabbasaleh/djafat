@@ -22,6 +22,8 @@ import { SmsIngestService } from './mobile-money/sms-ingest.service';
 import { SmsIngestController } from './mobile-money/sms-ingest.controller';
 import { CourierPayoutsService } from './mobile-money/courier-payouts.service';
 import { CourierPayoutsController } from './mobile-money/courier-payouts.controller';
+import { OrderRefundsService } from './order-refunds.service';
+import { RefundsAdminController } from './refunds-admin.controller';
 
 /**
  * At Bloc 0 only `cash` and `mock` providers are registered. Real Mobile Money
@@ -41,6 +43,7 @@ import { CourierPayoutsController } from './mobile-money/courier-payouts.control
     SettlementsController,
     CourierPayoutsController,
     SmsIngestController,
+    RefundsAdminController,
   ],
   providers: [
     CashPaymentProvider,
@@ -74,6 +77,7 @@ import { CourierPayoutsController } from './mobile-money/courier-payouts.control
     CodTrustService,
     SmsIngestService,
     SettlementsService,
+    OrderRefundsService,
   ],
   exports: [PaymentProviderRegistry, PaymentsService, MobileMoneyReceiptsService],
 })

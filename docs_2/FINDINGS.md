@@ -426,7 +426,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### PAY-04
 
-**Paid orders that are rejected, cancelled or failed are never refunded or reversed** · Not Implemented · High · LIVE · Status: Open
+**Paid orders that are rejected, cancelled or failed are never refunded or reversed** · Not Implemented · High · LIVE · Status: Open on `main`; fix present on `fix/order-cancel-refund` (version 0.22.0), verified there (sync S-027)
 
 - **Where:** orders, payments, deliveries, ledger. `orders.service.ts` `rejectOrder`,
   `onDeliveryCancelled`, `onDeliveryFailed`; `payments.service.ts` (refund is admin-only and manual);
@@ -444,6 +444,16 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 - **Sync S-021 re-check (2026-11-18), CODE:** unchanged on `main`: `rejectOrder`,
   `onDeliveryCancelled` and `onDeliveryFailed` issue no refund or reversal, and no listener reacts
   to a rejected or cancelled paid order.
+- **Sync S-027 (2026-11-18), RUN, branch `fix/order-cancel-refund`:** `payments` reacts to `order.cancelled`
+  (also emitted for a rejection), in process and from the durable stream. An open payment is cancelled; a
+  paid one gets one automatic refund. Policy applied (`docs/37`; the API design in `docs/07` already said
+  "refund auto si payé"): before the kitchen started, the accrual is reversed (restaurant, courier pool and
+  commission back to zero, the customer owed the amount in `REFUNDS_PAYABLE`, DJAFAT bears the PSP fee);
+  after, DJAFAT absorbs the refund (the documented rule). Merchant wallets (no refund API) leave the refund
+  `pending` in `GET /v1/admin/refunds`; `POST /v1/admin/refunds/:id/complete` records the hand transfer.
+  Integration (real PostgreSQL): customer cancel, restaurant reject, admin cancel after preparation,
+  hand-completed refund and a relayed event delivered twice; ledger balanced, payables at zero where
+  expected. A delivery that fails after pickup still has no order-side reaction (unchanged).
 
 ### PAY-05
 
@@ -525,7 +535,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### ORD-01
 
-**Nobody can cancel an order** · Not Implemented · High · LIVE · Status: Open
+**Nobody can cancel an order** · Not Implemented · High · LIVE · Status: Open on `main`; fix present on `fix/order-cancel-refund` (version 0.22.0), verified there (sync S-027)
 
 - **Where:** `orders.controller.ts` (routes: create, list, mine, get, confirm, ready, reject).
   The state machine defines `customer_cancel`, `cancel_before_preparing` and `admin_force_cancel`.
@@ -536,10 +546,16 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 - **Verify:** cancel from each allowed status; refused from the others; refund issued when paid.
 - **Sync S-021 re-check (2026-11-18), CODE:** unchanged: no cancel route in `orders.controller.ts`,
   and nothing calls the state machine's cancel transitions.
+- **Sync S-027 (2026-11-18), RUN, branch `fix/order-cancel-refund`:** `POST /v1/orders/:id/cancel` (the
+  customer: `awaiting_payment`, `placed`, `confirmed`; 409 after, 404 for someone else's order) and
+  `POST /v1/admin/orders/:id/cancel` (admin/super_admin, step-up, reason; up to `courier_assigned`; the
+  delivery is cancelled and the courier released), both as designed in `docs/07`. A cancel button in the
+  web order page and the mobile order screen (not tried in a browser or on a device). No console screen
+  for the admin cancel yet (`ADM-03`).
 
 ### ORD-02
 
-**A paid order the restaurant ignores stays `placed` forever** · Not Implemented · High · LIVE · Status: Open
+**A paid order the restaurant ignores stays `placed` forever** · Not Implemented · High · LIVE · Status: Open on `main`; fix present on `fix/order-cancel-refund` (version 0.22.0), verified there (sync S-027)
 
 - **Where:** worker (no job); `order-expiry.processor.ts` handles `awaiting_payment` only.
 - **Observed:** a paid order sat in "Nouvelles" for 4 h 42 during the audit with no escalation.
@@ -550,6 +566,12 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 - **Verify:** unconfirmed paid order is cancelled and refunded after the deadline.
 - **Sync S-021 re-check (2026-11-18), CODE:** unchanged: the worker's `order-expiry` still handles
   `awaiting_payment` only.
+- **Sync S-027 (2026-11-18), RUN, branch `fix/order-cancel-refund`:** worker job
+  `order-confirmation-timeout` (every 30 s) cancels `placed` orders older than
+  `platform_settings['order_confirmation_timeout_seconds']`, default 900 s (a proposal for DJAFAT to
+  confirm), as the system transition `confirmation_timeout`; the relayed `order.cancelled` makes the API
+  refund and notify the customer. The built job, run against the test database, cancelled a 20-minute-old
+  order with its history row and event. Operations are not alerted beyond the order list.
 
 ### FE-02
 

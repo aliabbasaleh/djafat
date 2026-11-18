@@ -33,6 +33,19 @@ describe('order state machine', () => {
     expect(canTransitionOrder('on_the_way', 'delivered', { actorRole: 'courier' })).toBe(true);
   });
 
+  it('cancellation: the customer before preparation, the system only for a placed order nobody confirmed (ORD-01, ORD-02)', () => {
+    for (const from of ['awaiting_payment', 'placed', 'confirmed'] as const) {
+      expect(canTransitionOrder(from, 'cancelled', { actorRole: 'customer' })).toBe(true);
+    }
+    for (const from of ['preparing', 'ready', 'courier_assigned', 'picked_up'] as const) {
+      expect(canTransitionOrder(from, 'cancelled', { actorRole: 'customer' })).toBe(false);
+    }
+    expect(canTransitionOrder('placed', 'cancelled', { system: true })).toBe(true);
+    expect(canTransitionOrder('confirmed', 'cancelled', { system: true })).toBe(false);
+    expect(canTransitionOrder('preparing', 'cancelled', { actorRole: 'admin' })).toBe(true);
+    expect(canTransitionOrder('picked_up', 'cancelled', { actorRole: 'admin' })).toBe(false);
+  });
+
   it('allows the cash happy path to skip awaiting_payment', () => {
     expect(canTransitionOrder('draft', 'placed', { actorRole: 'customer' })).toBe(true);
   });

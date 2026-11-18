@@ -878,20 +878,22 @@ model DeliveryCodePreset {
 
 /// ────────────────────── Bloc 5 — payment core (docs/24) ──────────────────────
 model Refund {
-  id             String   @id @default(uuid()) @db.Uuid
-  paymentId      String   @map("payment_id") @db.Uuid
-  amountMinor    BigInt   @map("amount_minor")
-  currency       String   @db.Char(3)
-  reason         String
-  status         String   @default("pending")
-  providerRef    String?  @map("provider_ref")
-  idempotencyKey String   @map("idempotency_key")
-  entryGroup     String?  @map("entry_group") @db.Uuid
-  requestedBy    String   @map("requested_by") @db.Uuid
-  attempts       Int      @default(0)
-  lastError      String?  @map("last_error")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  id                 String   @id @default(uuid()) @db.Uuid
+  paymentId          String   @map("payment_id") @db.Uuid
+  amountMinor        BigInt   @map("amount_minor")
+  currency           String   @db.Char(3)
+  reason             String
+  status             String   @default("pending")
+  providerRef        String?  @map("provider_ref")
+  idempotencyKey     String   @map("idempotency_key")
+  entryGroup         String?  @map("entry_group") @db.Uuid
+  requestedBy        String?  @map("requested_by") @db.Uuid
+  /// PAY-04: the order accrual was reversed into REFUNDS_PAYABLE; the refund pays that debt off.
+  compensatesAccrual Boolean  @default(false) @map("compensates_accrual")
+  attempts           Int      @default(0)
+  lastError          String?  @map("last_error")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
 
   @@unique([paymentId, idempotencyKey])
   @@map("refunds")

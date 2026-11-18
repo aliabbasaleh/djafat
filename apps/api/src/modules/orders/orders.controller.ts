@@ -18,6 +18,10 @@ import { OrdersService } from './orders.service';
 import { CreateOrderSchema, type CreateOrderInput } from './dto/create-order.schema';
 import { RejectOrderSchema, type RejectOrderInput } from './dto/reject-order.schema';
 import {
+  CustomerCancelOrderSchema,
+  type CustomerCancelOrderInput,
+} from './dto/cancel-order.schema';
+import {
   OrdersRestaurantQuerySchema,
   type OrdersRestaurantQueryInput,
 } from './dto/orders-restaurant-query.schema';
@@ -177,5 +181,22 @@ export class OrdersController {
       { userId: actor.userId, role: restaurantRole(actor) },
       body.reason,
     );
+  }
+
+  /**
+   * The customer cancels their own order before the restaurant starts
+   * cooking (ORD-01): from `awaiting_payment`, `placed` or `confirmed`, 409
+   * after. A paid order is refunded automatically (PAY-04).
+   */
+  @Post(':id/cancel')
+  @HttpCode(200)
+  @RequireAuth()
+  @RequireRole('customer')
+  cancel(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(CustomerCancelOrderSchema)) body: CustomerCancelOrderInput,
+  ) {
+    return this.orders.cancelByCustomer(id, { userId: actor.userId }, body.reason);
   }
 }

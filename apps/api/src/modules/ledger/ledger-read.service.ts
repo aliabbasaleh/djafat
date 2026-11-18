@@ -128,6 +128,47 @@ export class LedgerReadService {
   }
 
   /**
+   * PAY-04: the entries of one posted group, found by its idempotency key, as
+   * `accountRef`s (`CODE` or `CODE:<ownerId>`): what an order's accrual
+   * actually credited, so a reversal can mirror it exactly. Empty when no
+   * group has that key. Read-only.
+   */
+  async getEntryGroupEntriesTx(
+    tx: Prisma.TransactionClient,
+    idempotencyKey: string,
+  ): Promise<
+    Array<{
+      accountRef: string;
+      direction: 'debit' | 'credit';
+      amountMinor: bigint;
+      currency: string;
+    }>
+  > {
+    const rows = await tx.$queryRaw<
+      Array<{
+        code: string;
+        owner_id: string | null;
+        direction: 'debit' | 'credit';
+        amount_minor: bigint;
+        currency: string;
+      }>
+    >`
+      SELECT a.code, a.owner_id::text AS owner_id, e.direction, e.amount_minor, e.currency
+      FROM ledger_entries e
+      JOIN ledger_entry_groups g ON g.id = e.entry_group
+      JOIN ledger_accounts a ON a.id = e.account_id
+      WHERE g.idempotency_key = ${idempotencyKey}
+      ORDER BY e.created_at, e.id
+    `;
+    return rows.map((r) => ({
+      accountRef: r.owner_id ? `${r.code}:${r.owner_id}` : r.code,
+      direction: r.direction,
+      amountMinor: r.amount_minor,
+      currency: r.currency,
+    }));
+  }
+
+  /**
    * FEAT-014: a courier's AVAILABLE earnings (`COURIER_AVAILABLE`, a liability:
    * credits minus debits), read from the entries themselves so it is exact
    * inside the payout transaction.

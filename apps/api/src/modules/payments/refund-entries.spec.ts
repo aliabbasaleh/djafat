@@ -33,4 +33,22 @@ describe('buildRefundEntries (docs/08 §8.8)', () => {
       ).not.toThrow();
     }
   });
+
+  it('PAY-04: after an order reversal, the refund pays off REFUNDS_PAYABLE instead of debiting revenue', () => {
+    const entries = buildRefundEntries(
+      { providerCode: 'mock', owedFromReversal: true },
+      XAF(5500n),
+    );
+    expect(entries).toEqual([
+      { accountRef: 'REFUNDS_PAYABLE', direction: 'debit', amount: XAF(5500n) },
+      { accountRef: 'PSP_CLEARING', direction: 'credit', amount: XAF(5500n) },
+    ]);
+    expect(() => assertBalanced(entries, 'XAF')).not.toThrow();
+  });
+
+  it('PAY-04: a cash refund never pays off a reversal (cash is only collected at the door)', () => {
+    expect(() =>
+      buildRefundEntries({ providerCode: 'cash', owedFromReversal: true }, XAF(1500n)),
+    ).toThrow();
+  });
 });
