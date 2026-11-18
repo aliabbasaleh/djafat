@@ -37,7 +37,7 @@ export default function AddressesScreen() {
       setState('ready');
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
-        router.push('/(auth)/login?redirect=%2F(app)%2Faddresses' as `/${string}`);
+        router.push({ pathname: '/(auth)/login', params: { redirect: '/(app)/addresses' } });
         return;
       }
       setState('error');
@@ -46,7 +46,7 @@ export default function AddressesScreen() {
 
   useEffect(() => {
     if (authState === 'signed-out') {
-      router.replace('/(auth)/login?redirect=%2F(app)%2Faddresses' as `/${string}`);
+      router.replace({ pathname: '/(auth)/login', params: { redirect: '/(app)/addresses' } });
       return;
     }
     if (authState === 'signed-in') void load();

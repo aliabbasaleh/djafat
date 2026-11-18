@@ -63,7 +63,7 @@ export default function CartScreen() {
       setState('ready');
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
-        router.push('/(auth)/login?redirect=%2F(app)%2Fcart' as `/${string}`);
+        router.push({ pathname: '/(auth)/login', params: { redirect: '/(app)/cart' } });
         return;
       }
       setState('error');
@@ -72,7 +72,7 @@ export default function CartScreen() {
 
   useEffect(() => {
     if (authState === 'signed-out') {
-      router.replace('/(auth)/login?redirect=%2F(app)%2Fcart' as `/${string}`);
+      router.replace({ pathname: '/(auth)/login', params: { redirect: '/(app)/cart' } });
       return;
     }
     if (authState === 'signed-in') void load();
@@ -106,7 +106,7 @@ export default function CartScreen() {
         newIdempotencyKey(),
         selectedAddressId ?? undefined,
       );
-      router.replace(`/(app)/orders/${order.id}` as `/${string}`);
+      router.replace({ pathname: '/(app)/orders/[id]', params: { id: order.id } });
     } catch (err) {
       if (err instanceof ApiClientError && err.code === 'NOT_FOUND') {
         setOrderError('Cette adresse n’existe plus — choisissez-en une autre.');
