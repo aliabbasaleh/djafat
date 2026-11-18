@@ -8,6 +8,101 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-032: pull requests #13 to #16 merged into `main`
+
+**Verified:** at the user's request, #13 to #16 were merged in order, each only after its five checks
+(gitleaks, integration, lint/typecheck/test/build, local setup on Windows, `pnpm audit`) were green and
+GitHub reported it mergeable. `main` is `034123a` (DJAFAT 0.21.7), and its tree is identical to the
+verified tip of #16 (`ed35760`).
+
+**Status changes:** `TEST-04` and `DOC-03` resolved on `main`; the favicon item of `FE-06` is on `main`
+(the finding stays open for its other items). T-608 and T-609 done. Counts: 58 open (22 Medium), 12
+resolved.
+
+**Still open:** #17 (waits for the owner's review) to #22, and #23. The local `main` branch is checked
+out in `/Users/mac/projects/djafat-latest` (the user's local app) and was not moved.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `tasks/BACKLOG.md`,
+`history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`; outside `docs_2/`: `docs/ROADMAP.md`.
+
+---
+
+## 2026-11-18 — Report: the work of 18 November, pull requests #13 to #22 (sync S-031)
+
+A tracking entry for everything done on 18 November (syncs S-021 to S-030), at the user's request: what is
+where, what is verified, and what waits for whom. Nothing below is merged: `main` is still `96c36b9`
+(DJAFAT 0.21.3).
+
+### In one paragraph
+
+Ten pull requests, twenty commits (one version commit and one audit-marker commit each), versions 0.21.4
+to 0.23.1. They carry fixes for eleven findings (`TEST-04`, `DOC-03`, `TEST-05`, `ADM-01`, `ADM-02`,
+`ORD-01`, `PAY-04`, `ORD-02`, `FE-02`, `ADM-03`, and the `FE-06` favicon follow-up), part of `OPS-02`, and
+one new finding, `OPS-06`. Their CI (Linux and Windows) is green for #13 to #21; #22 was still running
+when this was written. A passing `pnpm verify:fast` is recorded in the commit message of #14, #15 and #17
+to #21, and was run before the #22 commit (all pass); the messages of #13 and #16 do not record one. The
+API changes also passed the full integration suite on a fresh database (112/112 at the top of the stack).
+
+### The stack
+
+| PR  | Branch                    | Version | Findings                        | What it does                                                                                                          | Verified                                                                 | CI                                   |
+| --- | ------------------------- | ------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------ |
+| #13 | `docs/audit-s021`         | 0.21.4  | (audit)                         | The 21 open Critical/High findings re-checked against `main`                                                          | CODE/LIVE re-check, recorded per finding                                 | green                                |
+| #14 | `fix/test-loopback`       | 0.21.5  | `TEST-04`                       | Integration tests listen on 127.0.0.1 (cause: port collision with Prisma's query engine on macOS)                     | Full suite 5 runs out of 5 green (3 of 12 failed before)                 | green                                |
+| #15 | `fix/env-init`            | 0.21.6  | `DOC-03`                        | `pnpm env:init`: real random secrets in the local `.env`                                                              | 5 unit tests; a Windows CI step                                          | green                                |
+| #16 | `fix/favicon-512`         | 0.21.7  | `FE-06` (follow-up)             | Favicon 512 px, 44 KB instead of 521 KB                                                                               | Image checked by eye; builds                                             | green                                |
+| #17 | `fix/mobile-typed-routes` | 0.21.8  | `TEST-05`                       | Typed navigation in the mobile app; no known failure left                                                             | Type check with and without generated routes; `expo export` of both apps | green                                |
+| #18 | `fix/admin-roles`         | 0.21.9  | `ADM-01`, `ADM-02` (part)       | Finance can enrol MFA; no status change on oneself or a superior; sessions revoked; refresh refuses inactive accounts | Integration 103/103 (6 new)                                              | green                                |
+| #19 | `fix/order-cancel-refund` | 0.22.0  | `ORD-01`, `PAY-04`, `ORD-02`    | Customer and staff cancel; automatic refund and accrual reversal; hand-refund queue; confirmation timeout job         | Integration 111/111 (8 new); the worker job run against PostgreSQL       | green                                |
+| #20 | `fix/token-refresh`       | 0.22.1  | `FE-02`                         | Session renewal in the SDK and the five apps; sockets renew and reconnect                                             | 9 SDK tests; live check against the API with 4-second tokens, 10/10      | green                                |
+| #21 | `fix/admin-console-mfa`   | 0.23.0  | `ADM-03`, `ADM-02` (step-up)    | Console MFA page and code prompt; refunds page; order cancel button; finance access                                   | Integration 112/112; rendered in Chromium against the test API           | green                                |
+| #22 | `fix/ops-monitoring`      | 0.23.1  | `OPS-02` (part), `OPS-06` (new) | Health check with phone alerts; weekly restore check; Oracle trial-end plan; external accounts checklist              | Restore drill on a real dump; scripts tested locally                     | running (3 of 5 passed when written) |
+
+**Merge order: #13, then #14, and so on up to #22.** Each branch contains the ones before it, so merging out
+of order brings unreviewed commits along. #17 touches the owner's area (the mobile app) and waits for their
+review; everything after it waits too. If that review takes long, #18 to #22 can be re-stacked on #16.
+
+### Waiting for a decision
+
+| Decision                                                                                  | Who         | When                                                                    | Where        |
+| ----------------------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------- | ------------ |
+| The refund split: before cooking, full refund and accrual reversed; after, DJAFAT absorbs | DJAFAT      | Before merging #19                                                      | `docs/37` §2 |
+| The confirmation timeout: 15 minutes by default (a setting, changeable without a deploy)  | DJAFAT      | Before merging #19                                                      | `docs/37` §3 |
+| The Oracle trial: upgrade to Pay As You Go, or move the demo (`OPS-06`)                   | DJAFAT      | Before the trial ends (console date; around 16 Dec if opened on 16 Nov) | `docs/38` §3 |
+| Open the SMS and Airtel/Moov merchant accounts (`AUTH-01`, `PAY-07`)                      | DJAFAT      | Before the pilot                                                        | `docs/39`    |
+| Merge #13 to #22, in order                                                                | User, owner | When each one's checks are green                                        | GitHub       |
+
+### Not verified yet
+
+- Anything on the live server (no access from these sessions): its real shape and trial date, the
+  monitoring and restore-check cron jobs, an off-server backup copy.
+- The customer cancel button in a browser or on a phone; the session-renewal React hooks themselves (the
+  live check reproduced their logic in Node); a finance account in the console; a real merchant-wallet
+  refund; the worker, Redis stream and API chain in one run.
+
+### What went wrong along the way (all caught before pushing)
+
+- Twice a version commit was refused (subject over 100 characters) and the next command put everything into
+  the audit-marker commit instead. Both were undone locally and redone; nothing wrong reached GitHub.
+- A new unit test hard-coded the PSP fee (83) where the code rounds 1.5 % of 5500 to 82: the test now reads
+  the fee from the accrual. A new integration test found a real bug: the open-refunds list showed no order
+  code (`getPaymentContext` only answers for an order awaiting payment); fixed before the commit.
+- A restore-check run reported exit 0 for a corrupt dump only because the test piped it through `tail`;
+  re-run without the pipe: exit 1.
+- The Docker daemon stopped twice during the day and was restarted; the test database containers were
+  stopped again at the end, as the user had asked.
+
+### Counts
+
+60 open findings (3 Critical, 19 High, 24 Medium, 14 Low) and 10 resolved on `main`. A fix present on a
+branch does not change a finding's count until its pull request is merged.
+
+**Documents changed:** `history/CHANGELOG.md` (this entry), `UNMERGED_BRANCHES.md` (§2d),
+`PROJECT_STATUS.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`; outside `docs_2/`:
+`docs/ROADMAP.md`.
+
+---
+
 ## 2026-11-18 — Sync S-030: monitoring, a tested restore, and the end of the Oracle trial
 
 **Verified:** a restore drill on a real dump of the test database: the deploy guide's `pg_restore
