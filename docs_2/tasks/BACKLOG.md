@@ -177,7 +177,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-207 · Token refresh in the SDK and all apps
 
-- **Area:** `packages/sdk`, all five apps · **Priority:** High · **Status:** Not started
+- **Area:** `packages/sdk`, all five apps · **Priority:** High · **Status:** In progress — on `fix/token-refresh` (0.22.1); the 20-minute browser session not run yet _(sync S-028)_
 - **Why:** [`FE-02`](../FINDINGS.md#fe-02) · **Depends on:** T-101 (exists in part on branch)
 - **Done when:** sessions last as long as the refresh token; sockets reconnect with fresh tokens.
 - **Test:** 20-minute browser session without redirect; unit test for concurrent 401s.

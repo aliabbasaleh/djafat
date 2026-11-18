@@ -10,6 +10,53 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-028 — 2026-11-18 — session renewal in the SDK and all five apps
+
+|                 |                                                                              |
+| --------------- | ---------------------------------------------------------------------------- |
+| **Trigger**     | Our own commit, at the user's request ("fix those also")                     |
+| **Range**       | `fix/token-refresh` (stacked on pull request #19)                            |
+| **Size**        | 1 commit: SDK (`http.ts`, tests), session wiring and socket hooks in 5 apps  |
+| **Evidence**    | RUN — SDK unit tests, `verify:fast`, live check against the API (4 s tokens) |
+| **Reviewed by** | Claude, in the session that wrote the commit                                 |
+
+### Added
+
+- `ApiClientOptions.session` (`SessionRenewal`), `RenewedTokens`, `webLocksMutex`, `renewSession()` in the SDK;
+  `updateTokens` / `updateStoredTokens` and renewal listeners in the apps.
+
+### Removed
+
+- `setApiAccessToken` in the Expo apps (replaced by `setApiSession`).
+
+### Fixed
+
+- `FE-02` on the branch (not yet merged).
+
+### Changed
+
+- Socket hooks read the token at each connection and renew after an expiry close.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- The React hooks in a browser or on a device (the live check reproduces their logic in Node); two real
+  browser tabs renewing at once.
+
+### Marker
+
+`HEAD` → this sync's version commit.
+
+---
+
 ## S-027 — 2026-11-18 — order cancellation, automatic refunds, confirmation timeout
 
 |                 |                                                                                                                           |

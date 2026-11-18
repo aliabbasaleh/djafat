@@ -1,7 +1,7 @@
 /**
  * Minimal client-side session storage for the restaurant app (Bloc 10,
  * docs/33) — same bounded approach `apps/admin` took in Bloc 9 (docs/30
- * §admin-web): no refresh-on-401 retry, no session-management UI, just
+ * §admin-web): the session is renewed on a 401 by the SDK (FE-02, `lib/api.ts`), no session-management UI, just
  * enough to reach `/v1/restaurants/me`, `/v1/orders`, etc. A SEPARATE
  * localStorage namespace (`djafat.restaurant.*`) — never shares a session
  * with `apps/admin`/`apps/web` even if they someday shared a domain.
@@ -64,6 +64,21 @@ export function setSession(session: {
     window.dispatchEvent(new Event('djafat-restaurant:auth-changed'));
   } catch {
     // Best-effort — a private-browsing tab with storage blocked simply can't stay logged in.
+  }
+}
+
+/**
+ * The SDK renewed the session (audit finding FE-02): store the new access
+ * token and the ROTATED refresh token, which replaces the spent one. Not an
+ * auth change (same user), so no `djafat:auth-changed` event.
+ */
+export function updateTokens(tokens: { access: string; refresh: string }): void {
+  if (!isBrowser()) return;
+  try {
+    window.localStorage.setItem(ACCESS_KEY, tokens.access);
+    window.localStorage.setItem(REFRESH_KEY, tokens.refresh);
+  } catch {
+    // Best-effort, like setSession.
   }
 }
 

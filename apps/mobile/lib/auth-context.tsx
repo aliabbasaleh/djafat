@@ -4,10 +4,11 @@ import {
   clearSession,
   loadSession,
   saveSession,
+  updateStoredTokens,
   type StoredSession,
   type StoredUser,
 } from './auth-storage';
-import { api, setApiAccessToken } from './api';
+import { api, onSessionRenewal, setApiSession } from './api';
 
 export type AuthState = 'loading' | 'signed-out' | 'signed-in';
 
@@ -34,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session) {
         setUser(session.user);
         setAccessToken(session.access);
-        setApiAccessToken(session.access);
+        setApiSession(session);
         setState('signed-in');
       } else {
         setState('signed-out');
@@ -45,11 +46,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // FE-02: the SDK renewed the session (persist the rotated tokens; a new
+  // access token also restarts the realtime socket) or the API refused to
+  // renew it (sign out locally, as an expired session).
+  useEffect(
+    () =>
+      onSessionRenewal(async (tokens) => {
+        if (tokens) {
+          await updateStoredTokens(tokens);
+          setAccessToken(tokens.access);
+          return;
+        }
+        await clearSession();
+        setUser(null);
+        setAccessToken(null);
+        setState('signed-out');
+      }),
+    [],
+  );
+
   const signIn = useCallback(async (session: StoredSession) => {
     await saveSession(session);
     setUser(session.user);
     setAccessToken(session.access);
-    setApiAccessToken(session.access);
+    setApiSession(session);
     setState('signed-in');
   }, []);
 
@@ -60,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await api.auth.signOut({ refresh: stored?.refresh ?? null, clearLocal: clearSession });
     setUser(null);
     setAccessToken(null);
-    setApiAccessToken(null);
+    setApiSession(null);
     setState('signed-out');
   }, []);
 

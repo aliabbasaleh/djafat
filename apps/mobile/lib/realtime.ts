@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Constants from 'expo-constants';
 import { io, type Socket } from 'socket.io-client';
+import { api } from './api';
 
 export type RealtimeStatus = 'connecting' | 'live' | 'offline';
 
@@ -24,6 +25,7 @@ export function useRoomRealtime(
 ): RealtimeStatus {
   const [status, setStatus] = useState<RealtimeStatus>('connecting');
   const onChangeRef = useRef(onChange);
+  const lastRenewal = useRef(0);
   onChangeRef.current = onChange;
   const notifyChange = (): void => {
     void onChangeRef.current();
@@ -50,7 +52,17 @@ export function useRoomRealtime(
     };
 
     socket.on('connect', join);
-    socket.on('disconnect', () => setStatus('offline'));
+    // The server closes a socket whose access token expired (15 min), and
+    // socket.io never reconnects after a server-side close (FE-02): renew the
+    // session; the `AuthProvider` then hands this hook the new token, which
+    // opens a new socket. At most once a minute, so a socket refused for
+    // another reason cannot loop.
+    socket.on('disconnect', (reason) => {
+      setStatus('offline');
+      if (reason !== 'io server disconnect' || Date.now() - lastRenewal.current < 60_000) return;
+      lastRenewal.current = Date.now();
+      void api.renewSession(token);
+    });
     socket.on('connect_error', () => setStatus('offline'));
     socket.onAny(() => notifyChange());
 

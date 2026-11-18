@@ -1,7 +1,7 @@
 /**
  * Minimal client-side session storage for the admin app (Bloc 9, docs/30
  * §admin-web) — same bounded approach `apps/web` took in Bloc 4 (docs/22
- * §17.3): no refresh-on-401 retry, no session-management UI, just enough to
+ * §17.3): the session is renewed on a 401 by the SDK (FE-02, `lib/api.ts`), no session-management UI, just enough to
  * reach `/v1/admin/*`. A SEPARATE localStorage namespace (`djafat.admin.*`,
  * not `djafat.auth.*`) — the admin app and the customer web app are
  * different origins/ports in dev, but never share a session even if they
@@ -65,6 +65,21 @@ export function setSession(session: {
     window.dispatchEvent(new Event('djafat-admin:auth-changed'));
   } catch {
     // Best-effort — a private-browsing tab with storage blocked simply can't stay logged in.
+  }
+}
+
+/**
+ * The SDK renewed the session (audit finding FE-02): store the new access
+ * token and the ROTATED refresh token, which replaces the spent one. Not an
+ * auth change (same user), so no `djafat:auth-changed` event.
+ */
+export function updateTokens(tokens: { access: string; refresh: string }): void {
+  if (!isBrowser()) return;
+  try {
+    window.localStorage.setItem(ACCESS_KEY, tokens.access);
+    window.localStorage.setItem(REFRESH_KEY, tokens.refresh);
+  } catch {
+    // Best-effort, like setSession.
   }
 }
 
