@@ -8,6 +8,30 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-033: a live server can start, without test accounts
+
+**Verified:** on a fresh database (never the user's data): the reference run as a production server leaves no
+user, no restaurant and only `cash` active; a second run changes no row count and keeps a setting edited on the
+server and a provider switched on by hand, while `mock` is forced off again; the demo seed is refused in
+production without `SEED_DEMO=1`; the first login gets the `customer` role; `create-super-admin.ts` grants the
+role (audited), is idempotent, refuses a second one without `--another`, and the console then answers 200.
+The old and the new demo seed give identical row counts in all 60 tables, identical settings and providers;
+integration suite 112/112 on the new one. `pnpm verify:fast` all pass.
+
+**Learned:** the old seed reset every platform setting and provider switch to its default at each run; the demo
+server runs it at every `install.sh`, so a setting changed on the demo was undone by the next deploy (unchanged
+for the demo; a live deploy no longer does it). A refusal of the new command first exited before Prisma
+disconnected, leaving the binary query engine running with a database connection (seen as two lingering
+sessions); fixed before the commit.
+
+**Status changes:** `SEC-02` and `OPS-05` fixes present on `fix/live-bootstrap` (0.23.4). T-302 in progress.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `tasks/BACKLOG.md`,
+`history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`; outside `docs_2/`: `infra/deploy/README.md`,
+`docs/ROADMAP.md`.
+
+---
+
 ## 2026-11-18 — Sync S-032: pull requests #13 to #16 merged into `main`
 
 **Verified:** at the user's request, #13 to #16 were merged in order, each only after its five checks

@@ -118,6 +118,21 @@ migrations appliquées et (mode démo) les données de démonstration ajoutées.
   (`SMS_HTTP_URL`, `SMS_HTTP_API_KEY`) et le numéro marchand Airtel
   (`MOBILE_MONEY_WALLETS`) ; démarrer **sans** `--profile demo`. Le serveur
   refuse de démarrer si le SMS est en mode test.
+  À chaque installation, la base reçoit ses **données de référence** (rôles,
+  permissions, comptes du grand livre, réglages ; jamais de compte de test, et
+  un réglage changé sur le serveur n'est jamais remis à sa valeur par défaut).
+  **Premier administrateur** _(ajouté le 18 nov. 2026)_ : la personne se
+  connecte une fois sur le site avec son numéro (cela crée son compte), puis,
+  depuis `infra/deploy` :
+
+  ```bash
+  docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm migrate node_modules/.bin/tsx prisma/create-super-admin.ts +235XXXXXXXX
+  ```
+
+  Elle se reconnecte, active la double authentification (console → « Sécurité »),
+  puis donne les autres rôles depuis la console. Les comptes de démonstration
+  (numéros publiés, dont un super_admin) ne sont **jamais** créés hors mode démo :
+  le script de démo refuse de tourner en production sans `SEED_DEMO=1`.
 
 ## 5. Au quotidien
 

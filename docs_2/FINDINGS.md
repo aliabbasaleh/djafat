@@ -793,7 +793,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### SEC-02
 
-**The only seed creates a super_admin on a known phone number** · Needs Improvement · High · LIVE · Status: Open
+**The only seed creates a super_admin on a known phone number** · Needs Improvement · High · LIVE · Status: Open on `main`; fix present on `fix/live-bootstrap` (version 0.23.4), verified there (sync S-033)
 
 - **Where:** `apps/api/prisma/seed.ts` (fixtures at L372–428 alongside roles, permissions, settings, ledger accounts).
 - **Observed:** `pnpm db:seed` is the only way to create the roles, the 21 permissions and the chart
@@ -814,6 +814,20 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   can. With `MODE=live` the seed does not run ([`OPS-05`](#ops-05)).
 - **Sync S-021 re-check (2026-11-18), CODE:** unchanged: the seed creates its fixture accounts, the
   `super_admin` among them, unconditionally; the live demo runs it.
+- **Sync S-033 (2026-11-18), RUN, branch `fix/live-bootstrap`:** the seed is split. `prisma/reference-data.ts`
+  holds what every database needs (market, landmarks, roles, permissions, payment providers with sandbox ones
+  off in production, commission default, settings, feature flags, ledger accounts); `seed-reference.ts` runs it
+  at every deploy in every mode, creating only what is missing, so a setting changed on the server survives a
+  deploy, while sandbox providers are forced off in production. `seed.ts` (demo and development) keeps today's
+  behaviour, reference data with defaults put back plus the fixtures, and refuses `NODE_ENV=production` without
+  `SEED_DEMO=1`. `create-super-admin.ts` grants the first super_admin to an account that signed in once
+  (audited; refuses a second one without `--another`). On a fresh database: the reference run leaves 0 users,
+  0 restaurants, only `cash` active; a second run changes no row count and keeps an edited setting and a
+  provider switched on by hand; the fixtures are refused in production; the first login gets `customer`; the
+  command grants the role and the console then answers 200. The old and the new demo seed, each on a fresh
+  database, give identical row counts in all 60 tables, identical settings and providers; the full integration
+  suite passed 112/112 on the new one. A bug found by these runs (a refusal exited before Prisma disconnected, leaving a
+  query-engine process holding a connection) is fixed in the same commit.
 
 ### ADM-01
 
@@ -938,7 +952,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### OPS-05
 
-**On the active branch, a live server starts without roles, permissions or ledger accounts** · Broken · High · BRANCH · Status: Open (branch only) · Found in sync S-001, 2026-11-11
+**On the active branch, a live server starts without roles, permissions or ledger accounts** · Broken · High · BRANCH · Status: Open on `main`; fix present on `fix/live-bootstrap` (version 0.23.4), verified there (sync S-033) · Found in sync S-001, 2026-11-11
 
 - **Where:** `origin/claude/compassionate-franklin-k23vcj` @ `804176f` — `infra/deploy/gen-secrets.sh`
   (`MODE=live` → `SEED_DEMO=0`), `infra/deploy/docker-compose.prod.yml` (service `migrate` runs the
@@ -967,6 +981,10 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Sync S-021 re-check (2026-11-18), CODE:** now on `main`: with `MODE=live` the deploy runs the
   migrations only (`SEED_DEMO=0`), and no migration creates roles, permissions or ledger accounts,
   so a live server would start without them.
+- **Sync S-033 (2026-11-18), RUN, branch `fix/live-bootstrap`:** the deploy's `migrate` step now runs
+  `seed-reference.ts` in every mode. Verified on a fresh database as described under [`SEC-02`](#sec-02): the
+  first login succeeds as `customer`, and no fixture account exists. A test payment on a live-style database was
+  not run (it needs a restaurant created through the console first).
 
 ### OPS-06
 
