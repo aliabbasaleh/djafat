@@ -8,6 +8,61 @@ export interface ApiClientOptions {
   /** Injected for tests / non-standard runtimes. Defaults to global `fetch`. */
   readonly fetchImpl?: typeof fetch;
   readonly defaultHeaders?: Readonly<Record<string, string>>;
+  /**
+   * Session renewal (audit finding FE-02). When set, a 401 on a request made
+   * with the stored access token renews the session once and retries the
+   * request once; access tokens last 15 minutes, sessions much longer.
+   * Without it, a 401 is thrown as before.
+   */
+  readonly session?: SessionRenewal;
+}
+
+/** What `/auth/refresh` returns: a new access token and the ROTATED refresh token. */
+export interface RenewedTokens {
+  readonly access: string;
+  readonly accessExpiresAt: string;
+  readonly refresh: string;
+  readonly refreshExpiresAt: string;
+}
+
+/**
+ * Where the app keeps its session, for the SDK to renew it (FE-02). The SDK
+ * never stores anything itself.
+ */
+export interface SessionRenewal {
+  /** The stored refresh token, or null. */
+  readonly getRefreshToken: () => string | null | Promise<string | null>;
+  /**
+   * Stores the renewed pair. The refresh token is rotated: the old one is
+   * spent, and presenting it again revokes the whole session (reuse
+   * detection), so the new one must replace it before anything else reads it.
+   */
+  readonly saveTokens: (tokens: RenewedTokens) => void | Promise<void>;
+  /** The API refused the renewal (session revoked or expired): clear the local session. */
+  readonly onSessionExpired?: () => void | Promise<void>;
+  /**
+   * Runs `fn` exclusively across every copy of the app sharing the stored
+   * session: browser tabs share `localStorage`, and two tabs renewing with the
+   * same refresh token would trip reuse detection. Use `webLocksMutex` in a
+   * browser; a single-process app (React Native) needs none.
+   */
+  readonly withLock?: <T>(fn: () => Promise<T>) => Promise<T>;
+}
+
+/**
+ * A cross-tab mutex on the Web Locks API (all current browsers), for
+ * `SessionRenewal.withLock`. Where the API is missing it runs `fn` directly:
+ * the in-tab single flight still holds, only tabs can race.
+ */
+export function webLocksMutex(name: string): <T>(fn: () => Promise<T>) => Promise<T> {
+  return <T>(fn: () => Promise<T>): Promise<T> => {
+    const locks = (
+      globalThis as {
+        navigator?: { locks?: { request: (n: string, cb: () => Promise<T>) => Promise<T> } };
+      }
+    ).navigator?.locks;
+    return locks ? locks.request(name, fn) : fn();
+  };
 }
 
 /** Typed error mirroring the API's `{ error: { code, message, traceId } }` envelope. */
@@ -45,9 +100,16 @@ export interface RequestOptions {
   readonly accessToken?: string;
 }
 
+/** Internal: a retry after renewal, or the renewal call itself, never renews again. */
+interface InternalRequestOptions extends RequestOptions {
+  readonly noRenew?: boolean;
+}
+
 export class ApiHttp {
   private readonly opts: ApiClientOptions;
   private readonly doFetch: typeof fetch;
+  /** The renewal in flight, shared by every request that got a 401 meanwhile. */
+  private renewing: Promise<string | null> | null = null;
 
   constructor(opts: ApiClientOptions) {
     this.opts = opts;
@@ -84,11 +146,78 @@ export class ApiHttp {
     return this.request<T>('DELETE', path, options);
   }
 
-  private async request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+  /**
+   * Renews the session now (FE-02) and returns the new access token, or null
+   * if it cannot be renewed. Realtime clients call it when the server closed
+   * their socket because the token expired. `staleToken`: the token known to
+   * have expired; if the stored one differs, another request or tab already
+   * renewed and it is returned as is.
+   */
+  async renewSession(staleToken?: string | null): Promise<string | null> {
+    if (!this.opts.session) return null;
+    const stale = staleToken ?? (await this.opts.getAccessToken?.()) ?? null;
+    this.renewing ??= this.doRenew(stale).finally(() => {
+      this.renewing = null;
+    });
+    return this.renewing;
+  }
+
+  private async doRenew(stale: string | null): Promise<string | null> {
+    const session = this.opts.session!;
+    const run = async (): Promise<string | null> => {
+      const current = (await this.opts.getAccessToken?.()) ?? null;
+      if (current && current !== stale) return current; // renewed elsewhere meanwhile
+      const refresh = await session.getRefreshToken();
+      if (!refresh) return null;
+      try {
+        const tokens = await this.request<RenewedTokens>('POST', '/auth/refresh', {
+          body: { refresh },
+          noRenew: true,
+        });
+        await session.saveTokens(tokens);
+        return tokens.access;
+      } catch (err) {
+        // Refused (401: revoked or expired; 403: account no longer active):
+        // the session is over. A network or server error keeps it for later.
+        if (err instanceof ApiClientError && (err.status === 401 || err.status === 403)) {
+          await session.onSessionExpired?.();
+        }
+        return null;
+      }
+    };
+    return session.withLock ? session.withLock(run) : run();
+  }
+
+  private async request<T>(
+    method: string,
+    path: string,
+    options: InternalRequestOptions = {},
+  ): Promise<T> {
+    const storedToken = options.accessToken === undefined;
+    const token = options.accessToken ?? (await this.opts.getAccessToken?.()) ?? null;
+    try {
+      return await this.send<T>(method, path, options, token);
+    } catch (err) {
+      if (!(err instanceof ApiClientError) || err.status !== 401) throw err;
+      // Only a request made with the STORED token (not an anonymous one, not
+      // one given its own token), by an app that gave a session, and never
+      // the renewal call or its retry.
+      if (!this.opts.session || options.noRenew || !storedToken || !token) throw err;
+      const renewed = await this.renewSession(token);
+      if (!renewed) throw err;
+      return this.send<T>(method, path, { ...options, noRenew: true }, renewed);
+    }
+  }
+
+  private async send<T>(
+    method: string,
+    path: string,
+    options: InternalRequestOptions,
+    token: string | null,
+  ): Promise<T> {
     const url = this.buildUrl(path, options.query);
     const headers = new Headers({ accept: 'application/json', ...this.opts.defaultHeaders });
 
-    const token = options.accessToken ?? (await this.opts.getAccessToken?.()) ?? null;
     if (token) headers.set('authorization', `Bearer ${token}`);
     if (options.idempotencyKey) headers.set('idempotency-key', options.idempotencyKey);
 

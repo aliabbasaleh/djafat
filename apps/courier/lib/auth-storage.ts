@@ -58,6 +58,17 @@ export async function saveSession(session: StoredSession): Promise<void> {
   ]);
 }
 
+/** FE-02: the SDK renewed the session; the rotated refresh token replaces the spent one. */
+export async function updateStoredTokens(tokens: {
+  access: string;
+  refresh: string;
+}): Promise<void> {
+  await Promise.all([
+    SecureStore.setItemAsync(ACCESS_KEY, tokens.access),
+    SecureStore.setItemAsync(REFRESH_KEY, tokens.refresh),
+  ]);
+}
+
 export async function clearSession(): Promise<void> {
   await Promise.all([
     SecureStore.deleteItemAsync(ACCESS_KEY),

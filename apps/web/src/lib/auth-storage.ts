@@ -2,7 +2,7 @@
  * Minimal client-side session storage (Bloc 4, docs/22 §17.3). Bloc 1 built
  * the full OTP/session backend; no frontend ever consumed it before now —
  * the cart requires an authenticated actor, so this bloc adds the smallest
- * possible bridge: no refresh-on-401 retry, no cookie/session-management UI,
+ * possible bridge: the session is renewed on a 401 by the SDK (FE-02, `lib/api.ts`), no cookie/session-management UI,
  * just enough to reach `/v1/carts` and `/v1/orders` from the browser.
  * Documented as bounded, not a full identity frontend (docs/23 dette).
  */
@@ -60,6 +60,21 @@ export function setSession(session: { access: string; refresh: string; user: Sto
     window.dispatchEvent(new Event('djafat:auth-changed'));
   } catch {
     // Best-effort — a private-browsing tab with storage blocked simply can't stay logged in.
+  }
+}
+
+/**
+ * The SDK renewed the session (audit finding FE-02): store the new access
+ * token and the ROTATED refresh token, which replaces the spent one. Not an
+ * auth change (same user), so no `djafat:auth-changed` event.
+ */
+export function updateTokens(tokens: { access: string; refresh: string }): void {
+  if (!isBrowser()) return;
+  try {
+    window.localStorage.setItem(ACCESS_KEY, tokens.access);
+    window.localStorage.setItem(REFRESH_KEY, tokens.refresh);
+  } catch {
+    // Best-effort, like setSession.
   }
 }
 

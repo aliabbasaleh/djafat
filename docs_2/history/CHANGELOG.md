@@ -8,6 +8,24 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-028: sessions no longer end after 15 minutes
+
+**Verified:** `pnpm verify:fast` all pass; 9 new SDK unit tests (single renewal for concurrent 401s, refused
+renewal clears, network error keeps, no loop, cross-tab lock, another tab's token reused). Live: the built
+API with 4-second access tokens, driven by the built SDK and a real socket.io client — all 10 checks passed.
+
+**Learned:** the realtime gateway closes a socket whose token expired (sweep every 30 s), and socket.io never
+reconnects after a server-side close, so a board went silent after 15 minutes even with a refresh. With
+rotation and reuse detection, two tabs sharing `localStorage` must not renew at the same time: the API's
+5-second grace absorbs a simultaneous double, not a late stale write.
+
+**Status changes:** `FE-02` fix present on `fix/token-refresh` (0.22.1). T-207 in progress.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`; outside `docs_2/`: `docs/ROADMAP.md`.
+
+---
+
 ## 2026-11-18 — Sync S-027: cancelling an order, and the money that follows
 
 **Verified:** `pnpm verify:fast` all pass; API integration suite 111/111 on a fresh database (8 new

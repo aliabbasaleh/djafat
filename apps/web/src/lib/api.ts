@@ -1,5 +1,5 @@
-import { createApiClient } from '@djafat/sdk';
-import { getAccessToken } from './auth-storage';
+import { createApiClient, webLocksMutex } from '@djafat/sdk';
+import { clearSession, getAccessToken, getRefreshToken, updateTokens } from './auth-storage';
 
 const publicBaseUrl = process.env['NEXT_PUBLIC_API_BASE_URL'] ?? 'http://localhost:3001/v1';
 /**
@@ -23,4 +23,16 @@ const baseUrl =
  * calls only ever happen from Client Components, where the token is
  * actually available.
  */
-export const api = createApiClient({ baseUrl, getAccessToken: () => getAccessToken() });
+export const api = createApiClient({
+  baseUrl,
+  getAccessToken: () => getAccessToken(),
+  // FE-02: access tokens last 15 minutes. On a 401 the SDK renews the session
+  // once and retries; tabs share localStorage, so they renew one at a time
+  // (two renewals with the same refresh token would trip reuse detection).
+  session: {
+    getRefreshToken,
+    saveTokens: updateTokens,
+    onSessionExpired: clearSession,
+    withLock: webLocksMutex('djafat.web.session'),
+  },
+});

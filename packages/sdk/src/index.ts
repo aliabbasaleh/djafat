@@ -66,6 +66,11 @@ export function createApiClient(options: ApiClientOptions) {
     restaurant: createRestaurantClient(http),
     courier: createCourierClient(http),
     auth: createAuthClient(http),
+    /**
+     * FE-02: renews the session now; null if it cannot be. For realtime
+     * clients whose socket the server closed because the token expired.
+     */
+    renewSession: (staleToken?: string | null) => http.renewSession(staleToken),
   };
 }
 

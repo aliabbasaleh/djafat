@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
+import { api } from './api';
 import { getAccessToken } from './auth-storage';
 
 export type RealtimeStatus = 'connecting' | 'live' | 'offline';
@@ -52,8 +53,14 @@ export function useRoomRealtime(
       return;
     }
 
+    // FE-02: the token is read at every (re)connection, so a renewed one is
+    // used; `connectedWith` remembers which one this socket presented.
+    let connectedWith: string | null = token;
     const socket: Socket = io(`${realtimeOrigin()}/rt`, {
-      auth: { token },
+      auth: (cb) => {
+        connectedWith = getAccessToken();
+        cb({ token: connectedWith });
+      },
       transports: ['websocket'],
       reconnection: true,
       reconnectionDelay: 1_000,
@@ -67,7 +74,19 @@ export function useRoomRealtime(
     };
 
     socket.on('connect', join);
-    socket.on('disconnect', () => setStatus('offline'));
+    // The server closes a socket whose access token expired (15 min), and
+    // socket.io never reconnects after a server-side close (FE-02): renew the
+    // session, then reconnect. At most once a minute, so a socket the server
+    // refuses for another reason cannot loop.
+    let lastRenewal = 0;
+    socket.on('disconnect', (reason) => {
+      setStatus('offline');
+      if (reason !== 'io server disconnect' || Date.now() - lastRenewal < 60_000) return;
+      lastRenewal = Date.now();
+      void api.renewSession(connectedWith).then((renewed) => {
+        if (renewed) socket.connect();
+      });
+    });
     socket.on('connect_error', () => setStatus('offline'));
     socket.onAny(() => notifyChange());
 

@@ -575,7 +575,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### FE-02
 
-**No token refresh anywhere: every session ends after 15 minutes** · Partially Completed · High · CODE · Status: Open
+**No token refresh anywhere: every session ends after 15 minutes** · Partially Completed · High · CODE · Status: Open on `main`; fix present on `fix/token-refresh` (version 0.22.1), verified there (sync S-028)
 
 - **Where:** `apps/*/src/lib/auth-storage.ts`, `apps/courier|mobile/lib/auth-*`; `packages/sdk/src/http.ts`.
 - **Observed (code):** all five apps store the refresh token and never use it; on 401 the pages
@@ -587,6 +587,17 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 - **Depends on:** `SDK-01`.
 - **Verify:** keep a board open for 20 minutes; no redirect, events keep arriving.
 - **Sync S-021 re-check (2026-11-18), CODE:** unchanged: no refresh call in the SDK or in any app.
+- **Sync S-028 (2026-11-18), RUN, branch `fix/token-refresh`:** the SDK renews on a 401 to a request made
+  with the stored token: one renewal at a time (concurrent 401s share it), the rotated pair stored by the
+  app, the request retried once; a refused renewal (401/403) clears the session, a network error keeps it.
+  The three web apps renew one tab at a time (Web Locks), since two tabs presenting the same refresh token
+  would trip reuse detection; the Expo apps keep the tokens in memory and SecureStore. The socket hooks read
+  the token at each connection and, after the server closes a socket for an expired token (socket.io never
+  reconnects after that), renew and reconnect, at most once a minute. Live check against the real API with
+  4-second tokens (built SDK, real socket.io client): an expired token is renewed once, six parallel calls
+  share one renewal, the server closed the socket on expiry and it reconnected with a renewed token. Not run:
+  the React hooks themselves in a browser or on a device. The "implementation on the unmerged branch" this
+  finding mentioned no longer exists (that branch was merged; no refresh code was on `main`).
 
 ### FE-03
 
