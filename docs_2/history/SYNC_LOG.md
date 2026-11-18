@@ -10,6 +10,51 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-031 — 2026-11-18 — tracking report of the day
+
+|                 |                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------- |
+| **Trigger**     | The user's request ("report on the changelog to track everything"), after a `git fetch`           |
+| **Range**       | No new commit upstream: `origin/main` still `96c36b9`; our own report commit on `docs/audit-s031` |
+| **Size**        | 1 commit, documentation only                                                                      |
+| **Evidence**    | `git log origin/main..origin/fix/ops-monitoring` (20 commits); CI states read on GitHub           |
+| **Reviewed by** | Claude, in the session that wrote the commit                                                      |
+
+### Added
+
+- The report entry at the top of `history/CHANGELOG.md`; `UNMERGED_BRANCHES.md` §2d (the open stack).
+
+### Removed
+
+- none
+
+### Fixed
+
+- none (no code)
+
+### Changed
+
+- `PROJECT_STATUS.md` points to the report and to the urgent `OPS-06`.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`history/CHANGELOG.md`, `UNMERGED_BRANCHES.md`, `PROJECT_STATUS.md`, `history/LAST_REVIEWED_COMMIT`;
+outside `docs_2/`: `docs/ROADMAP.md`.
+
+### Not verified
+
+- Nothing new was run; the report gathers what syncs S-021 to S-030 verified.
+
+### Marker
+
+`HEAD` → this sync's version commit.
+
+---
+
 ## S-030 — 2026-11-18 — monitoring, tested restore, Oracle trial end, external accounts
 
 |                 |                                                                                          |

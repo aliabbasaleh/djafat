@@ -75,6 +75,9 @@ owner's `fix/payment-reliability-backlog` (§2).
 
 _(updated 2026-11-17, sync S-014)_ New: the owner's `feat/welcome-greeting` (§2c).
 
+_(updated 2026-11-18, sync S-031)_ Ten pull requests of ours are open, #13 to #22, stacked in that
+order; none is merged yet (§2d).
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |
@@ -162,6 +165,29 @@ merged pull request #8 into `main` as `57120ed` (0.21.0); the branch was deleted
 _(updated 2026-11-18, sync S-020)_ The owner's pull request #12 (`fix/logo-arrowhead-and-favicons`) was merged into `main` as
 `8ceb437` (0.21.2) and its branch deleted. Our #11 (`docs/audit-s018`) brings `main` in again and is
 renumbered 0.21.3.
+
+## 2d. The open stack, pull requests #13 to #22 (20 commits) _(added 2026-11-18, sync S-031)_
+
+Our own branches, opened on 18 November, each stacked on the one before. Base: `main` @ `96c36b9`
+(DJAFAT 0.21.3). The full report, with the decisions they wait for, is the first entry of
+[`history/CHANGELOG.md`](history/CHANGELOG.md).
+
+| PR  | Branch                    | Version | Findings                        | What it does                                                                                                          | Verified                                                                 | CI                                   |
+| --- | ------------------------- | ------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------ |
+| #13 | `docs/audit-s021`         | 0.21.4  | (audit)                         | The 21 open Critical/High findings re-checked against `main`                                                          | CODE/LIVE re-check, recorded per finding                                 | green                                |
+| #14 | `fix/test-loopback`       | 0.21.5  | `TEST-04`                       | Integration tests listen on 127.0.0.1 (cause: port collision with Prisma's query engine on macOS)                     | Full suite 5 runs out of 5 green (3 of 12 failed before)                 | green                                |
+| #15 | `fix/env-init`            | 0.21.6  | `DOC-03`                        | `pnpm env:init`: real random secrets in the local `.env`                                                              | 5 unit tests; a Windows CI step                                          | green                                |
+| #16 | `fix/favicon-512`         | 0.21.7  | `FE-06` (follow-up)             | Favicon 512 px, 44 KB instead of 521 KB                                                                               | Image checked by eye; builds                                             | green                                |
+| #17 | `fix/mobile-typed-routes` | 0.21.8  | `TEST-05`                       | Typed navigation in the mobile app; no known failure left                                                             | Type check with and without generated routes; `expo export` of both apps | green                                |
+| #18 | `fix/admin-roles`         | 0.21.9  | `ADM-01`, `ADM-02` (part)       | Finance can enrol MFA; no status change on oneself or a superior; sessions revoked; refresh refuses inactive accounts | Integration 103/103 (6 new)                                              | green                                |
+| #19 | `fix/order-cancel-refund` | 0.22.0  | `ORD-01`, `PAY-04`, `ORD-02`    | Customer and staff cancel; automatic refund and accrual reversal; hand-refund queue; confirmation timeout job         | Integration 111/111 (8 new); the worker job run against PostgreSQL       | green                                |
+| #20 | `fix/token-refresh`       | 0.22.1  | `FE-02`                         | Session renewal in the SDK and the five apps; sockets renew and reconnect                                             | 9 SDK tests; live check against the API with 4-second tokens, 10/10      | green                                |
+| #21 | `fix/admin-console-mfa`   | 0.23.0  | `ADM-03`, `ADM-02` (step-up)    | Console MFA page and code prompt; refunds page; order cancel button; finance access                                   | Integration 112/112; rendered in Chromium against the test API           | green                                |
+| #22 | `fix/ops-monitoring`      | 0.23.1  | `OPS-02` (part), `OPS-06` (new) | Health check with phone alerts; weekly restore check; Oracle trial-end plan; external accounts checklist              | Restore drill on a real dump; scripts tested locally                     | running (3 of 5 passed when written) |
+
+Merge them in that order, each only once its Linux and Windows checks are green. #17 waits for the
+owner's review (the mobile app is their area), and the later ones wait with it; #18 to #22 can be
+re-stacked on #16 if needed. #19 also waits for DJAFAT's decision on the refund policy (`docs/37`).
 
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
 
