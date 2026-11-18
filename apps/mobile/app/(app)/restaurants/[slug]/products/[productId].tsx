@@ -84,9 +84,10 @@ export default function ProductDetailScreen() {
   async function submit(replaceCart: boolean) {
     if (!product) return;
     if (authState !== 'signed-in') {
-      router.push(
-        `/(auth)/login?redirect=${encodeURIComponent(`/(app)/restaurants/${slug}/products/${productId}`)}` as `/${string}`,
-      );
+      router.push({
+        pathname: '/(auth)/login',
+        params: { redirect: `/(app)/restaurants/${slug}/products/${productId}` },
+      });
       return;
     }
     setError(null);

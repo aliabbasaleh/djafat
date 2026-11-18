@@ -89,9 +89,7 @@ export default function OrderTrackingScreen() {
       setState('ready');
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
-        router.push(
-          `/(auth)/login?redirect=${encodeURIComponent(`/(app)/orders/${id}`)}` as `/${string}`,
-        );
+        router.push({ pathname: '/(auth)/login', params: { redirect: `/(app)/orders/${id}` } });
         return;
       }
       setState(err instanceof ApiClientError && err.status === 404 ? 'not-found' : 'error');
@@ -100,9 +98,7 @@ export default function OrderTrackingScreen() {
 
   useEffect(() => {
     if (authState === 'signed-out') {
-      router.replace(
-        `/(auth)/login?redirect=${encodeURIComponent(`/(app)/orders/${id}`)}` as `/${string}`,
-      );
+      router.replace({ pathname: '/(auth)/login', params: { redirect: `/(app)/orders/${id}` } });
       return;
     }
     if (authState === 'signed-in') void loadOrder();

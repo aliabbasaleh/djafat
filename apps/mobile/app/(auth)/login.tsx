@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { tokens } from '@djafat/tokens';
 import { Screen } from '../../components/Screen';
@@ -57,7 +57,13 @@ export default function LoginScreen() {
           fullName: result.user.fullName,
         },
       });
-      router.replace((redirect as `/${string}`) ?? '/(app)/restaurants');
+      // `redirect` comes from the URL, so it cannot be typed statically: only an
+      // in-app path is followed, anything else falls back to the restaurants.
+      router.replace(
+        typeof redirect === 'string' && redirect.startsWith('/(app)/')
+          ? (redirect as Href)
+          : '/(app)/restaurants',
+      );
     } catch {
       setError('Code invalide ou expiré.');
     } finally {

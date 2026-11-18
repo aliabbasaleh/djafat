@@ -416,6 +416,9 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   for the mobile app, the courier's build) is green on `main` (`8ceb437`), and the courier's web
   export built locally on 2026-11-17. Neither app has run on an Android device: that half of Verify
   is still to do.
+- **Sync S-025 note (2026-11-18), RUN:** `turbo run build` for `@djafat/mobile` and `@djafat/courier` succeeded
+  locally (`expo export`: "Exported: dist" for both), so their 2026-11-06 entries in `known-failures.json`
+  ("Metro cannot resolve `invariant`") were stale; removed on `fix/mobile-typed-routes` (0.21.8).
 
 ---
 
@@ -1216,7 +1219,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### TEST-05
 
-**The mobile typecheck is silenced by a known-failure entry** · Needs Improvement · Low · CODE · Status: Open _(added 2026-11-17, sync S-014; on `main` since pull request #8, `57120ed`, sync S-019)_ — `cabf058` on `feat/welcome-greeting` records `@djafat/mobile#typecheck` in `scripts/pipeline/baselines/known-failures.json` as pre-existing ("expo-router's generated route-literal type is stale…"). On `main` it passes (RUN, 2026-11-17: `turbo run typecheck --filter=@djafat/mobile`, and in every `verify:fast` run that day; CI green): it fails only where Expo has generated its typed routes (`.expo/types`, gitignored), against calls such as `router.push(`/orders/${id}`)`. Once the entry is in, any real mobile type error is reported as pre-existing on every machine. Fix: write those calls in typed-route form (or regenerate the types) and drop the entry. Verify: with `.expo/types` generated, `pnpm --filter @djafat/mobile typecheck` passes.
+**The mobile typecheck is silenced by a known-failure entry** · Needs Improvement · Low · CODE · Status: Open on `main`; fix present on `fix/mobile-typed-routes` (version 0.21.8), verified there (sync S-025) _(added 2026-11-17, sync S-014; on `main` since pull request #8, `57120ed`, sync S-019)_ — `cabf058` on `feat/welcome-greeting` records `@djafat/mobile#typecheck` in `scripts/pipeline/baselines/known-failures.json` as pre-existing ("expo-router's generated route-literal type is stale…"). On `main` it passes (RUN, 2026-11-17: `turbo run typecheck --filter=@djafat/mobile`, and in every `verify:fast` run that day; CI green): it fails only where Expo has generated its typed routes (`.expo/types`, gitignored), against calls such as `router.push(`/orders/${id}`)`. Once the entry is in, any real mobile type error is reported as pre-existing on every machine. Fix: write those calls in typed-route form (or regenerate the types) and drop the entry. Verify: with `.expo/types` generated, `pnpm --filter @djafat/mobile typecheck` passes. _Sync S-025 note (2026-11-18), RUN: reproduced (Expo's dev server generated `.expo/types`; the type check then failed with 9 errors, all calls cast to `` `/${string}` ``). The nine calls now use typed-route objects (`{ pathname, params }`), and login only follows an in-app `redirect` (`/(app)/…`). The type check passes with the generated types (0 errors) and without them, as in CI (0 errors); the `@djafat/mobile#typecheck`entry is removed from`known-failures.json`, together with the stale `@djafat/mobile#build`and`@djafat/courier#build`entries (both apps build:`expo export` succeeded for each). Navigation not run on a device.\_
 
 ---
 

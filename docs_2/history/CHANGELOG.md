@@ -8,6 +8,19 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-025: the mobile type check honest again
+
+**Verified:** with Expo's generated typed routes, the mobile type check failed with 9 errors (reproduced); after
+the fix, 0 errors with and without them. `expo export` succeeds for the mobile and courier apps.
+
+**Status changes:** `TEST-05` fix present on `fix/mobile-typed-routes` (0.21.8), for the owner's review;
+`known-failures.json` has no entry left (the two build entries were stale). T-610 in progress.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-18 — Sync S-024: lighter favicons
 
 **Changed:** the « D » favicon of the web, admin and restaurant apps resized from 2048 px (521 KB) to

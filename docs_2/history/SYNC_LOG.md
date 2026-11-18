@@ -10,6 +10,53 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-025 — 2026-11-18 — the mobile type check honest again
+
+|                 |                                                                                         |
+| --------------- | --------------------------------------------------------------------------------------- |
+| **Trigger**     | Our own commit, at the user's request (the owner's area: pull request for their review) |
+| **Range**       | `fix/mobile-typed-routes` (stacked on pull request #16)                                 |
+| **Size**        | 1 commit: 5 mobile screens, `known-failures.json`, version files                        |
+| **Evidence**    | RUN — type check with and without generated routes; both Expo builds                    |
+| **Reviewed by** | Claude, in the session that wrote the commit                                            |
+
+### Added
+
+- none
+
+### Removed
+
+- The three entries of `known-failures.json` (`@djafat/mobile#typecheck`, and the stale
+  `@djafat/mobile#build` and `@djafat/courier#build`).
+
+### Fixed
+
+- `TEST-05` on the branch (not yet merged).
+
+### Changed
+
+- Nine navigation calls in the mobile app use typed-route objects; login follows only an in-app
+  `redirect`.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- The navigation on a device.
+
+### Marker
+
+`HEAD` → this sync's version commit.
+
+---
+
 ## S-024 — 2026-11-18 — lighter favicons
 
 |                 |                                                 |
