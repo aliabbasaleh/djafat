@@ -10,6 +10,53 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-029 — 2026-11-18 — admin console: MFA, step-up prompt, refunds and order cancel
+
+|                 |                                                                                                                                    |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **Trigger**     | Our own commit, at the user's request ("fix those also")                                                                           |
+| **Range**       | `fix/admin-console-mfa` (stacked on pull request #20)                                                                              |
+| **Size**        | 1 commit: admin console (layout, 2 new pages, orders, user page, step-up), API (MFA status, step-up on status changes), SDK, tests |
+| **Evidence**    | RUN — unit tests, integration suite 112/112, console rendered in Chromium                                                          |
+| **Reviewed by** | Claude, in the session that wrote the commit                                                                                       |
+
+### Added
+
+- `GET /v1/auth/mfa/status`; SDK `mfaStatus`/`mfaSetup`/`mfaVerify`; console pages `/admin/security`,
+  `/admin/refunds`; `StepUpProvider`/`useStepUp`; order cancel button.
+
+### Removed
+
+- The unit test asserting `suspend`/`block`/`reactivate` are not step-up-gated (replaced, see Changed).
+
+### Fixed
+
+- `ADM-03` on the branch; `ADM-02` step-up part.
+
+### Changed
+
+- `suspend`/`block`/`reactivate` require a step-up; `finance` can log in to the console.
+
+### New findings
+
+- none (courier `suspend`/`reinstate` stay ungated: noted under `ADM-02`)
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- A finance account in the browser; the step-up prompt on role and status changes (same code path as the
+  order cancellation, rendered).
+
+### Marker
+
+`HEAD` → this sync's version commit.
+
+---
+
 ## S-028 — 2026-11-18 — session renewal in the SDK and all five apps
 
 |                 |                                                                              |

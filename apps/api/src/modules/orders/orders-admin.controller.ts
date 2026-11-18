@@ -39,7 +39,8 @@ export class OrdersAdminController {
   }
 
   /**
-   * Staff cancel an order (ORD-01): any status up to `courier_assigned`. The
+   * Staff cancel an order (ORD-01): awaiting payment, or any status up to
+   * `courier_assigned` (the order state machine decides). The
    * delivery in progress is cancelled and a paid order refunded (PAY-04).
    * Money moves, so a recent MFA step-up is required (docs/05 §5.4).
    */

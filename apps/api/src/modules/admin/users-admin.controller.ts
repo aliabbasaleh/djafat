@@ -60,18 +60,12 @@ import {
  * only a super_admin acts on an admin or super_admin. Suspending or blocking
  * also ends every session of the target, so its refresh tokens die with it.
  *
- * Step-up is deliberately NOT applied to `suspend`/`block`/`reactivate` here, nor to
- * `couriers-admin.controller.ts`'s `suspend`/`reinstate`: those are already
- * wired into a live Admin UI page (`apps/admin/.../users/[id]/page.tsx`,
- * `.../couriers/page.tsx`) with no step-up UI of any kind — gating them
- * would 428 a currently-working admin feature with no way to recover from
- * the UI, which is a worse outcome than the documented gap (and building
- * that UI is out of scope for this bloc). Role mutation is the one action
- * in this controller whose compromise is irreversible/persistent (standing
- * access for an attacker), unlike suspend/block/reactivate which are
- * reversible housekeeping — so it is the one worth this trade-off. See
- * docs/31 §mfa-effective for the full reasoning and the residual debt this
- * leaves.
+ * `suspend`/`block`/`reactivate` also carry `@RequireStepUp(MFA_REQUIRED_ROLES)`
+ * since the admin console can prompt for a TOTP code (audit ADM-02, ADM-03;
+ * docs/05 §5.4 lists account suspension among the step-up actions). Before
+ * that screen existed they were deliberately left ungated: gating them would
+ * have answered 428 to a working console button with no way to recover.
+ * `couriers-admin.controller.ts`'s `suspend`/`reinstate` are not gated yet.
  */
 @ApiTags('admin')
 @Controller('admin/users')
@@ -149,6 +143,7 @@ export class UsersAdminController {
   @Post(':id/suspend')
   @HttpCode(200)
   @RequireAuth()
+  @RequireStepUp(MFA_REQUIRED_ROLES)
   @RequireRole('admin', 'super_admin')
   @RequirePermission('users:write')
   async suspend(
@@ -164,6 +159,7 @@ export class UsersAdminController {
   @Post(':id/block')
   @HttpCode(200)
   @RequireAuth()
+  @RequireStepUp(MFA_REQUIRED_ROLES)
   @RequireRole('admin', 'super_admin')
   @RequirePermission('users:write')
   async block(
@@ -179,6 +175,7 @@ export class UsersAdminController {
   @Post(':id/reactivate')
   @HttpCode(200)
   @RequireAuth()
+  @RequireStepUp(MFA_REQUIRED_ROLES)
   @RequireRole('admin', 'super_admin')
   @RequirePermission('users:write')
   async reactivate(

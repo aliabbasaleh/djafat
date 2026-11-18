@@ -8,6 +8,23 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-029: the admin console can pass a step-up
+
+**Verified:** `pnpm verify:fast` all pass; API integration suite 112/112; 6 unit tests of the console's
+step-up flow; the console built and rendered in Chromium against the test API (enrolment with a real TOTP
+code, the code prompt on an order cancellation, the order cancelled in the database, the refunds page).
+
+**Learned:** the console admitted only admin, super_admin and support, so `finance` could not use it even
+with `ADM-01` fixed; it now reaches the Finance, Remboursements and Sécurité pages.
+
+**Status changes:** `ADM-03` fix present on `fix/admin-console-mfa` (0.23.0); `ADM-02` complete across two
+branches. T-214, T-303 in progress.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`; outside `docs_2/`: `docs/37`, `docs/07`, `docs/ROADMAP.md`.
+
+---
+
 ## 2026-11-18 — Sync S-028: sessions no longer end after 15 minutes
 
 **Verified:** `pnpm verify:fast` all pass; 9 new SDK unit tests (single renewal for concurrent 401s, refused

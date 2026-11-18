@@ -105,7 +105,19 @@ export function isAuthenticated(): boolean {
  * job; the API checks every route's roles anyway.
  */
 export function hasAdminAccess(user: StoredAdminUser | null): boolean {
-  return !!user && (isFullAdmin(user) || user.roles.includes('support'));
+  return (
+    !!user &&
+    (isFullAdmin(user) || user.roles.includes('support') || user.roles.includes('finance'))
+  );
+}
+
+/**
+ * ADM-01/ADM-03: `finance` refunds and records settlements; it reaches the
+ * console's finance, refund and security pages (the API still decides every
+ * action).
+ */
+export function isFinance(user: StoredAdminUser | null): boolean {
+  return !!user && user.roles.includes('finance');
 }
 
 export function isFullAdmin(user: StoredAdminUser | null): boolean {

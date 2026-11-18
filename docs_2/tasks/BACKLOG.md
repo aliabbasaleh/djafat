@@ -232,7 +232,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-214 · MFA and operational screens in the admin console
 
-- **Area:** `apps/admin` · **Priority:** High · **Status:** Not started
+- **Area:** `apps/admin` · **Priority:** High · **Status:** In progress — MFA enrolment, step-up prompt, refunds and order cancel on `fix/admin-console-mfa` (0.23.0); restaurant activation and courier onboarding screens left _(sync S-029)_
 - **Why:** [`ADM-03`](../FINDINGS.md#adm-03) · **Depends on:** T-101, T-213
 - **Done when:** enrolment and step-up exist; refunds, order actions, restaurant activation and courier onboarding can be done from the console.
 - **Test:** browser test of a role grant and a refund.
@@ -278,7 +278,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-303 · Staff hierarchy guard and step-up on account actions
 
-- **Area:** `apps/api` users/admin · **Priority:** High · **Status:** In progress — hierarchy, self-protection and session revocation on `fix/admin-roles` (0.21.9); step-up waits for T-214 _(sync S-026)_
+- **Area:** `apps/api` users/admin · **Priority:** High · **Status:** In progress — hierarchy, self-protection and session revocation on `fix/admin-roles` (0.21.9), step-up on `fix/admin-console-mfa` (0.23.0); done when merged _(syncs S-026, S-029)_
 - **Why:** [`ADM-02`](../FINDINGS.md#adm-02) · **Depends on:** T-214
 - **Done when:** no action on an equal or higher role or on oneself; target sessions revoked.
 - **Test:** integration tests.

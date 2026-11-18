@@ -823,7 +823,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### ADM-02
 
-**An `admin` can block a `super_admin`** · Needs Improvement · High · LIVE · Status: Open on `main`; partly fixed on `fix/admin-roles` (0.21.9): hierarchy, sessions and refresh verified there; step-up still missing (sync S-026)
+**An `admin` can block a `super_admin`** · Needs Improvement · High · LIVE · Status: Open on `main`; fix present across `fix/admin-roles` (0.21.9: hierarchy, sessions, refresh) and `fix/admin-console-mfa` (0.23.0: step-up), verified there (syncs S-026, S-029)
 
 - **Where:** `users.service.ts` `setStatus`; `users-admin.controller.ts` suspend/block/reactivate.
 - **Observed:** `admin` blocked the `super_admin`, whose next request got 403, then reactivated it.
@@ -841,10 +841,15 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   (it renewed tokens for blocked users before) and ends its sessions. Unit and integration tests: admin →
   super_admin block 403, self-block 403, a blocked customer's refresh token stays dead after reactivation.
   Still open: step-up on these routes, which waits for the console's MFA screen (`ADM-03`).
+- **Sync S-029 (2026-11-18), RUN, branch `fix/admin-console-mfa`:** `suspend`/`block`/`reactivate` now carry
+  `@RequireStepUp(MFA_REQUIRED_ROLES)`, the console prompting for the code. The unit test that pinned the old
+  deliberate gap (its reason: no console step-up flow) is replaced by one asserting the gate. Integration:
+  without a step-up 428, then the hierarchy scenarios with a stepped-up admin. Courier `suspend`/`reinstate`
+  are still ungated.
 
 ### ADM-03
 
-**Role management in the admin console cannot work: no MFA screen** · Broken · High · CODE · Status: Open
+**Role management in the admin console cannot work: no MFA screen** · Broken · High · CODE · Status: Open on `main`; fix present on `fix/admin-console-mfa` (version 0.23.0), verified there (sync S-029)
 
 - **Where:** `apps/admin/src` (no file mentions MFA, TOTP or step-up); `app/admin/users/[id]/page.tsx` offers role grant and revoke.
 - **Observed:** through the API, a role grant without step-up answers 428 (LIVE). The console has no
@@ -855,6 +860,14 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Verify:** grant a role from the console after entering a TOTP code.
 - **Sync S-021 re-check (2026-11-18), CODE:** unchanged: no file in `apps/admin/src` mentions TOTP,
   MFA or step-up.
+- **Sync S-029 (2026-11-18), RUN, branch `fix/admin-console-mfa`:** a "Sécurité" page enrols MFA (the key
+  grouped by four and an `otpauth://` link; no QR code, to avoid a new dependency) and opens the step-up
+  window; any console action answered 428 opens a code prompt and is retried (`lib/step-up-flow.ts`, 6 unit
+  tests): roles, account status, the new "Remboursements" page (hand refunds of `PAY-04`) and an "Annuler"
+  button on the orders list. New `GET /v1/auth/mfa/status`. `finance` can now log in to the console (Finance,
+  Remboursements, Sécurité pages). Rendered in Chromium against the test API: enrolment with a real TOTP code,
+  the prompt on an order cancellation then the order cancelled in the database, the refunds page with and
+  without a pending row. Still missing: restaurant activation and settlement screens.
 
 ### GOV-01
 

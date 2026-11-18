@@ -31,6 +31,20 @@ export interface MeProfile {
   readonly roles: readonly string[];
 }
 
+/** ADM-03: the caller's MFA state (`GET /auth/mfa/status`). */
+export interface MfaStatus {
+  readonly enabled: boolean;
+  /** Until when this session's step-up lasts; null when there is none. */
+  readonly stepUpValidUntil: string | null;
+}
+
+/** ADM-03: what enrolment returns, once: the key to type into an authenticator app. */
+export interface MfaEnrolment {
+  readonly secretBase32: string;
+  /** `otpauth://totp/...`: opens the authenticator app directly on a phone. */
+  readonly enrollmentUri: string;
+}
+
 export function createAuthClient(http: ApiHttp) {
   /** Revoke the server session (refreshing once if needed). Never throws. */
   async function revoke(refresh: string | null): Promise<SignOutResult> {
@@ -71,6 +85,16 @@ export function createAuthClient(http: ApiHttp) {
     /** The code makes the address verified: it can then be used to log in. */
     confirmEmail: (email: string, code: string) =>
       http.post<MeProfile>('/me/email/verify', { body: { email, code } }),
+    /**
+     * ADM-03 — staff MFA (admin, super_admin, finance). `mfaVerify` confirms a
+     * pending enrolment the first time, and opens a step-up window (10 min)
+     * every time after: the second factor sensitive actions ask for (428
+     * `STEP_UP_REQUIRED` otherwise).
+     */
+    mfaStatus: () => http.get<MfaStatus>('/auth/mfa/status'),
+    mfaSetup: () => http.post<MfaEnrolment>('/auth/mfa/setup'),
+    mfaVerify: (code: string) =>
+      http.post<{ justEnabled: boolean }>('/auth/mfa/verify', { body: { code } }),
     /** Login methods available on this deployment (FEAT-008): WhatsApp, SMS, e-mail. */
     methods: () =>
       http.get<{

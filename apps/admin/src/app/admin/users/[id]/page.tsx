@@ -6,8 +6,10 @@ import { ApiClientError, type AdminUserDetail, type AdminRestaurantSummary } fro
 import type { Role } from '@djafat/types';
 import { Heading, Text, Stack, Badge, ErrorState, Skeleton, cx } from '@djafat/ui';
 import { Button, Select, Alert } from '@/components/ui-client';
+import { useStepUp } from '@/components/StepUp';
 import { api } from '@/lib/api';
 import { clearSession } from '@/lib/auth-storage';
+import { StepUpCancelled } from '@/lib/step-up-flow';
 import styles from './page.module.css';
 
 type LoadState = 'loading' | 'ready' | 'error' | 'not-found';
@@ -33,6 +35,9 @@ export default function AdminUserDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const userId = params.id;
+  // ADM-03: role changes and account status need a recent MFA step-up;
+  // `withStepUp` asks for the TOTP code when the API answers 428.
+  const withStepUp = useStepUp();
 
   const [state, setState] = useState<LoadState>('loading');
   const [user, setUser] = useState<AdminUserDetail | null>(null);
@@ -80,9 +85,10 @@ export default function AdminUserDetailPage() {
         setActionError('Sélectionnez un restaurant pour ce rôle.');
         return;
       }
-      await api.admin.users.grantRole(userId, grantRole, scopeRestaurantId);
+      await withStepUp(() => api.admin.users.grantRole(userId, grantRole, scopeRestaurantId));
       await load();
     } catch (err) {
+      if (err instanceof StepUpCancelled) return;
       setActionError(
         err instanceof ApiClientError ? err.message : 'Impossible d’attribuer ce rôle.',
       );
@@ -97,9 +103,12 @@ export default function AdminUserDetailPage() {
     setActionError(null);
     setBusy(true);
     try {
-      await api.admin.users.revokeRole(userId, role, scopeRestaurantId ?? undefined);
+      await withStepUp(() =>
+        api.admin.users.revokeRole(userId, role, scopeRestaurantId ?? undefined),
+      );
       await load();
     } catch (err) {
+      if (err instanceof StepUpCancelled) return;
       setActionError(
         err instanceof ApiClientError ? err.message : 'Impossible de révoquer ce rôle.',
       );
@@ -122,9 +131,10 @@ export default function AdminUserDetailPage() {
     setActionError(null);
     setBusy(true);
     try {
-      await api.admin.users[action](userId, reason);
+      await withStepUp(() => api.admin.users[action](userId, reason));
       await load();
     } catch (err) {
+      if (err instanceof StepUpCancelled) return;
       setActionError(err instanceof ApiClientError ? err.message : 'Action impossible.');
     } finally {
       setBusy(false);
