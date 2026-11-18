@@ -1168,7 +1168,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### FE-06
 
-**Interface polish gaps** · Needs Improvement · Low · LIVE — no favicon in the three apps (404); on a 390 px screen the header wraps "Déconnexion — Client Test"; the admin order list shows raw status identifiers; the courier list shows only a UUID; login errors are generic whatever the cause. _Sync S-020 note (2026-11-18), CODE: the favicon part is fixed on `main` (`b141593`, pull request #12): the three web apps use the « D » icon through Next.js's `app/icon.png`; each is the 2048 px, 521 KB original, heavy for a favicon (a 512 px version would do). Not checked in a browser._
+**Interface polish gaps** · Needs Improvement · Low · LIVE — no favicon in the three apps (404); on a 390 px screen the header wraps "Déconnexion — Client Test"; the admin order list shows raw status identifiers; the courier list shows only a UUID; login errors are generic whatever the cause. _Sync S-020 note (2026-11-18), CODE: the favicon part is fixed on `main` (`b141593`, pull request #12): the three web apps use the « D » icon through Next.js's `app/icon.png`; each is the 2048 px, 521 KB original, heavy for a favicon (a 512 px version would do). Not checked in a browser._ _Sync S-024 note (2026-11-18): the three favicons are 512 px, 44 KB instead of 521 KB, on `fix/favicon-512` (version 0.21.7); same image, resized._
 
 ### DB-01
 
