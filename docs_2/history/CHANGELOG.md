@@ -8,6 +8,27 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-034: everything merged — `main` is DJAFAT 0.23.4
+
+**Verified:** at the user's request, #17 to #24 were merged in order, each only after its five checks were green
+and GitHub reported it mergeable (merge commits `0ab2644`, `e3f0d03`, `c1ea1e5`, `e78a6d8`, `83237aa`, `3e92261`,
+`47370de`, `afaa7c2`). `main`'s tree is identical to the verified tip of #24. No pull request of ours is open.
+
+**Status changes:** resolved on `main`: `TEST-05`, `ADM-01`, `ADM-02`, `ORD-01`, `PAY-04`, `ORD-02`, `ADM-03`,
+`SEC-02`, `OPS-05`. `FE-02` is merged but stays open until a real browser session confirms it. `OPS-02` stays open:
+the scripts are on `main`, not yet installed on the server. `OPS-06` (the trial server) waits for DJAFAT. Counts:
+49 open (3 Critical, 11 High, 22 Medium, 13 Low), 21 resolved. T-204, T-205, T-206, T-213, T-302, T-303, T-610
+done.
+
+**Merging meant two decisions:** #17 went in without the owner's review, and #19 brought the refund split of
+`docs/37` to `main`; both at the user's explicit request. Nothing is deployed: the server changes only when
+someone runs `install.sh` there.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `tasks/BACKLOG.md`,
+`history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`; outside `docs_2/`: `docs/ROADMAP.md`.
+
+---
+
 ## 2026-11-18 — Sync S-033: a live server can start, without test accounts
 
 **Verified:** on a fresh database (never the user's data): the reference run as a production server leaves no

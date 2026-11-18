@@ -156,28 +156,28 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-204 · Order cancellation for customers and staff
 
-- **Area:** `apps/api` orders, SDK, web, admin · **Priority:** High · **Status:** In progress — API, SDK, web and mobile buttons on `fix/order-cancel-refund` (0.22.0); console screen waits for T-214 _(sync S-027)_
+- **Area:** `apps/api` orders, SDK, web, admin · **Priority:** High · **Status:** Done — on `main` (#19 `c1ea1e5`; the console's cancel button with #21) _(sync S-034)_
 - **Why:** [`ORD-01`](../FINDINGS.md#ord-01) · **Depends on:** T-205
 - **Done when:** the transitions already in the state machine are reachable, with the right roles, and visible in the apps.
 - **Test:** integration tests per status and role.
 
 ### T-205 · Automatic refund and ledger reversal
 
-- **Area:** `apps/api` payments/ledger/orders · **Priority:** High · **Status:** In progress — on `fix/order-cancel-refund` (0.22.0) with the policy of `docs/37`, for DJAFAT to confirm; done when merged _(sync S-027)_
+- **Area:** `apps/api` payments/ledger/orders · **Priority:** High · **Status:** Done — on `main` (#19 `c1ea1e5`), with the policy of `docs/37` _(sync S-034)_
 - **Why:** [`PAY-04`](../FINDINGS.md#pay-04) · **Depends on:** T-103, policy decision
 - **Done when:** a paid order that ends rejected, cancelled or failed is refunded and its accrual reversed, per the policy.
 - **Test:** integration tests for each terminal path; ledger balanced, payables zero.
 
 ### T-206 · Restaurant confirmation timeout
 
-- **Area:** `apps/worker`, `apps/api` · **Priority:** High · **Status:** In progress — job on `fix/order-cancel-refund` (0.22.0), 15 min default to confirm _(sync S-027)_
+- **Area:** `apps/worker`, `apps/api` · **Priority:** High · **Status:** Done — on `main` (#19 `c1ea1e5`); the 15-minute default is a setting _(sync S-034)_
 - **Why:** [`ORD-02`](../FINDINGS.md#ord-02) · **Depends on:** T-204, T-205
 - **Done when:** an unconfirmed paid order is cancelled and refunded after a configurable delay; customer and operations are told.
 - **Test:** worker integration test with a shortened delay.
 
 ### T-207 · Token refresh in the SDK and all apps
 
-- **Area:** `packages/sdk`, all five apps · **Priority:** High · **Status:** In progress — on `fix/token-refresh` (0.22.1); the 20-minute browser session not run yet _(sync S-028)_
+- **Area:** `packages/sdk`, all five apps · **Priority:** High · **Status:** In progress — on `main` (#20 `e78a6d8`); the 20-minute browser session not run yet _(sync S-034)_
 - **Why:** [`FE-02`](../FINDINGS.md#fe-02) · **Depends on:** T-101 (exists in part on branch)
 - **Done when:** sessions last as long as the refresh token; sockets reconnect with fresh tokens.
 - **Test:** 20-minute browser session without redirect; unit test for concurrent 401s.
@@ -225,14 +225,14 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-213 · MFA for every role that faces a step-up
 
-- **Area:** `apps/api` auth · **Priority:** High · **Status:** In progress — fixed on `fix/admin-roles` (0.21.9); done when merged _(sync S-026)_
+- **Area:** `apps/api` auth · **Priority:** High · **Status:** Done — on `main` (#18 `e3f0d03`) _(sync S-034)_
 - **Why:** [`ADM-01`](../FINDINGS.md#adm-01) · **Depends on:** —
 - **Done when:** `finance` can enrol, verify, refund and record a settlement.
 - **Test:** integration test as finance.
 
 ### T-214 · MFA and operational screens in the admin console
 
-- **Area:** `apps/admin` · **Priority:** High · **Status:** In progress — MFA enrolment, step-up prompt, refunds and order cancel on `fix/admin-console-mfa` (0.23.0); restaurant activation and courier onboarding screens left _(sync S-029)_
+- **Area:** `apps/admin` · **Priority:** High · **Status:** In progress — MFA enrolment, step-up prompt, refunds and order cancel on `main` (#21 `83237aa`); settlement, restaurant activation and courier onboarding screens left _(sync S-034)_
 - **Why:** [`ADM-03`](../FINDINGS.md#adm-03) · **Depends on:** T-101, T-213
 - **Done when:** enrolment and step-up exist; refunds, order actions, restaurant activation and courier onboarding can be done from the console.
 - **Test:** browser test of a role grant and a refund.
@@ -271,14 +271,14 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-302 · Separate production bootstrap from development fixtures
 
-- **Area:** `apps/api/prisma` · **Priority:** High · **Status:** In progress — on `fix/live-bootstrap` (0.23.4), verified on a fresh database; done when merged _(sync S-033)_
+- **Area:** `apps/api/prisma` · **Priority:** High · **Status:** Done — on `main` (#24 `afaa7c2`) _(sync S-034)_
 - **Why:** [`SEC-02`](../FINDINGS.md#sec-02); on the active branch also [`OPS-05`](../FINDINGS.md#ops-05) _(sync S-001)_ · **Depends on:** —
 - **Done when:** production can be initialised without test users or the mock provider — the reference data is created in every deployment mode, fixtures only in demo/development; a documented command creates the first super_admin.
 - **Test:** bootstrap on an empty database; fixtures refuse `NODE_ENV=production`.
 
 ### T-303 · Staff hierarchy guard and step-up on account actions
 
-- **Area:** `apps/api` users/admin · **Priority:** High · **Status:** In progress — hierarchy, self-protection and session revocation on `fix/admin-roles` (0.21.9), step-up on `fix/admin-console-mfa` (0.23.0); done when merged _(syncs S-026, S-029)_
+- **Area:** `apps/api` users/admin · **Priority:** High · **Status:** Done — on `main` (#18 `e3f0d03`, #21 `83237aa`) _(sync S-034)_
 - **Why:** [`ADM-02`](../FINDINGS.md#adm-02) · **Depends on:** T-214
 - **Done when:** no action on an equal or higher role or on oneself; target sessions revoked.
 - **Test:** integration tests.
@@ -448,7 +448,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-603 · Deployment stack
 
-- **Area:** `infra/` · **Priority:** High · **Why:** [`OPS-02`](../FINDINGS.md#ops-02), [`OPS-06`](../FINDINGS.md#ops-06) · **Status:** In progress — restore drill passed locally; `healthcheck.sh` and `restore-check.sh` on `fix/ops-monitoring` (0.23.1), to install on the server; hosting decision before the Oracle trial ends _(sync S-030)_
+- **Area:** `infra/` · **Priority:** High · **Why:** [`OPS-02`](../FINDINGS.md#ops-02), [`OPS-06`](../FINDINGS.md#ops-06) · **Status:** In progress — restore drill passed locally; `healthcheck.sh` and `restore-check.sh` on `main` (#22 `3e92261`), to install on the server; hosting decision before the Oracle trial ends _(sync S-030)_
 - **Done when:** staging deploys from a clean host by following the runbook; backups restore in a drill.
 
 ### T-604 · Observability
@@ -486,7 +486,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-610 · Keep the mobile typecheck honest _(added 2026-11-17, sync S-014)_
 
-- **Area:** `apps/mobile`, `scripts/pipeline/baselines/known-failures.json` · **Priority:** Low · **Why:** [`TEST-05`](../FINDINGS.md#test-05) · **Status:** In progress — fixed on `fix/mobile-typed-routes` (0.21.8), for the owner's review; done when merged _(sync S-025)_
+- **Area:** `apps/mobile`, `scripts/pipeline/baselines/known-failures.json` · **Priority:** Low · **Why:** [`TEST-05`](../FINDINGS.md#test-05) · **Status:** Done — on `main` (#17 `0ab2644`) _(sync S-034)_
 - **Done when:** the app's navigation calls type-check with Expo's generated typed routes, and no known-failure entry covers `@djafat/mobile#typecheck`.
 - **Test:** generate `.expo/types`, then `pnpm --filter @djafat/mobile typecheck` passes.
 

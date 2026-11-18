@@ -82,6 +82,9 @@ _(updated 2026-11-18, sync S-032)_ #13 to #16 are merged into `main` (`034123a`)
 
 _(updated 2026-11-18, sync S-033)_ New: `fix/live-bootstrap` (#24, 0.23.4), stacked on #23 (§2d).
 
+_(updated 2026-11-18, sync S-034)_ All of #13 to #24 are merged into `main` (`afaa7c2`, DJAFAT 0.23.4). Left on GitHub:
+`claude/compassionate-franklin-k23vcj` (already in `main`) and the owner's `fix/payment-reliability-backlog`.
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |
@@ -195,6 +198,11 @@ checks green (merge commits `f74778d`, `4336ef7`, `07dd23b`, `034123a`); their b
 
 _(updated 2026-11-18, sync S-033)_ **#24, `fix/live-bootstrap` (0.23.4)**, stacked on #23: `SEC-02` and `OPS-05` (reference data
 at every deploy, demo fixtures refused in production, first super_admin command).
+
+_(updated 2026-11-18, sync S-034)_ **#17 to #24 are merged too**, in order, at the user's request, each with its
+five checks green: #17 `0ab2644`, #18 `e3f0d03`, #19 `c1ea1e5`, #20 `e78a6d8`, #21 `83237aa`, #22 `3e92261`,
+#23 `47370de`, #24 `afaa7c2`. Their branches are deleted, and `main`'s tree is identical to the verified tip of
+#24. No pull request of ours is open.
 
 Merge them in that order, each only once its Linux and Windows checks are green. #17 waits for the
 owner's review (the mobile app is their area), and the later ones wait with it; #18 to #22 can be

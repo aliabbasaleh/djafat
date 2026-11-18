@@ -9,7 +9,8 @@ these IDs instead of repeating the detail.
   their production builds, HTTP scenarios with `curl`, the three web apps in headless Chrome, and
   the hosted CI logs. Environment details: [`TESTING_AND_QUALITY_ASSURANCE.md`](TESTING_AND_QUALITY_ASSURANCE.md) §1.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
-- **Counts:** 3 Critical · 19 High · 22 Medium · 14 Low = 58 open findings, plus 12 resolved
+- **Counts:** 3 Critical · 11 High · 22 Medium · 13 Low = 49 open findings, plus 21 resolved
+  _(updated 2026-11-18, sync S-034: `TEST-05`, `ADM-01`, `ADM-02`, `ORD-01`, `PAY-04`, `ORD-02`, `ADM-03`, `SEC-02` and `OPS-05` resolved on `main`)_
   _(updated 2026-11-18, sync S-030: new `OPS-06`; sync S-032: `TEST-04` and `DOC-03` resolved on `main`)_
   _(updated 2026-11-14, sync S-008: new `DOC-03`; 2026-11-17, sync S-011: new `TEST-04`; sync
   S-013: `PAY-01`, `PAY-03`, `SEC-01`, `FE-03` and `PAY-05` resolved on `main`; sync S-014: new `TEST-05`)_
@@ -430,7 +431,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### PAY-04
 
-**Paid orders that are rejected, cancelled or failed are never refunded or reversed** · Not Implemented · High · LIVE · Status: Open on `main`; fix present on `fix/order-cancel-refund` (version 0.22.0), verified there (sync S-027)
+**Paid orders that are rejected, cancelled or failed are never refunded or reversed** · Not Implemented · High · LIVE · Status: Resolved on `main` (pull request #19, merged as `c1ea1e5` on 2026-11-18, sync S-034; `main` @ `afaa7c2` is identical to the verified tip of the stack); fix present on `fix/order-cancel-refund` (version 0.22.0), verified there (sync S-027)
 
 - **Where:** orders, payments, deliveries, ledger. `orders.service.ts` `rejectOrder`,
   `onDeliveryCancelled`, `onDeliveryFailed`; `payments.service.ts` (refund is admin-only and manual);
@@ -458,6 +459,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   Integration (real PostgreSQL): customer cancel, restaurant reject, admin cancel after preparation,
   hand-completed refund and a relayed event delivered twice; ledger balanced, payables at zero where
   expected. A delivery that fails after pickup still has no order-side reaction (unchanged).
+- **Sync S-034 (2026-11-18), merges:** Merged at the user's request with the refund split of `docs/37` (before cooking: accrual reversed; after: DJAFAT absorbs); DJAFAT can still change it.
 
 ### PAY-05
 
@@ -541,7 +543,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### ORD-01
 
-**Nobody can cancel an order** · Not Implemented · High · LIVE · Status: Open on `main`; fix present on `fix/order-cancel-refund` (version 0.22.0), verified there (sync S-027)
+**Nobody can cancel an order** · Not Implemented · High · LIVE · Status: Resolved on `main` (pull request #19, merged as `c1ea1e5` on 2026-11-18, sync S-034; `main` @ `afaa7c2` is identical to the verified tip of the stack); fix present on `fix/order-cancel-refund` (version 0.22.0), verified there (sync S-027)
 
 - **Where:** `orders.controller.ts` (routes: create, list, mine, get, confirm, ready, reject).
   The state machine defines `customer_cancel`, `cancel_before_preparing` and `admin_force_cancel`.
@@ -561,7 +563,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### ORD-02
 
-**A paid order the restaurant ignores stays `placed` forever** · Not Implemented · High · LIVE · Status: Open on `main`; fix present on `fix/order-cancel-refund` (version 0.22.0), verified there (sync S-027)
+**A paid order the restaurant ignores stays `placed` forever** · Not Implemented · High · LIVE · Status: Resolved on `main` (pull request #19, merged as `c1ea1e5` on 2026-11-18, sync S-034; `main` @ `afaa7c2` is identical to the verified tip of the stack); fix present on `fix/order-cancel-refund` (version 0.22.0), verified there (sync S-027)
 
 - **Where:** worker (no job); `order-expiry.processor.ts` handles `awaiting_payment` only.
 - **Observed:** a paid order sat in "Nouvelles" for 4 h 42 during the audit with no escalation.
@@ -578,10 +580,11 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   confirm), as the system transition `confirmation_timeout`; the relayed `order.cancelled` makes the API
   refund and notify the customer. The built job, run against the test database, cancelled a 20-minute-old
   order with its history row and event. Operations are not alerted beyond the order list.
+- **Sync S-034 (2026-11-18), merges:** Not run end to end: the worker, Redis stream and API chain in one go (each half verified). The 15-minute default is a setting.
 
 ### FE-02
 
-**No token refresh anywhere: every session ends after 15 minutes** · Partially Completed · High · CODE · Status: Open on `main`; fix present on `fix/token-refresh` (version 0.22.1), verified there (sync S-028)
+**No token refresh anywhere: every session ends after 15 minutes** · Partially Completed · High · CODE · Status: Open — fix merged into `main` (pull request #20, `e78a6d8`, sync S-034), the browser part of Verify not run yet; fix verified on `fix/token-refresh` (version 0.22.1), verified there (sync S-028)
 
 - **Where:** `apps/*/src/lib/auth-storage.ts`, `apps/courier|mobile/lib/auth-*`; `packages/sdk/src/http.ts`.
 - **Observed (code):** all five apps store the refresh token and never use it; on 401 the pages
@@ -604,6 +607,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   share one renewal, the server closed the socket on expiry and it reconnected with a renewed token. Not run:
   the React hooks themselves in a browser or on a device. The "implementation on the unmerged branch" this
   finding mentioned no longer exists (that branch was merged; no refresh code was on `main`).
+- **Sync S-034 (2026-11-18), merges:** Merged as #20 (`e78a6d8`): the SDK renewal and the socket reconnection were verified live against the API; the React hooks themselves were not run in a browser, so the 20-minute browser session of Verify is still to do.
 
 ### FE-03
 
@@ -740,7 +744,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### OPS-02
 
-**No deployment path, supervision, backups or monitoring** · Not Implemented · High · CODE · Status: Open — deployed with backups; monitoring and restore-check scripts on `fix/ops-monitoring` (0.23.1), tested locally, not installed on the server (sync S-030)
+**No deployment path, supervision, backups or monitoring** · Not Implemented · High · CODE · Status: Open — deployed with backups; monitoring and restore-check scripts on `main` since pull request #22 (`3e92261`, sync S-034), tested locally, not installed on the server
 
 - **Where:** `infra/deploy/.gitkeep` only; two Dockerfiles (API, worker) and none for the web apps.
 - **Observed (code):** no production compose or infrastructure code, no TLS or reverse proxy, no
@@ -790,10 +794,11 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   an empty database both gave every table its original row count, a balanced ledger, 39 migrations, and
   Prisma "up to date". Health check tested against a fake ntfy receiver and simulated failures. Not done:
   installing the cron jobs on the server, an off-server backup copy. End of the trial server: see `OPS-06`.
+- **Sync S-034 (2026-11-18), merges:** The scripts are on `main` since #22 (`3e92261`); installing the cron jobs on the server and an off-server backup copy are still to do. The end of the trial server is `OPS-06`.
 
 ### SEC-02
 
-**The only seed creates a super_admin on a known phone number** · Needs Improvement · High · LIVE · Status: Open on `main`; fix present on `fix/live-bootstrap` (version 0.23.4), verified there (sync S-033)
+**The only seed creates a super_admin on a known phone number** · Needs Improvement · High · LIVE · Status: Resolved on `main` (pull request #24, merged as `afaa7c2` on 2026-11-18, sync S-034; `main` @ `afaa7c2` is identical to the verified tip of the stack); fix present on `fix/live-bootstrap` (version 0.23.4), verified there (sync S-033)
 
 - **Where:** `apps/api/prisma/seed.ts` (fixtures at L372–428 alongside roles, permissions, settings, ledger accounts).
 - **Observed:** `pnpm db:seed` is the only way to create the roles, the 21 permissions and the chart
@@ -831,7 +836,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### ADM-01
 
-**The `finance` role cannot perform refunds or settlements** · Broken · High · LIVE · Status: Open on `main`; fix present on `fix/admin-roles` (version 0.21.9), verified there (sync S-026)
+**The `finance` role cannot perform refunds or settlements** · Broken · High · LIVE · Status: Resolved on `main` (pull request #18, merged as `e3f0d03` on 2026-11-18, sync S-034; `main` @ `afaa7c2` is identical to the verified tip of the stack); fix present on `fix/admin-roles` (version 0.21.9), verified there (sync S-026)
 
 - **Where:** `auth.controller.ts` (`mfa/setup`, `mfa/verify`: `admin`/`super_admin` only);
   `payments.controller.ts` refund and `settlements.controller.ts` record (`@RequireStepUp()`, role `finance` allowed).
@@ -848,10 +853,11 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   failed on the old controller ("PaymentsController.refund: finance cannot enrol MFA"). Integration: a fresh
   finance account gets 428 on a refund, enrols and verifies, then gets 404 for an unknown payment instead of 428.
   A refund of a real payment by finance was not run.
+- **Sync S-034 (2026-11-18), merges:** Console access for `finance` came with #21 (`83237aa`). Not run: a refund of a real payment by a finance account.
 
 ### ADM-02
 
-**An `admin` can block a `super_admin`** · Needs Improvement · High · LIVE · Status: Open on `main`; fix present across `fix/admin-roles` (0.21.9: hierarchy, sessions, refresh) and `fix/admin-console-mfa` (0.23.0: step-up), verified there (syncs S-026, S-029)
+**An `admin` can block a `super_admin`** · Needs Improvement · High · LIVE · Status: Resolved on `main` (pull requests #18 and #21, merged as `e3f0d03` and `83237aa` on 2026-11-18, sync S-034; `main` @ `afaa7c2` is identical to the verified tip of the stack); fix present across `fix/admin-roles` (0.21.9: hierarchy, sessions, refresh) and `fix/admin-console-mfa` (0.23.0: step-up), verified there (syncs S-026, S-029)
 
 - **Where:** `users.service.ts` `setStatus`; `users-admin.controller.ts` suspend/block/reactivate.
 - **Observed:** `admin` blocked the `super_admin`, whose next request got 403, then reactivated it.
@@ -874,10 +880,11 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   deliberate gap (its reason: no console step-up flow) is replaced by one asserting the gate. Integration:
   without a step-up 428, then the hierarchy scenarios with a stepped-up admin. Courier `suspend`/`reinstate`
   are still ungated.
+- **Sync S-034 (2026-11-18), merges:** Both parts are on `main`: hierarchy, sessions and refresh with #18 (`e3f0d03`), step-up with #21 (`83237aa`).
 
 ### ADM-03
 
-**Role management in the admin console cannot work: no MFA screen** · Broken · High · CODE · Status: Open on `main`; fix present on `fix/admin-console-mfa` (version 0.23.0), verified there (sync S-029)
+**Role management in the admin console cannot work: no MFA screen** · Broken · High · CODE · Status: Resolved on `main` (pull request #21, merged as `83237aa` on 2026-11-18, sync S-034; `main` @ `afaa7c2` is identical to the verified tip of the stack); fix present on `fix/admin-console-mfa` (version 0.23.0), verified there (sync S-029)
 
 - **Where:** `apps/admin/src` (no file mentions MFA, TOTP or step-up); `app/admin/users/[id]/page.tsx` offers role grant and revoke.
 - **Observed:** through the API, a role grant without step-up answers 428 (LIVE). The console has no
@@ -896,6 +903,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   Remboursements, Sécurité pages). Rendered in Chromium against the test API: enrolment with a real TOTP code,
   the prompt on an order cancellation then the order cancelled in the database, the refunds page with and
   without a pending row. Still missing: restaurant activation and settlement screens.
+- **Sync S-034 (2026-11-18), merges:** The step-up prompt was rendered on an order cancellation; the role-grant path uses the same prompt but was not rendered. Settlement and restaurant-activation screens are still missing (T-214).
 
 ### GOV-01
 
@@ -952,7 +960,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### OPS-05
 
-**On the active branch, a live server starts without roles, permissions or ledger accounts** · Broken · High · BRANCH · Status: Open on `main`; fix present on `fix/live-bootstrap` (version 0.23.4), verified there (sync S-033) · Found in sync S-001, 2026-11-11
+**On the active branch, a live server starts without roles, permissions or ledger accounts** · Broken · High · BRANCH · Status: Resolved on `main` (pull request #24, merged as `afaa7c2` on 2026-11-18, sync S-034; `main` @ `afaa7c2` is identical to the verified tip of the stack); fix present on `fix/live-bootstrap` (version 0.23.4), verified there (sync S-033) · Found in sync S-001, 2026-11-11
 
 - **Where:** `origin/claude/compassionate-franklin-k23vcj` @ `804176f` — `infra/deploy/gen-secrets.sh`
   (`MODE=live` → `SEED_DEMO=0`), `infra/deploy/docker-compose.prod.yml` (service `migrate` runs the
@@ -985,6 +993,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   `seed-reference.ts` in every mode. Verified on a fresh database as described under [`SEC-02`](#sec-02): the
   first login succeeds as `customer`, and no fixture account exists. A test payment on a live-style database was
   not run (it needs a restaurant created through the console first).
+- **Sync S-034 (2026-11-18), merges:** Not run: a test payment on a live-style database (it needs a restaurant created through the console first).
 
 ### OPS-06
 
@@ -1334,7 +1343,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### TEST-05
 
-**The mobile typecheck is silenced by a known-failure entry** · Needs Improvement · Low · CODE · Status: Open on `main`; fix present on `fix/mobile-typed-routes` (version 0.21.8), verified there (sync S-025) _(added 2026-11-17, sync S-014; on `main` since pull request #8, `57120ed`, sync S-019)_ — `cabf058` on `feat/welcome-greeting` records `@djafat/mobile#typecheck` in `scripts/pipeline/baselines/known-failures.json` as pre-existing ("expo-router's generated route-literal type is stale…"). On `main` it passes (RUN, 2026-11-17: `turbo run typecheck --filter=@djafat/mobile`, and in every `verify:fast` run that day; CI green): it fails only where Expo has generated its typed routes (`.expo/types`, gitignored), against calls such as `router.push(`/orders/${id}`)`. Once the entry is in, any real mobile type error is reported as pre-existing on every machine. Fix: write those calls in typed-route form (or regenerate the types) and drop the entry. Verify: with `.expo/types` generated, `pnpm --filter @djafat/mobile typecheck` passes. _Sync S-025 note (2026-11-18), RUN: reproduced (Expo's dev server generated `.expo/types`; the type check then failed with 9 errors, all calls cast to `` `/${string}` ``). The nine calls now use typed-route objects (`{ pathname, params }`), and login only follows an in-app `redirect` (`/(app)/…`). The type check passes with the generated types (0 errors) and without them, as in CI (0 errors); the `@djafat/mobile#typecheck`entry is removed from`known-failures.json`, together with the stale `@djafat/mobile#build`and`@djafat/courier#build`entries (both apps build:`expo export` succeeded for each). Navigation not run on a device.\_
+**The mobile typecheck is silenced by a known-failure entry** · Needs Improvement · Low · CODE · Status: Resolved on `main` (pull request #17, merged as `0ab2644` on 2026-11-18, sync S-034; `main` @ `afaa7c2` is identical to the verified tip of the stack); fix present on `fix/mobile-typed-routes` (version 0.21.8), verified there (sync S-025) _(added 2026-11-17, sync S-014; on `main` since pull request #8, `57120ed`, sync S-019)_ — `cabf058` on `feat/welcome-greeting` records `@djafat/mobile#typecheck` in `scripts/pipeline/baselines/known-failures.json` as pre-existing ("expo-router's generated route-literal type is stale…"). On `main` it passes (RUN, 2026-11-17: `turbo run typecheck --filter=@djafat/mobile`, and in every `verify:fast` run that day; CI green): it fails only where Expo has generated its typed routes (`.expo/types`, gitignored), against calls such as `router.push(`/orders/${id}`)`. Once the entry is in, any real mobile type error is reported as pre-existing on every machine. Fix: write those calls in typed-route form (or regenerate the types) and drop the entry. Verify: with `.expo/types` generated, `pnpm --filter @djafat/mobile typecheck` passes. _Sync S-025 note (2026-11-18), RUN: reproduced (Expo's dev server generated `.expo/types`; the type check then failed with 9 errors, all calls cast to `` `/${string}` ``). The nine calls now use typed-route objects (`{ pathname, params }`), and login only follows an in-app `redirect` (`/(app)/…`). The type check passes with the generated types (0 errors) and without them, as in CI (0 errors); the `@djafat/mobile#typecheck`entry is removed from`known-failures.json`, together with the stale `@djafat/mobile#build`and`@djafat/courier#build`entries (both apps build:`expo export` succeeded for each). Navigation not run on a device.\_
 
 ---
 
