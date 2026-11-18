@@ -473,13 +473,13 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-608 · Working secrets in the local setup _(added 2026-11-14, sync S-008)_
 
-- **Area:** `docs/TRAVAILLER-EN-LOCAL.md`, `.env.example`, a small script · **Priority:** Medium · **Why:** [`DOC-03`](../FINDINGS.md#doc-03) · **Status:** In progress — `pnpm env:init` on `fix/env-init` (0.21.6), tested; done when merged _(sync S-023)_
+- **Area:** `docs/TRAVAILLER-EN-LOCAL.md`, `.env.example`, a small script · **Priority:** Medium · **Why:** [`DOC-03`](../FINDINGS.md#doc-03) · **Status:** Done — `pnpm env:init` on `main` (pull request #15, `07dd23b`) _(sync S-032)_
 - **Done when:** following the guide on a fresh clone (macOS, Linux and Windows) gives five real secrets, and an order can be delivered end to end.
 - **Test:** the Windows workflow and a fresh local run follow the guide and finish a delivery.
 
 ### T-609 · Find the intermittent integration failures _(added 2026-11-17, sync S-011)_
 
-- **Area:** `apps/api/test`, deliveries dispatch · **Priority:** Medium · **Why:** [`TEST-04`](../FINDINGS.md#test-04) · **Status:** In progress — fix on `fix/test-loopback` (0.21.5): cause reproduced, 5 green runs in a row; done when merged _(sync S-022)_
+- **Area:** `apps/api/test`, deliveries dispatch · **Priority:** Medium · **Why:** [`TEST-04`](../FINDINGS.md#test-04) · **Status:** Done — on `main` (pull request #14, `4336ef7`): cause reproduced and fixed, 5 green runs in a row _(sync S-032)_
 - **Done when:** the two failure modes are explained and fixed, or shown to come from the test environment.
 - **Lead _(updated 2026-11-17, sync S-012)_:** port collisions between the test app (IPv6 wildcard) and 127.0.0.1-only listeners such as Prisma's binary query engine; try `app.listen(0, '127.0.0.1')` in the integration bootstrap ([`TEST-04`](../FINDINGS.md#test-04)).
 - **Test:** 20 consecutive full runs of the integration suite pass locally.

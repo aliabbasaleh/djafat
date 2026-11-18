@@ -10,6 +10,51 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-032 — 2026-11-18 — pull requests #13 to #16 merged
+
+|                 |                                                                             |
+| --------------- | --------------------------------------------------------------------------- |
+| **Trigger**     | Merges at the user's request ("yeah merge them"), then `git fetch`          |
+| **Range**       | `origin/main` `96c36b9..034123a` — 4 merge commits, no content of their own |
+| **Size**        | the content of #13 to #16, already reviewed in syncs S-021 to S-024         |
+| **Evidence**    | RUN — checks read before each merge; `git diff ed35760 034123a` empty       |
+| **Reviewed by** | Claude, in the session that merged them                                     |
+
+### Added
+
+- none (merges)
+
+### Removed
+
+- The branches `docs/audit-s021`, `fix/test-loopback`, `fix/env-init`, `fix/favicon-512` on GitHub.
+
+### Fixed
+
+- On `main`: `TEST-04` (#14), `DOC-03` (#15); the favicon item of `FE-06` (#16).
+
+### Changed
+
+- `main` moves from 0.21.3 to 0.21.7.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `tasks/BACKLOG.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT` (both the `HEAD` and the `origin/main` lines).
+
+### Not verified
+
+- Nothing new was run: the merged code is the code verified on the branches (identical tree).
+
+### Marker
+
+`HEAD` → this sync's version commit; `origin/main` → `034123a`.
+
+---
+
 ## S-031 — 2026-11-18 — tracking report of the day
 
 |                 |                                                                                                   |

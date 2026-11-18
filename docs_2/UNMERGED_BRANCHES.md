@@ -78,6 +78,8 @@ _(updated 2026-11-17, sync S-014)_ New: the owner's `feat/welcome-greeting` (§2
 _(updated 2026-11-18, sync S-031)_ Ten pull requests of ours are open, #13 to #22, stacked in that
 order; none is merged yet (§2d).
 
+_(updated 2026-11-18, sync S-032)_ #13 to #16 are merged into `main` (`034123a`); #17 to #23 remain (§2d).
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |
@@ -184,6 +186,10 @@ Our own branches, opened on 18 November, each stacked on the one before. Base: `
 | #20 | `fix/token-refresh`       | 0.22.1  | `FE-02`                         | Session renewal in the SDK and the five apps; sockets renew and reconnect                                             | 9 SDK tests; live check against the API with 4-second tokens, 10/10      | green                                |
 | #21 | `fix/admin-console-mfa`   | 0.23.0  | `ADM-03`, `ADM-02` (step-up)    | Console MFA page and code prompt; refunds page; order cancel button; finance access                                   | Integration 112/112; rendered in Chromium against the test API           | green                                |
 | #22 | `fix/ops-monitoring`      | 0.23.1  | `OPS-02` (part), `OPS-06` (new) | Health check with phone alerts; weekly restore check; Oracle trial-end plan; external accounts checklist              | Restore drill on a real dump; scripts tested locally                     | running (3 of 5 passed when written) |
+
+_(updated 2026-11-18, sync S-032)_ **#13 to #16 are merged into `main`**, in order, each with its five
+checks green (merge commits `f74778d`, `4336ef7`, `07dd23b`, `034123a`); their branches are deleted, and
+`main`'s tree is identical to the verified tip of #16. Still open: #17 to #22, and #23 (this report).
 
 Merge them in that order, each only once its Linux and Windows checks are green. #17 waits for the
 owner's review (the mobile app is their area), and the later ones wait with it; #18 to #22 can be

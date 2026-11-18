@@ -8,6 +8,25 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-032: pull requests #13 to #16 merged into `main`
+
+**Verified:** at the user's request, #13 to #16 were merged in order, each only after its five checks
+(gitleaks, integration, lint/typecheck/test/build, local setup on Windows, `pnpm audit`) were green and
+GitHub reported it mergeable. `main` is `034123a` (DJAFAT 0.21.7), and its tree is identical to the
+verified tip of #16 (`ed35760`).
+
+**Status changes:** `TEST-04` and `DOC-03` resolved on `main`; the favicon item of `FE-06` is on `main`
+(the finding stays open for its other items). T-608 and T-609 done. Counts: 58 open (22 Medium), 12
+resolved.
+
+**Still open:** #17 (waits for the owner's review) to #22, and #23. The local `main` branch is checked
+out in `/Users/mac/projects/djafat-latest` (the user's local app) and was not moved.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `tasks/BACKLOG.md`,
+`history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`; outside `docs_2/`: `docs/ROADMAP.md`.
+
+---
+
 ## 2026-11-18 — Report: the work of 18 November, pull requests #13 to #22 (sync S-031)
 
 A tracking entry for everything done on 18 November (syncs S-021 to S-030), at the user's request: what is

@@ -9,8 +9,8 @@ these IDs instead of repeating the detail.
   their production builds, HTTP scenarios with `curl`, the three web apps in headless Chrome, and
   the hosted CI logs. Environment details: [`TESTING_AND_QUALITY_ASSURANCE.md`](TESTING_AND_QUALITY_ASSURANCE.md) §1.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
-- **Counts:** 3 Critical · 19 High · 24 Medium · 14 Low = 60 open findings, plus 10 resolved
-  _(updated 2026-11-18, sync S-030: new `OPS-06`)_
+- **Counts:** 3 Critical · 19 High · 22 Medium · 14 Low = 58 open findings, plus 12 resolved
+  _(updated 2026-11-18, sync S-030: new `OPS-06`; sync S-032: `TEST-04` and `DOC-03` resolved on `main`)_
   _(updated 2026-11-14, sync S-008: new `DOC-03`; 2026-11-17, sync S-011: new `TEST-04`; sync
   S-013: `PAY-01`, `PAY-03`, `SEC-01`, `FE-03` and `PAY-05` resolved on `main`; sync S-014: new `TEST-05`)_
   _(updated 2026-11-14, sync S-007: `SDK-01`, `FE-01`, `PAY-02`, `TEST-01` and `CI-01` resolved on
@@ -1198,7 +1198,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### DOC-03
 
-**The local guide's placeholder secrets block local deliveries** · Broken · Medium · CODE · Status: Open on `main`; fix present on `fix/env-init` (version 0.21.6), verified there (sync S-023) _(added 2026-11-14, sync S-008)_
+**The local guide's placeholder secrets block local deliveries** · Broken · Medium · CODE · Status: Resolved on `main` (pull request #15, merged into `main` as `07dd23b` on 2026-11-18, sync S-032; `main`'s code is identical to the verified branch head); fix on `fix/env-init` (version 0.21.6), verified there (sync S-023) _(added 2026-11-14, sync S-008)_
 
 - **Where:** `docs/TRAVAILLER-EN-LOCAL.md` §2 (`cp .env.example .env`, nothing about the secrets);
   `.env.example`; `deliveries.service.ts` `doMarkPickedUp` → `issueDeliveryCode`;
@@ -1225,7 +1225,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### TEST-04
 
-**The API integration suite fails intermittently on a local machine** · Needs Improvement · Medium · RUN · Status: Open on `main`; fix present on `fix/test-loopback` (version 0.21.5), verified locally (sync S-022) _(added 2026-11-17, sync S-011)_
+**The API integration suite fails intermittently on a local machine** · Needs Improvement · Medium · RUN · Status: Resolved on `main` (pull request #14, merged into `main` as `4336ef7` on 2026-11-18, sync S-032; `main`'s code is identical to the verified branch head); fix on `fix/test-loopback` (version 0.21.5), verified locally (sync S-022) _(added 2026-11-17, sync S-011)_
 
 - **Where:** `apps/api/test` (`walking-skeleton`, `identity`, `webhook-forgery`); dispatch in
   `deliveries.service.ts` (`onOrderReady` → `createAndDispatch` → `runDispatchWave`).
@@ -1268,7 +1268,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### FE-06
 
-**Interface polish gaps** · Needs Improvement · Low · LIVE — no favicon in the three apps (404); on a 390 px screen the header wraps "Déconnexion — Client Test"; the admin order list shows raw status identifiers; the courier list shows only a UUID; login errors are generic whatever the cause. _Sync S-020 note (2026-11-18), CODE: the favicon part is fixed on `main` (`b141593`, pull request #12): the three web apps use the « D » icon through Next.js's `app/icon.png`; each is the 2048 px, 521 KB original, heavy for a favicon (a 512 px version would do). Not checked in a browser._ _Sync S-024 note (2026-11-18): the three favicons are 512 px, 44 KB instead of 521 KB, on `fix/favicon-512` (version 0.21.7); same image, resized._
+**Interface polish gaps** · Needs Improvement · Low · LIVE — no favicon in the three apps (404); on a 390 px screen the header wraps "Déconnexion — Client Test"; the admin order list shows raw status identifiers; the courier list shows only a UUID; login errors are generic whatever the cause. _Sync S-020 note (2026-11-18), CODE: the favicon part is fixed on `main` (`b141593`, pull request #12): the three web apps use the « D » icon through Next.js's `app/icon.png`; each is the 2048 px, 521 KB original, heavy for a favicon (a 512 px version would do). Not checked in a browser._ _Sync S-024 note (2026-11-18): the three favicons are 512 px, 44 KB instead of 521 KB, on `fix/favicon-512` (version 0.21.7); same image, resized._ _Sync S-032 note (2026-11-18): the favicon item is on `main` (pull request #12 added the icons, #16 resized them to 512 px, merged as `034123a`); the other items stay open._
 
 ### DB-01
 
