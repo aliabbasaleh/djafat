@@ -236,7 +236,7 @@ verified.
 
 ### AUTH-01
 
-**No real OTP delivery — nobody can log in to a production deployment** · Not Implemented · Critical · LIVE · Status: Open
+**No real OTP delivery — nobody can log in to a production deployment** · Not Implemented · Critical · LIVE · Status: Open — code ready, waits for an SMS provider account (sync S-021)
 
 - **Where:** `apps/api` → auth. `auth.module.ts` (binds `OTP_DELIVERY_PORT` to the mock);
   `providers/mock-otp-delivery.provider.ts`.
@@ -248,6 +248,11 @@ verified.
   refuse to boot in production when the mock is selected.
 - **Depends on:** choosing and contracting an SMS provider (external).
 - **Verify:** a real handset receives the code; boot fails in production with `SMS_PROVIDER=mock`.
+- **Sync S-021 re-check (2026-11-18), CODE + unit test:** fix present on `main`. The OTP transport
+  is chosen by `SMS_PROVIDER`: an HTTP SMS gateway (FEAT-006), WhatsApp (FEAT-008) and e-mail
+  (FEAT-007) exist, and production refuses `SMS_PROVIDER=mock` (`env.spec.ts` SPEC-006-02-SC01,
+  passing). What is left is an account with an SMS provider in Chad; the "real handset" step of
+  Verify cannot run before that.
 
 ### SEC-01
 
@@ -372,10 +377,13 @@ verified.
   comes only through Expo's CLI (`apps/courier`, `apps/mobile` → `expo` → `@expo/cli` → `picomatch`
   3.0.2; also 2.3.2 and 4.0.7), and no patched version exists yet (the advisory names none), so
   baselining it is the only option for now. Remove the entry once a fixed `picomatch` is published.
+- **Sync S-021 re-check (2026-11-18), RUN:** `pnpm audit --prod` on `main` (`8ceb437`): 37
+  advisories — 1 critical (`shell-quote`, Expo tooling), 18 high, 14 moderate, 4 low. The rest is
+  mostly the Expo tool chain, plus `postcss` through `next` and `zod` (fixed only in version 4).
 
 ### MOB-01
 
-**Neither Expo app can be bundled; root build and CI fail** · Broken · Critical · RUN · Status: Open; the CI export passes on `main` since `46d8cae`, no device build yet (sync S-007)
+**Neither Expo app can be bundled; root build and CI fail** · Broken · Critical · RUN · Status: Open — bundling fixed, never run on a device (sync S-021)
 
 - **Where:** `apps/mobile`, `apps/courier` (`package.json` `build` = `expo export`,
   `metro.config.js`); `.npmrc` (`node-linker=isolated`).
@@ -404,6 +412,10 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   apps; the commit reports that the courier web app could not be bundled without it (pnpm installed
   it, Metro did not find it). Fix present, unverified by us: our local courier web export, built
   before this change, did bundle, so the failure seems to depend on how the install is laid out.
+- **Sync S-021 re-check (2026-11-18), RUN:** both Expo apps bundle: CI's `pnpm build` (`expo export`
+  for the mobile app, the courier's build) is green on `main` (`8ceb437`), and the courier's web
+  export built locally on 2026-11-17. Neither app has run on an Android device: that half of Verify
+  is still to do.
 
 ---
 
@@ -426,6 +438,9 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   and a provider refund automatically when a paid order reaches `rejected`/`cancelled`/failed-before-pickup.
 - **Depends on:** `PAY-03`, `ARCH-01`; a business decision.
 - **Verify:** reject a paid order → refund created, payables back to zero, ledger balanced.
+- **Sync S-021 re-check (2026-11-18), CODE:** unchanged on `main`: `rejectOrder`,
+  `onDeliveryCancelled` and `onDeliveryFailed` issue no refund or reversal, and no listener reacts
+  to a rejected or cancelled paid order.
 
 ### PAY-05
 
@@ -453,7 +468,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 
 ### PAY-06
 
-**No payout flow: restaurant and courier balances can never be paid out** · Not Implemented · High · LIVE · Status: Open
+**No payout flow: restaurant and courier balances can never be paid out** · Not Implemented · High · LIVE · Status: Open — couriers covered (FEAT-014), restaurants not (sync S-021)
 
 - **Where:** ledger, payments. `settlements.service.ts` exists; there is no payout table, endpoint or job
   (`QUEUES.payouts` is declared and unused).
@@ -464,10 +479,14 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   approval → execution → ledger posting.
 - **Depends on:** `PAY-07`, `ADM-01`.
 - **Verify:** payout reduces `available`, credits bank/provider clearing, balances.
+- **Sync S-021 re-check (2026-11-18), CODE:** partly addressed on `main`: courier payouts exist
+  (FEAT-014: `courier_payouts` table, service and endpoints, the cash a courier owes settled first,
+  unit-tested). Restaurant balances are still settled only by recording a settlement by hand. Not
+  run.
 
 ### PAY-07
 
-**No real payment provider (Airtel / Moov)** · Not Implemented · High · CODE · Status: Blocked (external)
+**No real payment provider (Airtel / Moov)** · Not Implemented · High · CODE · Status: Blocked (external) — manual merchant-wallet flow in place, no provider API (sync S-021)
 
 - **Where:** `payments.module.ts` registers `cash` and `mock` only; seed rows `airtel_money`, `moov_money` are inactive.
 - **Why it matters:** together with `PAY-02`, there is no legitimate payment method.
@@ -475,6 +494,9 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   pending payments (`QUEUES.paymentsReconcile` is unused), and asynchronous refund handling.
 - **Depends on:** provider contract and sandbox (condition H1 in `docs/16`).
 - **Verify:** sandbox payment end to end, including a late webhook and a timeout.
+- **Sync S-021 re-check (2026-11-18), CODE:** partly addressed: merchant-wallet payments (FEAT-009:
+  the customer transfers to DJAFAT's Airtel, Tigo or Moov number, matched by a receipt or, FEAT-016,
+  by the merchant phone's SMS). No provider API yet (FEAT-019 waits for access).
 
 ### ARCH-01
 
@@ -495,6 +517,8 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 - **Depends on:** nothing; larger change — plan it.
 - **Verify:** kill the API between commit and reaction in a test; state converges after restart.
   Not reproduced live (timing-dependent); established by reading every emitter and listener.
+- **Sync S-021 re-check (2026-11-18), CODE:** unchanged: 17 in-process `emit` calls and 16
+  `@OnEvent` listeners in `apps/api`, no outbox relay for these reactions.
 
 ### ORD-01
 
@@ -507,6 +531,8 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 - **Fix:** add customer cancel (before preparation) and admin force-cancel, both wired to `PAY-04`.
 - **Depends on:** `PAY-04`.
 - **Verify:** cancel from each allowed status; refused from the others; refund issued when paid.
+- **Sync S-021 re-check (2026-11-18), CODE:** unchanged: no cancel route in `orders.controller.ts`,
+  and nothing calls the state machine's cancel transitions.
 
 ### ORD-02
 
@@ -519,6 +545,8 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   notifies the customer and operations.
 - **Depends on:** `PAY-04`, `ORD-01`.
 - **Verify:** unconfirmed paid order is cancelled and refunded after the deadline.
+- **Sync S-021 re-check (2026-11-18), CODE:** unchanged: the worker's `order-expiry` still handles
+  `awaiting_payment` only.
 
 ### FE-02
 
@@ -533,6 +561,7 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
   the new token. An implementation exists on the unmerged branch.
 - **Depends on:** `SDK-01`.
 - **Verify:** keep a board open for 20 minutes; no redirect, events keep arriving.
+- **Sync S-021 re-check (2026-11-18), CODE:** unchanged: no refresh call in the SDK or in any app.
 
 ### FE-03
 
@@ -583,7 +612,7 @@ properties of undefined (reading 'get')` in `new RedisService(undefined)` — Vi
 
 ### TEST-02
 
-**No automated test runs the application's SQL or the UI** · Needs Improvement · High · RUN · Status: Open
+**No automated test runs the application's SQL or the UI** · Needs Improvement · High · RUN · Status: Open — SQL covered, UI not (sync S-021)
 
 - **Where:** `apps/api/src/modules/*/*-test-support.ts` (≈2 000 lines of in-memory Prisma fakes);
   `apps/web` and `apps/admin` have no tests.
@@ -594,6 +623,9 @@ properties of undefined (reading 'get')` in `new RedisService(undefined)` — Vi
   for the three critical journeys; run both in CI.
 - **Depends on:** `TEST-01`.
 - **Verify:** the suites fail when the corresponding bug is reintroduced.
+- **Sync S-021 re-check (2026-11-18), RUN:** partly addressed: the integration suite (97 tests on
+  real PostgreSQL and Redis) runs the application's SQL in CI on every pull request. The UI is still
+  barely tested — test files per app: web 1, admin 0, restaurant 3, courier 3, mobile 2.
 
 ### CI-01
 
@@ -660,10 +692,13 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   `feat/welcome-greeting`) says the `quay.io/minio/minio` image can no longer be downloaded (registry
   locked in mid-November), even locally; the local guide's troubleshooting already starts the stack
   without MinIO. Not checked by us.
+- **Sync S-021 re-check (2026-11-18), CODE:** unchanged in `infra/docker-compose.yml`:
+  `postgis/postgis:16-3.5` has no ARM64 image and MinIO is pinned to `RELEASE.2024-12-18…` (which
+  the owner reports can no longer be pulled). Not re-run on a clean machine.
 
 ### OPS-02
 
-**No deployment path, supervision, backups or monitoring** · Not Implemented · High · CODE · Status: Open
+**No deployment path, supervision, backups or monitoring** · Not Implemented · High · CODE · Status: Open — deployed with backups; no monitoring, no restore drill (sync S-021)
 
 - **Where:** `infra/deploy/.gitkeep` only; two Dockerfiles (API, worker) and none for the web apps.
 - **Observed (code):** no production compose or infrastructure code, no TLS or reverse proxy, no
@@ -701,6 +736,10 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   on the user's machine ignored SIGTERM for 10 s and had to be force-stopped. A deployment should
   still give the API a stop timeout and check that it exits; the cause in that old process was not
   investigated.
+- **Sync S-021 re-check (2026-11-18), LIVE + CODE:** partly addressed: the one-server stack runs the
+  demo (`djafat.com` and the API's health answered 200 today), with restart policies, a health check
+  and a backup service (`infra/deploy/docker-compose.prod.yml`). Missing: monitoring and alerting, a
+  restore drill, and a plan for the end of the trial server.
 
 ### SEC-02
 
@@ -723,6 +762,8 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   super-admin exists on the known number. Its login codes only reach the test inbox bound to the
   server's localhost, so the number cannot be used from outside; anyone with a shell on the server
   can. With `MODE=live` the seed does not run ([`OPS-05`](#ops-05)).
+- **Sync S-021 re-check (2026-11-18), CODE:** unchanged: the seed creates its fixture accounts, the
+  `super_admin` among them, unconditionally; the live demo runs it.
 
 ### ADM-01
 
@@ -735,6 +776,8 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Fix:** let every role that faces a step-up enrol and verify (derive the list from `MFA_REQUIRED_ROLES`).
 - **Depends on:** nothing.
 - **Verify:** finance enrols, verifies, then refunds successfully.
+- **Sync S-021 re-check (2026-11-18), CODE:** unchanged: `mfa/setup` and `mfa/verify` still require
+  `admin` or `super_admin`, so `finance` cannot pass the step-up its refunds need.
 
 ### ADM-02
 
@@ -747,6 +790,8 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Fix:** forbid acting on an equal or higher role and on oneself; require step-up; revoke the target's sessions.
 - **Depends on:** `ADM-03` for the step-up part.
 - **Verify:** admin → super_admin block returns 403; admin → customer works after step-up.
+- **Sync S-021 re-check (2026-11-18), CODE:** unchanged: `setStatus` checks nothing about the
+  target's roles (role grants are guarded, status changes are not).
 
 ### ADM-03
 
@@ -759,10 +804,12 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Fix:** MFA enrolment (QR) and step-up prompt in the console; then the missing operational screens.
 - **Depends on:** `SDK-01`.
 - **Verify:** grant a role from the console after entering a TOTP code.
+- **Sync S-021 re-check (2026-11-18), CODE:** unchanged: no file in `apps/admin/src` mentions TOTP,
+  MFA or step-up.
 
 ### GOV-01
 
-**`main` is 41 commits behind the active branch; a fix branch is orphaned** · Needs Improvement · High · RUN · Status: Open
+**`main` is 41 commits behind the active branch; a fix branch is orphaned** · Needs Improvement · High · RUN · Status: Open — only the owner's old branch is left (sync S-021)
 
 - **Where:** `origin/claude/compassionate-franklin-k23vcj` (+41 commits, 456 files, +31 592 lines,
   last commit 2026-11-10 18:10); `origin/fix/payment-reliability-backlog` (+2 commits, 2026-11-01,
@@ -777,6 +824,11 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   with CI green as the gate.
 - **Depends on:** repository owner's decision.
 - **Verify:** one branch contains all accepted work; the others are deleted.
+- **Sync S-021 re-check (2026-11-18), RUN:** mostly resolved: `main` is the reference branch and
+  fully contains `claude/compassionate-franklin-k23vcj` (`git merge-base --is-ancestor`). Left: the
+  owner's `fix/payment-reliability-backlog`, 6 commits not in `main` (its webhook and enablement
+  fixes were re-applied as `PAY-05` and `PAY-01`, its PNG fix superseded), and the merged branch
+  could be deleted. The owner's call.
 
 ### DLV-01
 
@@ -791,6 +843,8 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   activation; decide the geocoding approach.
 - **Depends on:** nothing.
 - **Verify:** an order for an API-created restaurant reaches a courier.
+- **Sync S-021 re-check (2026-11-18), CODE:** unchanged: the restaurant-creation schema still has no
+  coordinates, and no route sets a restaurant's location.
 
 ### COUR-01
 
@@ -803,6 +857,8 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Fix:** background location task and real push; revisit the 30 s offer window for the field.
 - **Depends on:** `MOB-01`.
 - **Verify:** device test with the screen locked: an offer arrives and can be accepted.
+- **Sync S-021 re-check (2026-11-18), CODE:** unchanged: `apps/courier/lib/location.ts` is still
+  foreground only (it says so itself).
 
 ### OPS-05
 
@@ -832,6 +888,9 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Depends on:** T-001 (where the fix is made).
 - **Verify:** on the branch, `MODE=live` on an empty database: first login succeeds as `customer`, a
   test payment posts to the ledger, and no fixture account exists.
+- **Sync S-021 re-check (2026-11-18), CODE:** now on `main`: with `MODE=live` the deploy runs the
+  migrations only (`SEED_DEMO=0`), and no migration creates roles, permissions or ledger accounts,
+  so a live server would start without them.
 
 ---
 
