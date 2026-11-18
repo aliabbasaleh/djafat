@@ -108,6 +108,8 @@ POST /v1/orders                  (Idempotency-Key)               201  self
 GET  /v1/orders                  ?status&cursor                  200  self
 GET  /v1/orders/:id                                              200  owns-order  -> détail + statut + livraison + livreur
 POST /v1/orders/:id/cancel       {reason}  (Idempotency-Key)     200  owns-order  (libre avant 'preparing' ; sinon règle métier ; refund auto si payé)
+     # 0.22.0 (docs/37) : depuis awaiting_payment, placed, confirmed ; 409 ensuite ; reason facultatif ;
+     # sans Idempotency-Key (une 2e annulation répond 409, la transition empêche tout double effet)
 POST /v1/orders/:id/review       {restaurantRating, courierRating?, comment?}  201  owns-order
 GET  /v1/orders/:id/tracking                                     200  owns-order  -> snapshot ; live via WS
 ```
@@ -130,6 +132,7 @@ POST /v1/payments/webhook/:provider   (signé)                    200  public   
 GET   /v1/restaurant/orders        ?status                       200   (live via WS restaurant:{id})
 POST  /v1/restaurant/orders/:id/accept   {prepMinutes}           200   # uniquement si payée OU cash
 POST  /v1/restaurant/orders/:id/reject   {reason}                200   # refund auto si déjà payé
+      # 0.22.0 : route réelle POST /v1/orders/:id/reject ; remboursement automatique fait (docs/37)
 POST  /v1/restaurant/orders/:id/ready                            200
 GET   /v1/restaurant/profile ; PATCH /v1/restaurant/profile      200
 GET   /v1/restaurant/hours ; PUT /v1/restaurant/hours            200   # heures en tz de la ville
@@ -172,6 +175,7 @@ GET   /v1/admin/dashboard                                        200  admin
 GET   /v1/admin/orders            ?status&restaurant&courier&from&to&cursor   200  admin
 GET   /v1/admin/orders/:id                                       200  admin
 POST  /v1/admin/orders/:id/cancel            {reason}            200  admin+stepup   (si commande payée)
+      # 0.22.0 (docs/37) : de placed à courier_assigned ; livraison arrêtée ; remboursement automatique
 POST  /v1/admin/orders/:id/reassign-courier  {courierId}         200  admin
 GET/POST/PATCH /v1/admin/restaurants                                  200/201/200  admin
 POST  /v1/admin/restaurants/:id/suspend|activate                 200  admin+stepup
@@ -183,6 +187,8 @@ POST  /v1/admin/couriers/:id/approve|reject|suspend              200  admin+step
 GET   /v1/admin/payments          ?status&provider&from&to&cursor 200  admin
 GET   /v1/admin/payments/:id                                     200  admin
 POST  /v1/admin/payments/:id/refund   {amount: Money, reason}  (Idempotency-Key)  201  admin+stepup
+GET   /v1/admin/refunds                                          200  admin|finance   (0.22.0 : remboursements à faire à la main ou refusés)
+POST  /v1/admin/refunds/:id/complete  {providerRef}              200  admin|finance+stepup   (0.22.0 : argent renvoyé à la main)
 GET   /v1/admin/webhook-events     ?provider&status&cursor       200  admin
 POST  /v1/admin/webhook-events/:id/replay                        202  admin+stepup
 GET   /v1/admin/ledger/accounts   ?ownerType&ownerId             200  admin

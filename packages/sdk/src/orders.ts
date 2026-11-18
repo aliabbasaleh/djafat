@@ -90,6 +90,15 @@ export function createOrdersClient(http: ApiHttp) {
       }),
     get: (orderId: string) => http.get<Order>(`/orders/${encodeURIComponent(orderId)}`),
     /**
+     * The customer cancels their own order (ORD-01): accepted while it is
+     * awaiting payment, placed or confirmed, 409 once the restaurant started
+     * cooking. A paid order is refunded automatically (PAY-04).
+     */
+    cancel: (orderId: string, reason?: string) =>
+      http.post<Order>(`/orders/${encodeURIComponent(orderId)}/cancel`, {
+        body: reason ? { reason } : {},
+      }),
+    /**
      * The caller's OWN order history (docs/36 pilot fix). No customer id to
      * pass — the server scopes it to the authenticated token, which is why
      * there is no parameter here through which another customer's orders

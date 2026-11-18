@@ -44,7 +44,9 @@ export type AuditAction =
   | 'RESTAURANT_HOURS_REPLACED'
   // FEAT-011 — order taken on the phone by an operator.
   | 'ORDER_PLACED_BY_PHONE'
-  | 'ORDER_PLACED_BY_MESSAGE';
+  | 'ORDER_PLACED_BY_MESSAGE'
+  // PAY-04: operations sent an automatic refund by hand (merchant wallets).
+  | 'REFUND_COMPLETED_BY_HAND';
 
 export interface AuditLogEntry {
   readonly actorUserId?: string | null;

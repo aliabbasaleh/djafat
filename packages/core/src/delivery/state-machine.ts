@@ -91,6 +91,14 @@ export const DELIVERY_TRANSITIONS: readonly DeliveryTransition[] = [
     roles: ['admin', 'super_admin'],
   },
 
+  // ORD-01: staff cancelled the ORDER before pickup — its delivery stops too
+  // (`deliveries` reacts to `order.cancelled`). Never once the food is picked up.
+  { from: 'pending', to: 'cancelled', trigger: 'order_cancelled', system: true },
+  { from: 'searching_courier', to: 'cancelled', trigger: 'order_cancelled', system: true },
+  { from: 'courier_assigned', to: 'cancelled', trigger: 'order_cancelled', system: true },
+  { from: 'courier_accepted', to: 'cancelled', trigger: 'order_cancelled', system: true },
+  { from: 'pickup_in_progress', to: 'cancelled', trigger: 'order_cancelled', system: true },
+
   // Failed — a delivery genuinely attempted but not completable (docs/25 §14).
   {
     from: 'pickup_in_progress',

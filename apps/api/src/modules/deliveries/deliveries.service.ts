@@ -1185,6 +1185,37 @@ export class DeliveriesService {
     return this.getByIdOrThrow(deliveryId);
   }
 
+  /**
+   * The order was cancelled (ORD-01; by staff, possibly once a delivery
+   * exists): the delivery stops and its courier is released. A delivery
+   * already terminal, picked up, or absent is left alone, so a replay is a
+   * no-op. No in-process `delivery.cancelled` (the order is already
+   * cancelled); the outbox event still reaches the courier's app.
+   */
+  @OnEvent('order.cancelled')
+  async onOrderCancelled(payload: { orderId: string }): Promise<void> {
+    const fromStatuses = fromStatusesFor('cancelled', { system: true });
+    await this.prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<{ id: string; courier_id: string | null }>>`
+        UPDATE deliveries SET status = 'cancelled'::text, cancelled_at = now(),
+          cancelled_reason = 'order.cancelled'
+        WHERE order_id = ${payload.orderId}::uuid AND status = ANY(${fromStatuses}::text[])
+        RETURNING id, courier_id
+      `;
+      for (const delivery of rows) {
+        if (delivery.courier_id) await this.couriers.release(tx, delivery.courier_id);
+        await tx.outbox.create({
+          data: {
+            aggregate: 'delivery',
+            aggregateId: delivery.id,
+            eventType: 'delivery.cancelled',
+            payload: { deliveryId: delivery.id, orderId: payload.orderId },
+          },
+        });
+      }
+    });
+  }
+
   async reportFailed(
     actor: AccessActor,
     deliveryId: string,

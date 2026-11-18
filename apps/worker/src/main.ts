@@ -6,6 +6,7 @@ import { env, logger } from './logger';
 import { pool } from './db';
 import { makeOutboxRelayProcessor } from './processors/outbox-relay.processor';
 import { makeOrderExpiryProcessor } from './processors/order-expiry.processor';
+import { makeOrderConfirmationTimeoutProcessor } from './processors/order-confirmation-timeout.processor';
 import { makeDispatchRetryProcessor } from './processors/dispatch.processor';
 import {
   makeLedgerAssertProcessor,
@@ -48,6 +49,9 @@ async function bootstrap(): Promise<void> {
   const workers: Worker[] = [
     new Worker('outbox-relay', makeOutboxRelayProcessor(publish), { connection }),
     new Worker('order-expiry', makeOrderExpiryProcessor(), { connection }),
+    new Worker('order-confirmation-timeout', makeOrderConfirmationTimeoutProcessor(), {
+      connection,
+    }),
     new Worker('ledger-assert', makeLedgerAssertProcessor(), { connection }),
     new Worker('dispatch-retry', makeDispatchRetryProcessor(), { connection }),
   ];
@@ -66,6 +70,12 @@ async function bootstrap(): Promise<void> {
   const expiryQueue = new Queue('order-expiry', { connection });
   await expiryQueue.add('tick', {}, { repeat: { every: 30_000 }, removeOnComplete: 20 });
 
+  // ORD-02: placed orders nobody confirmed within
+  // platform_settings['order_confirmation_timeout_seconds'] are cancelled (and
+  // refunded by the API, PAY-04). A 30 s tick against a 15 min default.
+  const confirmationQueue = new Queue('order-confirmation-timeout', { connection });
+  await confirmationQueue.add('tick', {}, { repeat: { every: 30_000 }, removeOnComplete: 20 });
+
   const assertQueue = new Queue('ledger-assert', { connection });
   await assertQueue.add('tick', {}, { repeat: { every: 3_600_000 }, removeOnComplete: 10 });
 
@@ -75,7 +85,15 @@ async function bootstrap(): Promise<void> {
   await dispatchQueue.add('tick', {}, { repeat: { every: 10_000 }, removeOnComplete: 50 });
 
   logger.info(
-    { queues: ['outbox-relay', 'order-expiry', 'ledger-assert', 'dispatch-retry'] },
+    {
+      queues: [
+        'outbox-relay',
+        'order-expiry',
+        'order-confirmation-timeout',
+        'ledger-assert',
+        'dispatch-retry',
+      ],
+    },
     'DJAFAT worker started',
   );
 

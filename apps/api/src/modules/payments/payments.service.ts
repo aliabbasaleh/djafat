@@ -10,7 +10,13 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import type { Prisma } from '@prisma/client';
-import type { MoneyJson, OrderAmountPort, PaymentAction, RawWebhookRequest } from '@djafat/types';
+import type {
+  MoneyJson,
+  OrderAmountPort,
+  PaymentAction,
+  RawWebhookRequest,
+  RefundResult,
+} from '@djafat/types';
 import { assertPositive, money } from '@djafat/core';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { OutboxService } from '../../infra/outbox/outbox.service';
@@ -49,6 +55,25 @@ export interface RefundDto {
   amount: MoneyJson;
   reason: string;
   status: string;
+}
+
+/** PAY-04: a refund operations still have to send or finish. */
+export interface OpenRefundDto extends RefundDto {
+  orderId: string;
+  orderCode: string | null;
+  providerCode: string;
+  /** The number the customer paid from, when the payment recorded it (merchant wallets). */
+  payerPhone: string | null;
+  /** Started by the system when the order ended (no staff requester). */
+  automatic: boolean;
+  lastError: string | null;
+  createdAt: string;
+}
+
+function asJsonRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 @Injectable()
@@ -759,11 +784,17 @@ export class PaymentsService {
   private async finalizeRefundSuccess(refundId: string): Promise<void> {
     const outcome = await this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
-        Array<{ id: string; payment_id: string; amount_minor: bigint; currency: string }>
+        Array<{
+          id: string;
+          payment_id: string;
+          amount_minor: bigint;
+          currency: string;
+          compensates_accrual: boolean;
+        }>
       >`
-        UPDATE refunds SET status = 'succeeded'
+        UPDATE refunds SET status = 'succeeded', updated_at = now()
         WHERE id = ${refundId}::uuid AND status IN ('pending', 'processing')
-        RETURNING id, payment_id, amount_minor, currency
+        RETURNING id, payment_id, amount_minor, currency, compensates_accrual
       `;
       if (!rows[0]) return null; // already resolved — idempotent no-op
       const refund = rows[0];
@@ -778,7 +809,7 @@ export class PaymentsService {
       const newStatus = totalRefunded >= payment.amountMinor ? 'refunded' : 'partially_refunded';
 
       const entries = buildRefundEntries(
-        { providerCode: payment.providerCode },
+        { providerCode: payment.providerCode, owedFromReversal: refund.compensates_accrual },
         money(refund.amount_minor, refund.currency),
       );
       const posted = await this.ledger.postEntryGroupTx(tx, {
@@ -814,6 +845,132 @@ export class PaymentsService {
     this.logger.log(
       `refund ${outcome.refundId} succeeded on payment ${outcome.paymentId} -> ${outcome.newStatus}`,
     );
+  }
+
+  // ── refunds of orders that ended without delivery (PAY-04) ─────────────
+
+  /** PAY-04: an open payment of an order that ended is cancelled (idempotent). */
+  async cancelOpenPayment(paymentId: string): Promise<void> {
+    await this.markCancelled(paymentId);
+  }
+
+  /**
+   * PAY-04: hands a `pending` automatic refund to its provider and finalizes
+   * it once the provider confirms. Only for providers that refund by API
+   * (`capabilities.refund`); merchant wallets are refunded by hand
+   * (`completeRefundByHand`). A provider error marks it `failed` with the
+   * error, so operations see it and can finish it by hand.
+   */
+  async sendRefundToProvider(refundId: string): Promise<RefundDto> {
+    const refund = await this.prisma.refund.findUniqueOrThrow({ where: { id: refundId } });
+    if (refund.status !== 'pending') return this.refundToDto(refund);
+    // Two triggers may get here for the same refund at once (in-process and
+    // relayed). Safe without a claim: `provider.refund()` is idempotent on its
+    // key (docs/08 §8.8), the same `refund:<id>` both times, and finalizing is
+    // a conditional update. A claim would instead strand the refund in
+    // `processing`, out of the operations list, if the process stopped mid-call.
+    const payment = await this.prisma.payment.findUniqueOrThrow({
+      where: { id: refund.paymentId },
+    });
+    const provider = this.registry.get(payment.providerCode);
+    let result: RefundResult | null = null;
+    let error: string | null = null;
+    try {
+      result = await provider.refund({
+        providerRef: payment.providerRef ?? '',
+        amount: money(refund.amountMinor, refund.currency),
+        idempotencyKey: `refund:${refund.id}`,
+      });
+    } catch (err) {
+      error = String(err);
+    }
+    if (!result || result.status === 'failed') {
+      const failed = await this.prisma.refund.update({
+        where: { id: refund.id },
+        data: {
+          status: 'failed',
+          lastError: error ?? 'rejected by the provider',
+          attempts: { increment: 1 },
+          updatedAt: new Date(),
+        },
+      });
+      this.logger.warn(`automatic refund ${refund.id} failed at the provider: left for operations`);
+      return this.refundToDto(failed);
+    }
+    await this.prisma.refund.update({
+      where: { id: refund.id },
+      data: { providerRef: result.providerRef, status: 'processing', updatedAt: new Date() },
+    });
+    if (result.status === 'succeeded') await this.finalizeRefundSuccess(refund.id);
+    return this.refundToDto(
+      await this.prisma.refund.findUniqueOrThrow({ where: { id: refund.id } }),
+    );
+  }
+
+  /**
+   * PAY-04: operations sent the money back by hand (a merchant-wallet
+   * transfer to the customer) and record its reference: the refund is
+   * finalized and the ledger posted, exactly as a provider confirmation would.
+   * Only a refund still waiting (`pending`) or one the provider refused
+   * (`failed`) can be completed this way.
+   */
+  async completeRefundByHand(refundId: string, providerRef: string): Promise<RefundDto> {
+    const updated = await this.prisma.refund.updateMany({
+      where: { id: refundId, status: { in: ['pending', 'failed'] } },
+      data: { status: 'processing', providerRef, updatedAt: new Date() },
+    });
+    if (updated.count === 0) {
+      const refund = await this.prisma.refund.findUnique({ where: { id: refundId } });
+      if (!refund) {
+        throw new NotFoundException({
+          code: 'NOT_FOUND',
+          message: `Refund ${refundId} not found.`,
+        });
+      }
+      throw new ConflictException({
+        code: 'REFUND_INVALID_STATE',
+        message: `Refund ${refundId} is ${refund.status}: only a pending or failed refund can be completed by hand.`,
+      });
+    }
+    await this.finalizeRefundSuccess(refundId);
+    return this.refundToDto(
+      await this.prisma.refund.findUniqueOrThrow({ where: { id: refundId } }),
+    );
+  }
+
+  /**
+   * PAY-04: the refunds operations still have to send or finish (`pending`,
+   * `failed`), oldest first, with what they need to send the money back: the
+   * order code, the payment method, and the number the customer paid from.
+   */
+  async listOpenRefunds(limit = 100): Promise<OpenRefundDto[]> {
+    const refunds = await this.prisma.refund.findMany({
+      where: { status: { in: ['pending', 'failed'] } },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+    });
+    const result: OpenRefundDto[] = [];
+    for (const refund of refunds) {
+      const payment = await this.prisma.payment.findUniqueOrThrow({
+        where: { id: refund.paymentId },
+      });
+      // Not getPaymentContext: it only answers for an order still awaiting payment.
+      const facts = await this.orderAmount.getCancellationFacts(payment.orderId).catch(() => null);
+      const meta = asJsonRecord(payment.metadata);
+      const claim = asJsonRecord(meta['transferClaim']);
+      const payerPhone = claim['payerPhone'] ?? meta['payerPhone'];
+      result.push({
+        ...this.refundToDto(refund),
+        orderId: payment.orderId,
+        orderCode: facts?.orderCode ?? null,
+        providerCode: payment.providerCode,
+        payerPhone: typeof payerPhone === 'string' ? payerPhone : null,
+        automatic: refund.requestedBy === null,
+        lastError: refund.lastError,
+        createdAt: refund.createdAt.toISOString(),
+      });
+    }
+    return result;
   }
 
   // ── config discovery (docs/08 §8.4 step 2, docs/15 AD-04) ─────────────────

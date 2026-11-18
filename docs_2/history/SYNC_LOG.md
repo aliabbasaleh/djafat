@@ -10,6 +10,56 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-027 — 2026-11-18 — order cancellation, automatic refunds, confirmation timeout
+
+|                 |                                                                                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **Trigger**     | Our own commit, at the user's request ("fix those also")                                                                  |
+| **Range**       | `fix/order-cancel-refund` (stacked on pull request #18)                                                                   |
+| **Size**        | 1 commit: core, types, config, API (orders, payments, deliveries, ledger), worker, SDK, web, mobile, migration 0039, docs |
+| **Evidence**    | RUN — unit tests, `verify:fast`, API integration suite 111/111, worker job against PostgreSQL                             |
+| **Reviewed by** | Claude, in the session that wrote the commit                                                                              |
+
+### Added
+
+- Routes `POST /v1/orders/:id/cancel`, `POST /v1/admin/orders/:id/cancel`, `GET /v1/admin/refunds`,
+  `POST /v1/admin/refunds/:id/complete`; `OrderRefundsService`; worker job `order-confirmation-timeout`;
+  setting `order_confirmation_timeout_seconds` (900); migration `0039_refunds_for_ended_orders`; cancel
+  buttons (web, mobile); `docs/37-annulations-remboursements.md`.
+
+### Removed
+
+- none
+
+### Fixed
+
+- `ORD-01`, `PAY-04`, `ORD-02` on the branch (not yet merged).
+
+### Changed
+
+- System transitions: order `placed → cancelled` (`confirmation_timeout`); delivery pre-pickup statuses →
+  `cancelled` (`order_cancelled`). `refunds.requested_by` may be null (system refund).
+
+### New findings
+
+- none (limits listed in `docs/37` §6)
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- The full chain worker → Redis stream → API in one run; the buttons in a browser or on a device; a real
+  merchant-wallet refund.
+
+### Marker
+
+`HEAD` → this sync's version commit.
+
+---
+
 ## S-026 — 2026-11-18 — finance can enrol MFA; staff hierarchy on account status
 
 |                 |                                                                      |

@@ -52,6 +52,10 @@ export const ORDER_TRANSITIONS: readonly OrderTransition[] = [
     trigger: 'cancel_before_preparing',
     roles: ['customer', 'admin', 'super_admin'],
   },
+  // ORD-02: a placed order its restaurant never confirms is cancelled by the
+  // worker once `platform_settings['order_confirmation_timeout_seconds']` has
+  // passed; `payments` then settles the money like any cancellation (PAY-04).
+  { from: 'placed', to: 'cancelled', trigger: 'confirmation_timeout', system: true },
   {
     from: 'confirmed',
     to: 'preparing',

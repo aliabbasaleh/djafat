@@ -14,6 +14,7 @@ import type {
   MoneyJson,
   OrderAccrualBreakdown,
   OrderAmountPort,
+  OrderCancellationFacts,
   CustomerTrustFacts,
   OrderDeliveryContext,
   OrderPaymentContext,
@@ -1055,6 +1056,69 @@ export class OrdersService implements OrderAmountPort {
       ...(reason !== undefined ? { reason } : {}),
     });
     return this.getOrder(id);
+  }
+
+  /**
+   * The customer cancels their own order (ORD-01). The state machine decides
+   * from where: `awaiting_payment` (`customer_cancel`), `placed` and
+   * `confirmed` (`cancel_before_preparing`); anything later answers 409.
+   * Someone else's order answers the same 404 as an unknown id (docs/19 §21).
+   * The money is settled by `payments`, which reacts to `order.cancelled`
+   * (PAY-04): never from here (`orders` never imports `payments`).
+   */
+  async cancelByCustomer(
+    id: string,
+    actor: { userId: string },
+    reason?: string,
+  ): Promise<OrderDto> {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      select: { customerId: true },
+    });
+    if (!order || order.customerId !== actor.userId) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: `Order ${id} not found.` });
+    }
+    await this.transitionOrder(id, 'cancelled', {
+      actorRole: 'customer',
+      reason: reason ?? 'customer_cancel',
+    });
+    return this.getOrder(id);
+  }
+
+  /**
+   * Staff cancel an order (ORD-01, `admin_force_cancel`): any status up to
+   * `courier_assigned`, never once the food is picked up. `deliveries` cancels
+   * the delivery in progress and `payments` settles the money, both reacting
+   * to `order.cancelled`.
+   */
+  async cancelByAdmin(id: string, actor: { role: Role }, reason: string): Promise<OrderDto> {
+    await this.transitionOrder(id, 'cancelled', { actorRole: actor.role, reason });
+    return this.getOrder(id);
+  }
+
+  /** `OrderAmountPort.getCancellationFacts` (PAY-04). */
+  async getCancellationFacts(orderId: string): Promise<OrderCancellationFacts> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { code: true, status: true },
+    });
+    if (!order) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: `Order ${orderId} not found.` });
+    }
+    const history = await this.prisma.orderStatusHistory.findMany({
+      where: { orderId },
+      orderBy: { createdAt: 'asc' },
+      select: { toStatus: true, actorRole: true, reason: true },
+    });
+    const last = history.at(-1);
+    return {
+      orderId,
+      orderCode: order.code,
+      status: order.status as OrderStatusString,
+      reachedPreparation: history.some((h) => h.toStatus === 'preparing'),
+      endedByRole: last?.actorRole ?? null,
+      endReason: last?.reason ?? null,
+    };
   }
 
   // ── generic transition (single source of the state-machine logic) ────────

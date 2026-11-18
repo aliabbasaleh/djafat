@@ -28,6 +28,72 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 
 type LoadState = 'loading' | 'ready' | 'error' | 'not-found';
 
+/** The statuses from which the customer may cancel (ORD-01, the order state machine). */
+const CUSTOMER_CANCELLABLE: readonly OrderStatus[] = ['awaiting_payment', 'placed', 'confirmed'];
+
+/**
+ * "Annuler la commande" (ORD-01), until the restaurant starts cooking, behind
+ * a second tap. A paid order is refunded automatically (PAY-04). If the
+ * restaurant moved on in between, the API answers 409 and the order reloads.
+ */
+function CancelOrderCard({ orderId, onChanged }: { orderId: string; onChanged: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function cancel() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.orders.cancel(orderId);
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError && err.status === 409
+          ? 'Le restaurant a déjà commencé à préparer votre commande : elle ne peut plus être annulée.'
+          : 'L’annulation n’a pas abouti. Réessayez dans un instant.',
+      );
+      setConfirming(false);
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
+  }
+
+  return (
+    <View style={styles.cancelCard}>
+      {error && <Text style={styles.cancelError}>{error}</Text>}
+      {confirming ? (
+        <>
+          <Text style={styles.subtle}>
+            Annuler cette commande ? Si vous l’avez déjà payée, vous serez remboursé.
+          </Text>
+          <Button
+            label="Oui, annuler la commande"
+            variant="danger"
+            fullWidth
+            loading={busy}
+            onPress={() => void cancel()}
+          />
+          <Button
+            label="Non, garder ma commande"
+            variant="secondary"
+            fullWidth
+            disabled={busy}
+            onPress={() => setConfirming(false)}
+          />
+        </>
+      ) : (
+        <Button
+          label="Annuler la commande"
+          variant="ghost"
+          fullWidth
+          onPress={() => setConfirming(true)}
+        />
+      )}
+    </View>
+  );
+}
+
 /**
  * The customer's delivery code (audit finding FE-03): the courier asks for it
  * at the door and cannot finish the delivery without it. The API serves it to
@@ -152,6 +218,15 @@ export default function OrderTrackingScreen() {
       {(order.status === 'picked_up' || order.status === 'on_the_way') && (
         <DeliveryCodeCard orderId={order.id} />
       )}
+      {(order.status === 'cancelled' || order.status === 'rejected') && (
+        <Text style={styles.subtle}>
+          {order.status === 'rejected'
+            ? 'Le restaurant n’a pas pu accepter votre commande.'
+            : 'Cette commande est annulée.'}{' '}
+          Si vous l’aviez payée, le remboursement est automatique : par mobile money, il est envoyé
+          sur le numéro qui a payé.
+        </Text>
+      )}
 
       {order.items.map((item, index) => (
         <View key={index} style={styles.item}>
@@ -182,6 +257,10 @@ export default function OrderTrackingScreen() {
         </View>
       </View>
 
+      {CUSTOMER_CANCELLABLE.includes(order.status) && (
+        <CancelOrderCard orderId={order.id} onChanged={() => void loadOrder()} />
+      )}
+
       <Button
         label="Continuer mes achats"
         variant="secondary"
@@ -193,6 +272,12 @@ export default function OrderTrackingScreen() {
 }
 
 const styles = StyleSheet.create({
+  cancelCard: { gap: tokens.space['2'], marginBottom: tokens.space['3'] },
+  cancelError: {
+    fontSize: tokens.type.size.body,
+    color: tokens.color.state.danger,
+    marginBottom: tokens.space['2'],
+  },
   subtle: {
     fontSize: tokens.type.size.body,
     color: tokens.color.text.secondary,

@@ -2,6 +2,12 @@ import type { Money } from '@djafat/types';
 
 export interface RefundLedgerFacts {
   readonly providerCode: string;
+  /**
+   * PAY-04: the order's accrual was already reversed into `REFUNDS_PAYABLE`
+   * (an order that ended before the kitchen started, `order-reversal-entries.ts`);
+   * the refund then pays that debt off instead of debiting DJAFAT's revenue.
+   */
+  readonly owedFromReversal?: boolean;
 }
 
 export interface RefundLedgerEntry {
@@ -22,6 +28,11 @@ export interface RefundLedgerEntry {
  * so it becomes an owed-but-not-yet-paid liability (`REFUNDS_PAYABLE`,
  * settled later as a wallet credit or a cash handback).
  *
+ * One exception (PAY-04): when an order ends before the kitchen started, its
+ * accrual is reversed first (`order-reversal-entries.ts`), so the restaurant
+ * and courier shares are already taken back and the customer is owed the
+ * amount in `REFUNDS_PAYABLE`; the refund then debits that debt, not revenue.
+ *
  * Always exactly 2 legs, same amount — balances by construction.
  */
 export function buildRefundEntries(
@@ -29,8 +40,17 @@ export function buildRefundEntries(
   refundAmount: Money,
 ): RefundLedgerEntry[] {
   const isCash = payment.providerCode === 'cash';
+  if (isCash && payment.owedFromReversal) {
+    // Never built: cash is collected at the door, so an order that ended before
+    // the kitchen started has no cash payment to reverse (refundReversesAccrual).
+    throw new Error('A cash refund cannot pay off a reversed accrual.');
+  }
   return [
-    { accountRef: 'DJAFAT_REVENUE', direction: 'debit', amount: refundAmount },
+    {
+      accountRef: payment.owedFromReversal ? 'REFUNDS_PAYABLE' : 'DJAFAT_REVENUE',
+      direction: 'debit',
+      amount: refundAmount,
+    },
     {
       accountRef: isCash ? 'REFUNDS_PAYABLE' : 'PSP_CLEARING',
       direction: 'credit',

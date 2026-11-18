@@ -21,6 +21,10 @@ export const LAUNCH_MARKET = {
 export const PLATFORM_SETTINGS_DEFAULTS = {
   unpaid_order_ttl_seconds: 900, // A4
   offer_timeout_seconds: 30,
+  // ORD-02: a placed order its restaurant has not confirmed after this long is
+  // cancelled and refunded (PAY-04). 15 min like the unpaid-order TTL (A4);
+  // a default for DJAFAT to confirm, tunable in platform_settings.
+  order_confirmation_timeout_seconds: 900,
   courier_cash_float_cap_minor: 200_000, // B3
   psp_fee_policy: 'absorb', // A2
   funds_release_policy: { trigger: 'delivered', delay_hours: 0, reserve_percent: 0 }, // A3
