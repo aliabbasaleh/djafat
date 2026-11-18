@@ -10,6 +10,52 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-034 — 2026-11-18 — pull requests #17 to #24 merged
+
+|                 |                                                                             |
+| --------------- | --------------------------------------------------------------------------- |
+| **Trigger**     | Merges at the user's request ("merge the prs"), then `git fetch`            |
+| **Range**       | `origin/main` `034123a..afaa7c2` — 8 merge commits, no content of their own |
+| **Size**        | the content of #17 to #24, already reviewed in syncs S-025 to S-033         |
+| **Evidence**    | RUN — checks read before each merge; `git diff ac0ccca afaa7c2` empty       |
+| **Reviewed by** | Claude, in the session that merged them                                     |
+
+### Added
+
+- none (merges)
+
+### Removed
+
+- The eight merged branches, on GitHub and locally.
+
+### Fixed
+
+- On `main`: `TEST-05`, `ADM-01`, `ADM-02`, `ORD-01`, `PAY-04`, `ORD-02`, `ADM-03`, `SEC-02`, `OPS-05`.
+
+### Changed
+
+- `main` moves from 0.21.7 to 0.23.4; it now carries migration 0039 (refunds), so a server or a local copy
+  updated to it must run its migrations (`install.sh` and `./local.sh update` do).
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `tasks/BACKLOG.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT` (the `HEAD` and `origin/main` lines).
+
+### Not verified
+
+- Nothing new was run: the merged code is the code verified on the branches (identical tree).
+
+### Marker
+
+`HEAD` → this sync's version commit; `origin/main` → `afaa7c2`.
+
+---
+
 ## S-033 — 2026-11-18 — live-server bootstrap without test accounts
 
 |                 |                                                                                             |
