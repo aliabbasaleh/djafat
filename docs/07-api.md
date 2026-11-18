@@ -38,8 +38,8 @@ POST   /v1/auth/otp/request        {phone, purpose}              202   public   
 POST   /v1/auth/otp/verify         {phone, code, purpose}        200   public   -> {access, refresh, user}
 POST   /v1/auth/refresh            {refresh}|cookie              200   self     (rotation + reuse detection -> revoke family)
 POST   /v1/auth/logout                                           204   self
-POST   /v1/auth/mfa/setup                                        200   admin    (TOTP enrolment)
-POST   /v1/auth/mfa/verify         {code}                        200   admin    (ouvre une fenêtre step-up ~10 min)
+POST   /v1/auth/mfa/setup                                        200   admin    (TOTP enrolment ; aussi `finance`, qui rembourse et enregistre les règlements)
+POST   /v1/auth/mfa/verify         {code}                        200   admin    (ouvre une fenêtre step-up ~10 min ; aussi `finance`)
 GET    /v1/me                                                    200   self     -> profil + rôles + country
 PATCH  /v1/me                      {fullName, email, locale, avatarFileId}  200  self
 GET    /v1/me/addresses                                          200   self

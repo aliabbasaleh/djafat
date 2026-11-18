@@ -770,7 +770,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### ADM-01
 
-**The `finance` role cannot perform refunds or settlements** · Broken · High · LIVE · Status: Open
+**The `finance` role cannot perform refunds or settlements** · Broken · High · LIVE · Status: Open on `main`; fix present on `fix/admin-roles` (version 0.21.9), verified there (sync S-026)
 
 - **Where:** `auth.controller.ts` (`mfa/setup`, `mfa/verify`: `admin`/`super_admin` only);
   `payments.controller.ts` refund and `settlements.controller.ts` record (`@RequireStepUp()`, role `finance` allowed).
@@ -781,10 +781,16 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Verify:** finance enrols, verifies, then refunds successfully.
 - **Sync S-021 re-check (2026-11-18), CODE:** unchanged: `mfa/setup` and `mfa/verify` still require
   `admin` or `super_admin`, so `finance` cannot pass the step-up its refunds need.
+- **Sync S-026 (2026-11-18), RUN, branch `fix/admin-roles`:** `mfa/setup`, `mfa/verify` and `mfa/disable`
+  admit `MFA_ENROLLABLE_ROLES` (admin, super_admin, finance; new in `@djafat/types`). A unit test reads every
+  controller and checks that each role a step-up route asks a second factor from can enrol and verify; it
+  failed on the old controller ("PaymentsController.refund: finance cannot enrol MFA"). Integration: a fresh
+  finance account gets 428 on a refund, enrols and verifies, then gets 404 for an unknown payment instead of 428.
+  A refund of a real payment by finance was not run.
 
 ### ADM-02
 
-**An `admin` can block a `super_admin`** · Needs Improvement · High · LIVE · Status: Open
+**An `admin` can block a `super_admin`** · Needs Improvement · High · LIVE · Status: Open on `main`; partly fixed on `fix/admin-roles` (0.21.9): hierarchy, sessions and refresh verified there; step-up still missing (sync S-026)
 
 - **Where:** `users.service.ts` `setStatus`; `users-admin.controller.ts` suspend/block/reactivate.
 - **Observed:** `admin` blocked the `super_admin`, whose next request got 403, then reactivated it.
@@ -795,6 +801,13 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Verify:** admin → super_admin block returns 403; admin → customer works after step-up.
 - **Sync S-021 re-check (2026-11-18), CODE:** unchanged: `setStatus` checks nothing about the
   target's roles (role grants are guarded, status changes are not).
+- **Sync S-026 (2026-11-18), RUN, branch `fix/admin-roles`:** `setStatus` refuses one's own account and,
+  unless the actor is super_admin, any account holding admin or super_admin (the rule `grantRole` already
+  used; a super_admin may still act on another super_admin, or nobody could stop a compromised one).
+  Suspend and block revoke every session of the target, and `/auth/refresh` now refuses an inactive account
+  (it renewed tokens for blocked users before) and ends its sessions. Unit and integration tests: admin →
+  super_admin block 403, self-block 403, a blocked customer's refresh token stays dead after reactivation.
+  Still open: step-up on these routes, which waits for the console's MFA screen (`ADM-03`).
 
 ### ADM-03
 

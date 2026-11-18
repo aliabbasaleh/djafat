@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
-import type { AuthenticatedActor } from '@djafat/types';
+import { MFA_ENROLLABLE_ROLES, type AuthenticatedActor } from '@djafat/types';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { AppConfigService } from '../../common/config/config.service';
 import { AuthService, type RequestMeta } from './auth.service';
@@ -142,11 +142,14 @@ export class AuthController {
     await this.auth.logoutAll(actor.userId, requestMeta(req));
   }
 
-  /** TOTP enrollment — admin/super_admin only (docs/07 §"Auth"). */
+  /**
+   * TOTP enrollment (docs/07 §"Auth") for every role that faces a step-up:
+   * admin, super_admin and finance (`MFA_ENROLLABLE_ROLES`, audit ADM-01).
+   */
   @Post('mfa/setup')
   @HttpCode(200)
   @RequireAuth()
-  @RequireRole('admin', 'super_admin')
+  @RequireRole(...MFA_ENROLLABLE_ROLES)
   mfaSetup(@CurrentActor() actor: AuthenticatedActor) {
     return this.auth.mfaSetup(actor.userId);
   }
@@ -155,7 +158,7 @@ export class AuthController {
   @Post('mfa/verify')
   @HttpCode(200)
   @RequireAuth()
-  @RequireRole('admin', 'super_admin')
+  @RequireRole(...MFA_ENROLLABLE_ROLES)
   mfaVerify(
     @CurrentActor() actor: AuthenticatedActor,
     @Body(new ZodValidationPipe(MfaVerifySchema)) body: MfaVerifyInput,
@@ -167,7 +170,7 @@ export class AuthController {
   @HttpCode(204)
   @RequireAuth()
   @RequireStepUp()
-  @RequireRole('admin', 'super_admin')
+  @RequireRole(...MFA_ENROLLABLE_ROLES)
   async mfaDisable(@CurrentActor() actor: AuthenticatedActor): Promise<void> {
     await this.auth.mfaDisable(actor.userId);
   }

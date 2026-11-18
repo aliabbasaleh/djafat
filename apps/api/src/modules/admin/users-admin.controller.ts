@@ -5,6 +5,7 @@ import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { CurrentActor } from '../auth/current-actor.decorator';
 import { RequireAuth, RequirePermission, RequireRole, RequireStepUp } from '../auth/decorators';
 import { UsersService } from '../users/users.service';
+import { SessionService } from '../auth/session.service';
 import { AuditService } from '../../common/audit/audit.service';
 import {
   GrantRoleSchema,
@@ -54,7 +55,12 @@ import {
  * this way, `RolesGuard`/`PermissionsGuard` still reject a wrong-role/
  * wrong-permission actor with 403 before `StepUpGuard` is ever reached.
  *
- * Deliberately NOT applied to `suspend`/`block`/`reactivate` here, nor to
+ * `suspend`/`block`/`reactivate` follow the same hierarchy as roles, inside
+ * `UsersService.setStatus` (audit ADM-02): never on one's own account, and
+ * only a super_admin acts on an admin or super_admin. Suspending or blocking
+ * also ends every session of the target, so its refresh tokens die with it.
+ *
+ * Step-up is deliberately NOT applied to `suspend`/`block`/`reactivate` here, nor to
  * `couriers-admin.controller.ts`'s `suspend`/`reinstate`: those are already
  * wired into a live Admin UI page (`apps/admin/.../users/[id]/page.tsx`,
  * `.../couriers/page.tsx`) with no step-up UI of any kind — gating them
@@ -73,6 +79,7 @@ export class UsersAdminController {
   constructor(
     private readonly users: UsersService,
     private readonly audit: AuditService,
+    private readonly sessions: SessionService,
   ) {}
 
   @Get()
@@ -149,7 +156,8 @@ export class UsersAdminController {
     @Param('id') targetUserId: string,
     @Body(new ZodValidationPipe(ReasonSchema)) body: ReasonInput,
   ) {
-    await this.users.suspend(targetUserId, actor.userId, body.reason);
+    await this.users.suspend(actor, targetUserId, body.reason);
+    await this.sessions.revokeAllForUser(targetUserId, 'account_suspended');
     return this.users.getByIdOrThrow(targetUserId);
   }
 
@@ -163,7 +171,8 @@ export class UsersAdminController {
     @Param('id') targetUserId: string,
     @Body(new ZodValidationPipe(ReasonSchema)) body: ReasonInput,
   ) {
-    await this.users.block(targetUserId, actor.userId, body.reason);
+    await this.users.block(actor, targetUserId, body.reason);
+    await this.sessions.revokeAllForUser(targetUserId, 'account_blocked');
     return this.users.getByIdOrThrow(targetUserId);
   }
 
@@ -177,7 +186,7 @@ export class UsersAdminController {
     @Param('id') targetUserId: string,
     @Body(new ZodValidationPipe(ReasonSchema)) body: ReasonInput,
   ) {
-    await this.users.reactivate(targetUserId, actor.userId, body.reason);
+    await this.users.reactivate(actor, targetUserId, body.reason);
     return this.users.getByIdOrThrow(targetUserId);
   }
 }

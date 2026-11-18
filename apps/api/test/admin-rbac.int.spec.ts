@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { randomUUID } from 'node:crypto';
 import type { Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Test } from '@nestjs/testing';
@@ -9,6 +10,7 @@ import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
 import { listenOnLoopback } from './listen-on-loopback';
 import { RedisService } from '../src/common/redis/redis.service';
+import { PrismaService } from '../src/infra/prisma/prisma.service';
 import { mockOtpKey } from '../src/modules/auth/providers/mock-otp-delivery.provider';
 
 /**
@@ -39,6 +41,7 @@ const PHONES = {
 
 let app: NestFastifyApplication;
 let redis: RedisService;
+let prisma: PrismaService;
 let server: Server;
 const tokens: Record<keyof typeof PHONES, string> = {} as never;
 const refreshTokens: Record<keyof typeof PHONES, string> = {} as never;
@@ -83,6 +86,7 @@ beforeAll(async () => {
   configureApp(app);
   server = await listenOnLoopback(app);
   redis = app.get(RedisService);
+  prisma = app.get(PrismaService);
 
   for (const [key, phone] of Object.entries(PHONES) as Array<[keyof typeof PHONES, string]>) {
     const { access, refresh, userId } = await loginViaOtp(phone);
@@ -315,5 +319,99 @@ describe('Balance self-service routes never accept a client-supplied identity (P
       .get('/v1/restaurants/me/balance')
       .set('Authorization', `Bearer ${tokens.restaurantStaff}`)
       .expect(200);
+  });
+});
+
+// Fresh accounts, used by no other test file (see FRESH_ADMIN_PHONE above for why).
+const FRESH_FINANCE_PHONE = '+23566000095';
+const STATUS_TARGET_PHONE = '+23566000094';
+const GATE_TARGET_PHONE = '+23566000093';
+
+describe('finance can unlock its own step-up actions (audit ADM-01)', () => {
+  let finance: { access: string; refresh: string; userId: string };
+
+  beforeAll(async () => {
+    // super_admin stepped up in the role-grant block above: same file, same
+    // session, well inside the step-up window.
+    const created = await loginViaOtp(FRESH_FINANCE_PHONE);
+    await request(server)
+      .post(`/v1/admin/users/${created.userId}/roles`)
+      .set('Authorization', `Bearer ${tokens.superAdmin}`)
+      .send({ role: 'finance' })
+      .expect(201);
+    finance = await loginViaOtp(FRESH_FINANCE_PHONE); // roles are a login-time claim
+  }, 30_000);
+
+  const refundUnknownPayment = (access: string) =>
+    request(server)
+      .post(`/v1/payments/${randomUUID()}/refund`)
+      .set('Authorization', `Bearer ${access}`)
+      .set('Idempotency-Key', randomUUID())
+      .send({ amount: { minor: '100', currency: 'XAF' }, reason: 'ADM-01 check' });
+
+  it('before enrolling, a refund by finance answers 428 STEP_UP_REQUIRED', async () => {
+    const res = await refundUnknownPayment(finance.access).expect(428);
+    expect(res.body.error.code).toBe('STEP_UP_REQUIRED');
+  });
+
+  it('finance enrols and verifies MFA (was 403), then gets past the step-up: 404 for an unknown payment, not 428', async () => {
+    await enrollAndStepUp(finance.access);
+    const res = await refundUnknownPayment(finance.access).expect(404);
+    expect(res.body.error.code).toBe('NOT_FOUND');
+  });
+});
+
+describe('who may suspend, block or reactivate whom (audit ADM-02)', () => {
+  it('an admin cannot block the super_admin: 403, and the super_admin keeps working', async () => {
+    const res = await request(server)
+      .post(`/v1/admin/users/${userIds.superAdmin}/block`)
+      .set('Authorization', `Bearer ${tokens.admin}`)
+      .send({ reason: 'ADM-02 check' })
+      .expect(403);
+    expect(res.body.error.code).toBe('FORBIDDEN');
+    await request(server)
+      .get('/v1/admin/users')
+      .set('Authorization', `Bearer ${tokens.superAdmin}`)
+      .expect(200);
+  });
+
+  it('an admin cannot block its own account', async () => {
+    await request(server)
+      .post(`/v1/admin/users/${userIds.admin}/block`)
+      .set('Authorization', `Bearer ${tokens.admin}`)
+      .send({ reason: 'ADM-02 check' })
+      .expect(403);
+  });
+
+  it('an admin blocks a customer: its refresh token dies, and reactivation does not revive it', async () => {
+    const target = await loginViaOtp(STATUS_TARGET_PHONE);
+    await request(server)
+      .post(`/v1/admin/users/${target.userId}/block`)
+      .set('Authorization', `Bearer ${tokens.admin}`)
+      .send({ reason: 'ADM-02 check' })
+      .expect(200);
+    await request(server).post('/v1/auth/refresh').send({ refresh: target.refresh }).expect(401);
+
+    await request(server)
+      .post(`/v1/admin/users/${target.userId}/reactivate`)
+      .set('Authorization', `Bearer ${tokens.admin}`)
+      .send({ reason: 'ADM-02 check done' })
+      .expect(200);
+    await request(server).post('/v1/auth/refresh').send({ refresh: target.refresh }).expect(401);
+    const again = await loginViaOtp(STATUS_TARGET_PHONE); // a new login works
+    expect(again.userId).toBe(target.userId);
+  });
+
+  it('refresh refuses an account that is no longer active, and ends its sessions', async () => {
+    const gate = await loginViaOtp(GATE_TARGET_PHONE);
+    await prisma.user.update({ where: { id: gate.userId }, data: { status: 'suspended' } });
+    const res = await request(server)
+      .post('/v1/auth/refresh')
+      .send({ refresh: gate.refresh })
+      .expect(403);
+    expect(res.body.error.code).toBe('ACCOUNT_INACTIVE');
+
+    await prisma.user.update({ where: { id: gate.userId }, data: { status: 'active' } });
+    await request(server).post('/v1/auth/refresh').send({ refresh: gate.refresh }).expect(401);
   });
 });
