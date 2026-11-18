@@ -10,6 +10,52 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-022 — 2026-11-18 — the cause of `TEST-04`, and its fix
+
+|                 |                                                              |
+| --------------- | ------------------------------------------------------------ |
+| **Trigger**     | Our own commit, at the user's request                        |
+| **Range**       | `fix/test-loopback` (stacked on pull request #13)            |
+| **Size**        | 1 commit: a test helper, 11 integration files, version files |
+| **Evidence**    | RUN — reproduction script; 5 full integration runs           |
+| **Reviewed by** | Claude, in the session that wrote the commit                 |
+
+### Added
+
+- `apps/api/test/listen-on-loopback.ts`: starts the test app on 127.0.0.1.
+
+### Removed
+
+- none
+
+### Fixed
+
+- `TEST-04` on the branch (verified locally; not yet merged).
+
+### Changed
+
+- All 11 integration files start their app through the helper; the two realtime files listen on
+  127.0.0.1.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- 20 consecutive runs (5 done); CI on Linux was never affected.
+
+### Marker
+
+`HEAD` → this sync's version commit.
+
+---
+
 ## S-021 — 2026-11-18 — the open Critical and High findings re-checked
 
 |                 |                                                                            |

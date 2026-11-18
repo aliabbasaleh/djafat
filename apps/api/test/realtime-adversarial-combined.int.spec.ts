@@ -54,7 +54,7 @@ async function bootInstance(): Promise<Instance> {
   configureApp(app);
   const config = app.get(AppConfigService);
   await attachSocketIoRedisAdapter(app, config.get('REDIS_URL'));
-  await app.listen(0);
+  await app.listen(0, '127.0.0.1');
   await app.getHttpAdapter().getInstance().ready();
   const server = app.getHttpAdapter().getInstance().server as unknown as Server;
   const address = server.address();

@@ -58,7 +58,7 @@ async function bootInstance(): Promise<Instance> {
   // The exact call `main.ts` makes — this is what is under test.
   await attachSocketIoRedisAdapter(app, config.get('REDIS_URL'));
 
-  await app.listen(0); // ephemeral port — a real socket.io-client needs a real TCP port
+  await app.listen(0, '127.0.0.1'); // ephemeral port — a real socket.io-client needs a real TCP port
   await app.getHttpAdapter().getInstance().ready();
   const server = app.getHttpAdapter().getInstance().server as unknown as Server;
   const address = server.address();

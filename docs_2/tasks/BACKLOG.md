@@ -479,7 +479,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-609 · Find the intermittent integration failures _(added 2026-11-17, sync S-011)_
 
-- **Area:** `apps/api/test`, deliveries dispatch · **Priority:** Medium · **Why:** [`TEST-04`](../FINDINGS.md#test-04) · **Status:** Not started
+- **Area:** `apps/api/test`, deliveries dispatch · **Priority:** Medium · **Why:** [`TEST-04`](../FINDINGS.md#test-04) · **Status:** In progress — fix on `fix/test-loopback` (0.21.5): cause reproduced, 5 green runs in a row; done when merged _(sync S-022)_
 - **Done when:** the two failure modes are explained and fixed, or shown to come from the test environment.
 - **Lead _(updated 2026-11-17, sync S-012)_:** port collisions between the test app (IPv6 wildcard) and 127.0.0.1-only listeners such as Prisma's binary query engine; try `app.listen(0, '127.0.0.1')` in the integration bootstrap ([`TEST-04`](../FINDINGS.md#test-04)).
 - **Test:** 20 consecutive full runs of the integration suite pass locally.
