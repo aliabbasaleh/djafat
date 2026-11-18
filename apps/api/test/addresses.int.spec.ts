@@ -6,6 +6,7 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
+import { listenOnLoopback } from './listen-on-loopback';
 import { RedisService } from '../src/common/redis/redis.service';
 import { mockOtpKey } from '../src/modules/auth/providers/mock-otp-delivery.provider';
 
@@ -51,9 +52,7 @@ beforeAll(async () => {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
   configureApp(app);
-  await app.init();
-  await app.getHttpAdapter().getInstance().ready();
-  server = app.getHttpAdapter().getInstance().server as unknown as Server;
+  server = await listenOnLoopback(app);
   redis = app.get(RedisService);
 
   aliceToken = await loginViaOtp(CUSTOMER_PHONE);

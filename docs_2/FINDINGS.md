@@ -1119,7 +1119,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### TEST-04
 
-**The API integration suite fails intermittently on a local machine** · Needs Improvement · Medium · RUN · Status: Open _(added 2026-11-17, sync S-011)_
+**The API integration suite fails intermittently on a local machine** · Needs Improvement · Medium · RUN · Status: Open on `main`; fix present on `fix/test-loopback` (version 0.21.5), verified locally (sync S-022) _(added 2026-11-17, sync S-011)_
 
 - **Where:** `apps/api/test` (`walking-skeleton`, `identity`, `webhook-forgery`); dispatch in
   `deliveries.service.ts` (`onOrderReady` → `createAndDispatch` → `runDispatchWave`).
@@ -1144,6 +1144,13 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   started by every test file. macOS lets both binds coexist, so a request can reach the engine instead
   of the app; Linux refuses the second bind, which fits a CI that never fails. Not proven yet. Fix to
   try: start the test app with `app.listen(0, '127.0.0.1')` and point supertest at that address.
+- **Sync S-022 note (2026-11-18), RUN: cause proven, fix on a branch.** A 30-line Node script reproduces it
+  on this Mac: with a program listening on `127.0.0.1:P`, a second server still binds `[::]:P`, and a
+  request to `127.0.0.1:P` reaches the first program; binding the second to `127.0.0.1` is refused
+  (`EADDRINUSE`). `fix/test-loopback` starts the test app with `app.listen(0, '127.0.0.1')` (helper
+  `apps/api/test/listen-on-loopback.ts`, used by all 11 files), so supertest and the Socket.IO clients
+  reuse a port that is free on 127.0.0.1. Result: 5 consecutive full runs green (97/97 each), against 3
+  failing runs out of 12 before. Verify asks for 20 consecutive runs: 5 done.
 
 ---
 

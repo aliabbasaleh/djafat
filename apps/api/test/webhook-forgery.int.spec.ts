@@ -7,6 +7,7 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
+import { listenOnLoopback } from './listen-on-loopback';
 import { PrismaService } from '../src/infra/prisma/prisma.service';
 import { RedisService } from '../src/common/redis/redis.service';
 import { mockOtpKey } from '../src/modules/auth/providers/mock-otp-delivery.provider';
@@ -111,9 +112,7 @@ beforeAll(async () => {
     rawBody: true, // webhook signatures are checked on the raw bytes, as in main.ts
   });
   configureApp(app);
-  await app.init();
-  await app.getHttpAdapter().getInstance().ready();
-  server = app.getHttpAdapter().getInstance().server as unknown as Server;
+  server = await listenOnLoopback(app);
   prisma = app.get(PrismaService);
   redis = app.get(RedisService);
   customerAccess = await loginViaOtp(CUSTOMER_PHONE);

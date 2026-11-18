@@ -8,6 +8,19 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-022: the cause of `TEST-04`, and its fix
+
+**Verified:** the port collision reproduced on this Mac with a small Node script; with the test app bound to
+127.0.0.1 (`fix/test-loopback`, 0.21.5), 5 consecutive full integration runs green (97/97 each).
+
+**Status changes:** `TEST-04` fix present on a branch, verified locally (5 of the 20 runs its Verify asks for);
+T-609 in progress.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-18 — Sync S-021: the open Critical and High findings re-checked
 
 **Reviewed:** each of the 21 open Critical and High findings against `main` at `8ceb437`, by its

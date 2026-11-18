@@ -8,6 +8,7 @@ import request from 'supertest';
 import { REFRESH_ROTATION_GRACE_MS, totpCodeAt } from '@djafat/core';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
+import { listenOnLoopback } from './listen-on-loopback';
 import { PrismaService } from '../src/infra/prisma/prisma.service';
 import { RedisService } from '../src/common/redis/redis.service';
 import { mockOtpKey } from '../src/modules/auth/providers/mock-otp-delivery.provider';
@@ -50,9 +51,7 @@ beforeAll(async () => {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
   configureApp(app);
-  await app.init();
-  await app.getHttpAdapter().getInstance().ready();
-  server = app.getHttpAdapter().getInstance().server as unknown as Server;
+  server = await listenOnLoopback(app);
 
   prisma = app.get(PrismaService);
   redis = app.get(RedisService);
