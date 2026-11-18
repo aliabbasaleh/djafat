@@ -199,6 +199,15 @@ export class AuthService {
         message: 'This session was revoked (token reuse detected) — please log in again.',
       });
     }
+    // Same status gate as login (audit ADM-02): a suspended or blocked account
+    // must not keep renewing its tokens. Its sessions all end here, so a later
+    // reactivation does not bring them back.
+    const user = await this.users.getById(result.userId);
+    if (user?.status !== 'active') {
+      const status = user?.status ?? 'deleted';
+      await this.sessions.revokeAllForUser(result.userId, `account_${status}`);
+      throw new ForbiddenException({ code: 'ACCOUNT_INACTIVE', message: `Account is ${status}.` });
+    }
     const roles = await this.users.getRoles(result.userId);
     const access = this.tokens.signAccessToken({
       userId: result.userId,

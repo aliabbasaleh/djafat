@@ -21,6 +21,16 @@ export type Role = (typeof ROLES)[number];
  */
 export const MFA_REQUIRED_ROLES: readonly Role[] = ['admin', 'super_admin'];
 
+/**
+ * Roles that may enrol TOTP MFA and open a step-up window (`/auth/mfa/*`):
+ * every role that can reach a route guarded by `@RequireStepUp()`. Wider than
+ * `MFA_REQUIRED_ROLES` because `finance` may refund and record settlements,
+ * both step-up actions, and without enrolment it could never pass them
+ * (audit finding ADM-01). A unit test in the API checks that every step-up
+ * route only admits roles listed here.
+ */
+export const MFA_ENROLLABLE_ROLES: readonly Role[] = [...MFA_REQUIRED_ROLES, 'finance'];
+
 /** Account lifecycle (docs/19 §3). `pending` = created, onboarding incomplete. */
 export const USER_STATUSES = ['pending', 'active', 'suspended', 'blocked', 'deleted'] as const;
 export type UserStatus = (typeof USER_STATUSES)[number];

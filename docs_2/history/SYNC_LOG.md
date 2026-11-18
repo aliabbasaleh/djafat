@@ -10,6 +10,54 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-026 — 2026-11-18 — finance can enrol MFA; staff hierarchy on account status
+
+|                 |                                                                      |
+| --------------- | -------------------------------------------------------------------- |
+| **Trigger**     | Our own commit, at the user's request ("fix those also")             |
+| **Range**       | `fix/admin-roles` (stacked on pull request #17)                      |
+| **Size**        | 1 commit: auth, users, admin controller, types, tests, version files |
+| **Evidence**    | RUN — unit tests, `verify:fast`, API integration suite 103/103       |
+| **Reviewed by** | Claude, in the session that wrote the commit                         |
+
+### Added
+
+- `MFA_ENROLLABLE_ROLES` in `@djafat/types`; a unit test that checks every step-up route against the MFA
+  routes; six integration scenarios in `admin-rbac.int.spec.ts`.
+
+### Removed
+
+- none
+
+### Fixed
+
+- `ADM-01` on the branch (not yet merged); `ADM-02` partly (hierarchy, self-protection, session
+  revocation; step-up still missing).
+
+### Changed
+
+- `/auth/refresh` refuses a suspended, blocked or deleted account (403 `ACCOUNT_INACTIVE`) and revokes
+  its sessions. Suspend and block revoke every session of the target.
+
+### New findings
+
+- none (the refresh gap is recorded under `ADM-02`)
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md` (T-213, T-303), `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- A refund of a real payment by a finance account, and a settlement; the admin console (no MFA screen
+  yet, `ADM-03`).
+
+### Marker
+
+`HEAD` → this sync's version commit.
+
+---
+
 ## S-025 — 2026-11-18 — the mobile type check honest again
 
 |                 |                                                                                         |

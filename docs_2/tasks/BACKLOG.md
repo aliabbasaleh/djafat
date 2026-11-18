@@ -225,7 +225,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-213 · MFA for every role that faces a step-up
 
-- **Area:** `apps/api` auth · **Priority:** High · **Status:** Not started
+- **Area:** `apps/api` auth · **Priority:** High · **Status:** In progress — fixed on `fix/admin-roles` (0.21.9); done when merged _(sync S-026)_
 - **Why:** [`ADM-01`](../FINDINGS.md#adm-01) · **Depends on:** —
 - **Done when:** `finance` can enrol, verify, refund and record a settlement.
 - **Test:** integration test as finance.
@@ -278,7 +278,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-303 · Staff hierarchy guard and step-up on account actions
 
-- **Area:** `apps/api` users/admin · **Priority:** High · **Status:** Not started
+- **Area:** `apps/api` users/admin · **Priority:** High · **Status:** In progress — hierarchy, self-protection and session revocation on `fix/admin-roles` (0.21.9); step-up waits for T-214 _(sync S-026)_
 - **Why:** [`ADM-02`](../FINDINGS.md#adm-02) · **Depends on:** T-214
 - **Done when:** no action on an equal or higher role or on oneself; target sessions revoked.
 - **Test:** integration tests.

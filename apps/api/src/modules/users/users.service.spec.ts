@@ -282,6 +282,76 @@ describe('UsersService.grantRole / revokeRole (Bloc 9, docs/30 §role-management
   });
 });
 
+describe('UsersService.suspend / block / reactivate — who may act on whom (audit ADM-02)', () => {
+  function withTarget(role: Role | null) {
+    const ctx = buildService();
+    const target = seedUser(ctx.users);
+    if (role) ctx.roles.push({ userId: target.id, role, scopeRestaurantId: null });
+    return { ...ctx, target };
+  }
+
+  it.each(['suspend', 'block', 'reactivate'] as const)(
+    'an admin CANNOT %s a super_admin: 403, status unchanged, nothing audited',
+    async (method) => {
+      const { service, users, target, audit } = withTarget('super_admin');
+      if (method === 'reactivate') target.status = 'suspended';
+      const before = target.status;
+
+      await expect(service[method](actorOf('admin'), target.id, 'test')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(users.find((u) => u.id === target.id)?.status).toBe(before);
+      expect(audit.log).not.toHaveBeenCalled();
+    },
+  );
+
+  it('an admin CANNOT block another admin (equal role)', async () => {
+    const { service, target } = withTarget('admin');
+    await expect(service.block(actorOf('admin'), target.id, 'test')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(target.status).toBe('active');
+  });
+
+  it('nobody changes the status of their own account, not even a super_admin', async () => {
+    const { service, users } = buildService();
+    const actor = actorOf('super_admin');
+    const self = seedUser(users, { id: actor.userId });
+
+    await expect(service.block(actor, actor.userId, 'test')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(self.status).toBe('active');
+  });
+
+  it('a super_admin CAN block an admin and another super_admin', async () => {
+    const admin = withTarget('admin');
+    await admin.service.block(actorOf('super_admin'), admin.target.id, 'test');
+    expect(admin.target.status).toBe('blocked');
+
+    const other = withTarget('super_admin');
+    await other.service.block(actorOf('super_admin'), other.target.id, 'test');
+    expect(other.target.status).toBe('blocked');
+  });
+
+  it('an admin CAN suspend then reactivate a customer, audited under the actor', async () => {
+    const { service, target, audit } = withTarget('customer');
+    const actor = actorOf('admin');
+
+    await service.suspend(actor, target.id, 'fraud check');
+    expect(target.status).toBe('suspended');
+    await service.reactivate(actor, target.id, 'cleared');
+    expect(target.status).toBe('active');
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'USER_SUSPENDED',
+        actorUserId: actor.userId,
+        entityId: target.id,
+      }),
+    );
+  });
+});
+
 describe('UsersService.listUserRoleGrants', () => {
   it('lists every grant a user holds, including scope', async () => {
     const { service, users } = buildService();

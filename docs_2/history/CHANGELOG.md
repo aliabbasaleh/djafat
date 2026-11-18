@@ -8,6 +8,24 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-026: finance can unlock its step-up; staff cannot act on their superiors
+
+**Verified:** `pnpm verify:fast` all pass; the API integration suite 103/103 on a fresh database (6 new
+scenarios). A new unit test fails on the old `auth.controller.ts` ("PaymentsController.refund: finance
+cannot enrol MFA") and passes after the fix.
+
+**Learned:** `/auth/refresh` did not check the account status: a blocked user's refresh token kept
+producing access tokens (each refused at use, but the session survived a reactivation). Fixed with
+`ADM-02`.
+
+**Status changes:** `ADM-01` fix present on `fix/admin-roles` (0.21.9); `ADM-02` partly (step-up still
+missing, needs `ADM-03`). T-213 and T-303 in progress.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-18 — Sync S-025: the mobile type check honest again
 
 **Verified:** with Expo's generated typed routes, the mobile type check failed with 9 errors (reproduced); after

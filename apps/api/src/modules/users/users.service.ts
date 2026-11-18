@@ -16,6 +16,12 @@ const RESTAURANT_SCOPED_ROLES: readonly Role[] = ['restaurant_owner', 'restauran
 /** Roles only a `super_admin` may grant or revoke — never an `admin` (Bloc 9 mandate: "un admin ne peut pas créer un super_admin"). */
 const SUPER_ADMIN_ONLY_ROLES: readonly Role[] = ['admin', 'super_admin'];
 
+/** Who changes an account's status: the acting user and their roles. */
+export interface StatusActor {
+  readonly userId: string;
+  readonly roles: readonly Role[];
+}
+
 function isUniqueViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 }
@@ -465,16 +471,16 @@ export class UsersService {
   // ── admin-tier lifecycle (service capability only — no HTTP endpoint yet;
   //    the admin console that calls these is Bloc 9, docs/19 §46 dette) ─────
 
-  async suspend(userId: string, actorUserId: string, reason: string): Promise<void> {
-    await this.setStatus(userId, 'suspended', actorUserId, 'USER_SUSPENDED', reason);
+  async suspend(actor: StatusActor, userId: string, reason: string): Promise<void> {
+    await this.setStatus(actor, userId, 'suspended', 'USER_SUSPENDED', reason);
   }
 
-  async block(userId: string, actorUserId: string, reason: string): Promise<void> {
-    await this.setStatus(userId, 'blocked', actorUserId, 'USER_BLOCKED', reason);
+  async block(actor: StatusActor, userId: string, reason: string): Promise<void> {
+    await this.setStatus(actor, userId, 'blocked', 'USER_BLOCKED', reason);
   }
 
-  async reactivate(userId: string, actorUserId: string, reason: string): Promise<void> {
-    await this.setStatus(userId, 'active', actorUserId, 'USER_REACTIVATED', reason);
+  async reactivate(actor: StatusActor, userId: string, reason: string): Promise<void> {
+    await this.setStatus(actor, userId, 'active', 'USER_REACTIVATED', reason);
   }
 
   /**
@@ -505,14 +511,36 @@ export class UsersService {
     });
   }
 
+  /**
+   * Same hierarchy as role mutation (audit ADM-02): nobody changes the status
+   * of their own account, and only a super_admin may change the status of an
+   * account that holds `admin` or `super_admin`. A super_admin may still act
+   * on another super_admin, as with roles: otherwise nobody could stop a
+   * compromised one.
+   */
   private async setStatus(
+    actor: StatusActor,
     userId: string,
     status: UserStatus,
-    actorUserId: string,
     action: 'USER_SUSPENDED' | 'USER_BLOCKED' | 'USER_REACTIVATED',
     reason: string,
   ): Promise<void> {
+    if (userId === actor.userId) {
+      throw new ForbiddenException({
+        code: 'FORBIDDEN',
+        message: 'You cannot change the status of your own account — ask another admin.',
+      });
+    }
     const before = await this.getByIdOrThrow(userId);
+    if (!actor.roles.includes('super_admin')) {
+      const targetRoles = await this.getRoles(userId);
+      if (targetRoles.some((r) => SUPER_ADMIN_ONLY_ROLES.includes(r))) {
+        throw new ForbiddenException({
+          code: 'FORBIDDEN',
+          message: 'Only a super_admin may change the status of an admin or super_admin account.',
+        });
+      }
+    }
     if (before.status === status) {
       throw new ConflictException({
         code: 'VALIDATION_ERROR',
@@ -521,7 +549,7 @@ export class UsersService {
     }
     await this.prisma.user.update({ where: { id: userId }, data: { status } });
     await this.audit.log({
-      actorUserId,
+      actorUserId: actor.userId,
       action,
       entityType: 'user',
       entityId: userId,
