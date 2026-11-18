@@ -10,6 +10,54 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-020 — 2026-11-18 — the owner's pull request #12: logo, favicons, `picomatch` baseline
+
+|                 |                                                                           |
+| --------------- | ------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook, at the user's prompt, after a fetch                      |
+| **Range**       | `origin/main` `57120ed..8ceb437`                                          |
+| **Size**        | 3 commits by `kcerha` and the merge of #12; 7 files                       |
+| **Evidence**    | RUN — CI and Security on `8ceb437`, `pnpm audit --prod`; CODE — the diffs |
+| **Reviewed by** | Claude, in the audit session                                              |
+
+### Added
+
+- Favicons: `apps/web`, `apps/admin`, `apps/restaurant` get `src/app/icon.png` (the 2048 px « D » icon,
+  521 KB each).
+
+### Removed
+
+- The arrowhead at the end of the logo's curve (`djafat/logo.png`), judged too close to Amazon's
+  trademarked smile-arrow. The branch `fix/logo-arrowhead-and-favicons`, deleted after its merge.
+
+### Fixed
+
+- `FE-06`, favicon part (CODE; not checked in a browser).
+
+### Changed
+
+- `DEP-01`: one more baseline entry, `GHSA-fc5q-39xc-vjpf|picomatch` (high, through Expo's CLI, no
+  patched version published). Version 0.21.2 on `main`; our #11 renumbered 0.21.3.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The favicons and the edited logo in a browser.
+
+### Marker
+
+`origin/main` → `8ceb437`; `HEAD` → this sync's version commit.
+
+---
+
 ## S-019 — 2026-11-17 — the owner's pull request #8 merged into `main`
 
 |                 |                                                                                                |

@@ -159,6 +159,10 @@ merged pull request #8 into `main` as `57120ed` (0.21.0); the branch was deleted
 `claude/compassionate-franklin-k23vcj` (already in `main`) and the owner's
 `fix/payment-reliability-backlog`.
 
+_(updated 2026-11-18, sync S-020)_ The owner's pull request #12 (`fix/logo-arrowhead-and-favicons`) was merged into `main` as
+`8ceb437` (0.21.2) and its branch deleted. Our #11 (`docs/audit-s018`) brings `main` in again and is
+renumbered 0.21.3.
+
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
 
 ### What it adds

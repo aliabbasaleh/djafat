@@ -8,6 +8,22 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-020: the owner's pull request #12 (logo, favicons, `picomatch`)
+
+**Reviewed:** `b141593` (the logo's arrowhead removed, judged too close to Amazon's mark; the « D »
+icon as favicon of the three web apps), `97a9b77` (the `picomatch` advisory GHSA-fc5q-39xc-vjpf
+added to the audit baseline) and `6940153` (version 0.21.2), merged as `8ceb437` by `aliabbasaleh`.
+
+**Verified:** CI and Security green on `8ceb437`; `pnpm audit --prod` re-run: the advisory is high,
+comes only through Expo's CLI, and has no patched version yet, so the baseline entry is justified.
+
+**Status changes:** the favicon part of `FE-06` fixed on `main` (CODE). Our #11 renumbered 0.21.3.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`,
+`history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-019: the owner's greeting on `main` (0.21.0)
 
 **Reviewed:** `7d2c5a2` by `kcerha` (brings #10 into `feat/welcome-greeting`; roadmap journal only)
