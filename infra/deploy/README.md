@@ -19,15 +19,19 @@ sauvegarde de la base est faite chaque nuit dans `infra/deploy/backups/`
 
 ### Gratuit pour commencer : Oracle Cloud « Always Free »
 
-Oracle offre **sans limite de durée** un serveur ARM de 4 processeurs et 24 Go
-de mémoire, assez pour toute la démo et le pilote.
+Oracle offre **sans limite de durée** un serveur ARM de **2 processeurs et 12 Go**
+de mémoire (« Always Free », chiffres de la documentation Oracle au 18 nov. 2026).
+_(Corrigé le 18 nov. 2026 : ce guide disait 4 processeurs et 24 Go. Au-delà de 2 et 12 Go, un
+compte resté gratuit voit ses instances Ampere désactivées puis supprimées au bout de 30
+jours (documentation Oracle). Plus de mémoire est possible en passant le compte en « Pay As You Go » : voir
+`docs/38-exploitation-demo.md` §3.)_
 
 1. Créer un compte sur [oracle.com/cloud/free](https://www.oracle.com/cloud/free/)
    (une carte bancaire est demandée pour vérifier l'identité ; rien n'est
    prélevé tant qu'on reste dans « Always Free »). Région conseillée :
    **France Central (Paris)** ou **Germany Central (Frankfurt)**.
 2. **Compute → Instances → Create instance** : image **Ubuntu 24.04**, forme
-   **VM.Standard.A1.Flex** (Ampere), **4 OCPU, 24 Go**, disque 100 Go. Dans
+   **VM.Standard.A1.Flex** (Ampere), **2 OCPU, 12 Go** (le maximum gratuit), disque 100 Go. Dans
    « Add SSH keys », choisir **Generate a key pair for me** et cliquer **Save
    private key** (garder ce fichier précieusement : c'est la clé du serveur) ;
    créer. Noter l'**adresse IP publique**.
@@ -142,3 +146,18 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T postgres 
 Copier aussi régulièrement `backups/` **hors du serveur** (autre machine ou
 stockage externe) : une sauvegarde sur le même disque ne protège pas d'une
 panne du serveur.
+
+### Surveillance et test des sauvegardes
+
+_(Ajouté le 18 nov. 2026.)_ Deux scripts, à programmer avec `crontab -e` sur le serveur
+(détails et réglage des alertes sur téléphone : `docs/38-exploitation-demo.md`) :
+
+```cron
+*/5 * * * * cd /home/ubuntu/djafat/infra/deploy && ./healthcheck.sh >> backups/.healthcheck.log 2>&1
+0 4 * * 1 cd /home/ubuntu/djafat/infra/deploy && ./restore-check.sh >> backups/.restore-check.log 2>&1
+```
+
+- `healthcheck.sh` : sites, API, conteneurs, disque, âge de la sauvegarde, dernier test de
+  restauration ; alerte `ALERT_NTFY_URL` (dans `.env.prod`) quand l'état change.
+- `restore-check.sh` : restaure la dernière sauvegarde dans une base à part, la vérifie, puis la
+  supprime. La base en service n'est jamais modifiée.

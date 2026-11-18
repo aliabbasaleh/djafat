@@ -10,6 +10,53 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-030 — 2026-11-18 — monitoring, tested restore, Oracle trial end, external accounts
+
+|                 |                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| **Trigger**     | Our own commit, at the user's request ("fix those also")                                 |
+| **Range**       | `fix/ops-monitoring` (stacked on pull request #21)                                       |
+| **Size**        | 1 commit: `infra/deploy` (2 scripts, guide, env template), `docs/38`, `docs/39`, roadmap |
+| **Evidence**    | RUN locally (restore drill, script tests); DOC (Oracle documentation, read 2026-11-18)   |
+| **Reviewed by** | Claude, in the session that wrote the commit                                             |
+
+### Added
+
+- `infra/deploy/healthcheck.sh`, `infra/deploy/restore-check.sh`, `ALERT_NTFY_URL` in the generated
+  `.env.prod`; `docs/38-exploitation-demo.md`, `docs/39-comptes-externes.md`.
+
+### Removed
+
+- none
+
+### Fixed
+
+- `OPS-02` partly (scripts present, tested locally, not installed on the server).
+
+### Changed
+
+- `infra/deploy/README.md`: Always Free is 2 OCPUs / 12 GB (was written 4 / 24); a monitoring section.
+
+### New findings
+
+- `OPS-06` (High): the demo server is paid by the trial credits and will be reclaimed at the end of the
+  trial unless the account is upgraded.
+
+### Documents updated
+
+`FINDINGS.md` (index, counts, `OPS-02`, `OPS-06`, `AUTH-01`, `PAY-07`), `PROJECT_STATUS.md`,
+`tasks/BACKLOG.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- Anything on the live server (no access): its real shape, the trial end date, the scripts under cron.
+
+### Marker
+
+`HEAD` → this sync's version commit.
+
+---
+
 ## S-029 — 2026-11-18 — admin console: MFA, step-up prompt, refunds and order cancel
 
 |                 |                                                                                                                                    |
