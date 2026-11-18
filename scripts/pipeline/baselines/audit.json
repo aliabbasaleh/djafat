@@ -1,6 +1,6 @@
 {
   "$comment": "Pre-existing production advisories accepted explicitly; any advisory not listed here fails check:audit. Remove entries as upgrades fix them (check:audit warns).",
-  "reason": "Pre-existing at adoption (2026-11-07), identical to origin/main: 127 advisories, essentially via expo/react-native (apps/mobile, apps/courier). Reduced by the Expo upgrade workstream.",
+  "reason": "Pre-existing at adoption (2026-11-07), identical to origin/main: 127 advisories, essentially via expo/react-native (apps/mobile, apps/courier). Reduced by the Expo upgrade workstream. GHSA-fc5q-39xc-vjpf|picomatch added 2026-11-18 on fix/logo-arrowhead-and-favicons: newly published advisory, unrelated to that branch (its diff vs main touches only 2 image files, no package.json or pnpm-lock.yaml — identical dependency tree, so it fails identically on main).",
   "advisories": [
     "GHSA-2m5v-pch6-74hx|undici",
     "GHSA-333x-w4r6-6crp|fast-uri",
@@ -15,6 +15,7 @@
     "GHSA-6j4f-fj2g-mc7p|brace-expansion",
     "GHSA-6j4f-fj2g-mc7p|brace-expansion",
     "GHSA-9fm3-97px-rjf6|undici",
+    "GHSA-fc5q-39xc-vjpf|picomatch",
     "GHSA-fxqj-rqcc-2cmp|postcss",
     "GHSA-g3hv-75wg-m249|minimatch",
     "GHSA-hrr3-gc8f-f4qj|fast-uri",
