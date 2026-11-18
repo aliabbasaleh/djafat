@@ -36,9 +36,8 @@ jobs:
       - name: pnpm install (guide step 1)
         run: pnpm install --frozen-lockfile
 
-      - name: copy .env.example .env (guide step 2)
-        shell: cmd
-        run: copy .env.example .env
+      - name: pnpm env:init (guide step 2)
+        run: pnpm env:init
 
       - name: Generate Prisma client
         run: pnpm --filter @djafat/api db:generate

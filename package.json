@@ -1,6 +1,6 @@
 {
   "name": "djafat",
-  "version": "0.21.5",
+  "version": "0.21.6",
   "private": true,
   "description": "DJAFAT — plateforme de livraison multi-plateforme (Tchad). Monorepo.",
   "engines": {
@@ -24,6 +24,7 @@
     "check:hygiene": "node scripts/pipeline/check-hygiene.mjs",
     "check:audit": "node scripts/pipeline/check-audit.mjs",
     "check:pipeline": "node --test \"scripts/pipeline/test/*.test.mjs\"",
+    "env:init": "node scripts/env-init.mjs",
     "dev": "turbo run dev --parallel",
     "clean": "turbo run clean && rimraf node_modules",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
