@@ -10,6 +10,149 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-020 — 2026-11-18 — the owner's pull request #12: logo, favicons, `picomatch` baseline
+
+|                 |                                                                           |
+| --------------- | ------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook, at the user's prompt, after a fetch                      |
+| **Range**       | `origin/main` `57120ed..8ceb437`                                          |
+| **Size**        | 3 commits by `kcerha` and the merge of #12; 7 files                       |
+| **Evidence**    | RUN — CI and Security on `8ceb437`, `pnpm audit --prod`; CODE — the diffs |
+| **Reviewed by** | Claude, in the audit session                                              |
+
+### Added
+
+- Favicons: `apps/web`, `apps/admin`, `apps/restaurant` get `src/app/icon.png` (the 2048 px « D » icon,
+  521 KB each).
+
+### Removed
+
+- The arrowhead at the end of the logo's curve (`djafat/logo.png`), judged too close to Amazon's
+  trademarked smile-arrow. The branch `fix/logo-arrowhead-and-favicons`, deleted after its merge.
+
+### Fixed
+
+- `FE-06`, favicon part (CODE; not checked in a browser).
+
+### Changed
+
+- `DEP-01`: one more baseline entry, `GHSA-fc5q-39xc-vjpf|picomatch` (high, through Expo's CLI, no
+  patched version published). Version 0.21.2 on `main`; our #11 renumbered 0.21.3.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The favicons and the edited logo in a browser.
+
+### Marker
+
+`origin/main` → `8ceb437`; `HEAD` → this sync's version commit.
+
+---
+
+## S-019 — 2026-11-17 — the owner's pull request #8 merged into `main`
+
+|                 |                                                                                                |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook, after a fetch                                                                 |
+| **Range**       | `origin/main` `29d3d04..57120ed`                                                               |
+| **Size**        | `7d2c5a2` (merge by `kcerha`, roadmap journal only) and the merge of #8 (no change of its own) |
+| **Evidence**    | RUN — CI and Security on `57120ed`; CODE — combined diffs                                      |
+| **Reviewed by** | Claude, in the audit session                                                                   |
+
+### Added
+
+- On `main`: the greeting (`<Greeting>` in `@djafat/ui`, the four apps), Windows quoting of every
+  argument in `scripts/pipeline`, the roadmap updates (demo online, Tigo Cash and Moov Money in demo,
+  the "100 % API" list), and `@djafat/mobile#typecheck` in `known-failures.json`. DJAFAT 0.21.0.
+
+### Removed
+
+- The branch `feat/welcome-greeting`, deleted after its merge.
+
+### Fixed
+
+- none
+
+### Changed
+
+- `TEST-05` applies to `main` now; evidence CODE.
+- Our S-018 entry is renumbered 0.21.1 together with this one (pushed first as 0.20.17).
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `UNMERGED_BRANCHES.md`,
+`history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+The greeting in a browser.
+
+### Marker
+
+`origin/main` → `57120ed`; the line of `feat/welcome-greeting` removed; `HEAD` → this sync's
+version commit.
+
+---
+
+## S-018 — 2026-11-17 — pull requests #9 and #10 on `main`; #8 brings in `main` again
+
+|                 |                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| **Trigger**     | The shared hook, after the merges and a fetch                                            |
+| **Range**       | `origin/main` `75db772..29d3d04`; `origin/feat/welcome-greeting` `6198a89..7cfeaa6`      |
+| **Size**        | 2 merges on `main` (no changes of their own); 1 merge by `kcerha` (roadmap journal only) |
+| **Evidence**    | RUN — the checks of #9 and #10; CODE — combined diffs                                    |
+| **Reviewed by** | Claude, in the audit session                                                             |
+
+### Added
+
+- On `main`: the audit update (#9, 0.20.12–0.20.13) and the brand files (#10, 0.20.14–0.20.16).
+
+### Removed
+
+- The branches `docs/audit-s013` and `chore/brand-assets`, deleted after their merges.
+
+### Fixed
+
+- none
+
+### Changed
+
+- `feat/welcome-greeting` brings in `main` up to #9 (`7cfeaa6`); it conflicts again with `main`
+  on the version and the journal until it brings in #10.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- Pull request #8's checks.
+
+### Marker
+
+`origin/main` → `29d3d04`; `origin/feat/welcome-greeting` → `7cfeaa6`; the line of
+`chore/brand-assets` removed; `HEAD` → this sync's version commit.
+
+---
+
 ## S-017 — 2026-11-17 — the logo file renamed
 
 |                 |                                                                     |

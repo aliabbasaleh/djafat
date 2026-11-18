@@ -8,6 +8,54 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-020: the owner's pull request #12 (logo, favicons, `picomatch`)
+
+**Reviewed:** `b141593` (the logo's arrowhead removed, judged too close to Amazon's mark; the « D »
+icon as favicon of the three web apps), `97a9b77` (the `picomatch` advisory GHSA-fc5q-39xc-vjpf
+added to the audit baseline) and `6940153` (version 0.21.2), merged as `8ceb437` by `aliabbasaleh`.
+
+**Verified:** CI and Security green on `8ceb437`; `pnpm audit --prod` re-run: the advisory is high,
+comes only through Expo's CLI, and has no patched version yet, so the baseline entry is justified.
+
+**Status changes:** the favicon part of `FE-06` fixed on `main` (CODE). Our #11 renumbered 0.21.3.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`,
+`history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
+## 2026-11-17 — Sync S-019: the owner's greeting on `main` (0.21.0)
+
+**Reviewed:** `7d2c5a2` by `kcerha` (brings #10 into `feat/welcome-greeting`; roadmap journal only)
+and the merge of pull request #8 into `main` by `aliabbasaleh` (`57120ed`, 0.21.0), which adds nothing
+beyond the branch: the greeting on the four apps, Windows quoting in the pipeline scripts, the
+roadmap updates, and the known-failure entry for the mobile typecheck.
+
+**Verified:** CI and Security green on `57120ed`; the merge's combined diff is empty.
+
+**Status changes:** `TEST-05` is now on `main` (evidence CODE). Our audit entry S-018 is renumbered
+0.21.1 with this one (it was 0.20.17, below `main`'s 0.21.0).
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
+## 2026-11-17 — Sync S-018: pull requests #9 and #10 on `main`
+
+**Reviewed:** the merges of #9 (`5d4befd`, the audit update) and #10 (`29d3d04`, the brand files and
+the logo rename) into `main`, at the user's request, each after every check passed; neither adds
+anything of its own. `7cfeaa6` by `kcerha` brings `main` (up to #9) into `feat/welcome-greeting`: only
+the roadmap journal resolved by hand, version 0.21.0 kept.
+
+**Status changes:** none. Pull request #8 conflicts with `main` again (version and journal) until it
+brings in #10.
+
+**Documents changed:** `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-17 — Sync S-017: the logo file renamed
 
 **Reviewed:** our own rename on pull request #10 (0.20.16): `djafat/ogo.png` → `djafat/logo.png`, same

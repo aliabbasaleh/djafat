@@ -95,7 +95,7 @@ verified.
 | [CI-03](#ci-03)       | The pre-commit hook cannot run ESLint on `main`                                          | Broken              | Low      | RUN      |
 | [FE-07](#fe-07)       | Typed routes are configured but never checked                                            | Broken              | Low      | RUN      |
 | [PAY-09](#pay-09)     | Payment idempotency scope is global; attempt counter never moves                         | Needs Improvement   | Low      | CODE     |
-| [TEST-05](#test-05)   | The owner's branch silences the mobile typecheck                                         | Needs Improvement   | Low      | BRANCH   |
+| [TEST-05](#test-05)   | The mobile typecheck is silenced by a known-failure entry                                | Needs Improvement   | Low      | CODE     |
 
 ---
 
@@ -367,6 +367,11 @@ verified.
   is identical to the branch head that was verified. `pnpm audit --prod` on that lockfile: 36
   advisories, 1 critical, none in the API's stack. Open: the Expo tool chain, `postcss` through
   `next`, `zod` (fixed only in version 4).
+- **Sync S-020 note (2026-11-18), RUN:** the baseline gains one entry on `main` (`97a9b77`, pull
+  request #12): `GHSA-fc5q-39xc-vjpf|picomatch`, a high ReDoS advisory published on 2026-11-18. It
+  comes only through Expo's CLI (`apps/courier`, `apps/mobile` → `expo` → `@expo/cli` → `picomatch`
+  3.0.2; also 2.3.2 and 4.0.7), and no patched version exists yet (the advisory names none), so
+  baselining it is the only option for now. Remove the entry once a fixed `picomatch` is published.
 
 ### MOB-01
 
@@ -1091,7 +1096,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### FE-06
 
-**Interface polish gaps** · Needs Improvement · Low · LIVE — no favicon in the three apps (404); on a 390 px screen the header wraps "Déconnexion — Client Test"; the admin order list shows raw status identifiers; the courier list shows only a UUID; login errors are generic whatever the cause.
+**Interface polish gaps** · Needs Improvement · Low · LIVE — no favicon in the three apps (404); on a 390 px screen the header wraps "Déconnexion — Client Test"; the admin order list shows raw status identifiers; the courier list shows only a UUID; login errors are generic whatever the cause. _Sync S-020 note (2026-11-18), CODE: the favicon part is fixed on `main` (`b141593`, pull request #12): the three web apps use the « D » icon through Next.js's `app/icon.png`; each is the 2048 px, 521 KB original, heavy for a favicon (a 512 px version would do). Not checked in a browser._
 
 ### DB-01
 
@@ -1139,7 +1144,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### TEST-05
 
-**The owner's branch silences the mobile typecheck** · Needs Improvement · Low · BRANCH · Status: Open _(added 2026-11-17, sync S-014)_ — `cabf058` on `feat/welcome-greeting` records `@djafat/mobile#typecheck` in `scripts/pipeline/baselines/known-failures.json` as pre-existing ("expo-router's generated route-literal type is stale…"). On `main` it passes (RUN, 2026-11-17: `turbo run typecheck --filter=@djafat/mobile`, and in every `verify:fast` run that day; CI green): it fails only where Expo has generated its typed routes (`.expo/types`, gitignored), against calls such as `router.push(`/orders/${id}`)`. Once the entry is in, any real mobile type error is reported as pre-existing on every machine. Fix: write those calls in typed-route form (or regenerate the types) and drop the entry. Verify: with `.expo/types` generated, `pnpm --filter @djafat/mobile typecheck` passes.
+**The mobile typecheck is silenced by a known-failure entry** · Needs Improvement · Low · CODE · Status: Open _(added 2026-11-17, sync S-014; on `main` since pull request #8, `57120ed`, sync S-019)_ — `cabf058` on `feat/welcome-greeting` records `@djafat/mobile#typecheck` in `scripts/pipeline/baselines/known-failures.json` as pre-existing ("expo-router's generated route-literal type is stale…"). On `main` it passes (RUN, 2026-11-17: `turbo run typecheck --filter=@djafat/mobile`, and in every `verify:fast` run that day; CI green): it fails only where Expo has generated its typed routes (`.expo/types`, gitignored), against calls such as `router.push(`/orders/${id}`)`. Once the entry is in, any real mobile type error is reported as pre-existing on every machine. Fix: write those calls in typed-route form (or regenerate the types) and drop the entry. Verify: with `.expo/types` generated, `pnpm --filter @djafat/mobile typecheck` passes.
 
 ---
 

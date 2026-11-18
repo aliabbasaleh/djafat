@@ -486,7 +486,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-610 · Keep the mobile typecheck honest _(added 2026-11-17, sync S-014)_
 
-- **Area:** `apps/mobile`, `scripts/pipeline/baselines/known-failures.json` · **Priority:** Low · **Why:** [`TEST-05`](../FINDINGS.md#test-05) · **Status:** Not started
+- **Area:** `apps/mobile`, `scripts/pipeline/baselines/known-failures.json` · **Priority:** Low · **Why:** [`TEST-05`](../FINDINGS.md#test-05) · **Status:** Not started (the entry is on `main` since `57120ed`; _sync S-019_)
 - **Done when:** the app's navigation calls type-check with Expo's generated typed routes, and no known-failure entry covers `@djafat/mobile#typecheck`.
 - **Test:** generate `.expo/types`, then `pnpm --filter @djafat/mobile typecheck` passes.
 
