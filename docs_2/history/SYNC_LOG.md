@@ -10,6 +10,50 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-024 — 2026-11-18 — lighter favicons
+
+|                 |                                                 |
+| --------------- | ----------------------------------------------- |
+| **Trigger**     | Our own commit, at the user's request           |
+| **Range**       | `fix/favicon-512` (stacked on pull request #15) |
+| **Size**        | 1 commit: 3 images, version files               |
+| **Evidence**    | RUN — image size and dimensions; looked at      |
+| **Reviewed by** | Claude, in the session that wrote the commit    |
+
+### Added
+
+- none
+
+### Removed
+
+- none
+
+### Fixed
+
+- `FE-06`: the favicons' weight (512 px, 44 KB each).
+
+### Changed
+
+- `apps/{web,admin,restaurant}/src/app/icon.png`: same image, resized.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- The favicon in a browser tab (CI builds the apps).
+
+### Marker
+
+`HEAD` → this sync's version commit.
+
+---
+
 ## S-023 — 2026-11-18 — real local secrets with `pnpm env:init`
 
 |                 |                                                                                 |

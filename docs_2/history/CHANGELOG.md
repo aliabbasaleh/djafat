@@ -8,6 +8,16 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-024: lighter favicons
+
+**Changed:** the « D » favicon of the web, admin and restaurant apps resized from 2048 px (521 KB) to
+512 px (44 KB) on `fix/favicon-512` (0.21.7); checked by eye.
+
+**Documents changed:** `FINDINGS.md` (`FE-06`), `PROJECT_STATUS.md`,
+`history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-18 — Sync S-023: real local secrets with `pnpm env:init`
 
 **Verified:** 5 tooling tests; a `.env` generated from `.env.example` boots the built API in production mode
