@@ -10,6 +10,54 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-033 — 2026-11-18 — live-server bootstrap without test accounts
+
+|                 |                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| **Trigger**     | Our own commit, at the user's request (next step agreed: SEC-02 + OPS-05)                   |
+| **Range**       | `fix/live-bootstrap` (stacked on pull request #23)                                          |
+| **Size**        | 1 commit: `apps/api/prisma` (split seed, guard, first-admin command), deploy compose, guide |
+| **Evidence**    | RUN — fresh-database checks (37 assertions), integration suite 112/112, `verify:fast`       |
+| **Reviewed by** | Claude, in the session that wrote the commit                                                |
+
+### Added
+
+- `prisma/reference-data.ts`, `prisma/seed-reference.ts`, `prisma/seed-guards.ts`, `prisma/create-super-admin.ts`;
+  scripts `db:seed:reference`, `admin:create-super-admin`.
+
+### Removed
+
+- none (the reference part of `seed.ts` moved to `reference-data.ts`)
+
+### Fixed
+
+- `SEC-02`, `OPS-05` on the branch.
+
+### Changed
+
+- The deploy's `migrate` step runs the reference data in every mode; `seed.ts` refuses production without
+  `SEED_DEMO=1`; the flat delivery fee setting moved from the fixtures to the reference data (same value).
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `UNMERGED_BRANCHES.md`, `tasks/BACKLOG.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- On the live demo server (no access); a test payment on a live-style database (needs a restaurant created
+  through the console first).
+
+### Marker
+
+`HEAD` → this sync's version commit.
+
+---
+
 ## S-032 — 2026-11-18 — pull requests #13 to #16 merged
 
 |                 |                                                                             |

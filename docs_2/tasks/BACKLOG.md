@@ -271,7 +271,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-302 · Separate production bootstrap from development fixtures
 
-- **Area:** `apps/api/prisma` · **Priority:** High · **Status:** Not started
+- **Area:** `apps/api/prisma` · **Priority:** High · **Status:** In progress — on `fix/live-bootstrap` (0.23.4), verified on a fresh database; done when merged _(sync S-033)_
 - **Why:** [`SEC-02`](../FINDINGS.md#sec-02); on the active branch also [`OPS-05`](../FINDINGS.md#ops-05) _(sync S-001)_ · **Depends on:** —
 - **Done when:** production can be initialised without test users or the mock provider — the reference data is created in every deployment mode, fixtures only in demo/development; a documented command creates the first super_admin.
 - **Test:** bootstrap on an empty database; fixtures refuse `NODE_ENV=production`.

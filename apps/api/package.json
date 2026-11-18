@@ -18,6 +18,8 @@
     "db:migrate:dev": "prisma migrate dev --schema prisma/schema.prisma",
     "db:reset": "prisma migrate reset --force --schema prisma/schema.prisma",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:reference": "tsx prisma/seed-reference.ts",
+    "admin:create-super-admin": "tsx prisma/create-super-admin.ts",
     "clean": "rimraf dist .turbo coverage *.tsbuildinfo"
   },
   "dependencies": {

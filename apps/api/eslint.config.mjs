@@ -7,8 +7,9 @@ export default [
     ignores: ['dist/**', 'coverage/**', 'prisma/migrations/**', '*.tsbuildinfo'],
   },
   {
-    // Prisma seed + bootstrap legitimately log to stdout.
-    files: ['prisma/seed.ts', 'src/main.ts'],
+    // Prisma command-line scripts (seeds, create-super-admin) and the bootstrap
+    // legitimately log to stdout.
+    files: ['prisma/*.ts', 'src/main.ts'],
     rules: { 'no-console': 'off' },
   },
   // Module-local pure business helpers — files WITHOUT a role suffix

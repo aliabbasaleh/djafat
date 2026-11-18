@@ -1,6 +1,6 @@
 {
   "name": "djafat",
-  "version": "0.23.3",
+  "version": "0.23.4",
   "private": true,
   "description": "DJAFAT — plateforme de livraison multi-plateforme (Tchad). Monorepo.",
   "engines": {

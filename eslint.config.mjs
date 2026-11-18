@@ -43,7 +43,7 @@ export default [
   // Mirrors apps/api/eslint.config.mjs's own override — this root config is
   // a separate resolution path (see comment above), so it doesn't inherit it.
   {
-    files: ['**/prisma/seed.ts', '**/src/main.ts'],
+    files: ['**/prisma/*.ts', '**/src/main.ts'],
     rules: { 'no-console': 'off' },
   },
 ];

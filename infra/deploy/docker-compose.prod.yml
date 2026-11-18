@@ -41,6 +41,9 @@ services:
 
   # One-shot: applies the database migrations (and the demo seed when
   # SEED_DEMO=1), then exits. The API waits for it.
+  # Migrations, then the reference data in every mode (roles, permissions, ledger
+  # accounts, settings: audit OPS-05; never overwrites a setting changed on the
+  # server), then the demo fixtures in demo mode only (test accounts: SEC-02).
   migrate:
     build: { context: ../.., dockerfile: infra/docker/api.Dockerfile, target: build }
     <<: *api-env
@@ -49,7 +52,7 @@ services:
       [
         'sh',
         '-c',
-        'node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma && if [ "$$SEED_DEMO" = "1" ]; then node_modules/.bin/tsx prisma/seed.ts; fi',
+        'node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma && node_modules/.bin/tsx prisma/seed-reference.ts && if [ "$$SEED_DEMO" = "1" ]; then node_modules/.bin/tsx prisma/seed.ts; fi',
       ]
     depends_on:
       postgres: { condition: service_healthy }

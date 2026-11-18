@@ -80,6 +80,8 @@ order; none is merged yet (§2d).
 
 _(updated 2026-11-18, sync S-032)_ #13 to #16 are merged into `main` (`034123a`); #17 to #23 remain (§2d).
 
+_(updated 2026-11-18, sync S-033)_ New: `fix/live-bootstrap` (#24, 0.23.4), stacked on #23 (§2d).
+
 ## 2. `fix/payment-reliability-backlog` (2 commits)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |
@@ -190,6 +192,9 @@ Our own branches, opened on 18 November, each stacked on the one before. Base: `
 _(updated 2026-11-18, sync S-032)_ **#13 to #16 are merged into `main`**, in order, each with its five
 checks green (merge commits `f74778d`, `4336ef7`, `07dd23b`, `034123a`); their branches are deleted, and
 `main`'s tree is identical to the verified tip of #16. Still open: #17 to #22, and #23 (this report).
+
+_(updated 2026-11-18, sync S-033)_ **#24, `fix/live-bootstrap` (0.23.4)**, stacked on #23: `SEC-02` and `OPS-05` (reference data
+at every deploy, demo fixtures refused in production, first super_admin command).
 
 Merge them in that order, each only once its Linux and Windows checks are green. #17 waits for the
 owner's review (the mobile app is their area), and the later ones wait with it; #18 to #22 can be
