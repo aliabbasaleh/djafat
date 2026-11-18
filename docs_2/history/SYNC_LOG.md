@@ -10,6 +10,56 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-021 — 2026-11-18 — the open Critical and High findings re-checked
+
+|                 |                                                                            |
+| --------------- | -------------------------------------------------------------------------- |
+| **Trigger**     | The user asked for a re-check of the open findings against today's `main`  |
+| **Range**       | no new commit; `main` at `8ceb437`                                         |
+| **Size**        | 21 findings (3 Critical, 18 High)                                          |
+| **Evidence**    | RUN where the Verify step could run here (audit, CI, demo); CODE otherwise |
+| **Reviewed by** | Claude, in the audit session                                               |
+
+### Added
+
+- none
+
+### Removed
+
+- none
+
+### Fixed
+
+- none fully. Partly addressed since the audit: `AUTH-01` (code ready, waits for an SMS provider
+  account), `MOB-01` (bundles; no device run), `PAY-06` (courier payouts), `PAY-07` (manual merchant
+  wallets), `TEST-02` (SQL tested in CI), `OPS-02` (deployed with backups), `GOV-01` (only the
+  owner's old branch left).
+
+### Changed
+
+- Statuses of the seven above; a dated re-check note on all 21.
+- Unchanged after re-check: `PAY-04`, `ORD-01`, `ORD-02`, `FE-02`, `ARCH-01`, `OPS-01`, `SEC-02`,
+  `ADM-01`, `ADM-02`, `ADM-03`, `DLV-01`, `COUR-01`, `OPS-05`, `DEP-01` (37 advisories, 1 critical).
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `history/CHANGELOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+Device steps (`MOB-01`, `COUR-01`), a real SMS handset (`AUTH-01`), a clean-machine install
+(`OPS-01`), payouts and payments run end to end (`PAY-06`, `PAY-07`): code read only.
+
+### Marker
+
+`HEAD` → this sync's version commit.
+
+---
+
 ## S-020 — 2026-11-18 — the owner's pull request #12: logo, favicons, `picomatch` baseline
 
 |                 |                                                                           |

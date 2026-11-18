@@ -8,6 +8,23 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-021: the open Critical and High findings re-checked
+
+**Reviewed:** each of the 21 open Critical and High findings against `main` at `8ceb437`, by its
+Verify step where it could run here and by the code otherwise.
+
+**Verified:** `pnpm audit --prod` (37 advisories, 1 critical); CI on `main` (both Expo apps bundle);
+the demo's addresses (200); code read for the rest (evidence level stated in each note).
+
+**Status changes:** none resolved. Partly addressed: `AUTH-01`, `MOB-01`, `PAY-06`, `PAY-07`,
+`TEST-02`, `OPS-02`, `GOV-01` (statuses updated). Unchanged: `PAY-04`, `ORD-01`, `ORD-02`, `FE-02`,
+`ARCH-01`, `OPS-01`, `SEC-02`, `ADM-01`, `ADM-02`, `ADM-03`, `DLV-01`, `COUR-01`, `OPS-05`, `DEP-01`.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-18 — Sync S-020: the owner's pull request #12 (logo, favicons, `picomatch`)
 
 **Reviewed:** `b141593` (the logo's arrowhead removed, judged too close to Amazon's mark; the « D »
