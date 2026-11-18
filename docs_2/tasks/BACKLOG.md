@@ -473,7 +473,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-608 · Working secrets in the local setup _(added 2026-11-14, sync S-008)_
 
-- **Area:** `docs/TRAVAILLER-EN-LOCAL.md`, `.env.example`, a small script · **Priority:** Medium · **Why:** [`DOC-03`](../FINDINGS.md#doc-03) · **Status:** Not started
+- **Area:** `docs/TRAVAILLER-EN-LOCAL.md`, `.env.example`, a small script · **Priority:** Medium · **Why:** [`DOC-03`](../FINDINGS.md#doc-03) · **Status:** In progress — `pnpm env:init` on `fix/env-init` (0.21.6), tested; done when merged _(sync S-023)_
 - **Done when:** following the guide on a fresh clone (macOS, Linux and Windows) gives five real secrets, and an order can be delivered end to end.
 - **Test:** the Windows workflow and a fresh local run follow the guide and finish a delivery.
 

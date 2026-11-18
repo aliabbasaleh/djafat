@@ -1098,7 +1098,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### DOC-03
 
-**The local guide's placeholder secrets block local deliveries** · Broken · Medium · CODE · Status: Open _(added 2026-11-14, sync S-008)_
+**The local guide's placeholder secrets block local deliveries** · Broken · Medium · CODE · Status: Open on `main`; fix present on `fix/env-init` (version 0.21.6), verified there (sync S-023) _(added 2026-11-14, sync S-008)_
 
 - **Where:** `docs/TRAVAILLER-EN-LOCAL.md` §2 (`cp .env.example .env`, nothing about the secrets);
   `.env.example`; `deliveries.service.ts` `doMarkPickedUp` → `issueDeliveryCode`;
@@ -1116,6 +1116,12 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   `.env.example` with random secrets, or one documented command per secret); consider making
   pickup and code issuance one transaction, so a failure cannot leave a delivery without a code.
 - **Verify:** follow the guide on a fresh clone and deliver an order end to end.
+- **Sync S-023 note (2026-11-18), RUN: fix on a branch.** `pnpm env:init` (`scripts/env-init.mjs`, plain Node)
+  creates `.env` from `.env.example` if needed and gives the five secrets fresh random values wherever
+  they are empty or placeholders (64 hex characters; AES keys that decode to 32 bytes); real values are
+  kept and nothing is printed. The guide's step 2 and the Windows workflow use it. Verified: 5 tooling
+  tests; a `.env` generated from the real `.env.example` booted the built API in production mode, where
+  SEC-01 refuses weak secrets, with no complaint. Not run: a full delivery on a fresh clone.
 
 ### TEST-04
 

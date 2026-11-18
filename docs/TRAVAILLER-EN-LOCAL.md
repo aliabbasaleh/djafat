@@ -27,8 +27,12 @@ cd djafat && corepack enable && pnpm install
 ## 2. Lancer l'application
 
 ```bash
-cp .env.example .env
+pnpm env:init
 ```
+
+Crée `.env` à partir de `.env.example` et y met de vrais secrets aléatoires (jamais affichés). Sans
+cela, l'API démarre mais chaque livraison échoue au retrait du colis. À relancer sans risque : un
+`.env` existant est complété, ses vraies valeurs gardées.
 
 ```bash
 pnpm infra:up

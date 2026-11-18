@@ -8,6 +8,19 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-023: real local secrets with `pnpm env:init`
+
+**Verified:** 5 tooling tests; a `.env` generated from `.env.example` boots the built API in production mode
+without any complaint about secrets.
+
+**Status changes:** `DOC-03` fix present on a branch (`fix/env-init`,
+0.21.6); T-608 in progress.
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`,
+`history/SYNC_LOG.md`, `history/LAST_REVIEWED_COMMIT`.
+
+---
+
 ## 2026-11-18 — Sync S-022: the cause of `TEST-04`, and its fix
 
 **Verified:** the port collision reproduced on this Mac with a small Node script; with the test app bound to

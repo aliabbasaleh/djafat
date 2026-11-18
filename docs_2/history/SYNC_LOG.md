@@ -10,6 +10,52 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-023 — 2026-11-18 — real local secrets with `pnpm env:init`
+
+|                 |                                                                                 |
+| --------------- | ------------------------------------------------------------------------------- |
+| **Trigger**     | Our own commit, at the user's request                                           |
+| **Range**       | `fix/env-init` (stacked on pull request #14)                                    |
+| **Size**        | 1 commit: a script, its test, the root command, the guide, the Windows workflow |
+| **Evidence**    | RUN — tooling tests; production boot with a generated `.env`                    |
+| **Reviewed by** | Claude, in the session that wrote the commit                                    |
+
+### Added
+
+- `scripts/env-init.mjs` (`pnpm env:init`) and `scripts/pipeline/test/env-init.test.mjs`.
+
+### Removed
+
+- none
+
+### Fixed
+
+- `DOC-03` on the branch (not yet merged).
+
+### Changed
+
+- `docs/TRAVAILLER-EN-LOCAL.md` step 2 and the Windows workflow use `pnpm env:init` instead of copying
+  `.env.example`.
+
+### New findings
+
+- none
+
+### Documents updated
+
+`FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `history/CHANGELOG.md`,
+`history/LAST_REVIEWED_COMMIT`.
+
+### Not verified
+
+- A full delivery on a fresh clone; the Windows run (CI will do it).
+
+### Marker
+
+`HEAD` → this sync's version commit.
+
+---
+
 ## S-022 — 2026-11-18 — the cause of `TEST-04`, and its fix
 
 |                 |                                                              |
