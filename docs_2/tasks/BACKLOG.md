@@ -448,7 +448,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-603 · Deployment stack
 
-- **Area:** `infra/` · **Priority:** High · **Why:** [`OPS-02`](../FINDINGS.md#ops-02) · **Status:** Blocked (hosting decision)
+- **Area:** `infra/` · **Priority:** High · **Why:** [`OPS-02`](../FINDINGS.md#ops-02), [`OPS-06`](../FINDINGS.md#ops-06) · **Status:** In progress — restore drill passed locally; `healthcheck.sh` and `restore-check.sh` on `fix/ops-monitoring` (0.23.1), to install on the server; hosting decision before the Oracle trial ends _(sync S-030)_
 - **Done when:** staging deploys from a clean host by following the runbook; backups restore in a drill.
 
 ### T-604 · Observability

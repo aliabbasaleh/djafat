@@ -79,5 +79,9 @@ MOBILE_MONEY_WALLETS=airtel_money=$([ "$MODE" = demo ] && echo "+23560000010" ||
 # Shown on the site for orders without data (FEAT-017).
 DJAFAT_ORDER_NUMBER=+23566868973
 DJAFAT_CALL_NUMBER=+23530109090
+
+# Server alerts (healthcheck.sh, docs/38): an ntfy.sh topic only the team knows,
+# e.g. https://ntfy.sh/djafat-ops-<long random suffix>. Empty = log only.
+ALERT_NTFY_URL=
 ENV
 echo "Wrote $OUT (mode $MODE). Next: docker compose --env-file .env.prod -f docker-compose.prod.yml $([ "$MODE" = demo ] && echo '--profile demo ')up -d --build"

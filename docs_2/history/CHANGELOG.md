@@ -8,6 +8,27 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-18 — Sync S-030: monitoring, a tested restore, and the end of the Oracle trial
+
+**Verified:** a restore drill on a real dump of the test database: the deploy guide's `pg_restore
+--clean` and a restore into an empty database both reproduced every table's row count, a balanced
+ledger, 39 migrations and a working PostGIS; Prisma reported the schema up to date. `restore-check.sh`
+passed a good dump and failed a truncated one and a missing one (exit 1), dropping its scratch
+database each time. `healthcheck.sh` alerted only on state changes against a fake ntfy receiver.
+
+**Learned:** Oracle's current Always Free allowance for Ampere A1 is 2 OCPUs and 12 GB, half of what
+the deploy guide said; and per the roadmap the demo runs on an x86 instance of the free trial, which
+Oracle reclaims when the trial ends unless the account is upgraded (new `OPS-06`).
+
+**Status changes:** `OPS-02` scripts on `fix/ops-monitoring` (0.23.1); new `OPS-06` (High). Counts: 60
+open (19 High).
+
+**Documents changed:** `FINDINGS.md`, `PROJECT_STATUS.md`, `tasks/BACKLOG.md`, `history/SYNC_LOG.md`,
+`history/LAST_REVIEWED_COMMIT`; outside `docs_2/`: `docs/38` and `docs/39` (new), `infra/deploy/README.md`,
+`docs/ROADMAP.md`.
+
+---
+
 ## 2026-11-18 — Sync S-029: the admin console can pass a step-up
 
 **Verified:** `pnpm verify:fast` all pass; API integration suite 112/112; 6 unit tests of the console's

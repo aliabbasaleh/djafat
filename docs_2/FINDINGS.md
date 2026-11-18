@@ -9,7 +9,8 @@ these IDs instead of repeating the detail.
   their production builds, HTTP scenarios with `curl`, the three web apps in headless Chrome, and
   the hosted CI logs. Environment details: [`TESTING_AND_QUALITY_ASSURANCE.md`](TESTING_AND_QUALITY_ASSURANCE.md) §1.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
-- **Counts:** 3 Critical · 18 High · 24 Medium · 14 Low = 59 open findings, plus 10 resolved
+- **Counts:** 3 Critical · 19 High · 24 Medium · 14 Low = 60 open findings, plus 10 resolved
+  _(updated 2026-11-18, sync S-030: new `OPS-06`)_
   _(updated 2026-11-14, sync S-008: new `DOC-03`; 2026-11-17, sync S-011: new `TEST-04`; sync
   S-013: `PAY-01`, `PAY-03`, `SEC-01`, `FE-03` and `PAY-05` resolved on `main`; sync S-014: new `TEST-05`)_
   _(updated 2026-11-14, sync S-007: `SDK-01`, `FE-01`, `PAY-02`, `TEST-01` and `CI-01` resolved on
@@ -25,77 +26,78 @@ verified.
 
 ## Index
 
-| ID                    | Title                                                                                    | Class               | Priority | Evidence |
-| --------------------- | ---------------------------------------------------------------------------------------- | ------------------- | -------- | -------- |
-| [SDK-01](#sdk-01)     | Browser calls to the API fail in every web app                                           | Broken              | Critical | LIVE     |
-| [PAY-01](#pay-01)     | A disabled payment provider can still be charged — free orders                           | Broken              | Critical | LIVE     |
-| [PAY-02](#pay-02)     | Cash-on-delivery orders are never placed; they expire                                    | Broken              | Critical | LIVE     |
-| [PAY-03](#pay-03)     | Every refund request crashes                                                             | Broken              | Critical | LIVE     |
-| [FE-01](#fe-01)       | No customer screen or SDK call can pay for an order                                      | Not Implemented     | Critical | LIVE     |
-| [AUTH-01](#auth-01)   | No real OTP delivery — nobody can log in to a production deployment                      | Not Implemented     | Critical | LIVE     |
-| [SEC-01](#sec-01)     | The API boots with the published placeholder secrets                                     | Broken              | Critical | LIVE     |
-| [DEP-01](#dep-01)     | 8 critical and 66 high vulnerabilities in production dependencies                        | Needs Improvement   | Critical | RUN      |
-| [MOB-01](#mob-01)     | Neither Expo app can be bundled; root build and CI fail                                  | Broken              | Critical | RUN      |
-| [PAY-04](#pay-04)     | Paid orders that are rejected, cancelled or failed are never refunded or reversed        | Not Implemented     | High     | LIVE     |
-| [PAY-05](#pay-05)     | An unauthenticated request can make a genuine payment webhook be ignored                 | Broken              | High     | LIVE     |
-| [PAY-06](#pay-06)     | No payout flow: restaurant and courier balances can never be paid out                    | Not Implemented     | High     | LIVE     |
-| [PAY-07](#pay-07)     | No real payment provider (Airtel / Moov)                                                 | Not Implemented     | High     | CODE     |
-| [ARCH-01](#arch-01)   | Cross-module business reactions are fire-and-forget, in-process                          | Needs Improvement   | High     | CODE     |
-| [ORD-01](#ord-01)     | Nobody can cancel an order                                                               | Not Implemented     | High     | LIVE     |
-| [ORD-02](#ord-02)     | A paid order the restaurant ignores stays `placed` forever                               | Not Implemented     | High     | LIVE     |
-| [FE-02](#fe-02)       | No token refresh anywhere: every session ends after 15 minutes                           | Partially Completed | High     | CODE     |
-| [FE-03](#fe-03)       | The customer cannot see the delivery code in any app                                     | Not Implemented     | High     | CODE     |
-| [TEST-01](#test-01)   | The API integration suite (93 tests) cannot run                                          | Broken              | High     | RUN      |
-| [TEST-02](#test-02)   | No automated test runs the application's SQL or the UI                                   | Needs Improvement   | High     | RUN      |
-| [CI-01](#ci-01)       | Every CI workflow on `main` is red                                                       | Broken              | High     | RUN      |
-| [OPS-01](#ops-01)     | `pnpm infra:up` fails on a fresh machine and on ARM64                                    | Broken              | High     | RUN      |
-| [OPS-02](#ops-02)     | No deployment path, supervision, backups or monitoring                                   | Not Implemented     | High     | CODE     |
-| [SEC-02](#sec-02)     | The only seed creates a super_admin on a known phone number                              | Needs Improvement   | High     | LIVE     |
-| [ADM-01](#adm-01)     | The `finance` role cannot perform refunds or settlements                                 | Broken              | High     | LIVE     |
-| [ADM-02](#adm-02)     | An `admin` can block a `super_admin`                                                     | Needs Improvement   | High     | LIVE     |
-| [ADM-03](#adm-03)     | Role management in the admin console cannot work: no MFA screen                          | Broken              | High     | CODE     |
-| [GOV-01](#gov-01)     | `main` is 41 commits behind the active branch; a fix branch is orphaned                  | Needs Improvement   | High     | RUN      |
-| [DLV-01](#dlv-01)     | Restaurants created through the API can never be dispatched to                           | Not Implemented     | High     | LIVE     |
-| [COUR-01](#cour-01)   | Courier app tracks location only in the foreground; no push                              | Partially Completed | High     | CODE     |
-| [OPS-05](#ops-05)     | On the active branch, a live server starts without roles, permissions or ledger accounts | Broken              | High     | BRANCH   |
-| [SEC-03](#sec-03)     | Anyone can lock any phone number out of login                                            | Needs Improvement   | Medium   | LIVE     |
-| [SEC-04](#sec-04)     | Client-supplied `X-Forwarded-For` is trusted                                             | Needs Improvement   | Medium   | LIVE     |
-| [SEC-05](#sec-05)     | Web apps keep access and refresh tokens in `localStorage`                                | Needs Improvement   | Medium   | CODE     |
-| [SEC-06](#sec-06)     | No general API rate limiting                                                             | Not Implemented     | Medium   | CODE     |
-| [SEC-07](#sec-07)     | The "single ledger writer" rule is not enforced by the database                          | Needs Improvement   | Medium   | LIVE     |
-| [SEC-08](#sec-08)     | Access tokens survive logout and role revocation for up to 15 minutes                    | Needs Improvement   | Medium   | LIVE     |
-| [ORD-03](#ord-03)     | Minimum order amount is displayed but not enforced                                       | Broken              | Medium   | LIVE     |
-| [ORD-04](#ord-04)     | A restaurant owner can create additional restaurants                                     | Needs Verification  | Medium   | LIVE     |
-| [ORD-05](#ord-05)     | Delivery fee is one flat global amount; no zones, taxes or promotions                    | Partially Completed | Medium   | LIVE     |
-| [DLV-02](#dlv-02)     | No way to complete a delivery once the code is locked or expired                         | Not Implemented     | Medium   | CODE     |
-| [DLV-03](#dlv-03)     | Pickup is not atomic; a retry can leave a delivery without a code                        | Needs Improvement   | Medium   | CODE     |
-| [OPS-03](#ops-03)     | Readiness probe answers HTTP 200 when not ready                                          | Broken              | Medium   | LIVE     |
-| [WRK-01](#wrk-01)     | Missing background jobs, no cleanup, no worker health signal                             | Not Implemented     | Medium   | CODE     |
-| [TEST-03](#test-03)   | Worker integration tests fail on a seeded database and are not in CI                     | Broken              | Medium   | RUN      |
-| [ARCH-02](#arch-02)   | Dispatch logic exists twice (API and worker)                                             | Needs Improvement   | Medium   | CODE     |
-| [AUTH-02](#auth-02)   | No profile update, phone change or account deletion                                      | Not Implemented     | Medium   | CODE     |
-| [NOTIF-01](#notif-01) | Notifications are stored but never shown or pushed                                       | Partially Completed | Medium   | LIVE     |
-| [STOR-01](#stor-01)   | No file upload: object storage is a stub                                                 | Not Implemented     | Medium   | CODE     |
-| [OBS-01](#obs-01)     | No error tracking, metrics or tracing; request IDs are not propagated                    | Not Implemented     | Medium   | LIVE     |
-| [FE-04](#fe-04)       | Customer web has no order history or profile page                                        | Not Implemented     | Medium   | LIVE     |
-| [PAY-08](#pay-08)     | Cash settlement posts ledger groups in the wrong order                                   | Needs Verification  | Medium   | CODE     |
-| [API-01](#api-01)     | Several client mistakes are answered with HTTP 500                                       | Needs Improvement   | Medium   | LIVE     |
-| [DOC-03](#doc-03)     | The local guide's placeholder secrets block local deliveries                             | Broken              | Medium   | CODE     |
-| [TEST-04](#test-04)   | The API integration suite fails intermittently on a local machine                        | Needs Improvement   | Medium   | RUN      |
-| [FE-05](#fe-05)       | Seeded restaurant and product images do not render                                       | Broken              | Low      | LIVE     |
-| [FE-06](#fe-06)       | Interface polish gaps                                                                    | Needs Improvement   | Low      | LIVE     |
-| [DB-01](#db-01)       | Schema hygiene: retention, indexes, a missing primary key, a reused column               | Needs Improvement   | Low      | LIVE     |
-| [DOC-01](#doc-01)     | Entry-point documents were out of date                                                   | Needs Improvement   | Low      | RUN      |
-| [DOC-02](#doc-02)     | Earlier "GO" verdicts covered the API only                                               | Needs Improvement   | Low      | LIVE     |
-| [OPS-04](#ops-04)     | Install is refused on the current Node release                                           | Needs Improvement   | Low      | RUN      |
-| [RT-01](#rt-01)       | Realtime: multi-instance fan-out unproven; refused joins are silent                      | Needs Verification  | Low      | LIVE     |
-| [I18N-01](#i18n-01)   | Text is hard-coded in French; Arabic not started                                         | Partially Completed | Low      | CODE     |
-| [QA-01](#qa-01)       | Accessibility and performance were not measured                                          | Needs Verification  | Low      | —        |
-| [CI-02](#ci-02)       | The pre-push secret scan never reads the pushed commits                                  | Broken              | Low      | RUN      |
-| [CI-03](#ci-03)       | The pre-commit hook cannot run ESLint on `main`                                          | Broken              | Low      | RUN      |
-| [FE-07](#fe-07)       | Typed routes are configured but never checked                                            | Broken              | Low      | RUN      |
-| [PAY-09](#pay-09)     | Payment idempotency scope is global; attempt counter never moves                         | Needs Improvement   | Low      | CODE     |
-| [TEST-05](#test-05)   | The mobile typecheck is silenced by a known-failure entry                                | Needs Improvement   | Low      | CODE     |
+| ID                    | Title                                                                                       | Class               | Priority | Evidence |
+| --------------------- | ------------------------------------------------------------------------------------------- | ------------------- | -------- | -------- |
+| [SDK-01](#sdk-01)     | Browser calls to the API fail in every web app                                              | Broken              | Critical | LIVE     |
+| [PAY-01](#pay-01)     | A disabled payment provider can still be charged — free orders                              | Broken              | Critical | LIVE     |
+| [PAY-02](#pay-02)     | Cash-on-delivery orders are never placed; they expire                                       | Broken              | Critical | LIVE     |
+| [PAY-03](#pay-03)     | Every refund request crashes                                                                | Broken              | Critical | LIVE     |
+| [FE-01](#fe-01)       | No customer screen or SDK call can pay for an order                                         | Not Implemented     | Critical | LIVE     |
+| [AUTH-01](#auth-01)   | No real OTP delivery — nobody can log in to a production deployment                         | Not Implemented     | Critical | LIVE     |
+| [SEC-01](#sec-01)     | The API boots with the published placeholder secrets                                        | Broken              | Critical | LIVE     |
+| [DEP-01](#dep-01)     | 8 critical and 66 high vulnerabilities in production dependencies                           | Needs Improvement   | Critical | RUN      |
+| [MOB-01](#mob-01)     | Neither Expo app can be bundled; root build and CI fail                                     | Broken              | Critical | RUN      |
+| [PAY-04](#pay-04)     | Paid orders that are rejected, cancelled or failed are never refunded or reversed           | Not Implemented     | High     | LIVE     |
+| [PAY-05](#pay-05)     | An unauthenticated request can make a genuine payment webhook be ignored                    | Broken              | High     | LIVE     |
+| [PAY-06](#pay-06)     | No payout flow: restaurant and courier balances can never be paid out                       | Not Implemented     | High     | LIVE     |
+| [PAY-07](#pay-07)     | No real payment provider (Airtel / Moov)                                                    | Not Implemented     | High     | CODE     |
+| [ARCH-01](#arch-01)   | Cross-module business reactions are fire-and-forget, in-process                             | Needs Improvement   | High     | CODE     |
+| [ORD-01](#ord-01)     | Nobody can cancel an order                                                                  | Not Implemented     | High     | LIVE     |
+| [ORD-02](#ord-02)     | A paid order the restaurant ignores stays `placed` forever                                  | Not Implemented     | High     | LIVE     |
+| [FE-02](#fe-02)       | No token refresh anywhere: every session ends after 15 minutes                              | Partially Completed | High     | CODE     |
+| [FE-03](#fe-03)       | The customer cannot see the delivery code in any app                                        | Not Implemented     | High     | CODE     |
+| [TEST-01](#test-01)   | The API integration suite (93 tests) cannot run                                             | Broken              | High     | RUN      |
+| [TEST-02](#test-02)   | No automated test runs the application's SQL or the UI                                      | Needs Improvement   | High     | RUN      |
+| [CI-01](#ci-01)       | Every CI workflow on `main` is red                                                          | Broken              | High     | RUN      |
+| [OPS-01](#ops-01)     | `pnpm infra:up` fails on a fresh machine and on ARM64                                       | Broken              | High     | RUN      |
+| [OPS-02](#ops-02)     | No deployment path, supervision, backups or monitoring                                      | Not Implemented     | High     | CODE     |
+| [SEC-02](#sec-02)     | The only seed creates a super_admin on a known phone number                                 | Needs Improvement   | High     | LIVE     |
+| [ADM-01](#adm-01)     | The `finance` role cannot perform refunds or settlements                                    | Broken              | High     | LIVE     |
+| [ADM-02](#adm-02)     | An `admin` can block a `super_admin`                                                        | Needs Improvement   | High     | LIVE     |
+| [ADM-03](#adm-03)     | Role management in the admin console cannot work: no MFA screen                             | Broken              | High     | CODE     |
+| [GOV-01](#gov-01)     | `main` is 41 commits behind the active branch; a fix branch is orphaned                     | Needs Improvement   | High     | RUN      |
+| [DLV-01](#dlv-01)     | Restaurants created through the API can never be dispatched to                              | Not Implemented     | High     | LIVE     |
+| [COUR-01](#cour-01)   | Courier app tracks location only in the foreground; no push                                 | Partially Completed | High     | CODE     |
+| [OPS-05](#ops-05)     | On the active branch, a live server starts without roles, permissions or ledger accounts    | Broken              | High     | BRANCH   |
+| [OPS-06](#ops-06)     | The demo server is paid by Oracle's trial credits and will be reclaimed when the trial ends | Needs Improvement   | High     | DOC      |
+| [SEC-03](#sec-03)     | Anyone can lock any phone number out of login                                               | Needs Improvement   | Medium   | LIVE     |
+| [SEC-04](#sec-04)     | Client-supplied `X-Forwarded-For` is trusted                                                | Needs Improvement   | Medium   | LIVE     |
+| [SEC-05](#sec-05)     | Web apps keep access and refresh tokens in `localStorage`                                   | Needs Improvement   | Medium   | CODE     |
+| [SEC-06](#sec-06)     | No general API rate limiting                                                                | Not Implemented     | Medium   | CODE     |
+| [SEC-07](#sec-07)     | The "single ledger writer" rule is not enforced by the database                             | Needs Improvement   | Medium   | LIVE     |
+| [SEC-08](#sec-08)     | Access tokens survive logout and role revocation for up to 15 minutes                       | Needs Improvement   | Medium   | LIVE     |
+| [ORD-03](#ord-03)     | Minimum order amount is displayed but not enforced                                          | Broken              | Medium   | LIVE     |
+| [ORD-04](#ord-04)     | A restaurant owner can create additional restaurants                                        | Needs Verification  | Medium   | LIVE     |
+| [ORD-05](#ord-05)     | Delivery fee is one flat global amount; no zones, taxes or promotions                       | Partially Completed | Medium   | LIVE     |
+| [DLV-02](#dlv-02)     | No way to complete a delivery once the code is locked or expired                            | Not Implemented     | Medium   | CODE     |
+| [DLV-03](#dlv-03)     | Pickup is not atomic; a retry can leave a delivery without a code                           | Needs Improvement   | Medium   | CODE     |
+| [OPS-03](#ops-03)     | Readiness probe answers HTTP 200 when not ready                                             | Broken              | Medium   | LIVE     |
+| [WRK-01](#wrk-01)     | Missing background jobs, no cleanup, no worker health signal                                | Not Implemented     | Medium   | CODE     |
+| [TEST-03](#test-03)   | Worker integration tests fail on a seeded database and are not in CI                        | Broken              | Medium   | RUN      |
+| [ARCH-02](#arch-02)   | Dispatch logic exists twice (API and worker)                                                | Needs Improvement   | Medium   | CODE     |
+| [AUTH-02](#auth-02)   | No profile update, phone change or account deletion                                         | Not Implemented     | Medium   | CODE     |
+| [NOTIF-01](#notif-01) | Notifications are stored but never shown or pushed                                          | Partially Completed | Medium   | LIVE     |
+| [STOR-01](#stor-01)   | No file upload: object storage is a stub                                                    | Not Implemented     | Medium   | CODE     |
+| [OBS-01](#obs-01)     | No error tracking, metrics or tracing; request IDs are not propagated                       | Not Implemented     | Medium   | LIVE     |
+| [FE-04](#fe-04)       | Customer web has no order history or profile page                                           | Not Implemented     | Medium   | LIVE     |
+| [PAY-08](#pay-08)     | Cash settlement posts ledger groups in the wrong order                                      | Needs Verification  | Medium   | CODE     |
+| [API-01](#api-01)     | Several client mistakes are answered with HTTP 500                                          | Needs Improvement   | Medium   | LIVE     |
+| [DOC-03](#doc-03)     | The local guide's placeholder secrets block local deliveries                                | Broken              | Medium   | CODE     |
+| [TEST-04](#test-04)   | The API integration suite fails intermittently on a local machine                           | Needs Improvement   | Medium   | RUN      |
+| [FE-05](#fe-05)       | Seeded restaurant and product images do not render                                          | Broken              | Low      | LIVE     |
+| [FE-06](#fe-06)       | Interface polish gaps                                                                       | Needs Improvement   | Low      | LIVE     |
+| [DB-01](#db-01)       | Schema hygiene: retention, indexes, a missing primary key, a reused column                  | Needs Improvement   | Low      | LIVE     |
+| [DOC-01](#doc-01)     | Entry-point documents were out of date                                                      | Needs Improvement   | Low      | RUN      |
+| [DOC-02](#doc-02)     | Earlier "GO" verdicts covered the API only                                                  | Needs Improvement   | Low      | LIVE     |
+| [OPS-04](#ops-04)     | Install is refused on the current Node release                                              | Needs Improvement   | Low      | RUN      |
+| [RT-01](#rt-01)       | Realtime: multi-instance fan-out unproven; refused joins are silent                         | Needs Verification  | Low      | LIVE     |
+| [I18N-01](#i18n-01)   | Text is hard-coded in French; Arabic not started                                            | Partially Completed | Low      | CODE     |
+| [QA-01](#qa-01)       | Accessibility and performance were not measured                                             | Needs Verification  | Low      | —        |
+| [CI-02](#ci-02)       | The pre-push secret scan never reads the pushed commits                                     | Broken              | Low      | RUN      |
+| [CI-03](#ci-03)       | The pre-commit hook cannot run ESLint on `main`                                             | Broken              | Low      | RUN      |
+| [FE-07](#fe-07)       | Typed routes are configured but never checked                                               | Broken              | Low      | RUN      |
+| [PAY-09](#pay-09)     | Payment idempotency scope is global; attempt counter never moves                            | Needs Improvement   | Low      | CODE     |
+| [TEST-05](#test-05)   | The mobile typecheck is silenced by a known-failure entry                                   | Needs Improvement   | Low      | CODE     |
 
 ---
 
@@ -253,6 +255,8 @@ verified.
   (FEAT-007) exist, and production refuses `SMS_PROVIDER=mock` (`env.spec.ts` SPEC-006-02-SC01,
   passing). What is left is an account with an SMS provider in Chad; the "real handset" step of
   Verify cannot run before that.
+- **Sync S-030 (2026-11-18), DOC:** what DJAFAT must obtain, the HTTP contract the code expects and how
+  to check it: `docs/39-comptes-externes.md` §1.
 
 ### SEC-01
 
@@ -510,6 +514,8 @@ regenerator-runtime/runtime` from `react-native`. Because `turbo run build` incl
 - **Sync S-021 re-check (2026-11-18), CODE:** partly addressed: merchant-wallet payments (FEAT-009:
   the customer transfers to DJAFAT's Airtel, Tigo or Moov number, matched by a receipt or, FEAT-016,
   by the merchant phone's SMS). No provider API yet (FEAT-019 waits for access).
+- **Sync S-030 (2026-11-18), DOC:** checklist for the merchant accounts, the dedicated phones and the
+  one setting to change (`MOBILE_MONEY_WALLETS`): `docs/39-comptes-externes.md` §2.
 
 ### ARCH-01
 
@@ -734,7 +740,7 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### OPS-02
 
-**No deployment path, supervision, backups or monitoring** · Not Implemented · High · CODE · Status: Open — deployed with backups; no monitoring, no restore drill (sync S-021)
+**No deployment path, supervision, backups or monitoring** · Not Implemented · High · CODE · Status: Open — deployed with backups; monitoring and restore-check scripts on `fix/ops-monitoring` (0.23.1), tested locally, not installed on the server (sync S-030)
 
 - **Where:** `infra/deploy/.gitkeep` only; two Dockerfiles (API, worker) and none for the web apps.
 - **Observed (code):** no production compose or infrastructure code, no TLS or reverse proxy, no
@@ -776,6 +782,14 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   demo (`djafat.com` and the API's health answered 200 today), with restart policies, a health check
   and a backup service (`infra/deploy/docker-compose.prod.yml`). Missing: monitoring and alerting, a
   restore drill, and a plan for the end of the trial server.
+- **Sync S-030 (2026-11-18), RUN (locally), branch `fix/ops-monitoring`:** `healthcheck.sh` (sites, API,
+  containers, disk, backup age, last restore check; alerts an ntfy topic only on a state change, plus a
+  6-hour reminder) and `restore-check.sh` (restores the newest dump into a scratch database, checks
+  migrations, users, ledger balance and PostGIS, drops it). Restore drill on a real dump of the test
+  database (same PostgreSQL 16 + PostGIS 3.5 image): the guide's `pg_restore --clean` and a restore into
+  an empty database both gave every table its original row count, a balanced ledger, 39 migrations, and
+  Prisma "up to date". Health check tested against a fake ntfy receiver and simulated failures. Not done:
+  installing the cron jobs on the server, an off-server backup copy. End of the trial server: see `OPS-06`.
 
 ### SEC-02
 
@@ -953,6 +967,30 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Sync S-021 re-check (2026-11-18), CODE:** now on `main`: with `MODE=live` the deploy runs the
   migrations only (`SEED_DEMO=0`), and no migration creates roles, permissions or ledger accounts,
   so a live server would start without them.
+
+### OPS-06
+
+**The demo server is paid by Oracle's trial credits and will be reclaimed when the trial ends** · Needs Improvement · High · CLAIM + DOC · Status: Open _(added 2026-11-18, sync S-030)_
+
+- **Where:** the live server (not inspected: no access); `docs/ROADMAP.md` phase 1 ("Serveur Oracle
+  Cloud (essai gratuit, x86 — l'offre ARM « Always Free » restait indisponible…)");
+  `infra/deploy/README.md` §1.
+- **Observed:** per the project's own roadmap, the demo runs on an **x86 instance of the free
+  trial**. Oracle's Free Tier documentation (read on 2026-11-18): "Paid resources that were provisioned
+  with your credits during your free trial are reclaimed by Oracle unless you upgrade your account."
+  The deployment guide also told readers to create an Ampere A1 instance of **4 OCPUs and 24 GB** as
+  "sans limite de durée"; Oracle's current Always Free allowance is **2 OCPUs and 12 GB** (1,500
+  OCPU-hours and 9,000 GB-hours a month), and above it "all existing OCI Ampere A1 Compute instances are
+  disabled and then deleted after 30 days, unless you upgrade to a paid account".
+- **Why it matters:** at the end of the trial (around 2026-12-16 if the account was opened on
+  2026-11-16; the console shows the date) the demo would go down **with its backups**, which are on
+  the server's own disk.
+- **Fix:** decide before the date: upgrade the account to Pay As You Go (with a budget alert), or move
+  to an Always Free A1 instance (2/12, if capacity allows) or a paid VPS; in every case copy backups off
+  the server. Runbook: `docs/38-exploitation-demo.md` §3. The guide's numbers are corrected.
+- **Depends on:** a DJAFAT decision (cost); console access.
+- **Verify:** the console shows a Pay As You Go account (or the demo runs elsewhere), and an off-server
+  backup copy exists and passes `restore-check.sh`.
 
 ---
 
