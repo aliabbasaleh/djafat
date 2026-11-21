@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import type { Route } from 'next';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ApiClientError } from '@djafat/sdk';
@@ -12,6 +12,60 @@ import styles from './page.module.css';
 
 type Step = 'start' | 'code';
 type Method = 'whatsapp' | 'sms' | 'email';
+
+/** Line icons for the login method tabs — no emoji, no external icon library. */
+function WhatsAppIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 3a9 9 0 0 0-7.75 13.5L3 21l4.62-1.2A9 9 0 1 0 12 3Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8.3 8.6c.2-.5.5-.5.7-.5h.5c.2 0 .4 0 .6.4.2.4.6 1.4.6 1.5.1.1.1.3 0 .4-.1.2-.1.3-.3.5l-.3.4c-.1.1-.2.3-.1.5.2.3.7 1.1 1.4 1.7.9.8 1.6 1 1.9 1.1.2.1.4.1.5-.1l.5-.6c.2-.2.3-.2.5-.1l1.3.6c.2.1.3.1.4.2.1.1.1.6-.1 1.1-.2.5-1.1 1-1.6 1-.4 0-1.6-.1-3.1-1.3-1.9-1.5-3-3.3-3.2-3.7-.2-.4-.9-1.5-.9-2.3 0-.8.4-1.2.6-1.4Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function SmsIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4 3.5V16H5.5A1.5 1.5 0 0 1 4 14.5v-9Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function EmailIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect
+        x="3.5"
+        y="5.5"
+        width="17"
+        height="13"
+        rx="1.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <path
+        d="m4.5 6.5 6.47 5.06a1.6 1.6 0 0 0 1.97 0L19.5 6.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 /**
  * A blanket "check the number" message hid an unreachable API for two
@@ -146,10 +200,10 @@ function ConnexionForm() {
     }
   }
 
-  const LABELS: Record<Method, { icon: string; name: string }> = {
-    whatsapp: { icon: '🟢', name: 'WhatsApp' },
-    sms: { icon: '💬', name: 'SMS' },
-    email: { icon: '✉️', name: 'E-mail' },
+  const LABELS: Record<Method, { icon: ReactNode; name: string }> = {
+    whatsapp: { icon: <WhatsAppIcon />, name: 'WhatsApp' },
+    sms: { icon: <SmsIcon />, name: 'SMS' },
+    email: { icon: <EmailIcon />, name: 'E-mail' },
   };
 
   const intro =
