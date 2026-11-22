@@ -38,6 +38,16 @@ export const API_ERROR_CODES = [
   'WHATSAPP_UNAVAILABLE',
   /** The email is already verified on another account (409) — FEAT-007. */
   'EMAIL_ALREADY_USED',
+  /** Registration with a phone number another account already holds (409) — FEAT-020. */
+  'PHONE_ALREADY_USED',
+  /** Unknown email, no password, or wrong password: one answer for all three (401) — FEAT-020. */
+  'INVALID_CREDENTIALS',
+  /** Changing a password with a wrong current one (403, not 401: not an expired session) — FEAT-020. */
+  'CURRENT_PASSWORD_INCORRECT',
+  /** A password needs a verified email to log in with (409) — FEAT-020. */
+  'EMAIL_REQUIRED',
+  /** A phone code on an email account whose number was never confirmed (409) — FEAT-020. */
+  'PHONE_NOT_CONFIRMED',
   'MFA_INVALID',
   'MFA_REQUIRED',
   'ACCOUNT_INACTIVE',

@@ -8,6 +8,32 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-21 — Sync S-035: customer accounts by e-mail and password (FEAT-020), CORS fix (API-02)
+
+**Changed (branch `feat/compte-email-password`, version 0.24.0, not on `main` yet):** at the user's request,
+« Connexion » becomes « Compte »: registration with name, phone, e-mail and password, confirmed by an e-mail
+code; login by password with a code on a device not remembered (30 days), or by a code alone; forgotten
+password; « Mon profil » sets or changes the password and confirms the number. WhatsApp and SMS stay available
+as code channels and show « Bientôt disponible » while switched off. E-mails go through the official Gmail account
+(`SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` — the app password is set by the user in `.env`, never in Git).
+Migration 0040 (password hash, pending challenges, remembered devices, codes bound to their request).
+
+**Verified:** `pnpm verify:fast` green; unit tests of every scenario; the three FEAT-020 integration scenarios and
+the whole integration suite (13 files, 115 tests) on a fresh PostgreSQL database; a real browser run of the site
+(registration, new device, remembered device, wrong password, reset, profile) with 13 screenshots
+(`docs/features/FEAT-020-compte-email-mot-de-passe/progress.md`). Not verified: a real Gmail delivery (needs the
+user's app password) and the app's screen (no Expo build, `MOB-01`).
+
+**Reviewed (collaborator):** `origin/fix/login-method-icons` `628dce4` (kcerha, 0.23.6) — SVG icons instead of
+emoji on the old login page; reused in FEAT-020's account screens, which replace that page (CODE + RUN in the
+browser pass of 2026-11-22). The two branches conflict on `connexion/page.tsx`, `docs/ROADMAP.md`, `package.json`.
+
+**Learned:** [`API-02`](../FINDINGS.md#api-02) — `@fastify/cors` allows only GET, HEAD and POST by default: browsers
+refused every PUT, PATCH and DELETE from another origin, LIVE on `api.djafat.com` (profile name, cart quantities,
+addresses, the restaurant console's edits). Fixed on the same branch.
+
+---
+
 ## 2026-11-18 — Sync S-034: everything merged — `main` is DJAFAT 0.23.4
 
 **Verified:** at the user's request, #17 to #24 were merged in order, each only after its five checks were green

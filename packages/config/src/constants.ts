@@ -43,6 +43,11 @@ export const PLATFORM_SETTINGS_DEFAULTS = {
   // any instant. At 5 / 5 min that is ~231 days of sustained attempts for one
   // expected hit, while still leaving a human room for typos and clock drift.
   mfa_verify_rate_limit_per_user: { limit: 5, window_seconds: 300 },
+  // FEAT-020 — password login. Per network (many customers share an operator's
+  // NAT, so not too low); the per-address lock is `phone_lock_threshold`.
+  password_login_rate_limit_per_ip: { limit: 50, window_seconds: 900 },
+  // FEAT-020-Q03 — a device that passed the email code skips it for 30 days.
+  trusted_device_ttl_seconds: 2_592_000,
   // Bloc 4 — Cart + Core Order (docs/22 §5).
   cart_max_item_quantity: 99, // per line item; the wire-level Zod schema also caps at 99 as a hard ceiling
   // Bloc 6 — Delivery / Dispatch Core (docs/25 §6, §11, §43).

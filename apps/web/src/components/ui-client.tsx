@@ -20,4 +20,5 @@ export {
   Alert,
   Radio,
   Textarea,
+  Tabs,
 } from '@djafat/ui';

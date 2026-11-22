@@ -32,6 +32,8 @@ export interface UserRecord {
   readonly phoneVerifiedAt: Date | null;
   /** Optional so existing fakes stay valid; set by every read from the database. */
   readonly emailVerifiedAt?: Date | null;
+  /** FEAT-020: whether a password is set — never the hash itself. Optional like `emailVerifiedAt`. */
+  readonly hasPassword?: boolean;
   readonly email: string | null;
   readonly fullName: string | null;
   readonly countryId: string | null;
@@ -59,6 +61,10 @@ export interface MeDto {
   readonly email: string | null;
   /** Only a verified address can be used to log in by e-mail (FEAT-007). */
   readonly emailVerified: boolean;
+  /** FEAT-020: a number confirmed by a code; only then do phone codes open this account. */
+  readonly phoneVerified: boolean;
+  /** FEAT-020: the account can log in with its email and a password. */
+  readonly hasPassword: boolean;
   readonly fullName: string | null;
   readonly locale: string;
   readonly status: UserStatus;
@@ -110,6 +116,7 @@ export class UsersService {
       phone: u.phone,
       phoneVerifiedAt: u.phoneVerifiedAt,
       emailVerifiedAt: u.emailVerifiedAt,
+      hasPassword: u.passwordHash !== null,
       email: u.email,
       fullName: u.fullName,
       countryId: u.countryId,
@@ -141,6 +148,79 @@ export class UsersService {
       select: { id: true },
     });
     return u ? this.getById(u.id) : null;
+  }
+
+  /** FEAT-020: the non-deleted account that holds this address, verified or not (citext). */
+  async findByEmail(email: string): Promise<UserRecord | null> {
+    const u = await this.prisma.user.findFirst({
+      where: { email, deletedAt: null },
+      select: { id: true },
+    });
+    return u ? this.getById(u.id) : null;
+  }
+
+  /**
+   * FEAT-020 (SPEC-020-03 R5): the account of a confirmed registration, in one
+   * transaction — active, email verified, phone NOT verified (only typed),
+   * the password hash, and the `customer` role. The partial unique indexes
+   * decide a race: 409 `PHONE_ALREADY_USED` or `EMAIL_ALREADY_USED`.
+   */
+  async createRegisteredCustomer(input: {
+    readonly fullName: string;
+    readonly phone: string;
+    readonly email: string;
+    readonly passwordHash: string;
+  }): Promise<{ userId: string }> {
+    const now = new Date();
+    try {
+      const user = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
+          data: {
+            phone: input.phone,
+            email: input.email,
+            emailVerifiedAt: now,
+            fullName: input.fullName,
+            passwordHash: input.passwordHash,
+            passwordUpdatedAt: now,
+            status: 'active',
+          },
+          select: { id: true },
+        });
+        await tx.$executeRaw`INSERT INTO user_roles (user_id, role) VALUES (${created.id}::uuid, 'customer')`;
+        return created;
+      });
+      return { userId: user.id };
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+      if (await this.findByPhone(input.phone)) {
+        throw new ConflictException({
+          code: 'PHONE_ALREADY_USED',
+          message:
+            "Ce numéro a déjà un compte. Connectez-vous avec ce numéro ou avec l'e-mail de ce compte.",
+        });
+      }
+      throw new ConflictException({
+        code: 'EMAIL_ALREADY_USED',
+        message: 'Cette adresse e-mail est déjà utilisée par un autre compte.',
+      });
+    }
+  }
+
+  /** FEAT-020: the stored hash, read only to verify a password — it never travels in a `UserRecord`. */
+  async getPasswordHash(userId: string): Promise<string | null> {
+    const u = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+      select: { passwordHash: true },
+    });
+    return u?.passwordHash ?? null;
+  }
+
+  /** FEAT-020: set or replace the password hash. */
+  async setPasswordHash(userId: string, passwordHash: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash, passwordUpdatedAt: new Date() },
+    });
   }
 
   /** "Mon profil": the name the courier and the restaurant see (spaces collapsed). */
@@ -459,6 +539,8 @@ export class UsersService {
       phone: user.phone,
       email: user.email,
       emailVerified: Boolean(user.email && user.emailVerifiedAt),
+      phoneVerified: Boolean(user.phoneVerifiedAt),
+      hasPassword: user.hasPassword ?? false,
       fullName: user.fullName,
       locale: user.locale,
       status: user.status,
@@ -498,6 +580,8 @@ export class UsersService {
         phone: `deleted:${randomUUID()}`,
         email: null,
         fullName: null,
+        passwordHash: null, // FEAT-020: nothing to log in with on an anonymised account
+        passwordUpdatedAt: null,
       },
     });
     await this.audit.log({

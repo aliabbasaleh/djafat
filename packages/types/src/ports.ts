@@ -202,10 +202,31 @@ export interface ObjectStoragePort {
   deleteObject(key: string): Promise<void>;
 }
 
+/**
+ * What a code is for (FEAT-007, FEAT-020). Persisted in `otp_codes.purpose`
+ * (CHECK constraint, migrations 0030 and 0040); an email transport words its
+ * message after it.
+ */
+export type OtpDeliveryPurpose =
+  | 'login'
+  | 'register'
+  | 'change_phone'
+  | 'verify_email'
+  | 'login_device'
+  | 'reset_password'
+  | 'verify_phone';
+
 /** OTP delivery. `sms` impl for MVP; extensible to whatsapp/email (decision A9). */
 export interface OtpDeliveryPort {
   readonly channel: 'sms' | 'whatsapp' | 'email';
-  send(input: { to: string; code: string; ttlSeconds: number; locale: string }): Promise<void>;
+  send(input: {
+    to: string;
+    code: string;
+    ttlSeconds: number;
+    locale: string;
+    /** Optional (FEAT-020): absent means a login code, as before. */
+    purpose?: OtpDeliveryPurpose;
+  }): Promise<void>;
 }
 
 /**

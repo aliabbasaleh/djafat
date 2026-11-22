@@ -8,7 +8,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 **A task is Done only when its "Done when" is met and its "Test" has been run and recorded.**
 
-62 tasks: Phase 0 (1) · 1 (10) · 2 (17) · 3 (13) · 4 (8) · 5 (6) · 6 (7) _(updated 2026-11-12, sync S-004: T-407 and T-408 added; S-003 added T-313)_.
+62 tasks: Phase 0 (1) · 1 (10) · 2 (17) · 3 (13) · 4 (8) · 5 (6) · 6 (7) _(updated 2026-11-12, sync S-004: T-407 and T-408 added; S-003 added T-313; updated 2026-11-21, sync S-035: T-611 to T-613 added)_.
 
 ---
 
@@ -490,4 +490,22 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Done when:** the app's navigation calls type-check with Expo's generated typed routes, and no known-failure entry covers `@djafat/mobile#typecheck`.
 - **Test:** generate `.expo/types`, then `pnpm --filter @djafat/mobile typecheck` passes.
 
-Last updated: 2026-11-17 (sync S-014)
+### T-611 · Customer accounts by e-mail and password (FEAT-020) _(added 2026-11-21, sync S-035)_
+
+- **Area:** `auth`, `users`, migration 0040, `@djafat/sdk`, `apps/web`, `apps/mobile` · **Priority:** High · **Why:** the user's request of 2026-11-21 (`docs/features/FEAT-020-compte-email-mot-de-passe`) · **Status:** Implemented, verified on the branch `feat/compte-email-password` (unit, real PostgreSQL + Redis integration, browser run) — not on `main`
+- **Done when:** merged into `main`; the official Gmail address and its Google app password set in the server's `.env.prod` (`EMAIL_PROVIDER=smtp`, `SMTP_USER`, `SMTP_PASSWORD`); a real registration code received in a real mailbox (SPEC-020-01-SC06, only the user holds the password).
+- **Test:** `pnpm --filter @djafat/api test:int -- test/customer-account.int.spec.ts`; on the server, register with a real address.
+
+### T-612 · Account follow-ups left out of FEAT-020 _(added 2026-11-21, sync S-035)_
+
+- **Area:** `apps/mobile`, `auth` · **Priority:** Medium · **Why:** FEAT-020-Q09, Q21, Q23 · **Status:** Not started
+- **Done when:** a « Mon profil » screen in the app (password, number); a customer can change a mistyped number; deciding whether « Se déconnecter partout » also forgets remembered devices.
+- **Test:** each with its own feature and specs.
+
+### T-613 · Deploy the CORS fix _(added 2026-11-21, sync S-035)_
+
+- **Area:** `apps/api/src/main.ts`, the server · **Priority:** High · **Why:** [`API-02`](../FINDINGS.md#api-02) · **Status:** Implemented, verified locally — ships with T-611's merge
+- **Done when:** `https://api.<domain>` answers a `PATCH` preflight with PUT, PATCH and DELETE allowed.
+- **Test:** `curl -s -o /dev/null -D - -X OPTIONS -H 'Origin: https://<domain>' -H 'Access-Control-Request-Method: PATCH' https://api.<domain>/v1/me`.
+
+Last updated: 2026-11-21 (sync S-035)

@@ -1,5 +1,10 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
-import type { MeDto } from '../users/users.service';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import type { MeDto, UserRecord } from '../users/users.service';
 import { UsersService } from '../users/users.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { OtpService, type OtpPurpose } from './otp.service';
@@ -66,7 +71,8 @@ export class AuthService {
   ): Promise<LoginResultDto> {
     await this.otp.verifyOtp(phone, code, purpose, meta.ip); // throws OTP_INVALID / OTP_LOCKED
 
-    const { userId } = await this.users.findOrCreateByPhone(phone, meta.countryId);
+    const { userId, isNew } = await this.users.findOrCreateByPhone(phone, meta.countryId);
+    if (!isNew) await this.assertPhoneMayOpen(userId); // FEAT-020 SPEC-020-06 R4
     await this.users.markPhoneVerified(userId);
     return this.openSession(userId, meta);
   }
@@ -133,30 +139,44 @@ export class AuthService {
     meta: RequestMeta & { countryId: string | null },
   ): Promise<LoginResultDto> {
     await this.otp.verifyCode({ channel: 'whatsapp', target: phone }, code, 'login', meta.ip); // throws OTP_INVALID / OTP_LOCKED
-    const { userId } = await this.users.findOrCreateByPhone(phone, meta.countryId);
+    const { userId, isNew } = await this.users.findOrCreateByPhone(phone, meta.countryId);
+    if (!isNew) await this.assertPhoneMayOpen(userId); // FEAT-020 SPEC-020-06 R4
     await this.users.markPhoneVerified(userId);
     return this.openSession(userId, meta);
   }
 
-  /** Shared by SMS, email and WhatsApp login: status gate, session, access token, audit. */
-  private async openSession(userId: string, meta: LoginMeta): Promise<LoginResultDto> {
+  /**
+   * FEAT-020 (SPEC-020-06 R4): a phone code proves the number, but the number
+   * of an account created by email was only TYPED at registration. Until its
+   * owner confirms it, a code on it must not open that account — a typo would
+   * otherwise hand someone else's orders and addresses to a stranger. Runs
+   * after the code is verified, so only the holder of the number learns why.
+   */
+  private async assertPhoneMayOpen(userId: string): Promise<void> {
     const user = await this.users.getByIdOrThrow(userId);
-
-    if (user.status !== 'active') {
-      await this.audit.log({
-        actorUserId: userId,
-        action: 'AUTH_LOGIN_FAILURE',
-        entityType: 'user',
-        entityId: userId,
-        ip: meta.ip,
-        userAgent: meta.userAgent,
-        metadata: { reason: `account_${user.status}` },
-      });
-      throw new ForbiddenException({
-        code: 'ACCOUNT_INACTIVE',
-        message: `Account is ${user.status}.`,
+    if (!user.phoneVerifiedAt && (user.emailVerifiedAt || user.hasPassword)) {
+      throw new ConflictException({
+        code: 'PHONE_NOT_CONFIRMED',
+        message:
+          'Ce numéro est enregistré sur un compte créé avec un e-mail. Connectez-vous avec votre e-mail, puis confirmez votre numéro dans Mon profil.',
       });
     }
+  }
+
+  /**
+   * The status gate of every login (SMS, email, WhatsApp, password —
+   * FEAT-020 checks it before sending a new device's code): 403
+   * `ACCOUNT_INACTIVE`, audited, for an account that is not active.
+   */
+  async assertCanSignIn(userId: string, meta: LoginMeta): Promise<UserRecord> {
+    const user = await this.users.getByIdOrThrow(userId);
+    await this.refuseIfInactive(user, meta);
+    return user;
+  }
+
+  /** Shared by every login (SMS, email, WhatsApp, password, registration): status gate, session, access token, audit. */
+  async openSession(userId: string, meta: LoginMeta): Promise<LoginResultDto> {
+    const user = await this.assertCanSignIn(userId, meta);
 
     const roles = await this.users.getRoles(userId);
     const session = await this.sessions.createSession({
@@ -183,6 +203,25 @@ export class AuthService {
       refreshExpiresAt: session.expiresAt.toISOString(),
       user: this.users.toMeDto(user, roles),
     };
+  }
+
+  private async refuseIfInactive(user: UserRecord, meta: LoginMeta): Promise<void> {
+    const userId = user.id;
+    if (user.status !== 'active') {
+      await this.audit.log({
+        actorUserId: userId,
+        action: 'AUTH_LOGIN_FAILURE',
+        entityType: 'user',
+        entityId: userId,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        metadata: { reason: `account_${user.status}` },
+      });
+      throw new ForbiddenException({
+        code: 'ACCOUNT_INACTIVE',
+        message: `Account is ${user.status}.`,
+      });
+    }
   }
 
   async refresh(refreshToken: string, meta: RequestMeta): Promise<TokenPairDto> {

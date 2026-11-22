@@ -66,3 +66,27 @@ export async function clearSession(): Promise<void> {
     SecureStore.deleteItemAsync(USER_KEY),
   ]);
 }
+
+/**
+ * FEAT-020 (SPEC-020-08 R3): this phone as a remembered device. Not part of
+ * the session: `clearSession` (sign-out) keeps it, so the next password login
+ * here skips the email code. One per phone — the last account that chose
+ * « Se souvenir de cet appareil » (FEAT-020-Q20).
+ */
+const DEVICE_KEY = 'djafat_mobile_device';
+
+export async function loadDeviceToken(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(DEVICE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export async function saveDeviceToken(token: string): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(DEVICE_KEY, token);
+  } catch {
+    // Best-effort, like the session: a code will simply be asked again.
+  }
+}

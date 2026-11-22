@@ -1,64 +1,21 @@
-import type { AddressInfo } from 'node:net';
 import { Logger, type ArgumentsHost } from '@nestjs/common';
-import { SMTPServer } from 'smtp-server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ApiErrorBody } from '@djafat/types';
-import type { AppConfigService } from '../../../common/config/config.service';
+import type { ApiErrorBody, OtpDeliveryPurpose } from '@djafat/types';
 import type { RedisService } from '../../../common/redis/redis.service';
 import { AllExceptionsFilter } from '../../../common/errors/all-exceptions.filter';
 import { SmtpEmailOtpDeliveryProvider } from './smtp-email-otp-delivery.provider';
 import { MockEmailOtpDeliveryProvider } from './mock-email-otp-delivery.provider';
 import { emailOtpMessage } from './email-otp-text';
+import { closeSmtpSinks, configFake as config, decodedBody, smtpSink } from './smtp-test-support';
 
 // FEAT-007 — docs/features/FEAT-007-email-login (SPEC-007-01). The SMTP
 // adapter talks to a REAL local SMTP server (smtp-server), not a mock.
+// FEAT-020 — SPEC-020-01: a wording per purpose, the Gmail settings.
 
-interface Received {
-  readonly from: string | undefined;
-  readonly to: string[];
-  readonly raw: string;
-}
-
-const servers: SMTPServer[] = [];
 afterEach(async () => {
-  await Promise.all(servers.splice(0).map((s) => new Promise<void>((r) => s.close(() => r()))));
+  await closeSmtpSinks();
   vi.restoreAllMocks();
 });
-
-async function smtpSink(): Promise<{ url: string; received: Received[] }> {
-  const received: Received[] = [];
-  const server = new SMTPServer({
-    authOptional: true,
-    allowInsecureAuth: true, // local test sink only: accept AUTH without TLS
-    onAuth(_auth, _session, callback) {
-      callback(null, { user: 'mailer' });
-    },
-    disabledCommands: ['STARTTLS'],
-    logger: false,
-    onData(stream, session, callback) {
-      let raw = '';
-      stream.on('data', (c: Buffer) => (raw += c.toString()));
-      stream.on('end', () => {
-        received.push({
-          from: session.envelope.mailFrom ? session.envelope.mailFrom.address : undefined,
-          to: session.envelope.rcptTo.map((r) => r.address),
-          raw,
-        });
-        callback();
-      });
-    },
-  });
-  servers.push(server);
-  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
-  return { url: `smtp://127.0.0.1:${(server.server.address() as AddressInfo).port}`, received };
-}
-
-function config(values: Record<string, unknown>): AppConfigService {
-  return {
-    get: (k: string) => values[k],
-    isProduction: values['NODE_ENV'] === 'production',
-  } as unknown as AppConfigService;
-}
 
 function throughFilter(err: unknown): { status: number; body: ApiErrorBody | undefined } {
   let status = 0;
@@ -167,5 +124,64 @@ describe('SPEC-007-01 — email OTP delivery', () => {
     expect(all).not.toContain('735246');
     expect(all).not.toContain('awa@example.td');
     expect(all).not.toContain('s3cr3t-pass');
+  });
+});
+
+describe('SPEC-020-01 — one wording per purpose', () => {
+  const purposes: OtpDeliveryPurpose[] = [
+    'register',
+    'login',
+    'login_device',
+    'reset_password',
+    'verify_email',
+  ];
+
+  // SPEC-020-01-SC04
+  it('SPEC-020-01-SC04 — each purpose has its own subject; the text has the code and the validity', () => {
+    const subjects = purposes.map((purpose) => {
+      const message = emailOtpMessage('123456', 300, purpose);
+      expect(message.text, purpose).toContain('123456');
+      expect(message.text, purpose).toContain('5 min');
+      return message.subject;
+    });
+    expect(new Set(subjects).size).toBe(purposes.length);
+    // Without a purpose: the FEAT-007 login code, unchanged.
+    expect(emailOtpMessage('123456', 300)).toEqual(emailOtpMessage('123456', 300, 'login'));
+  });
+
+  // SPEC-020-01-SC04
+  it('SPEC-020-01-SC04 — over SMTP, Gmail-style settings, the registration wording and nothing in the logs', async () => {
+    const logs: string[] = [];
+    for (const level of ['log', 'warn', 'error', 'debug', 'verbose'] as const) {
+      vi.spyOn(Logger.prototype, level).mockImplementation((...args: unknown[]) => {
+        logs.push(args.map(String).join(' '));
+      });
+    }
+    const sink = await smtpSink();
+    await new SmtpEmailOtpDeliveryProvider(
+      config({
+        SMTP_HOST: '127.0.0.1',
+        SMTP_PORT: sink.port,
+        SMTP_USER: 'djafat@example.td',
+        SMTP_PASSWORD: 'app-password-xyz',
+      }),
+    ).send({
+      to: 'awa@example.td',
+      code: '123456',
+      ttlSeconds: 300,
+      locale: 'fr',
+      purpose: 'register',
+    });
+
+    expect(sink.received).toHaveLength(1);
+    expect(sink.received[0]).toMatchObject({ from: 'djafat@example.td', to: ['awa@example.td'] });
+    const body = decodedBody(sink.received[0]?.raw ?? '');
+    expect(body).toContain('Pour créer votre compte DJAFAT, saisissez ce code : 123456');
+    expect(body).toContain('5 min');
+
+    const all = logs.join('\n');
+    expect(all).not.toContain('123456');
+    expect(all).not.toContain('awa@example.td');
+    expect(all).not.toContain('app-password-xyz');
   });
 });

@@ -155,7 +155,7 @@ export default function AdressesPage() {
 
   const load = useCallback(async () => {
     if (!isAuthenticated()) {
-      router.push('/connexion?redirect=%2Fadresses' as Route);
+      router.push('/compte?redirect=%2Fadresses' as Route);
       return;
     }
     setState('loading');
@@ -166,7 +166,7 @@ export default function AdressesPage() {
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
         clearSession();
-        router.push('/connexion?redirect=%2Fadresses' as Route);
+        router.push('/compte?redirect=%2Fadresses' as Route);
         return;
       }
       setState('error');

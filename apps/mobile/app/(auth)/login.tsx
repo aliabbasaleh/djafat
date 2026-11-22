@@ -1,165 +1,117 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { SignedIn } from '@djafat/sdk';
 import { tokens } from '@djafat/tokens';
 import { Screen } from '../../components/Screen';
-import { Button } from '../../components/Button';
+import { LoginForm, type AuthMethods } from '../../components/account/LoginForm';
+import { RegisterForm } from '../../components/account/RegisterForm';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
+import { saveDeviceToken } from '../../lib/auth-storage';
+import { afterLoginRoute } from '../../lib/account';
 
-type Step = 'phone' | 'code';
+type TabId = 'connexion' | 'inscription';
 
 /**
- * Customer login (Bloc 12, docs/04 §4.7-ish, same bounded OTP flow every app
- * in this repo uses). `redirect` mirrors `apps/web`'s `?redirect=` query
- * param — reached from the cart/checkout/order-tracking screens that need
- * auth, so sign-in lands the customer back where they were headed.
+ * « Mon compte » (FEAT-020, SPEC-020-08): the signed-out screen of the app —
+ * « Se connecter » and « Créer un compte », the same flows as the site's
+ * `/compte`. `redirect` mirrors the site's `?redirect=`: only an in-app path
+ * is followed, otherwise the restaurants.
  */
-export default function LoginScreen() {
+export default function AccountScreen() {
   const router = useRouter();
   const { redirect } = useLocalSearchParams<{ redirect?: string }>();
   const { signIn } = useAuth();
-  const [step, setStep] = useState<Step>('phone');
-  const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState<TabId>('connexion');
+  const [methods, setMethods] = useState<AuthMethods | undefined>(undefined);
 
-  async function requestCode() {
-    setError(null);
-    setLoading(true);
-    try {
-      await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
-      setStep('code');
-    } catch {
-      setError("Impossible d'envoyer le code. Vérifiez le numéro (+235XXXXXXXX).");
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    api.auth
+      .methods()
+      .then((res) => setMethods(res.methods))
+      .catch(() => setMethods(null));
+  }, []);
+
+  async function onSignedIn(result: SignedIn) {
+    if (result.deviceToken) await saveDeviceToken(result.deviceToken);
+    await signIn({
+      access: result.access,
+      refresh: result.refresh,
+      user: { id: result.user.id, phone: result.user.phone, fullName: result.user.fullName },
+    });
+    // `redirect` comes from the URL, so it cannot be typed statically.
+    router.replace(afterLoginRoute(redirect) as Href);
   }
 
-  async function verifyCode() {
-    setError(null);
-    setLoading(true);
-    try {
-      const result = await api.http.post<{
-        access: string;
-        refresh: string;
-        user: { id: string; phone: string; fullName: string | null };
-      }>('/auth/otp/verify', { body: { phone, code, purpose: 'login' } });
-
-      await signIn({
-        access: result.access,
-        refresh: result.refresh,
-        user: {
-          id: result.user.id,
-          phone: result.user.phone,
-          fullName: result.user.fullName,
-        },
-      });
-      // `redirect` comes from the URL, so it cannot be typed statically: only an
-      // in-app path is followed, anything else falls back to the restaurants.
-      router.replace(
-        typeof redirect === 'string' && redirect.startsWith('/(app)/')
-          ? (redirect as Href)
-          : '/(app)/restaurants',
-      );
-    } catch {
-      setError('Code invalide ou expiré.');
-    } finally {
-      setLoading(false);
-    }
-  }
+  const tabs: ReadonlyArray<{ id: TabId; label: string }> = [
+    { id: 'connexion', label: 'Se connecter' },
+    { id: 'inscription', label: 'Créer un compte' },
+  ];
 
   return (
     <Screen>
       <View style={styles.header}>
-        <Text style={styles.title}>DJAFAT</Text>
-        <Text style={styles.subtitle}>
-          {step === 'phone' ? 'Connectez-vous pour commander.' : `Code envoyé au ${phone}.`}
+        <Text style={styles.brand}>DJAFAT</Text>
+        <Text style={styles.title} accessibilityRole="header">
+          Mon compte
         </Text>
       </View>
 
-      {error && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
+      <View style={styles.tabs} accessibilityRole="tablist">
+        {tabs.map((t) => {
+          const active = tab === t.id;
+          return (
+            <Pressable
+              key={t.id}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              onPress={() => setTab(t.id)}
+              style={[styles.tab, active && styles.tabActive]}
+            >
+              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
-      {step === 'phone' ? (
-        <View style={styles.form}>
-          <Text style={styles.label}>Numéro de téléphone</Text>
-          <TextInput
-            style={styles.input}
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="+23566000000"
-            placeholderTextColor={tokens.color.text.muted}
-            keyboardType="phone-pad"
-            autoFocus
-          />
-          <Button
-            label="Envoyer le code"
-            onPress={() => void requestCode()}
-            loading={loading}
-            fullWidth
-          />
-        </View>
+      {tab === 'connexion' ? (
+        <LoginForm methods={methods ?? null} onSignedIn={onSignedIn} />
       ) : (
-        <View style={styles.form}>
-          <Text style={styles.label}>Code à 6 chiffres</Text>
-          <TextInput
-            style={styles.input}
-            value={code}
-            onChangeText={setCode}
-            placeholder="123456"
-            placeholderTextColor={tokens.color.text.muted}
-            keyboardType="number-pad"
-            maxLength={6}
-            autoFocus
-          />
-          <Button label="Vérifier" onPress={() => void verifyCode()} loading={loading} fullWidth />
-          <Button
-            label="Changer de numéro"
-            variant="ghost"
-            onPress={() => setStep('phone')}
-            fullWidth
-          />
-        </View>
+        <RegisterForm onSignedIn={onSignedIn} onGoToLogin={() => setTab('connexion')} />
       )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { marginTop: tokens.space['10'], marginBottom: tokens.space['6'] },
-  title: {
+  header: { marginTop: tokens.space['8'], marginBottom: tokens.space['4'] },
+  brand: {
     fontSize: tokens.type.size.display,
     fontWeight: '700',
     color: tokens.color.brand.primary,
   },
-  subtitle: {
+  title: {
     marginTop: tokens.space['2'],
-    fontSize: tokens.type.size.body,
-    color: tokens.color.text.secondary,
-  },
-  form: { gap: tokens.space['3'] },
-  label: { fontSize: tokens.type.size.label, fontWeight: '600', color: tokens.color.text.primary },
-  input: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: tokens.color.border.default,
-    borderRadius: tokens.radius.md,
-    paddingHorizontal: tokens.space['4'],
-    fontSize: tokens.type.size.h3,
+    fontSize: tokens.type.size.h1,
+    fontWeight: '700',
     color: tokens.color.text.primary,
-    backgroundColor: tokens.color.bg.surface,
   },
-  errorBox: {
-    backgroundColor: tokens.color.state.dangerBg,
-    borderRadius: tokens.radius.md,
-    padding: tokens.space['3'],
+  tabs: {
+    flexDirection: 'row',
     marginBottom: tokens.space['4'],
+    borderBottomWidth: 1,
+    borderBottomColor: tokens.color.border.default,
   },
-  errorText: { color: tokens.color.state.danger, fontSize: tokens.type.size.body },
+  tab: {
+    flex: 1,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: { borderBottomColor: tokens.color.brand.primary },
+  tabLabel: { fontSize: tokens.type.size.body, color: tokens.color.text.secondary },
+  tabLabelActive: { color: tokens.color.text.primary, fontWeight: '700' },
 });

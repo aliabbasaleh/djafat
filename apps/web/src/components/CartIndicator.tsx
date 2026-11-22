@@ -44,9 +44,10 @@ export function CartIndicator() {
   }, [refresh]);
 
   if (!authed) {
+    // FEAT-020 (SPEC-020-07): « Connexion » became « Compte » — log in or create an account.
     return (
-      <Button href="/connexion" variant="secondary" size="sm">
-        Connexion
+      <Button href="/compte" variant="secondary" size="sm">
+        <span aria-hidden="true">👤</span> Compte
       </Button>
     );
   }

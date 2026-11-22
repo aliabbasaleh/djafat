@@ -24,6 +24,7 @@
     "clean": "rimraf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@djafat/core": "workspace:*",
     "@djafat/types": "workspace:*"
   },
   "devDependencies": {

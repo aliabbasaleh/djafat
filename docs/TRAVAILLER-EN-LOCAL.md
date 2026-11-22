@@ -63,6 +63,26 @@ docker compose -f infra/docker-compose.yml exec redis redis-cli get "otp:mock:+2
 Comptes de test : `66 00 00 01` client, `66 00 00 02` livreur, `66 00 00 04`
 restaurant, `66 00 00 05` standardiste, `66 00 00 06` finance, `66 00 00 07` admin.
 
+**Comptes clients par e-mail (FEAT-020)** : sur le site, « Compte » → « Créer un
+compte ». Avec `EMAIL_PROVIDER=mock` (la valeur du `.env` local), aucun e-mail ne
+part : le code d'inscription, de nouvel appareil ou de mot de passe oublié est
+lisible dans Redis :
+
+```bash
+docker compose -f infra/docker-compose.yml exec redis redis-cli get "otp:mock:email:vous@exemple.td"
+```
+
+Pour envoyer de **vrais e-mails** depuis le Gmail officiel de DJAFAT :
+
+1. Sur le compte Google de DJAFAT : activer la **validation en deux étapes**, puis
+   créer un **mot de passe d'application** (myaccount.google.com → Sécurité →
+   Mots de passe des applications). Jamais le mot de passe normal du compte.
+2. Dans `.env` : `SMTP_USER` = l'adresse Gmail, `SMTP_PASSWORD` = le mot de passe
+   d'application (16 lettres ; les espaces sont retirés), puis `EMAIL_PROVIDER=smtp`.
+3. Relancer l'API. Ce mot de passe ne va **jamais** dans Git ni dans un message.
+
+Un compte Gmail gratuit envoie environ 500 e-mails par jour.
+
 App livreur dans le navigateur :
 
 ```bash

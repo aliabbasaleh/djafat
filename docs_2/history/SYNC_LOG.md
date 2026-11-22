@@ -10,6 +10,46 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-035 — 2026-11-21/22 — the collaborator's `fix/login-method-icons`; our FEAT-020 branch
+
+|                 |                                                                                                                                         |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Trigger**     | The user asked to pull the collaborator's work, then to build customer accounts (FEAT-020)                                              |
+| **Range**       | `origin/main` unchanged since S-034 (`96a88d3`); new `origin/fix/login-method-icons` `628dce4`; our branch `feat/compte-email-password` |
+| **Size**        | 0 new commits on GitHub; our change: auth, users, migration 0040, SDK, web, mobile, docs                                                |
+| **Evidence**    | RUN — `git fetch -v` up to date; FEAT-020 checks in its `progress.md`; API-02 LIVE preflight                                            |
+| **Reviewed by** | Claude, in the session that wrote FEAT-020                                                                                              |
+
+### Added
+
+- `origin/fix/login-method-icons` (kcerha, 2026-11-21, version 0.23.6, not merged, no pull request seen):
+  `628dce4` replaces the emoji of the login method tabs (`apps/web/src/app/connexion/page.tsx`) by three
+  inline SVG icons (no dependency); roadmap line and version. Reviewed from the diff (CODE); our FEAT-020
+  replaces that page by a redirect, so the icons were moved into `components/account/ChannelIcons.tsx`
+  and shown in the account screens' channel buttons (RUN: browser pass of 2026-11-22). Merging both
+  branches conflicts on `connexion/page.tsx`, `docs/ROADMAP.md` and `package.json` (resolution in the
+  FEAT-020 `pr.md`).
+- FEAT-020 on its branch (see `history/CHANGELOG.md`); tasks T-611 to T-613.
+
+### Removed
+
+- none
+
+### Fixed
+
+- On the branch: [`API-02`](../FINDINGS.md#api-02) (CORS methods).
+
+### Changed
+
+- The branch's version is 0.24.0; it carries migration 0040, so a server or a local copy updated to it must run its
+  migrations.
+
+### New findings
+
+- [`API-02`](../FINDINGS.md#api-02) — Broken, High, LIVE.
+
+---
+
 ## S-034 — 2026-11-18 — pull requests #17 to #24 merged
 
 |                 |                                                                             |

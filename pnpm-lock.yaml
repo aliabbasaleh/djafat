@@ -749,6 +749,9 @@ importers:
 
   packages/sdk:
     dependencies:
+      '@djafat/core':
+        specifier: workspace:*
+        version: link:../core
       '@djafat/types':
         specifier: workspace:*
         version: link:../types

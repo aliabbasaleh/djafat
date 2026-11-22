@@ -1,0 +1,26 @@
+FEAT-020-VIS03 — étape du code (inscription, nouvel appareil, code seul,
+mot de passe oublié), 390x844 (mobile). Nature : attendu.
+
+ DJAFAT                      [👤 Compte]
+ ───────────────────────────────────────
+  Vérifiez votre e-mail
+
+  Entrez le code à 6 chiffres envoyé à
+  a***@gmail.com (valable 5 min).
+
+  Code à 6 chiffres
+  [ 123456                           ]
+
+  [x] Se souvenir de cet appareil       <- nouvel appareil seulement
+
+  [             Vérifier             ]
+
+  Renvoyer le code (dans 60 s)
+  Retour
+
+Notes :
+- Nouvel appareil : si le compte a un numéro confirmé et que WhatsApp ou SMS
+  sont actifs, le client choisit où recevoir le code (même rangée de canaux
+  que FEAT-020-VIS01, canaux inactifs « Bientôt disponible »).
+- Mot de passe oublié : sous le code, « Nouveau mot de passe » et
+  « Confirmer le mot de passe ».

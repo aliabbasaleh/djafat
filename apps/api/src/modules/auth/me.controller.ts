@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Patch, Post, Put, Req } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedActor } from '@djafat/types';
@@ -14,6 +14,17 @@ import {
   type EmailRequestInput,
   type EmailVerifyInput,
 } from './dto/email.schema';
+import { ChangePasswordSchema, type ChangePasswordInput } from './dto/password.schema';
+import {
+  PhoneRequestSchema,
+  PhoneVerifySchema,
+  type PhoneRequestInput,
+  type PhoneVerifyInput,
+} from './dto/phone-link.schema';
+import type { RequestMeta } from './auth.service';
+import { PasswordService } from './password.service';
+import { PhoneLinkService } from './phone-link.service';
+import { ReqMeta } from './request-meta.decorator';
 
 /**
  * `GET /v1/me` (docs/07 §"Auth") — lives in `auth`, not `users`: `users`
@@ -26,6 +37,8 @@ export class MeController {
   constructor(
     private readonly users: UsersService,
     private readonly auth: AuthService,
+    private readonly passwords: PasswordService,
+    private readonly phones: PhoneLinkService,
   ) {}
 
   @Get()
@@ -69,5 +82,51 @@ export class MeController {
     @Req() req: FastifyRequest,
   ) {
     return this.auth.confirmEmailVerification(actor.userId, body.email, body.code, req.ip ?? null);
+  }
+
+  /**
+   * FEAT-020 (SPEC-020-05 R4-R7): set a first password (an account created by
+   * WhatsApp or SMS, with a verified email) or change it (the current one is
+   * asked). The other sessions are logged out; this one stays.
+   */
+  @Put('password')
+  @HttpCode(204)
+  @RequireAuth()
+  async changePassword(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Body(new ZodValidationPipe(ChangePasswordSchema)) body: ChangePasswordInput,
+    @ReqMeta() meta: RequestMeta,
+  ): Promise<void> {
+    await this.passwords.changePassword(
+      { userId: actor.userId, sessionId: actor.sessionId },
+      body,
+      meta,
+    );
+  }
+
+  /** FEAT-020 (SPEC-020-06 R1): a code by SMS to confirm the account's own number. */
+  @Post('phone/request')
+  @HttpCode(202)
+  @RequireAuth()
+  async requestPhoneCode(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Body(new ZodValidationPipe(PhoneRequestSchema)) _body: PhoneRequestInput,
+    @ReqMeta() meta: RequestMeta,
+  ) {
+    await this.phones.request(actor.userId, meta.ip);
+    return { status: 'sent' };
+  }
+
+  /** FEAT-020 (SPEC-020-06 R2-R3): the SMS code, or the code WhatsApp replied — the number is confirmed. */
+  @Post('phone/verify')
+  @HttpCode(200)
+  @RequireAuth()
+  async verifyPhone(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Body(new ZodValidationPipe(PhoneVerifySchema)) body: PhoneVerifyInput,
+    @ReqMeta() meta: RequestMeta,
+  ) {
+    const user = await this.phones.verify(actor.userId, body.channel, body.code, meta);
+    return this.users.toMeDto(user, actor.roles);
   }
 }
