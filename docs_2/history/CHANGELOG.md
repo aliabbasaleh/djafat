@@ -42,6 +42,15 @@ neither the password nor an alert. **Changed by the user's decisions:** a verifi
 delivery at level T1; phone orders are refused for such numbers until confirmed. **Learned:** a fix can
 open its own hole (the first redirect fix normalised `/..//x` into `//x`) — the second review caught it.
 
+## 2026-11-22 — Sync S-038: three features confirmed (FEAT-021, FEAT-022, FEAT-023)
+
+**Added (plans, no code):** the user decided to switch SMS off until DJAFAT has an API, so admins, restaurants and
+couriers will log in by e-mail and password (FEAT-021, T-614); anyone will sign up as customer, courier or restaurant,
+complete their profile in their own app and be validated by DJAFAT (FEAT-022, T-615); WhatsApp login will be free
+because the customer sends the code (FEAT-023, T-616). **Learned:** Meta's official pricing page (read 2026-11-22)
+charges every business-sent message since 2026-10-01, including replies in the 24-hour window; FEAT-008's reply with
+the code is therefore no longer free.
+
 ---
 
 ## 2026-11-22 — Sync S-037: first registration code received in a real inbox (FEAT-020, 0.24.2)

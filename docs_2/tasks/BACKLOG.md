@@ -509,4 +509,22 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Done when:** `https://api.<domain>` answers a `PATCH` preflight with PUT, PATCH and DELETE allowed.
 - **Test:** `curl -s -o /dev/null -D - -X OPTIONS -H 'Origin: https://<domain>' -H 'Access-Control-Request-Method: PATCH' https://api.<domain>/v1/me`.
 
+### T-614 · Team log in by e-mail and password; SMS off (FEAT-021) _(added 2026-11-22, sync S-038)_
+
+- **Area:** `apps/admin`, `apps/restaurant`, `apps/courier`, `packages/config`, `auth` · **Priority:** High · **Why:** the user's decision of 2026-11-22 to switch SMS off until DJAFAT has an API (codes today land in a test box on the server); the three team apps only accept a phone code (`docs/features/FEAT-021-equipe-connexion-email`) · **Status:** Confirmed by the user, specs to write
+- **Done when:** the three team apps log in by e-mail and password (code by e-mail on a new device); the API starts in production with `SMS_PROVIDER=disabled` when e-mail is configured; the server runs with SMS off.
+- **Test:** the FEAT-021 specs' tests; on the server, log in to each app with an e-mail and password.
+
+### T-615 · Sign-up as customer, courier or restaurant, validated by DJAFAT (FEAT-022) _(added 2026-11-22, sync S-038)_
+
+- **Area:** `auth`, `users`, `catalog`, `couriers`, `admin`, `notifications`, the four front ends · **Priority:** High · **Why:** the user's request of 2026-11-22 (`docs/features/FEAT-022-inscription-par-type-de-compte`) · **Status:** Confirmed by the user, specs to write; needs T-614
+- **Done when:** a courier and a restaurant sign up on their own, complete their profile in their app, and only work after an admin approves them; document photos are private.
+- **Test:** the FEAT-022 specs' tests.
+
+### T-616 · Free WhatsApp login: the customer sends the code (FEAT-023) _(added 2026-11-22, sync S-038)_
+
+- **Area:** `auth` (WhatsApp webhook), web and mobile login · **Priority:** Medium · **Why:** Meta charges every business-sent message since 2026-10-01, including FEAT-008's reply with the code; customer-sent messages stay free (`docs/features/FEAT-023-whatsapp-gratuit`) · **Status:** Confirmed by the user, specs to write; switched on only once DJAFAT's number is on Meta's WhatsApp Cloud API
+- **Done when:** a customer logs in by sending the displayed code from WhatsApp, and DJAFAT sends no WhatsApp message.
+- **Test:** the FEAT-023 specs' tests.
+
 Last updated: 2026-11-23 (sync S-041)
