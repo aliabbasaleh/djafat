@@ -581,6 +581,7 @@ export function fakeOrderAmountPort(): OrderAmountPort {
     getDropoffVoiceNote: vi.fn().mockResolvedValue(null),
     getCustomerTrustSignals: vi.fn().mockResolvedValue({
       phoneVerified: true,
+      emailVerified: false,
       deliveredOrders: 0,
       noShows: 0,
       cancelAfterDispatch: 0,

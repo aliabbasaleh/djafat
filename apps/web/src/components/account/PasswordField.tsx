@@ -28,7 +28,6 @@ export function PasswordField({ label, error, ...rest }: PasswordFieldProps) {
       <button
         type="button"
         className={styles['reveal']}
-        aria-pressed={visible}
         aria-label={visible ? `Masquer : ${label}` : `Afficher : ${label}`}
         onClick={() => setVisible((v) => !v)}
       >

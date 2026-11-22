@@ -7,7 +7,7 @@ import type { RateLimiterService } from '../../common/rate-limit/rate-limiter.se
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { PlatformService } from '../platform/platform.service';
 import type { UserRecord, UsersService } from '../users/users.service';
-import type { AccountNotice, AccountNoticePort } from './account-notice.port';
+import type { AccountNotice, AccountNoticePort, NoticeOutcome } from './account-notice.port';
 import { AuthService } from './auth.service';
 import type { MfaService } from './mfa.service';
 import type { OtpPurpose, OtpRequestOptions, OtpService, OtpTarget } from './otp.service';
@@ -42,8 +42,11 @@ export interface SentCode {
 }
 
 /** A stored account; unlike `UserRecord`, the fakes and tests may change it in place. */
-export interface Account extends Omit<UserRecord, 'phoneVerifiedAt'> {
+export interface Account extends Omit<UserRecord, 'phoneVerifiedAt' | 'email' | 'emailVerifiedAt'> {
   phoneVerifiedAt: Date | null;
+  /** Mutable like `phoneVerifiedAt`: the e-mail change tests confirm a new address (SPEC-020-12). */
+  email: string | null;
+  emailVerifiedAt?: Date | null;
   passwordHash: string | null;
   deleted?: boolean;
 }
@@ -61,18 +64,32 @@ interface ChallengeRow {
 const otpInvalid = () =>
   new UnauthorizedException({ code: 'OTP_INVALID', message: 'Invalid or expired code.' });
 const otpLocked = () => new HttpException({ code: 'OTP_LOCKED', message: 'locked' }, 423);
+const rateLimited = () =>
+  new HttpException({ code: 'RATE_LIMITED', message: 'Too many codes requested' }, 429);
 const LOCK_THRESHOLD = 10;
+/** Like `otp_request_rate_limit_per_target` (3 per 10 min): the fake has no clock, one window per test. */
+const TARGET_BUDGET = 3;
 
 export function fakeOtp() {
   const sent: SentCode[] = [];
   const failures = new Map<string, number>();
   const locked = (target: string) => (failures.get(target) ?? 0) >= LOCK_THRESHOLD;
   const fail = (target: string) => failures.set(target, (failures.get(target) ?? 0) + 1);
+  // Review FEAT-020 #10: the fake now applies the per-target budget and the lock
+  // where the real service does, so tests see what a caller would see.
+  const budgets = new Map<string, number>();
+  const spend = (target: string) => {
+    const used = (budgets.get(target) ?? 0) + 1;
+    budgets.set(target, used);
+    if (used > TARGET_BUDGET) throw rateLimited();
+  };
+  const push = (to: OtpTarget, purpose: OtpPurpose, context: string | null) =>
+    sent.push({ to, purpose, context, code: String(100_000 + sent.length), consumed: false });
   const otp = {
     sent,
     failures,
     consumeIpBudget: vi.fn(later(() => undefined)),
-    consumeTargetBudget: vi.fn(later(() => undefined)),
+    consumeTargetBudget: vi.fn(later((to: OtpTarget) => spend(to.target))),
     requestCode: vi.fn(
       later(
         (
@@ -81,15 +98,18 @@ export function fakeOtp() {
           _ip: string | null,
           options: OtpRequestOptions = {},
         ) => {
-          sent.push({
-            to,
-            purpose,
-            context: options.context ?? null,
-            code: String(100_000 + sent.length),
-            consumed: false,
-          });
+          if (!options.targetCharged) spend(to.target);
+          if (locked(to.target)) throw otpLocked();
+          push(to, purpose, options.context ?? null);
         },
       ),
+    ),
+    requestCodeIfOwned: vi.fn(
+      later((to: OtpTarget, purpose: OtpPurpose, _ip: string | null, owned: boolean) => {
+        spend(to.target);
+        if (locked(to.target)) throw otpLocked();
+        if (owned) push(to, purpose, null);
+      }),
     ),
     verifyCode: vi.fn(
       later(
@@ -179,7 +199,8 @@ export function account(over: Partial<Account> = {}): Account {
   };
 }
 
-export function fakeUsers(initial: Account[] = []) {
+/** `tx`: what `createRegisteredCustomer`'s in-transaction step receives (the registrations fake). */
+export function fakeUsers(initial: Account[] = [], options: { tx?: unknown } = {}) {
   const accounts: Account[] = [...initial];
   const live = () => accounts.filter((a) => !a.deleted);
   const record = (a: Account): UserRecord => ({ ...a, hasPassword: a.passwordHash !== null });
@@ -216,25 +237,31 @@ export function fakeUsers(initial: Account[] = []) {
       }),
     ),
     createRegisteredCustomer: vi.fn(
-      later((input: { fullName: string; phone: string; email: string; passwordHash: string }) => {
-        if (live().some((x) => x.phone === input.phone)) {
-          throw new ConflictException({ code: 'PHONE_ALREADY_USED', message: 'phone taken' });
-        }
-        if (live().some((x) => x.email === input.email)) {
-          throw new ConflictException({ code: 'EMAIL_ALREADY_USED', message: 'email taken' });
-        }
-        const created = account({
-          id: `u-${accounts.length + 1}`,
-          fullName: input.fullName,
-          phone: input.phone,
-          email: input.email,
-          emailVerifiedAt: new Date(),
-          phoneVerifiedAt: null,
-          passwordHash: input.passwordHash,
-        });
-        accounts.push(created);
-        return { userId: created.id };
-      }),
+      later(
+        async (
+          input: { fullName: string; phone: string; email: string; passwordHash: string },
+          beforeCreate?: (tx: never) => Promise<void>,
+        ) => {
+          if (beforeCreate) await beforeCreate(options.tx as never);
+          if (live().some((x) => x.phone === input.phone)) {
+            throw new ConflictException({ code: 'PHONE_ALREADY_USED', message: 'phone taken' });
+          }
+          if (live().some((x) => x.email === input.email)) {
+            throw new ConflictException({ code: 'EMAIL_ALREADY_USED', message: 'email taken' });
+          }
+          const created = account({
+            id: `u-${accounts.length + 1}`,
+            fullName: input.fullName,
+            phone: input.phone,
+            email: input.email,
+            emailVerifiedAt: new Date(),
+            phoneVerifiedAt: null,
+            passwordHash: input.passwordHash,
+          });
+          accounts.push(created);
+          return { userId: created.id };
+        },
+      ),
     ),
     getPasswordHash: vi.fn(
       later((id: string) => live().find((x) => x.id === id)?.passwordHash ?? null),
@@ -243,6 +270,19 @@ export function fakeUsers(initial: Account[] = []) {
       later((id: string, hash: string) => {
         const a = live().find((x) => x.id === id);
         if (a) a.passwordHash = hash;
+      }),
+    ),
+    /** Like `UsersService.setVerifiedEmail`: 409 `EMAIL_ALREADY_USED` when another account verified it. */
+    setVerifiedEmail: vi.fn(
+      later((id: string, email: string) => {
+        if (live().some((x) => x.id !== id && x.email === email && x.emailVerifiedAt)) {
+          throw new ConflictException({ code: 'EMAIL_ALREADY_USED', message: 'email taken' });
+        }
+        const a = live().find((x) => x.id === id);
+        if (!a) throw new Error(`no account ${id}`);
+        a.email = email;
+        a.emailVerifiedAt = new Date();
+        return record(a);
       }),
     ),
     markPhoneVerified: vi.fn(
@@ -392,8 +432,9 @@ export function fakeNotices() {
   const port: AccountNoticePort & { sent: AccountNotice[] } = {
     sent,
     send: vi.fn(
-      later((notice: AccountNotice) => {
+      later((notice: AccountNotice): NoticeOutcome => {
         sent.push(notice);
+        return 'sent';
       }),
     ),
   };

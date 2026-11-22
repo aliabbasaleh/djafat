@@ -130,9 +130,14 @@ export function createAuthClient(http: ApiHttp) {
     me: () => http.get<MeProfile>('/me'),
     /** "Mon profil": the name shown to the courier and the restaurant. */
     updateName: (fullName: string) => http.patch<MeProfile>('/me', { body: { fullName } }),
-    /** Add an e-mail (Gmail…): a 6-digit code is sent to it (FEAT-007). */
-    requestEmailVerification: (email: string) =>
-      http.post<{ status: 'sent' }>('/me/email', { body: { email } }),
+    /**
+     * Add an e-mail (Gmail…): a 6-digit code is sent to it (FEAT-007). An account
+     * with a password gives it first (FEAT-020 SPEC-020-12).
+     */
+    requestEmailVerification: (email: string, currentPassword?: string) =>
+      http.post<{ status: 'sent' }>('/me/email', {
+        body: { email, ...(currentPassword ? { currentPassword } : {}) },
+      }),
     /** The code makes the address verified: it can then be used to log in. */
     confirmEmail: (email: string, code: string) =>
       http.post<MeProfile>('/me/email/verify', { body: { email, code } }),

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ArgumentsHost } from '@nestjs/common';
 import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { LedgerError, MoneyError, OrderTransitionError } from '@djafat/core';
+import { FieldValidationError, LedgerError, MoneyError, OrderTransitionError } from '@djafat/core';
 import { ZodError } from 'zod';
 import type { ApiErrorBody } from '@djafat/types';
 import { AllExceptionsFilter } from './all-exceptions.filter';
@@ -241,5 +241,20 @@ describe('AllExceptionsFilter — a malformed identifier is a 400, not a 500 (pi
     );
     expect(other.getStatus()).toBe(500);
     expect(other.getBody().error.code).toBe('INTERNAL');
+  });
+
+  // FEAT-020 review #8: a service-level field rule answers like a schema failure.
+  it('a FieldValidationError maps to 422 VALIDATION_ERROR with its details per field', () => {
+    const filter = new AllExceptionsFilter();
+    const { host, getBody, getStatus } = makeHost();
+    filter.catch(
+      new FieldValidationError([{ path: 'newPassword', message: 'Trop proche de votre nom.' }]),
+      host,
+    );
+    expect(getStatus()).toBe(422);
+    expect(getBody().error.code).toBe('VALIDATION_ERROR');
+    expect(getBody().error.details).toEqual([
+      { path: 'newPassword', message: 'Trop proche de votre nom.' },
+    ]);
   });
 });

@@ -540,13 +540,13 @@ export class OrdersService implements OrderAmountPort {
    * FEAT-015 — the facts a cash-on-delivery decision rests on, from this
    * module's own tables: delivered orders, deliveries that failed at the door
    * (history reason `delivery.failed`), cancellations once a courier was on
-   * the order, account age and phone verification.
+   * the order, account age, phone and e-mail verification (FEAT-020-Q26).
    */
   async getCustomerTrustSignals(customerId: string): Promise<CustomerTrustFacts> {
     const [user, delivered, failures] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: customerId },
-        select: { createdAt: true, phoneVerifiedAt: true },
+        select: { createdAt: true, phoneVerifiedAt: true, emailVerifiedAt: true },
       }),
       this.prisma.order.count({ where: { customerId, status: 'delivered' } }),
       this.prisma.$queryRaw<Array<{ no_shows: bigint; late_cancels: bigint }>>`
@@ -562,6 +562,7 @@ export class OrdersService implements OrderAmountPort {
     const ageMs = user ? Date.now() - user.createdAt.getTime() : 0;
     return {
       phoneVerified: user?.phoneVerifiedAt != null,
+      emailVerified: user?.emailVerifiedAt != null,
       deliveredOrders: delivered,
       noShows: Number(failures[0]?.no_shows ?? 0n),
       cancelAfterDispatch: Number(failures[0]?.late_cancels ?? 0n),

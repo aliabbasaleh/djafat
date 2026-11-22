@@ -51,9 +51,9 @@ describe('SPEC-020-01 — account notices without a code', () => {
     const set = vi.fn();
     const redis = { client: { set } } as unknown as RedisService;
     const mock = new MockAccountNoticeProvider(redis, configFake({ NODE_ENV: 'production' }));
-    await expect(
-      mock.send({ kind: 'already_registered', to: 'awa@example.td' }),
-    ).resolves.toBeUndefined();
+    await expect(mock.send({ kind: 'already_registered', to: 'awa@example.td' })).resolves.toBe(
+      'unavailable',
+    );
     expect(set).not.toHaveBeenCalled();
   });
 
@@ -66,9 +66,10 @@ describe('SPEC-020-01 — account notices without a code', () => {
       });
     }
     const sink = await smtpSink();
-    await new SmtpAccountNoticeProvider(
+    const outcome = await new SmtpAccountNoticeProvider(
       configFake({ SMTP_URL: sink.url, EMAIL_FROM: 'DJAFAT <no-reply@djafat.test>' }),
     ).send({ kind: 'password_changed', to: 'awa@example.td', at: AT });
+    expect(outcome).toBe('sent');
     expect(sink.received).toHaveLength(1);
     expect(sink.received[0]).toMatchObject({ to: ['awa@example.td'] });
     const body = decodedBody(sink.received[0]?.raw ?? '');
@@ -79,7 +80,7 @@ describe('SPEC-020-01 — account notices without a code', () => {
       new SmtpAccountNoticeProvider(
         configFake({ SMTP_URL: 'smtp://127.0.0.1:1', EMAIL_FROM: 'DJAFAT <a@b.td>' }),
       ).send({ kind: 'already_registered', to: 'awa@example.td' }),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe('failed');
     expect(logs.join('\n')).not.toContain('awa@example.td');
   });
 
@@ -87,5 +88,19 @@ describe('SPEC-020-01 — account notices without a code', () => {
     const { text } = accountNoticeMessage({ kind: 'already_registered', to: 'awa@example.td' });
     expect(text).toContain('« Se connecter »');
     expect(text).toContain('« Mot de passe oublié ? »');
+  });
+
+  // SPEC-020-12-SC04
+  it('SPEC-020-12-SC04 — the "e-mail changed" alert names the masked new address and what to do', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'email_changed',
+      to: 'awa@example.td',
+      newAddress: 'a***@gmail.com',
+      at: new Date('2026-11-21T13:05:00Z'),
+    });
+    expect(subject).toContain('a été changée');
+    expect(text).toContain('a***@gmail.com');
+    expect(text).toContain('le 21 novembre 2026');
+    expect(text).toContain('contactez DJAFAT');
   });
 });

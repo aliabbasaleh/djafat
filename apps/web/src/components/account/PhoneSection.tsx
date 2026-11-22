@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MeProfile } from '@djafat/sdk';
 import { Stack, cx } from '@djafat/ui';
 import { Alert, Button, Input } from '@/components/ui-client';
@@ -68,8 +68,21 @@ export function PhoneSection(props: PhoneSectionProps) {
     }
   }
 
+  // Review FEAT-020 #12: when the form opens or closes, focus moves to its first control.
+  const sectionRef = useRef<HTMLElement>(null);
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    sectionRef.current
+      ?.querySelector<HTMLElement>('input:not([disabled]), button:not([disabled])')
+      ?.focus();
+  }, [channel]);
+
   return (
-    <section className={cx(props.cardClassName)}>
+    <section ref={sectionRef} className={cx(props.cardClassName)}>
       <p className={cx(props.labelClassName)}>Téléphone</p>
       <p className={cx(props.valueClassName)}>
         {me.phone}{' '}

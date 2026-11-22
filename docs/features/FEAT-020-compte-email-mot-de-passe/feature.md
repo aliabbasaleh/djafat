@@ -27,6 +27,10 @@ that variable »
 Message suivant : « make an option of the OTP. It can be sent either by
 email, or by WhatsApp […] and even phone number. But […] we don't have an API
 now, and we don't want to pay for extra services […] »
+
+Ajouts du 2026-11-22, après la revue indépendante : AC16 et AC17, et la fin d'AC13,
+d'après les réponses de l'utilisateur aux questions « Cash », « E-mail change » et
+« Phone order » (clarifications.md, FEAT-020-Q26 à Q28).
 -->
 
 # FEAT-020 — Compte client : inscription et connexion par e-mail et mot de passe
@@ -104,9 +108,11 @@ colle lui-même l'adresse et le mot de passe d'application dans `.env`.
 - **FEAT-020-AC10** — « Mot de passe oublié ? » : le bon code reçu par e-mail permet de choisir un nouveau mot de passe ; toutes les sessions et tous les appareils mémorisés du compte sont révoqués et un e-mail d'alerte part. Une adresse inconnue obtient la même réponse visible et ne reçoit rien.
 - **FEAT-020-AC11** — Dans « Mon profil », un compte sans mot de passe peut en définir un, et un compte avec mot de passe peut le changer en donnant l'actuel ; un e-mail « Votre mot de passe a été modifié » part et les autres sessions sont déconnectées.
 - **FEAT-020-AC12** — Dans « Mon profil », le client confirme son numéro par un code WhatsApp ou SMS quand ces canaux sont actifs ; ensuite, un code WhatsApp ou SMS sur ce numéro ouvre ce compte.
-- **FEAT-020-AC13** — Un code WhatsApp ou SMS sur un numéro enregistré par un compte créé par e-mail, dont le numéro n'est pas confirmé, n'ouvre pas ce compte : le message invite à se connecter avec l'e-mail.
+- **FEAT-020-AC13** — Un code WhatsApp ou SMS sur un numéro enregistré par un compte créé par e-mail, dont le numéro n'est pas confirmé, n'ouvre pas ce compte : le message invite à se connecter avec l'e-mail. De même, une commande prise au téléphone pour ce numéro est refusée tant que le numéro n'est pas confirmé.
 - **FEAT-020-AC14** — `.env.example` et `.env` contiennent les variables d'envoi Gmail (serveur, port, adresse, mot de passe d'application, expéditeur). Une fois le mot de passe d'application renseigné, les codes arrivent dans la boîte de réception ; sans lui, le développement local garde le faux envoi.
 - **FEAT-020-AC15** — Inscriptions, connexions réussies et échouées, changements et réinitialisations de mot de passe et mémorisations d'appareil sont audités ; aucun code, mot de passe ni e-mail complet n'apparaît dans les journaux.
+- **FEAT-020-AC16** — Un client dont l'e-mail est vérifié peut payer en espèces à la livraison au premier niveau de confiance (T1), même si son numéro n'est pas confirmé, comme un client au numéro confirmé ; les absences à la livraison le font redescendre comme avant.
+- **FEAT-020-AC17** — Changer l'e-mail d'un compte qui a un mot de passe demande le mot de passe actuel ; quand une adresse vérifiée est remplacée, l'ancienne reçoit une alerte et les appareils mémorisés sont oubliés.
 
 ## Dépendances et contraintes
 

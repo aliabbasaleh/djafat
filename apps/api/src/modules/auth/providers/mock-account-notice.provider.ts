@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AppConfigService } from '../../../common/config/config.service';
 import { RedisService } from '../../../common/redis/redis.service';
-import type { AccountNotice, AccountNoticePort } from '../account-notice.port';
+import type { AccountNotice, AccountNoticePort, NoticeOutcome } from '../account-notice.port';
 import { accountNoticeMessage } from './account-notice-text';
 
 /** How long the last notice of an address stays readable in development. */
@@ -22,12 +22,12 @@ export class MockAccountNoticeProvider implements AccountNoticePort {
     private readonly config: AppConfigService,
   ) {}
 
-  async send(notice: AccountNotice): Promise<void> {
+  async send(notice: AccountNotice): Promise<NoticeOutcome> {
     if (this.config.isProduction) {
       this.logger.warn(
         `Account notice "${notice.kind}" not sent: EMAIL_PROVIDER=mock in production`,
       );
-      return;
+      return 'unavailable';
     }
     const { subject } = accountNoticeMessage(notice);
     await this.redis.client.set(
@@ -36,6 +36,7 @@ export class MockAccountNoticeProvider implements AccountNoticePort {
       'EX',
       MOCK_NOTICE_TTL_SECONDS,
     );
+    return 'sent';
   }
 }
 

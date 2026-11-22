@@ -10,6 +10,7 @@ import {
 
 const base: CustomerTrustSignals = {
   phoneVerified: true,
+  emailVerified: false,
   deliveredOrders: 0,
   noShows: 0,
   cancelAfterDispatch: 0,
@@ -65,5 +66,39 @@ describe('SPEC-015-01 — customer trust score (pure)', () => {
     expect(isNightInNdjamena(new Date('2026-11-09T21:00:00Z'))).toBe(true); // 22:00 local
     expect(isNightInNdjamena(new Date('2026-11-09T04:59:00Z'))).toBe(true); // 05:59 local
     expect(isNightInNdjamena(new Date('2026-11-09T05:00:00Z'))).toBe(false); // 06:00 local
+  });
+});
+
+// FEAT-020 — docs/features/FEAT-020-compte-email-mot-de-passe (SPEC-020-11, FEAT-020-Q26).
+describe('SPEC-020-11 — a verified e-mail counts like a confirmed number', () => {
+  // SPEC-020-11-SC01
+  it('SPEC-020-11-SC01 — new customer, verified e-mail, number not confirmed: T1, capped at 10 000', () => {
+    const t = scoreCustomerTrust({ ...base, phoneVerified: false, emailVerified: true });
+    expect(t).toEqual({ score: 40, tier: 'T1' });
+    expect(codCapFor(t.tier, CAPS)).toBe(10_000n);
+  });
+
+  // SPEC-020-11-SC02
+  it('SPEC-020-11-SC02 — neither confirmed: T0, no cash at the door; both: counted once, not 80', () => {
+    expect(scoreCustomerTrust({ ...base, phoneVerified: false, emailVerified: false }).tier).toBe(
+      'T0',
+    );
+    expect(scoreCustomerTrust({ ...base, phoneVerified: true, emailVerified: true })).toEqual({
+      score: 40,
+      tier: 'T1',
+    });
+  });
+
+  // SPEC-020-11-SC02
+  it('SPEC-020-11-SC02 — no-shows still lower an e-mail customer: two of them mean T0', () => {
+    const t = scoreCustomerTrust({
+      ...base,
+      phoneVerified: false,
+      emailVerified: true,
+      deliveredOrders: 10,
+      accountAgeDays: 30,
+      noShows: 2,
+    });
+    expect(t.tier).toBe('T0');
   });
 });

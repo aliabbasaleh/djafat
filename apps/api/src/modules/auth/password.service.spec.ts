@@ -264,6 +264,25 @@ describe('SPEC-020-04 — log in with email and password, a code on a new device
     });
   });
 
+  // SPEC-020-04-SC02
+  it('SPEC-020-04-SC02 — SMS and WhatsApp on, number NOT confirmed: they are still not offered (review #10)', async () => {
+    const channelsOn = fakeConfig({
+      SMS_PROVIDER: 'http',
+      WHATSAPP_BUSINESS_NUMBER: '+23560000001',
+    });
+    const t = build(
+      [account({ passwordHash: HASH, phone: '+23566123456', phoneVerifiedAt: null })],
+      channelsOn,
+    );
+    const res = await t.service.login({ email: EMAIL, password: PASSWORD }, META);
+    if (res.status !== 'code_required') throw new Error('expected a challenge');
+    expect(res.channels).toEqual([
+      expect.objectContaining({ id: 'email', available: true }),
+      expect.objectContaining({ id: 'sms', available: false }),
+      expect.objectContaining({ id: 'whatsapp', available: false }),
+    ]);
+  });
+
   // SPEC-020-04-SC10
   it('SPEC-020-04-SC10 — with a confirmed number and SMS on, the code can go by SMS; otherwise 409 PHONE_NOT_CONFIRMED', async () => {
     const smsOn = fakeConfig({ SMS_PROVIDER: 'http' });
@@ -471,6 +490,38 @@ describe('SPEC-020-05 — forgot password, set or change it', () => {
         { currentPassword: PASSWORD, newPassword: 'AwaHassan-1990' },
         META,
       ),
-    ).rejects.toMatchObject({ issues: [expect.objectContaining({ path: ['newPassword'] })] });
+    ).rejects.toMatchObject({ issues: [expect.objectContaining({ path: 'newPassword' })] });
+  });
+});
+
+// Review FEAT-020 #4 — SPEC-020-05 R1 (v2): nothing tells a known address from an unknown one.
+describe('SPEC-020-05 R1 — « Mot de passe oublié ? » behaves the same for any address', () => {
+  // SPEC-020-05-SC09
+  it('SPEC-020-05-SC09 — known and unknown: three requests pass, the fourth is refused, for both; a code only for the known one', async () => {
+    const { service, otp } = build([account({ email: 'awa@example.td' })]);
+    for (const email of ['awa@example.td', 'personne@example.td']) {
+      for (let i = 0; i < 3; i += 1)
+        await expect(service.forgot(email, META.ip)).resolves.toBeUndefined();
+      await expect(service.forgot(email, META.ip)).rejects.toMatchObject({
+        response: { code: 'RATE_LIMITED' },
+      });
+    }
+    expect(otp.sent.map((s) => s.to.target)).toEqual([
+      'awa@example.td',
+      'awa@example.td',
+      'awa@example.td',
+    ]);
+  });
+
+  // SPEC-020-05-SC09
+  it('SPEC-020-05-SC09 — known and unknown, both locked: the same 423', async () => {
+    const { service, otp } = build([account({ email: 'awa@example.td' })]);
+    for (const email of ['awa@example.td', 'personne@example.td']) {
+      otp.failures.set(email, 10);
+      await expect(service.forgot(email, META.ip)).rejects.toMatchObject({
+        response: { code: 'OTP_LOCKED' },
+      });
+    }
+    expect(otp.sent).toHaveLength(0);
   });
 });

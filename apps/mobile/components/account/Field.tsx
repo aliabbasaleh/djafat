@@ -21,7 +21,6 @@ export function Field({ label, error, secret = false, ...input }: FieldProps) {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={visible ? `Masquer : ${label}` : `Afficher : ${label}`}
-            accessibilityState={{ selected: visible }}
             onPress={() => setVisible((v) => !v)}
             hitSlop={8}
           >

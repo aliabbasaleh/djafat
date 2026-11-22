@@ -91,6 +91,8 @@ export interface OrderCancellationFacts {
 /** FEAT-015 — order-history facts about a customer (no time-of-day: the caller knows "now"). */
 export interface CustomerTrustFacts {
   readonly phoneVerified: boolean;
+  /** FEAT-020 (FEAT-020-Q26): a verified e-mail counts like a confirmed number. */
+  readonly emailVerified: boolean;
   readonly deliveredOrders: number;
   readonly noShows: number;
   readonly cancelAfterDispatch: number;

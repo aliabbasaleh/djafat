@@ -22,6 +22,22 @@ export function accountNoticeMessage(notice: AccountNotice): { subject: string; 
       ].join('\n'),
     };
   }
+  if (notice.kind === 'email_changed') {
+    return {
+      subject: 'L’adresse e-mail de votre compte DJAFAT a été changée',
+      text: [
+        'Bonjour,',
+        '',
+        `L'adresse e-mail de votre compte DJAFAT a été remplacée par ${notice.newAddress} le ${ndjamenaTime(notice.at)} (heure de N'Djamena).`,
+        'Cette adresse-ci ne sert plus à vous connecter.',
+        '',
+        "Si c'est vous, il n'y a rien à faire.",
+        "Si ce n'est pas vous, contactez DJAFAT tout de suite : quelqu'un utilise peut-être votre compte.",
+        '',
+        "L'équipe DJAFAT",
+      ].join('\n'),
+    };
+  }
   return {
     subject: 'Votre mot de passe DJAFAT a été modifié',
     text: [

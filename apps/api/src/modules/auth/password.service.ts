@@ -7,8 +7,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ZodError } from 'zod';
-import { PASSWORD_REJECTION_MESSAGES, evaluatePassword } from '@djafat/core';
+import { FieldValidationError, PASSWORD_REJECTION_MESSAGES, evaluatePassword } from '@djafat/core';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AppConfigService } from '../../common/config/config.service';
 import { AuditService } from '../../common/audit/audit.service';
@@ -219,10 +218,14 @@ export class PasswordService {
   async forgot(email: string, ip: string | null): Promise<void> {
     if (ip) await this.otp.consumeIpBudget(ip); // charged for unknown addresses too
     const owner = await this.users.findByVerifiedEmail(email);
-    if (!owner) return;
-    await this.otp.requestCode({ channel: 'email', target: email }, 'reset_password', ip, {
-      ipCharged: true,
-    });
+    // R1 (review #4): the same budgets, lock, answer and time for any address.
+    await this.otp.requestCodeIfOwned(
+      { channel: 'email', target: email },
+      'reset_password',
+      ip,
+      owner !== null,
+      { ipCharged: true },
+    );
   }
 
   /** R2, R3 — the new password already passed the schema (before the code was read). */
@@ -263,31 +266,41 @@ export class PasswordService {
   }
 
   /** R4 to R7 — « Mon profil ». The identity comes from the access token, never the body. */
+  /**
+   * The current password of a signed-in account (password change, and e-mail
+   * change since review #6), under the account's lock — 10 failures, 15 min.
+   * 403 `CURRENT_PASSWORD_INCORRECT`, not 401: the SDK must not take it for an
+   * expired session. Resolves `false` when the account has no password.
+   */
+  async assertCurrentPassword(
+    user: UserRecord,
+    currentPassword: string | undefined,
+  ): Promise<boolean> {
+    const hash = await this.users.getPasswordHash(user.id);
+    if (!hash) return false;
+    const lockTarget = user.email && user.emailVerifiedAt ? user.email : user.id;
+    await this.otp.assertNotLocked(lockTarget);
+    const valid = currentPassword ? await verifyPassword(currentPassword, hash) : false;
+    if (!valid) {
+      await this.otp.registerFailedAttempt(lockTarget);
+      throw new ForbiddenException({
+        code: 'CURRENT_PASSWORD_INCORRECT',
+        message: 'Mot de passe actuel incorrect.',
+      });
+    }
+    await this.otp.clearLock(lockTarget);
+    return true;
+  }
+
   async changePassword(
     actor: { userId: string; sessionId: string },
     input: { currentPassword?: string | undefined; newPassword: string },
     meta: RequestMeta,
   ): Promise<void> {
     const user = await this.users.getByIdOrThrow(actor.userId);
-    const hash = await this.users.getPasswordHash(user.id);
     const verifiedEmail = user.email && user.emailVerifiedAt ? user.email : null;
-
-    if (hash) {
-      const lockTarget = verifiedEmail ?? user.id;
-      await this.otp.assertNotLocked(lockTarget);
-      const valid = input.currentPassword
-        ? await verifyPassword(input.currentPassword, hash)
-        : false;
-      if (!valid) {
-        await this.otp.registerFailedAttempt(lockTarget);
-        // 403, not 401: the SDK must not take it for an expired session.
-        throw new ForbiddenException({
-          code: 'CURRENT_PASSWORD_INCORRECT',
-          message: 'Mot de passe actuel incorrect.',
-        });
-      }
-      await this.otp.clearLock(lockTarget);
-    } else if (!verifiedEmail) {
+    const hadPassword = await this.assertCurrentPassword(user, input.currentPassword);
+    if (!hadPassword && !verifiedEmail) {
       throw new ConflictException({
         code: 'EMAIL_REQUIRED',
         message: "Ajoutez d'abord votre adresse e-mail.",
@@ -300,12 +313,8 @@ export class PasswordService {
       fullName: user.fullName,
     });
     if (!verdict.ok) {
-      throw new ZodError([
-        {
-          code: 'custom',
-          path: ['newPassword'],
-          message: PASSWORD_REJECTION_MESSAGES[verdict.reason],
-        },
+      throw new FieldValidationError([
+        { path: 'newPassword', message: PASSWORD_REJECTION_MESSAGES[verdict.reason] },
       ]); // 422 VALIDATION_ERROR on the field
     }
 
@@ -322,7 +331,7 @@ export class PasswordService {
       entityId: user.id,
       ip: meta.ip,
       userAgent: meta.userAgent,
-      metadata: { first: !hash },
+      metadata: { first: !hadPassword },
     });
   }
 

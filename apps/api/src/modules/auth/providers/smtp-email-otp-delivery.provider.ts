@@ -1,7 +1,8 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createTransport, type Transporter } from 'nodemailer';
 import type { OtpDeliveryPort, OtpDeliveryPurpose } from '@djafat/types';
 import { AppConfigService } from '../../../common/config/config.service';
+import { emailDeliveryFailed } from '../email-delivery-errors';
 import { maskEmail } from '../masking';
 import { emailOtpMessage } from './email-otp-text';
 import { smtpSender, smtpSettingsFrom, smtpTransportOptions } from './smtp-options';
@@ -41,13 +42,7 @@ export class SmtpEmailOtpDeliveryProvider implements OtpDeliveryPort {
           ? String((err as { code: unknown }).code)
           : 'smtp error';
       this.logger.error(`OTP email delivery failed for ${to}: ${reason}`);
-      throw new HttpException(
-        {
-          code: 'OTP_DELIVERY_FAILED',
-          message: "Impossible d'envoyer l'e-mail, réessayez dans un instant.",
-        },
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
+      throw emailDeliveryFailed();
     }
   }
 

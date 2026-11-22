@@ -25,15 +25,34 @@ export {
 /** The account page (FEAT-020-Q04). */
 export const COMPTE_PATH = '/compte';
 
+/** The URL parser silently drops tabs and line breaks and reads `\\` as `/`. */
+function hasControlOrBackslash(value: string): boolean {
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    if (code < 0x20 || code === 0x7f || char === '\\') return true;
+  }
+  return false;
+}
+
+const LOCAL_ORIGIN = 'http://djafat.invalid';
+
 /**
  * Where to go after logging in (SPEC-020-10 R4): an internal path only — never
- * `//host` or a full URL, which would send the customer to another site.
+ * `//host` or a full URL, which would send the customer to another site. The
+ * target is resolved the way the browser will resolve it (`/\t/evil.example`
+ * becomes `https://evil.example/` once the tab is dropped), and only a path
+ * that stays on our own origin is kept (review FEAT-020 #1).
  */
 export function safeRedirect(target: string | null | undefined): string {
-  if (!target || !target.startsWith('/') || target.startsWith('//') || target.startsWith('/\\')) {
+  if (!target || !target.startsWith('/') || hasControlOrBackslash(target)) return '/';
+  let url: URL;
+  try {
+    url = new URL(target, LOCAL_ORIGIN);
+  } catch {
     return '/';
   }
-  return target;
+  if (url.origin !== LOCAL_ORIGIN) return '/';
+  return url.pathname + url.search + url.hash;
 }
 
 /** `/compte`, keeping a safe `redirect` (SPEC-020-07: the old `/connexion?redirect=X`). */

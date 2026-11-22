@@ -110,8 +110,8 @@ export class AuthService {
   async requestEmailLogin(email: string, ip: string | null): Promise<void> {
     const target = normalizeEmail(email);
     const owner = await this.users.findByVerifiedEmail(target);
-    if (!owner) return;
-    await this.otp.requestCode({ channel: 'email', target }, 'login', ip);
+    // FEAT-020 AC08 (review #4): the same budgets, lock, answer and time for any address.
+    await this.otp.requestCodeIfOwned({ channel: 'email', target }, 'login', ip, owner !== null);
   }
 
   /** Email login: same session path as SMS login. Never creates an account. */

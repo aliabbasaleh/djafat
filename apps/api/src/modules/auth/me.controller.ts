@@ -22,6 +22,7 @@ import {
   type PhoneVerifyInput,
 } from './dto/phone-link.schema';
 import type { RequestMeta } from './auth.service';
+import { EmailChangeService } from './email-change.service';
 import { PasswordService } from './password.service';
 import { PhoneLinkService } from './phone-link.service';
 import { ReqMeta } from './request-meta.decorator';
@@ -38,6 +39,7 @@ export class MeController {
     private readonly users: UsersService,
     private readonly auth: AuthService,
     private readonly passwords: PasswordService,
+    private readonly emailChange: EmailChangeService,
     private readonly phones: PhoneLinkService,
   ) {}
 
@@ -68,7 +70,7 @@ export class MeController {
     @Body(new ZodValidationPipe(EmailRequestSchema)) body: EmailRequestInput,
     @Req() req: FastifyRequest,
   ) {
-    await this.auth.requestEmailVerification(actor.userId, body.email, req.ip ?? null);
+    await this.emailChange.request(actor.userId, body, req.ip ?? null);
     return { status: 'sent' };
   }
 
@@ -79,9 +81,9 @@ export class MeController {
   confirmEmailVerification(
     @CurrentActor() actor: AuthenticatedActor,
     @Body(new ZodValidationPipe(EmailVerifySchema)) body: EmailVerifyInput,
-    @Req() req: FastifyRequest,
+    @ReqMeta() meta: RequestMeta,
   ) {
-    return this.auth.confirmEmailVerification(actor.userId, body.email, body.code, req.ip ?? null);
+    return this.emailChange.confirm(actor.userId, body, meta);
   }
 
   /**

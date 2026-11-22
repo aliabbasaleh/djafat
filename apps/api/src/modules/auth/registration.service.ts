@@ -1,11 +1,11 @@
 import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { UsersService } from '../users/users.service';
 import { ACCOUNT_NOTICE_PORT, type AccountNoticePort } from './account-notice.port';
 import { AuthService, type LoginResultDto, type RequestMeta } from './auth.service';
+import { emailDeliveryFailed, emailUnavailable } from './email-delivery-errors';
 import { OtpService } from './otp.service';
 import { hashPassword } from './password-hash.util';
 import { TrustedDeviceService } from './trusted-device.service';
@@ -45,6 +45,13 @@ const otpInvalid = () =>
  * `auth_challenges`, and its code is bound to it (`context`), so two pending
  * registrations for one address can never complete each other.
  */
+/** What a used address's pending registration holds: nothing that could create an account (R12). */
+const DECOY_PAYLOAD = { decoy: true } as const;
+
+function isDecoy(payload: unknown): boolean {
+  return typeof payload === 'object' && payload !== null && 'decoy' in payload;
+}
+
 @Injectable()
 export class RegistrationService {
   constructor(
@@ -77,25 +84,27 @@ export class RegistrationService {
     const expiresAt = new Date(Date.now() + REGISTRATION_TTL_MS);
     const target = { channel: 'email' as const, target: input.email };
 
-    // R3 (FEAT-020-Q16): an address already used gets a notice instead of a
-    // code, from the same budget, and the answer looks exactly the same.
-    if (await this.users.findByEmail(input.email)) {
-      await this.otp.consumeTargetBudget(target);
-      await this.notices.send({ kind: 'already_registered', to: input.email });
-      return { registrationId: randomUUID(), expiresAt: expiresAt.toISOString() };
-    }
-
+    // R3, R12 (FEAT-020-Q16, review #3): an address already used gets a notice
+    // instead of a code, and nothing tells it from a free one — not the answer,
+    // not a lock (checked first for both), not the time (both hash and store a
+    // pending registration), not what follows (`resend` and `verify` take the
+    // same path on the decoy row, which has no code and can never complete).
+    await this.otp.assertNotLocked(input.email);
     const passwordHash = await hashPassword(input.password);
+    const taken = (await this.users.findByEmail(input.email)) !== null;
     const row = await this.prisma.authChallenge.create({
       data: {
         kind: 'registration',
         email: input.email,
-        payload: { fullName: input.fullName, phone: input.phone, passwordHash },
+        payload: taken
+          ? DECOY_PAYLOAD
+          : { fullName: input.fullName, phone: input.phone, passwordHash },
         expiresAt,
       },
       select: { id: true },
     });
-    await this.otp.requestCode(target, 'register', ip, { context: row.id, ipCharged: true });
+    if (taken) await this.sendAlreadyRegistered(target);
+    else await this.otp.requestCode(target, 'register', ip, { context: row.id, ipCharged: true });
     return { registrationId: row.id, expiresAt: expiresAt.toISOString() };
   }
 
@@ -109,15 +118,22 @@ export class RegistrationService {
 
     await this.otp.verifyCode({ channel: 'email', target: row.email }, code, 'register', meta.ip, {
       context: row.id,
-    }); // throws OTP_INVALID / OTP_LOCKED
+    }); // throws OTP_INVALID / OTP_LOCKED — a decoy has no code, so it always stops here
+    if (isDecoy(row.payload)) throw otpInvalid();
 
     const payload = RegistrationPayload.parse(row.payload);
-    // R5, R8: one transaction; a number or address taken meanwhile -> 409.
-    const { userId } = await this.users.createRegisteredCustomer({ ...payload, email: row.email });
-    await this.prisma.authChallenge.updateMany({
-      where: { id: row.id, consumedAt: null },
-      data: { consumedAt: new Date() },
-    });
+    // R5, R8 (review #7): the account, its role and the consumed registration
+    // in ONE transaction; a number or address taken meanwhile -> 409.
+    const { userId } = await this.users.createRegisteredCustomer(
+      { ...payload, email: row.email },
+      async (tx) => {
+        const claimed = await tx.authChallenge.updateMany({
+          where: { id: row.id, consumedAt: null },
+          data: { consumedAt: new Date() },
+        });
+        if (claimed.count !== 1) throw otpInvalid();
+      },
+    );
     await this.audit.log({
       actorUserId: userId,
       action: 'AUTH_REGISTERED',
@@ -141,9 +157,23 @@ export class RegistrationService {
   async resend(registrationId: string, ip: string | null): Promise<void> {
     const row = await this.pending(registrationId);
     if (!row) return;
-    await this.otp.requestCode({ channel: 'email', target: row.email }, 'register', ip, {
-      context: row.id,
-    });
+    const target = { channel: 'email' as const, target: row.email };
+    if (isDecoy(row.payload)) {
+      // R12: the same budgets, lock and outcome as the code below.
+      if (ip) await this.otp.consumeIpBudget(ip);
+      await this.sendAlreadyRegistered(target);
+      return;
+    }
+    await this.otp.requestCode(target, 'register', ip, { context: row.id });
+  }
+
+  /** R3, R12: the decoy's "send" — same budget and lock as a code, same 503 when it cannot leave. */
+  private async sendAlreadyRegistered(target: { channel: 'email'; target: string }): Promise<void> {
+    await this.otp.consumeTargetBudget(target);
+    await this.otp.assertNotLocked(target.target);
+    const outcome = await this.notices.send({ kind: 'already_registered', to: target.target });
+    if (outcome === 'failed') throw emailDeliveryFailed();
+    if (outcome === 'unavailable') throw emailUnavailable();
   }
 
   private pending(id: string) {

@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { API_ERROR_CODES, type ApiErrorBody, type ApiErrorCode } from '@djafat/types';
-import { LedgerError, MoneyError, OrderTransitionError } from '@djafat/core';
+import { FieldValidationError, LedgerError, MoneyError, OrderTransitionError } from '@djafat/core';
 import { ZodError } from 'zod';
 import { CORRELATION_ID_HEADER } from '@djafat/config';
 
@@ -51,6 +51,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
         code: 'VALIDATION_ERROR',
         message: 'Request validation failed',
         details: exception.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+      };
+    }
+    if (exception instanceof FieldValidationError) {
+      return {
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        code: 'VALIDATION_ERROR',
+        message: exception.message,
+        details: exception.issues.map((i) => ({ path: i.path, message: i.message })),
       };
     }
     if (exception instanceof MoneyError) {

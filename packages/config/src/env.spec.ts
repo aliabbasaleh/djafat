@@ -223,7 +223,7 @@ describe('SPEC-020-01 — sending through the official Gmail account', () => {
     expect(env.EMAIL_FROM).toBeUndefined();
   });
 
-  it('SPEC-020-01-SC02 — the new platform defaults for password login', () => {
+  it('SPEC-020-04 R2, R9 — the new platform defaults for password login', () => {
     expect(PLATFORM_SETTINGS_DEFAULTS.password_login_rate_limit_per_ip).toEqual({
       limit: 50,
       window_seconds: 900,

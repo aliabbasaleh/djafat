@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { PASSWORD_REJECTION_MESSAGES, evaluatePassword, type PasswordContext } from '@djafat/core';
 import { EmailInputSchema } from './email.schema';
+import { MAX_RAW_PASSWORD } from './password-bounds.schema';
 
 /**
  * Password routes (FEAT-020, SPEC-020-04, SPEC-020-05). Every new password
@@ -8,9 +9,6 @@ import { EmailInputSchema } from './email.schema';
  */
 
 const OtpCode = z.string().regex(/^\d{6}$/, 'code must be 6 digits');
-
-/** A guard before NFKC and hashing; the rule itself caps at 128 characters. */
-const MAX_RAW_PASSWORD = 1024;
 
 /** A new password, the rules that need no context: length, common, simple (SPEC-020-02 R1-R4). */
 export const NewPasswordSchema = z

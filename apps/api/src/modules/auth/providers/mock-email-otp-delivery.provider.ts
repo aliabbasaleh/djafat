@@ -1,7 +1,8 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { OtpDeliveryPort } from '@djafat/types';
 import { RedisService } from '../../../common/redis/redis.service';
 import { AppConfigService } from '../../../common/config/config.service';
+import { emailUnavailable } from '../email-delivery-errors';
 
 /**
  * Dev/CI email transport (FEAT-007), same idea as `MockOtpDeliveryProvider`:
@@ -25,13 +26,7 @@ export class MockEmailOtpDeliveryProvider implements OtpDeliveryPort {
     locale: string;
   }): Promise<void> {
     if (this.config.isProduction) {
-      throw new HttpException(
-        {
-          code: 'EMAIL_UNAVAILABLE',
-          message: "La connexion par e-mail n'est pas disponible pour le moment.",
-        },
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
+      throw emailUnavailable();
     }
     await this.redis.client.set(mockEmailOtpKey(input.to), input.code, 'EX', input.ttlSeconds);
   }

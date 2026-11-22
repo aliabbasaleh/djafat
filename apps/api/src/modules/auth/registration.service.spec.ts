@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { RegistrationService } from './registration.service';
 import { verifyPassword } from './password-hash.util';
 import {
@@ -31,12 +31,12 @@ const INPUT = {
 
 function build(initial: Account[] = []) {
   const otp = fakeOtp();
-  const users = fakeUsers(initial);
+  const challenges = fakeChallenges();
+  const users = fakeUsers(initial, { tx: challenges.prisma });
   const sessions = fakeSessions();
   const devices = fakeDevices();
   const notices = fakeNotices();
   const audit = fakeAudit();
-  const challenges = fakeChallenges();
   const auth = realAuth(otp, users, sessions, audit.service);
   const service = new RegistrationService(
     challenges.prisma,
@@ -120,13 +120,17 @@ describe('SPEC-020-03 — create an account confirmed by an email code', () => {
   });
 
   // SPEC-020-03-SC04
-  it('SPEC-020-03-SC04 — an address already used: same answer, no registration, no code, the "already registered" notice', async () => {
+  it('SPEC-020-03-SC04 — an address already used: same answer, a decoy registration without data, no code, the "already registered" notice', async () => {
     const { service, otp, challenges, notices } = build([account({ email: 'awa@example.td' })]);
     const res = await service.request({ ...INPUT, phone: '+23566999999' }, META.ip);
 
     expect(Object.keys(res).sort()).toEqual(['expiresAt', 'registrationId']);
     expect(res.registrationId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(challenges.rows).toHaveLength(0);
+    // R3 (v2, review #3): a pending row like a real one, but holding nothing — no
+    // name, no number, no password hash — and no code: it can never complete.
+    expect(challenges.rows).toHaveLength(1);
+    expect(challenges.rows[0]).toMatchObject({ id: res.registrationId, email: 'awa@example.td' });
+    expect(challenges.rows[0]?.payload).toEqual({ decoy: true });
     expect(otp.sent).toHaveLength(0);
     expect(otp.consumeTargetBudget).toHaveBeenCalledWith({
       channel: 'email',
@@ -221,5 +225,70 @@ describe('SPEC-020-03 — create an account confirmed by an email code', () => {
 
     await service.resend('00000000-0000-4000-8000-999999999999', META.ip);
     expect(otp.sent).toHaveLength(2);
+  });
+});
+
+// Review FEAT-020 #3 — SPEC-020-03 R13: nothing tells a used address from a free one.
+describe('SPEC-020-03 R13 — a used address and a free one behave the same', () => {
+  const FREE = { ...INPUT, email: 'nouveau@example.td', phone: '+23566111111' };
+  const TAKEN = { ...INPUT, email: 'awa@example.td', phone: '+23566222222' };
+
+  // SPEC-020-03-SC11
+  it('SPEC-020-03-SC11 — both addresses locked: the same 423 OTP_LOCKED, nothing stored or sent', async () => {
+    const { service, otp, challenges, notices } = build([account({ email: 'awa@example.td' })]);
+    for (const email of [FREE.email, TAKEN.email]) otp.failures.set(email, 10);
+
+    await expect(service.request(FREE, META.ip)).rejects.toMatchObject({
+      response: { code: 'OTP_LOCKED' },
+    });
+    await expect(service.request(TAKEN, META.ip)).rejects.toMatchObject({
+      response: { code: 'OTP_LOCKED' },
+    });
+    expect(challenges.rows).toHaveLength(0);
+    expect(otp.sent).toHaveLength(0);
+    expect(notices.sent).toHaveLength(0);
+  });
+
+  // SPEC-020-03-SC12
+  it('SPEC-020-03-SC12 — the same budget: a request and two resends pass, the third resend is refused, for both', async () => {
+    const { service } = build([account({ email: 'awa@example.td' })]);
+    for (const input of [FREE, TAKEN]) {
+      const { registrationId } = await service.request(input, META.ip);
+      await service.resend(registrationId, META.ip);
+      await service.resend(registrationId, META.ip);
+      await expect(service.resend(registrationId, META.ip)).rejects.toMatchObject({
+        response: { code: 'RATE_LIMITED' },
+      });
+    }
+  });
+
+  // SPEC-020-03-SC13
+  it('SPEC-020-03-SC13 — wrong codes count the same: after 10, both registrations answer 423', async () => {
+    const { service, otp } = build([account({ email: 'awa@example.td' })]);
+    for (const input of [FREE, TAKEN]) {
+      const { registrationId } = await service.request(input, META.ip);
+      for (let i = 0; i < 10; i += 1) {
+        await expect(service.verify(registrationId, '000000', META)).rejects.toMatchObject({
+          response: { code: 'OTP_INVALID' },
+        });
+      }
+      await expect(service.verify(registrationId, '000000', META)).rejects.toMatchObject({
+        response: { code: 'OTP_LOCKED' },
+      });
+      expect(otp.failures.get(input.email)).toBe(10);
+    }
+  });
+
+  // SPEC-020-03-SC13
+  it('SPEC-020-03-SC13 — a notice that cannot leave fails like a code: 503 for the used address', async () => {
+    const { service, notices } = build([account({ email: 'awa@example.td' })]);
+    vi.mocked(notices.send).mockResolvedValueOnce('failed');
+    await expect(service.request(TAKEN, META.ip)).rejects.toMatchObject({
+      response: { code: 'OTP_DELIVERY_FAILED' },
+    });
+    vi.mocked(notices.send).mockResolvedValueOnce('unavailable');
+    await expect(service.request(TAKEN, META.ip)).rejects.toMatchObject({
+      response: { code: 'EMAIL_UNAVAILABLE' },
+    });
   });
 });

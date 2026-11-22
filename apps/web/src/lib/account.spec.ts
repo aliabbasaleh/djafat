@@ -36,6 +36,13 @@ describe('SPEC-020-07 — the account page', () => {
     expect(compteHref('/panier')).toBe('/compte?redirect=%2Fpanier');
     expect(compteHref('//evil.example')).toBe('/compte');
     expect(compteHref(null, 'inscription')).toBe('/compte?onglet=inscription');
+    // Review FEAT-020 #1: the URL parser drops tabs and line breaks and reads « \\ » as « / ».
+    expect(safeRedirect('/\t/evil.example')).toBe('/');
+    expect(safeRedirect('/\n\\evil.example')).toBe('/');
+    expect(safeRedirect('/\\evil.example')).toBe('/');
+    expect(safeRedirect('/ /evil.example')).toBe('/%20/evil.example');
+    expect(safeRedirect('/panier?etape=2#adresse')).toBe('/panier?etape=2#adresse');
+    expect(compteHref('/\t/evil.example')).toBe('/compte');
   });
 
   // SPEC-020-07-SC03
@@ -66,10 +73,13 @@ describe('SPEC-020-07 — the account page', () => {
     expect(invalid).toEqual({
       fields: { email: 'adresse e-mail invalide', password: 'Au moins 8 caractères.' },
       general: null,
+      code: 'VALIDATION_ERROR',
     });
     const taken = fieldErrorsFromApi(apiError(409, 'PHONE_ALREADY_USED'), fields, 'fallback');
     expect(taken.general).toBeNull();
     expect(taken.fields.phone).toMatch(/^Ce numéro a déjà un compte/);
+    // Review FEAT-020 #15: the « Se connecter » link keys off the code, not the message.
+    expect(taken.code).toBe('PHONE_ALREADY_USED');
   });
 
   // SPEC-020-07-SC05

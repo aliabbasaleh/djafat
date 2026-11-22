@@ -59,6 +59,8 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors<'password' | 'confirm'>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Review FEAT-020 #12: after a change of view, its first field takes the focus (not on first load). */
+  const [navigated, setNavigated] = useState(false);
 
   const whatsappLink = methods?.find((m) => m.id === 'whatsapp')?.link;
 
@@ -66,6 +68,7 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
     setError(null);
     setFieldErrors({});
     setView(next);
+    setNavigated(true);
   }
 
   /** Runs one server call with the busy flag and the error message of its real cause. */
@@ -315,6 +318,7 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
         </Stack>
         {error && <Alert tone="danger">{error}</Alert>}
         <Input
+          autoFocus={navigated}
           label="E-mail"
           type="email"
           autoComplete="email"
@@ -364,6 +368,7 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
         </Stack>
         {error && <Alert tone="danger">{error}</Alert>}
         <Input
+          autoFocus={navigated}
           label="Numéro de téléphone"
           type="tel"
           autoComplete="tel"
@@ -393,6 +398,7 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
     >
       {error && <Alert tone="danger">{error}</Alert>}
       <Input
+        autoFocus={navigated}
         label="E-mail"
         type="email"
         autoComplete="email"

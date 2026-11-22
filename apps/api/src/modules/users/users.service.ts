@@ -165,15 +165,20 @@ export class UsersService {
    * the password hash, and the `customer` role. The partial unique indexes
    * decide a race: 409 `PHONE_ALREADY_USED` or `EMAIL_ALREADY_USED`.
    */
-  async createRegisteredCustomer(input: {
-    readonly fullName: string;
-    readonly phone: string;
-    readonly email: string;
-    readonly passwordHash: string;
-  }): Promise<{ userId: string }> {
+  async createRegisteredCustomer(
+    input: {
+      readonly fullName: string;
+      readonly phone: string;
+      readonly email: string;
+      readonly passwordHash: string;
+    },
+    /** Runs first, in the same transaction (FEAT-020 SPEC-020-03 R5: the registration is consumed with the account). */
+    beforeCreate?: (tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<{ userId: string }> {
     const now = new Date();
     try {
       const user = await this.prisma.$transaction(async (tx) => {
+        if (beforeCreate) await beforeCreate(tx);
         const created = await tx.user.create({
           data: {
             phone: input.phone,

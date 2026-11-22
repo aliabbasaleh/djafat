@@ -9,12 +9,19 @@ import { buildPaymentsService, makePaymentsRaceDb, ORDER_ID } from './payments-t
 const DAY = new Date('2026-11-09T10:00:00Z'); // 11:00 in N'Djamena
 
 function trust(
-  facts: Partial<{ deliveredOrders: number; noShows: number; accountAgeDays: number }>,
+  facts: Partial<{
+    phoneVerified: boolean;
+    emailVerified: boolean;
+    deliveredOrders: number;
+    noShows: number;
+    accountAgeDays: number;
+  }>,
 ) {
   const orders = {
     getOwnerUserId: vi.fn(async () => 'cust-1'),
     getCustomerTrustSignals: vi.fn(async () => ({
       phoneVerified: true,
+      emailVerified: false,
       deliveredOrders: 0,
       noShows: 0,
       cancelAfterDispatch: 0,
@@ -110,5 +117,31 @@ describe('SPEC-015-02 — cash on delivery only within the customer’s trust', 
         randomUUID(),
       ),
     ).resolves.toMatchObject({ status: 'created' });
+  });
+});
+
+// FEAT-020 — SPEC-020-11 (FEAT-020-Q26): customers who signed up by e-mail.
+describe('SPEC-020-11 — cash on delivery for a customer who signed up by e-mail', () => {
+  // SPEC-020-11-SC03
+  it('SPEC-020-11-SC03 — verified e-mail, number not confirmed: cash allowed up to the T1 cap, not more', async () => {
+    const t = trust({ phoneVerified: false, emailVerified: true });
+    expect(await t.decide(ORDER_ID, money(10_000n, 'XAF'), DAY)).toMatchObject({
+      allowed: true,
+      tier: 'T1',
+    });
+    expect(await t.decide(ORDER_ID, money(10_001n, 'XAF'), DAY)).toMatchObject({
+      allowed: false,
+      cap: 10_000n,
+    });
+  });
+
+  // SPEC-020-11-SC03
+  it('SPEC-020-11-SC03 — neither the number nor the e-mail confirmed: no cash at the door', async () => {
+    const t = trust({ phoneVerified: false, emailVerified: false });
+    expect(await t.decide(ORDER_ID, money(1n, 'XAF'), DAY)).toMatchObject({
+      allowed: false,
+      tier: 'T0',
+      cap: 0n,
+    });
   });
 });

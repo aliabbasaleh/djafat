@@ -33,10 +33,18 @@ function build(
   opts: { verifiedOwner?: UserRecord | null; otpValid?: boolean; emailTaken?: boolean } = {},
 ) {
   const requested: Array<{ target: OtpTarget; purpose: string }> = [];
+  const charged: OtpTarget[] = [];
   const otp = {
     requestCode: vi.fn(async (target: OtpTarget, purpose: string) => {
       requested.push({ target, purpose });
     }),
+    // FEAT-020 AC08 (review #4): the budget is charged for any address, a code only for an owner.
+    requestCodeIfOwned: vi.fn(
+      async (target: OtpTarget, purpose: string, _ip: string | null, owned: boolean) => {
+        charged.push(target);
+        if (owned) requested.push({ target, purpose });
+      },
+    ),
     verifyCode: vi.fn(async () => {
       if (opts.otpValid === false) {
         throw new UnauthorizedException({
@@ -84,7 +92,7 @@ function build(
   } as unknown as TokenService;
   const audit = { log: vi.fn(async () => undefined) } as unknown as AuditService;
   const auth = new AuthService(otp, users, sessions, tokens, {} as MfaService, audit);
-  return { auth, requested, saved, sessions, audit };
+  return { auth, requested, charged, saved, sessions, audit };
 }
 
 describe('SPEC-007-02 — add and verify an email on one’s account', () => {
@@ -153,6 +161,8 @@ describe('SPEC-007-03 — log in with a code received by email', () => {
       unknown.auth.requestEmailLogin('nobody@example.td', META.ip),
     ).resolves.toBeUndefined();
     expect(unknown.requested).toEqual([]);
+    // FEAT-020 AC08: the same budget as a known address — nothing tells them apart.
+    expect(unknown.charged).toEqual([{ channel: 'email', target: 'nobody@example.td' }]);
   });
 
   // SPEC-007-03-SC03

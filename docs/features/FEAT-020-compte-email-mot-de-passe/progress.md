@@ -1,16 +1,16 @@
 # FEAT-020 — Avancement
 
-| Étape                   | Statut      | Date       | Notes                                                                                                     |
-| ----------------------- | ----------- | ---------- | --------------------------------------------------------------------------------------------------------- |
-| Intake                  | fait        | 2026-11-21 | `pnpm check:specs` : 0 erreur ; 3 maquettes lues ; correspondances ci-dessous                             |
-| Specs                   | fait        | 2026-11-21 | SPEC-020-01 à 10 ; chaque critère couvert ; `check:specs` 0 erreur                                        |
-| Grill-me                | fait        | 2026-11-21 | Q10 à Q25 en hypothèses techniques, aucune question bloquante ouverte ; specs `clarified` v1              |
-| Brief                   | fait        | 2026-11-21 | épingle SPEC-020-01@1 à SPEC-020-10@1 ; aucune arête de DAG nouvelle                                      |
-| Tests dérivés des specs | fait        | 2026-11-21 | chaque scénario automatisable cité par un test (voir « Tests »)                                           |
-| Implémentation          | fait        | 2026-11-21 | API, migration 0040, SDK, site, application ; `pnpm verify:fast` vert                                     |
-| Visuel                  | fait        | 2026-11-21 | 13 captures d'exécution (site), refaites le 2026-11-22 avec les icônes SVG ; mobile indisponible (MOB-01) |
-| Revue qualité           | interrompue | 2026-11-21 | sous-agent `spec-reviewer` arrêté par une limite d'usage ; à refaire avant la fusion                      |
-| PR                      | préparée    | 2026-11-22 | `pr.md` ; branche poussée à la demande de l'utilisateur ; PR GitHub à ouvrir sur demande explicite        |
+| Étape                   | Statut             | Date       | Notes                                                                                                              |
+| ----------------------- | ------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------ |
+| Intake                  | fait               | 2026-11-21 | `pnpm check:specs` : 0 erreur ; 3 maquettes lues ; correspondances ci-dessous                                      |
+| Specs                   | fait               | 2026-11-21 | SPEC-020-01 à 10 ; chaque critère couvert ; `check:specs` 0 erreur                                                 |
+| Grill-me                | fait               | 2026-11-21 | Q10 à Q25 en hypothèses techniques, aucune question bloquante ouverte ; specs `clarified` v1                       |
+| Brief                   | fait               | 2026-11-21 | épingle SPEC-020-01@1 à SPEC-020-10@1 ; aucune arête de DAG nouvelle                                               |
+| Tests dérivés des specs | fait               | 2026-11-21 | chaque scénario automatisable cité par un test (voir « Tests »)                                                    |
+| Implémentation          | fait               | 2026-11-21 | API, migration 0040, SDK, site, application ; `pnpm verify:fast` vert                                              |
+| Visuel                  | fait               | 2026-11-21 | 13 captures d'exécution (site), refaites le 2026-11-22 avec les icônes SVG ; mobile indisponible (MOB-01)          |
+| Revue qualité           | corrections faites | 2026-11-22 | revue 1 (sous-agent `spec-reviewer`) : 2 bloquants, 4 majeurs, tous traités (`review.md`) ; revue 2 ciblée à venir |
+| PR                      | préparée           | 2026-11-22 | `pr.md` mis à jour ; ouverture sur GitHub après la revue 2 (l'utilisateur a demandé « Ship it now »)               |
 
 ## Intake (2026-11-21)
 
@@ -117,6 +117,29 @@ Piège trouvé : un mot de passe collé avec ses espaces et sans guillemets cass
 shell n'en garde rien) ; `.env.example` et le guide disent maintenant « sans espaces ou entre
 guillemets ».
 
+## Revue indépendante et corrections (2026-11-22)
+
+Revue 1 (`review.md`) : corrections requises. Constats et suite :
+
+- **Bloquants** : redirection ouverte par un caractère de contrôle (`safeRedirect` résout désormais
+  la cible comme le navigateur) ; commande au téléphone qui confirmait un numéro seulement saisi
+  (refus 409 décidé par l'utilisateur, FEAT-020-Q27, SPEC-020-06 R7).
+- **Majeurs** : l'inscription, « Mot de passe oublié ? » et la connexion par code e-mail ne révèlent
+  plus si une adresse a un compte (inscription leurre, mêmes verrou, budgets et délais, envoi en
+  arrière-plan ; SPEC-020-03 R13, R14, SPEC-020-05 R1) ; paiement à la livraison pour un e-mail
+  vérifié (Q26, SPEC-020-11) ; changer d'e-mail demande le mot de passe actuel, alerte l'ancienne
+  adresse et oublie les appareils (Q28, SPEC-020-12).
+- **Mineurs** : transaction unique de l'inscription, `FieldValidationError` (core) au lieu d'une
+  `ZodError`, faux fidèles (verrou, budget), tests HTTP de `/me/password` et `/me/phone`, focus
+  après un changement de vue, bouton « Afficher » annoncé une fois, « Vérifier » à l'étape du code,
+  lien « Se connecter » d'après le code d'erreur, retour arrière de 0040 écrit en SQL, préfixes de
+  test.
+
+Tests : API 108 fichiers et 1 062 tests puis, après les derniers ajouts, auth et common 277 ; SDK,
+site et application : typage et tests verts ; intégration complète sur base neuve : 13 fichiers,
+dont `customer-account.int.spec.ts` 9/9 (6 cas nouveaux). Deux anciens cas d'intégration attendaient
+le code tout de suite : ils l'attendent maintenant, l'envoi étant en arrière-plan (même oracle).
+
 ## Trouvés en route (2026-11-21)
 
 - **CORS (préexistant, corrigé ici)** : `@fastify/cors` n'autorise par défaut que GET, HEAD,
@@ -148,4 +171,5 @@ versionnée). Verdict : aucun nouvel échec, pas « tout vert » (1 indisponible
 
 ## Reste à faire
 
-- Specs, brief, grill-me, tests, implémentation, visuel, revue, PR.
+- Revue 2 ciblée sur les corrections, `verify --full`, capture de « Mon profil » (SPEC-020-12-SC06),
+  puis la PR GitHub.

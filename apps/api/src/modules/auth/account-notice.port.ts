@@ -7,10 +7,24 @@
  */
 export type AccountNotice =
   | { readonly kind: 'already_registered'; readonly to: string }
-  | { readonly kind: 'password_changed'; readonly to: string; readonly at: Date };
+  | { readonly kind: 'password_changed'; readonly to: string; readonly at: Date }
+  /** FEAT-020 SPEC-020-12: sent to the OLD address; `newAddress` is already masked. */
+  | {
+      readonly kind: 'email_changed';
+      readonly to: string;
+      readonly newAddress: string;
+      readonly at: Date;
+    };
+
+/**
+ * What became of a notice: accepted by the mail server, not possible on this
+ * deployment (the mock in production), or failed. A provider never throws; a
+ * caller that must fail like a code transport maps it (review FEAT-020 #3).
+ */
+export type NoticeOutcome = 'sent' | 'unavailable' | 'failed';
 
 export interface AccountNoticePort {
-  send(notice: AccountNotice): Promise<void>;
+  send(notice: AccountNotice): Promise<NoticeOutcome>;
 }
 
 export const ACCOUNT_NOTICE_PORT = Symbol('ACCOUNT_NOTICE_PORT');

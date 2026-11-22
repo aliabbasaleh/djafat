@@ -1,7 +1,7 @@
 ---
 feature: FEAT-020
 # prettier-ignore
-specs: [SPEC-020-01@1, SPEC-020-02@1, SPEC-020-03@1, SPEC-020-04@1, SPEC-020-05@1, SPEC-020-06@1, SPEC-020-07@1, SPEC-020-08@1, SPEC-020-09@1, SPEC-020-10@1]
+specs: [SPEC-020-01@1, SPEC-020-02@1, SPEC-020-03@2, SPEC-020-04@1, SPEC-020-05@2, SPEC-020-06@2, SPEC-020-07@1, SPEC-020-08@1, SPEC-020-09@1, SPEC-020-10@1, SPEC-020-11@1, SPEC-020-12@1]
 ---
 
 # FEAT-020 — Brief d'exécution
@@ -143,6 +143,34 @@ avec les dépendances communes déjà utilisées par `otp.service.ts` (`platform
 
 Un test entièrement simulé (faux Prisma, faux Redis) n'est pas une preuve d'intégration : les
 scénarios SC10/SC11/SC08 tournent sur PostgreSQL et Redis réels (`pnpm --filter @djafat/api test:int`).
+
+## Corrections après la revue indépendante (2026-11-22)
+
+Revue 1 (`review.md`) : 2 constats bloquants, 4 majeurs. Décisions de l'utilisateur :
+FEAT-020-Q26 à Q28 ; choix techniques : Q29 à Q31.
+
+| Fichier                                                                | Changement                                                                                                | Couche                   |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `apps/web/src/lib/account.ts`                                          | `safeRedirect` résout la cible comme le navigateur, refuse caractères de contrôle et `\` (revue n° 1)     | client-logic             |
+| `apps/api/src/modules/admin/phone-orders.service.ts`                   | refus 409 `PHONE_NOT_CONFIRMED` (SPEC-020-06 R7)                                                          | application              |
+| `apps/api/src/modules/auth/registration.service.ts`                    | inscription leurre, verrou et hachage avant l'embranchement, transaction unique (SPEC-020-03 R3, R5, R13) | application              |
+| `apps/api/src/modules/auth/otp.service.ts`                             | `requestCodeIfOwned`, option `targetCharged` (SPEC-020-03 R14, SPEC-020-05 R1)                            | application              |
+| `apps/api/src/modules/auth/account-notice.port.ts` et ses fournisseurs | l'avis rend son issue (`sent`, `unavailable`, `failed`) ; avis `email_changed`                            | port, adaptateur         |
+| `apps/api/src/modules/auth/email-change.service.ts`                    | _nouveau_ : mot de passe actuel, alerte, appareils oubliés (SPEC-020-12)                                  | application              |
+| `apps/api/src/common/errors/field-validation.error.ts`                 | _nouveau_ : 422 par champ sans `ZodError` dans un service (revue n° 8)                                    | transport                |
+| `packages/core/src/trust/cod-trust.ts`, `packages/types/src/ports.ts`  | `emailVerified` compte comme le numéro (SPEC-020-11)                                                      | domaine, contrat         |
+| `apps/web/src/app/profil/page.tsx`, `packages/sdk/src/auth.ts`         | « Mot de passe actuel » pour changer d'e-mail                                                             | présentation, adaptateur |
+
+| Scénario                | Niveau                                    | Fichier de test                                                                   | Oracle                                                                                          |
+| ----------------------- | ----------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| SPEC-020-03-SC11 à SC13 | use case (faux fidèle : verrou et budget) | `registration.service.spec.ts`                                                    | « mêmes 423, 429 et 503 pour une adresse prise et une libre »                                   |
+| SPEC-020-03-SC11        | intégration                               | `customer-account.int.spec.ts`                                                    | « les deux répondent 423 `OTP_LOCKED` »                                                         |
+| SPEC-020-03-SC14        | use case                                  | `otp.service.spec.ts`                                                             | « un envoi qui échoue est journalisé, sans l'adresse, et ne change pas la réponse »             |
+| SPEC-020-05-SC09        | use case et intégration                   | `password.service.spec.ts`, `otp.service.spec.ts`, `customer-account.int.spec.ts` | « trois fois 202 puis 429, pour les deux »                                                      |
+| SPEC-020-06-SC08        | use case                                  | `phone-orders.service.spec.ts`                                                    | « 409 `PHONE_NOT_CONFIRMED`, sans confirmer le numéro ni enregistrer d'adresse ou de commande » |
+| SPEC-020-11-SC01 à SC03 | domaine, use case                         | `cod-trust.spec.ts` (core et payments)                                            | « score 40, niveau T1, plafond 10 000 XAF »                                                     |
+| SPEC-020-12-SC01 à SC05 | use case et intégration                   | `email-change.service.spec.ts`, `customer-account.int.spec.ts`                    | « 403 `CURRENT_PASSWORD_INCORRECT` et aucun code » ; « l'ancienne adresse reçoit l'alerte »     |
+| SPEC-020-12-SC06        | manuel                                    | capture de « Mon profil »                                                         | « le champ « Mot de passe actuel » apparaît »                                                   |
 
 ## Commandes de vérification
 

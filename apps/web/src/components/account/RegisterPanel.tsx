@@ -34,6 +34,8 @@ export function RegisterPanel({ onSignedIn, onGoToLogin }: RegisterPanelProps) {
   const [values, setValues] = useState<RegisterFormValues>(EMPTY);
   const [errors, setErrors] = useState<FieldErrors<RegisterField>>({});
   const [general, setGeneral] = useState<string | null>(null);
+  /** The last API error's code: the « Se connecter » link under the number depends on it. */
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [registration, setRegistration] = useState<{ id: string; email: string } | null>(null);
 
@@ -47,6 +49,7 @@ export function RegisterPanel({ onSignedIn, onGoToLogin }: RegisterPanelProps) {
       if (field === 'password') delete next.confirm;
       return next;
     });
+    if (field === 'phone') setErrorCode(null);
   };
 
   async function submit() {
@@ -67,6 +70,7 @@ export function RegisterPanel({ onSignedIn, onGoToLogin }: RegisterPanelProps) {
       const mapped = fieldErrorsFromApi(err, FIELDS, "L'inscription n'a pas pu être envoyée.");
       setErrors(mapped.fields);
       setGeneral(mapped.general);
+      setErrorCode(mapped.code);
     } finally {
       setBusy(false);
     }
@@ -79,7 +83,7 @@ export function RegisterPanel({ onSignedIn, onGoToLogin }: RegisterPanelProps) {
         intro={`Entrez le code à 6 chiffres envoyé à ${maskEmail(registration.email)} (valable 5 min).`}
         busy={busy}
         error={general}
-        submitLabel="Créer mon compte"
+        submitLabel="Vérifier"
         onSubmit={(code) => {
           void (async () => {
             setGeneral(null);
@@ -108,7 +112,7 @@ export function RegisterPanel({ onSignedIn, onGoToLogin }: RegisterPanelProps) {
     );
   }
 
-  const phoneTaken = errors.phone?.startsWith('Ce numéro a déjà un compte') ?? false;
+  const phoneTaken = errorCode === 'PHONE_ALREADY_USED' && Boolean(errors.phone);
 
   return (
     <form

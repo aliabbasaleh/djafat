@@ -3,10 +3,15 @@
 -- registrations and password logins waiting for their email code, devices a
 -- customer chose to remember, and codes bound to the request that asked them.
 -- Owned by module `auth` (users columns: `users`). Purely additive.
--- Rollback: DROP TABLE trusted_devices; DROP TABLE auth_challenges;
+-- Rollback, in this order (passwords are lost; accounts stay reachable by e-mail code):
+--   DROP TABLE trusted_devices; DROP TABLE auth_challenges;
 --   DELETE FROM otp_codes WHERE purpose IN ('login_device', 'reset_password', 'verify_phone');
---   ALTER TABLE otp_codes DROP COLUMN context; restore the CHECK of 0030;
---   ALTER TABLE users DROP COLUMN password_updated_at, DROP COLUMN password_hash.
+--   ALTER TABLE otp_codes DROP CONSTRAINT otp_codes_purpose_check;
+--   ALTER TABLE otp_codes ADD CONSTRAINT otp_codes_purpose_check
+--     CHECK (purpose IN ('login', 'register', 'change_phone', 'verify_email'));  -- as in 0030
+--   ALTER TABLE otp_codes DROP COLUMN context;
+--   ALTER TABLE users DROP COLUMN password_updated_at, DROP COLUMN password_hash;
+--   DELETE FROM _prisma_migrations WHERE migration_name = '0040_customer_accounts';
 
 -- scrypt hash (`scrypt$N$r$p$salt$hash`, SPEC-020-02 R7); never the password.
 ALTER TABLE users ADD COLUMN password_hash text;

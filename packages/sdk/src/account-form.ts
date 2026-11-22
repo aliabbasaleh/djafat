@@ -108,8 +108,14 @@ export function fieldErrorsFromApi<F extends string>(
   err: unknown,
   fields: readonly F[],
   fallback: string,
-): { readonly fields: FieldErrors<F>; readonly general: string | null } {
+): {
+  readonly fields: FieldErrors<F>;
+  readonly general: string | null;
+  /** The API error code, so a screen can react to a cause without reading a message (review FEAT-020 #15). */
+  readonly code: string | null;
+} {
   const out: FieldErrors<F> = {};
+  const code = err instanceof ApiClientError ? err.code : null;
   const has = (f: string): f is F => (fields as readonly string[]).includes(f);
   if (err instanceof ApiClientError) {
     if (err.code === 'VALIDATION_ERROR' && Array.isArray(err.details)) {
@@ -117,7 +123,7 @@ export function fieldErrorsFromApi<F extends string>(
         const field = typeof d.path === 'string' ? d.path.split('.')[0] : undefined;
         if (field && has(field) && typeof d.message === 'string') out[field] ??= d.message;
       }
-      if (Object.keys(out).length > 0) return { fields: out, general: null };
+      if (Object.keys(out).length > 0) return { fields: out, general: null, code };
     }
     const byCode: Partial<Record<string, string>> = {
       PHONE_ALREADY_USED: 'phone',
@@ -127,10 +133,10 @@ export function fieldErrorsFromApi<F extends string>(
     const field = byCode[err.code];
     if (field && has(field)) {
       out[field] = accountErrorMessage(err, fallback);
-      return { fields: out, general: null };
+      return { fields: out, general: null, code };
     }
   }
-  return { fields: out, general: accountErrorMessage(err, fallback) };
+  return { fields: out, general: accountErrorMessage(err, fallback), code };
 }
 
 export interface ChannelButton {

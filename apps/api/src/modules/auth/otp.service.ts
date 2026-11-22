@@ -34,6 +34,8 @@ export interface OtpRequestOptions {
   readonly context?: string;
   /** The caller already charged this request's network budget (`consumeIpBudget`). */
   readonly ipCharged?: boolean;
+  /** The caller already charged this target's budget (`consumeTargetBudget`). */
+  readonly targetCharged?: boolean;
 }
 
 /**
@@ -90,6 +92,33 @@ export class OtpService {
     return this.verifyCode({ channel: 'sms', target: phone }, code, purpose, ip);
   }
 
+  /**
+   * FEAT-020 (review #3, #4; SPEC-020-03 R12, SPEC-020-05 R1, AC08): a code to an
+   * address that may or may not belong to an account. Both cases spend the same
+   * budgets and meet the same lock first; the code itself then leaves in the
+   * background and a delivery failure is only logged — so neither the answer,
+   * a 429 or 423, a 503 nor the response time tells whether the address has an
+   * account. The log line names the channel, never the address.
+   */
+  async requestCodeIfOwned(
+    to: OtpTarget,
+    purpose: OtpPurpose,
+    ip: string | null,
+    owned: boolean,
+    options: Pick<OtpRequestOptions, 'ipCharged'> = {},
+  ): Promise<void> {
+    if (ip && !options.ipCharged) await this.consumeIpBudget(ip);
+    await this.consumeTargetBudget(to);
+    await this.assertNotLocked(to.target);
+    if (!owned) return;
+    void this.requestCode(to, purpose, ip, { ipCharged: true, targetCharged: true }).catch(
+      (err: unknown) => {
+        const reason = err instanceof Error ? err.message : 'unknown error';
+        this.logger.warn(`Code "${purpose}" not sent by ${to.channel}: ${reason}`);
+      },
+    );
+  }
+
   async requestCode(
     to: OtpTarget,
     purpose: OtpPurpose,
@@ -103,7 +132,7 @@ export class OtpService {
       throw smsUnavailable();
     }
     if (ip && !options.ipCharged) await this.consumeIpBudget(ip);
-    await this.consumeTargetBudget(to);
+    if (!options.targetCharged) await this.consumeTargetBudget(to);
 
     await this.assertNotLocked(to.target);
 

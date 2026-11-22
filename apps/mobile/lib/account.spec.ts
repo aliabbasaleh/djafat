@@ -39,6 +39,7 @@ describe('SPEC-020-08 — the app’s account screen', () => {
       'fallback',
     );
     expect(taken.fields.phone).toMatch(/^Ce numéro a déjà un compte/);
+    expect(taken.code).toBe('PHONE_ALREADY_USED'); // review FEAT-020 #15
     expect(accountErrorMessage(apiError(401, 'INVALID_CREDENTIALS'), 'fallback')).toBe(
       'E-mail ou mot de passe incorrect.',
     );

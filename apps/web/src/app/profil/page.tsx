@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { ApiClientError, type MeProfile } from '@djafat/sdk';
+import { ApiClientError, accountErrorMessage, type MeProfile } from '@djafat/sdk';
 import { Container, Heading, Text, Stack, cx } from '@djafat/ui';
 import { Alert, Button, Input } from '@/components/ui-client';
 import { api } from '@/lib/api';
@@ -32,6 +32,8 @@ export default function ProfilePage() {
   const [me, setMe] = useState<MeProfile | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  /** FEAT-020 SPEC-020-12 R1: an account with a password gives it to change its e-mail. */
+  const [emailPassword, setEmailPassword] = useState('');
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -98,11 +100,14 @@ export default function ProfilePage() {
     setBusy(true);
     setMessage(null);
     try {
-      await api.auth.requestEmailVerification(email);
+      await api.auth.requestEmailVerification(email, me?.hasPassword ? emailPassword : undefined);
       setCodeSent(true);
       setMessage({ tone: 'info', text: `Un code à 6 chiffres a été envoyé à ${email}.` });
-    } catch {
-      setMessage({ tone: 'danger', text: "Impossible d'envoyer le code. Vérifiez l'adresse." });
+    } catch (err) {
+      setMessage({
+        tone: 'danger',
+        text: accountErrorMessage(err, "Impossible d'envoyer le code. Vérifiez l'adresse."),
+      });
     } finally {
       setBusy(false);
     }
@@ -112,14 +117,18 @@ export default function ProfilePage() {
     setBusy(true);
     setMessage(null);
     try {
+      const replaced = Boolean(me?.email && me.emailVerified);
       const profile = await api.auth.confirmEmail(email, code);
       setMe(profile);
       setCodeSent(false);
       setCode('');
       setEmail('');
+      setEmailPassword('');
       setMessage({
         tone: 'success',
-        text: 'E-mail vérifié : vous pouvez maintenant vous connecter avec lui.',
+        text: replaced
+          ? 'E-mail changé : votre ancienne adresse a reçu une alerte, et vos appareils mémorisés vous redemanderont un code.'
+          : 'E-mail vérifié : vous pouvez maintenant vous connecter avec lui.',
       });
     } catch (err) {
       setMessage({
@@ -211,6 +220,16 @@ export default function ProfilePage() {
                 disabled={codeSent}
                 required
               />
+              {me.hasPassword && !codeSent && (
+                <Input
+                  label="Mot de passe actuel"
+                  type="password"
+                  autoComplete="current-password"
+                  value={emailPassword}
+                  onChange={(e) => setEmailPassword(e.target.value)}
+                  required
+                />
+              )}
               {codeSent && (
                 <Input
                   label="Code reçu par e-mail"

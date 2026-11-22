@@ -85,12 +85,23 @@ export class PhoneOrdersService {
       input.customerPhone,
       null,
     );
+    const existing = await this.users.getByIdOrThrow(customerId);
+    // FEAT-020 (SPEC-020-06 R7, FEAT-020-Q27): the number of an account created
+    // online was only TYPED at registration. Taking the order would confirm it
+    // and file the caller's order and address in that account — a stranger's if
+    // the number was mistyped. Refused until the account's owner confirms it.
+    if (!isNew && !existing.phoneVerifiedAt && (existing.emailVerifiedAt || existing.hasPassword)) {
+      throw new ConflictException({
+        code: 'PHONE_NOT_CONFIRMED',
+        message:
+          "Ce numéro est enregistré sur un compte créé en ligne, et son propriétaire ne l'a pas encore confirmé. Pour protéger ce compte, la commande ne peut pas être prise sous ce numéro : le client peut commander sur le site ou dans l'application, ou donner un autre numéro.",
+      });
+    }
     // FEAT-015: the operator is speaking with the owner of this number, which
     // proves possession as much as an SMS code does.
     await this.users.markPhoneVerified(customerId);
-    if (input.customerName) {
-      const existing = await this.users.getByIdOrThrow(customerId);
-      if (!existing.fullName) await this.users.updateFullName(customerId, input.customerName);
+    if (input.customerName && !existing.fullName) {
+      await this.users.updateFullName(customerId, input.customerName);
     }
 
     const address = await this.findOrCreateAddress(customerId, input.address);
