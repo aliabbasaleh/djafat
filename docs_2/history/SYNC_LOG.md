@@ -58,6 +58,8 @@ scanning had passed. No new finding.
 
 - The production server (no access from here); the « Mon profil » screen was checked by screenshot only.
 
+---
+
 ## S-038 — 2026-11-22 — three features confirmed by the user (FEAT-021 to FEAT-023)
 
 Short entry (our own docs commit on `feat/equipe-connexion-email`): the user's requests of 2026-11-22, transcribed and

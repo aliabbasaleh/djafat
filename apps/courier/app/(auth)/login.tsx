@@ -310,7 +310,6 @@ export default function LoginScreen() {
             <Text style={styles.label}>Mot de passe</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ selected: showPassword }}
               onPress={() => setShowPassword((v) => !v)}
             >
               <Text style={styles.toggle}>{showPassword ? 'Masquer' : 'Afficher'}</Text>

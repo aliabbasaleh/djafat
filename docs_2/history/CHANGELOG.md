@@ -42,6 +42,8 @@ neither the password nor an alert. **Changed by the user's decisions:** a verifi
 delivery at level T1; phone orders are refused for such numbers until confirmed. **Learned:** a fix can
 open its own hole (the first redirect fix normalised `/..//x` into `//x`) — the second review caught it.
 
+---
+
 ## 2026-11-22 — Sync S-038: three features confirmed (FEAT-021, FEAT-022, FEAT-023)
 
 **Added (plans, no code):** the user decided to switch SMS off until DJAFAT has an API, so admins, restaurants and

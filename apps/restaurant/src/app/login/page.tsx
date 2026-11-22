@@ -282,7 +282,6 @@ export default function LoginPage() {
                   <button
                     type="button"
                     className={cx(styles['toggle'])}
-                    aria-pressed={showPassword}
                     onClick={() => setShowPassword((v) => !v)}
                   >
                     {showPassword ? 'Masquer' : 'Afficher'}
