@@ -1,0 +1,21 @@
+FEAT-022-VIS04 — apps/restaurant, accueil d'un restaurant pas encore validé, 1280x800
+Nature : attendu. Étapes choisies par l'utilisateur le 2026-11-22
+(question « Resto info » : les quatre blocs).
+
+ DJAFAT Restaurant — Chez Fatimé                              Fatimé ▾
+ ──────────────────────────────────────────────────────────────────────
+  Votre restaurant n'est pas encore visible des clients.
+  Complétez les 4 étapes, puis envoyez-le à DJAFAT pour validation.
+
+  ✅ 1. Emplacement          point sur la carte, adresse, repère     [Modifier]
+  ⬜ 2. Horaires et menu     horaires d'ouverture, au moins un plat  [Compléter]
+  ⬜ 3. Logo et photos       logo, photo de couverture               [Compléter]
+  ⬜ 4. Papiers et paiement  RCCM ou NIF, pièce d'identité du        [Compléter]
+                             responsable, numéro Mobile Money
+
+  [ Envoyer pour validation ]   (grisé tant qu'une étape manque)
+
+ États suivants :
+  ⏳ En cours de vérification par DJAFAT — vous recevrez un e-mail.
+  ❌ Refusé : « La photo du RCCM est illisible. » — corrigez, puis renvoyez.
+  ✅ Validé : votre restaurant est visible des clients.

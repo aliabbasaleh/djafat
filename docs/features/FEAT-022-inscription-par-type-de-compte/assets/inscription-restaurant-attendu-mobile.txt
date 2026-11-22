@@ -1,0 +1,33 @@
+FEAT-022-VIS03 — apps/web /compte, inscription « Restaurant », 390x844 (mobile)
+Nature : attendu. Champs choisis par l'utilisateur le 2026-11-22
+(question « Restaurant » : « Name + neighbourhood »).
+
+  ← Changer de type             Restaurant
+
+  Vous (responsable)
+  Nom complet
+  [ Fatimé Hassan                    ]
+  Téléphone
+  [ 66 00 00 00                      ]
+  E-mail (votre identifiant)
+  [ vous@gmail.com                   ]
+  Mot de passe                   👁 Afficher
+  [ ••••••••                         ]
+  Confirmer le mot de passe
+  [ ••••••••                         ]
+
+  Votre restaurant
+  Nom du restaurant
+  [ Chez Fatimé                      ]
+  Quartier (N'Djamena)
+  [ Klémat                         ▾ ]
+
+  [         Créer mon compte         ]
+
+ Après le code reçu par e-mail (étape de FEAT-020) :
+
+  ✅ Compte restaurant créé
+  « Chez Fatimé » n'est pas encore visible des clients. Complétez-le sur
+  la console restaurant : emplacement, horaires et menu, photos, papiers
+  et Mobile Money. DJAFAT vérifie, puis le met en ligne.
+  [   Ouvrir la console restaurant   ]

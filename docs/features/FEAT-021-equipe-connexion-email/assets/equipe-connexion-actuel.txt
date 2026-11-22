@@ -1,0 +1,25 @@
+FEAT-021-VIS01 — écrans de connexion de l'équipe AUJOURD'HUI (2026-11-22)
+Nature : actuel, contextuel. Transcription du code, pas une capture :
+apps/admin/src/app/login/page.tsx, apps/restaurant/src/app/login/page.tsx,
+apps/courier/app/(auth)/login.tsx.
+
+ DJAFAT Admin            (« DJAFAT Restaurant », « DJAFAT Livreur »)
+ Connexion réservée au personnel administratif.
+   (« … aux comptes restaurant. », « Connexion livreur. »)
+
+  Numéro de téléphone
+  [ +23566000000                     ]
+  [         Recevoir le code         ]     (livreur : « Envoyer le code »)
+
+ puis :
+
+  Entrez le code envoyé au +235…
+  Code à 6 chiffres
+  [ 123456                           ]
+  [            Vérifier              ]
+  Changer de numéro
+
+Notes :
+- Le téléphone est le seul moyen de connexion ; le code part par SMS.
+- En production, ces SMS tombent dans une boîte de test du serveur
+  (docs/ROADMAP.md, « Fournisseur SMS réel ») : aucun vrai SMS.

@@ -1,0 +1,25 @@
+FEAT-022-VIS05 — apps/courier, accueil d'un livreur pas encore validé, 390x844 (mobile)
+Nature : attendu. Éléments choisis par l'utilisateur le 2026-11-22
+(question « Courier docs » : les quatre groupes).
+
+ DJAFAT Livreur
+ ─────────────────────────────────
+  Avant votre première course
+
+  ✅ Photo de votre visage
+  ⬜ Pièce d'identité (CNI ou passeport)
+  ⬜ Permis de conduire          (moto, voiture)
+  ⬜ Papiers du véhicule         (moto, voiture)
+     carte grise, assurance, plaque
+  ⬜ Numéro Mobile Money pour vos gains
+  ⬜ Contact en cas d'urgence
+
+  [   Envoyer pour validation   ]  (grisé tant qu'un élément manque)
+
+  ( En ligne )  impossible tant que DJAFAT ne vous a pas validé
+
+Notes :
+- Vélo et à pied : ni permis ni papiers du véhicule.
+- Les photos se prennent avec l'appareil photo ou depuis la galerie.
+- Mêmes états que le restaurant : en vérification, refusé avec le motif,
+  validé.
