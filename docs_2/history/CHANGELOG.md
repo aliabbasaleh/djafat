@@ -8,6 +8,18 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-22 — Sync S-039: FEAT-020 reviewed three times, corrected, ready for PR (0.24.2)
+
+**Verified:** `verify --full` on `4a785d0` (fresh database, mock e-mail): every check passes, e2e
+unavailable — no new failure; the third review found nothing left to fix. **Fixed before merge:** an
+open redirect after login; phone orders filing a caller's order into an e-mail account whose number
+was only typed; three ways to learn whether an address had an account; an e-mail change that needed
+neither the password nor an alert. **Changed by the user's decisions:** a verified e-mail opens cash on
+delivery at level T1; phone orders are refused for such numbers until confirmed. **Learned:** a fix can
+open its own hole (the first redirect fix normalised `/..//x` into `//x`) — the second review caught it.
+
+---
+
 ## 2026-11-22 — Sync S-037: first registration code received in a real inbox (FEAT-020, 0.24.2)
 
 **Verified:** the user received « Confirmez votre adresse e-mail DJAFAT » in DJAFAT's Gmail inbox (Inbox, not spam),

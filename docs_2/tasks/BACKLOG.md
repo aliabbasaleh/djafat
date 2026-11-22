@@ -492,7 +492,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-611 · Customer accounts by e-mail and password (FEAT-020) _(added 2026-11-21, sync S-035)_
 
-- **Area:** `auth`, `users`, migration 0040, `@djafat/sdk`, `apps/web`, `apps/mobile` · **Priority:** High · **Why:** the user's request of 2026-11-21 (`docs/features/FEAT-020-compte-email-mot-de-passe`) · **Status:** Implemented, verified on the branch `feat/compte-email-password` (unit, real PostgreSQL + Redis integration, browser run) — not on `main`; _(updated 2026-11-22, sync S-037)_ a real registration code reached DJAFAT's Gmail inbox (SPEC-020-01-SC06, local `.env`)
+- **Area:** `auth`, `users`, migration 0040, `@djafat/sdk`, `apps/web`, `apps/mobile` · **Priority:** High · **Why:** the user's request of 2026-11-21 (`docs/features/FEAT-020-compte-email-mot-de-passe`) · **Status:** Implemented, verified on the branch `feat/compte-email-password` (unit, real PostgreSQL + Redis integration, browser run) — not on `main`; _(updated 2026-11-22, sync S-037)_ a real registration code reached DJAFAT's Gmail inbox (SPEC-020-01-SC06, local `.env`); _(updated 2026-11-22, sync S-039)_ reviewed three times, corrected, `verify --full` without new failure — pull request next
 - **Done when:** merged into `main`; the official Gmail address and its Google app password set in the server's `.env.prod` (`EMAIL_PROVIDER=smtp`, `SMTP_USER`, `SMTP_PASSWORD`); a real registration code received in a real mailbox (SPEC-020-01-SC06, only the user holds the password).
 - **Test:** `pnpm --filter @djafat/api test:int -- test/customer-account.int.spec.ts`; on the server, register with a real address.
 
@@ -500,6 +500,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 - **Area:** `apps/mobile`, `auth` · **Priority:** Medium · **Why:** FEAT-020-Q09, Q21, Q23 · **Status:** Not started
 - **Done when:** a « Mon profil » screen in the app (password, number); a customer can change a mistyped number; deciding whether « Se déconnecter partout » also forgets remembered devices.
+- **Added from the FEAT-020 review** _(2026-11-22, sync S-039)_: an operational alert when an account e-mail cannot leave (codes now leave in the background); hide « Mot de passe oublié ? » when `/auth/methods` says e-mail is unavailable; decide how an account without a password guards its e-mail and first password against a stolen session; watch no-shows of new e-mail accounts (cash on delivery at T1).
 - **Test:** each with its own feature and specs.
 
 ### T-613 · Deploy the CORS fix _(added 2026-11-21, sync S-035)_

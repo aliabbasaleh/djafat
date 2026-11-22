@@ -10,6 +10,38 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-039 — 2026-11-22 — FEAT-020: independent review, corrections, ready for PR
+
+(S-038 belongs to the branch `feat/equipe-connexion-email`, not merged yet.)
+
+|                 |                                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Trigger**     | The user chose « Ship it now »: independent review, then pull request                                         |
+| **Range**       | `origin/main` unchanged (`96a88d3`, fetched); our branch `feat/compte-email-password`, `44d0fa4` to `610ca13` |
+| **Size**        | 3 commits: auth, web, admin (phone orders), core (trust rule), types, SDK, docs                               |
+| **Evidence**    | RUN — `verify --full` on `4a785d0`: no new failure, e2e unavailable; review 3 « prêt pour PR »                |
+| **Reviewed by** | Claude, in the session that wrote FEAT-020; three rounds of the `spec-reviewer` sub-agent                     |
+
+### Fixed (on the branch, before any merge)
+
+- An open redirect after login (a tab, a newline or `/..//` in `?redirect=`), measured by the reviewer.
+- A phone order confirmed a number only typed at an e-mail sign-up and filed the caller's order in that
+  account; it is now refused, 409 `PHONE_NOT_CONFIRMED` (user's decision FEAT-020-Q27).
+- Registration, « Mot de passe oublié ? » and e-mail code login told whether an address had an account
+  (lock, budget, delivery error, timing); they now behave the same for any address.
+- Changing the e-mail of an account with a password asked nothing: it now asks the current password,
+  alerts the old address and forgets remembered devices; its codes are bound to the account (Q28).
+
+### Changed
+
+- Cash on delivery: a verified e-mail counts like a confirmed number for trust level T1 (Q26).
+
+### Not verified
+
+- The production server (no access from here); the « Mon profil » screen was checked by screenshot only.
+
+---
+
 ## S-037 — 2026-11-22 — our docs commit on the FEAT-020 branch (0.24.2)
 
 Short entry (our own commit `d6481b8`, already described): the user received the registration code in DJAFAT's
