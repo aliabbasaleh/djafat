@@ -82,8 +82,22 @@ Corrections jugées justes par le relecteur : n° 2 (commandes au téléphone), 
 (oubli, code e-mail), 5 (paiement à la livraison), 6 (changement d'e-mail, hors constat 3), 7, 8,
 10, 11, 12 à 15 et 21.
 
+## Revue 3 (2026-11-22, ciblée, commit `4a785d0`)
+
+| #   | Sévérité      | Emplacement                                       | Constat                                                                                                                                             |
+| --- | ------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | note (résolu) | `apps/web/src/lib/account.ts:46-59`               | Redirection : 23 entrées essayées (segments `..`, `%2F`, `%5C`, `／`, U+3000, U+2028, `@`, `?//`, `#//`, `%252e`…), aucune ne sort du site (mesuré) |
+| 2   | note (résolu) | `packages/core/src/errors.spec.ts`                | Couverture de `core` refermée ; confirmée par `verify --full` sur `4a785d0`                                                                         |
+| 3   | note (résolu) | `auth.service.ts:83-107`                          | Codes `verify_email` liés au compte aux deux bouts ; aucun autre chemin n'écrit l'e-mail d'un compte existant                                       |
+| 4   | note          | `migrations/0040_customer_accounts/migration.sql` | Fichier identique octet pour octet (même SHA-256 à `c83efcb`, `34ce0d4`, `4a785d0`)                                                                 |
+| 5   | note          | `RegisterPanel.tsx:131`, `PhoneSection.tsx:73-88` | Focus : correct                                                                                                                                     |
+
+`verify --full` sur `4a785d0` (2026-11-22T14:34Z, `verification.md`) : tout passe, `e2e`
+indisponible — aucun nouvel échec.
+
 ## 3. Verdict
 
 Revue 1 : **corrections requises** — constats 1 et 2 (bloquants), 3 à 6 (majeurs), tous traités.
-Revue 2 : **corrections requises, étroites** — constats 1 à 3, corrigés ; vérification ciblée de ces
-trois corrections demandée (revue 3).
+Revue 2 : **corrections requises, étroites** — constats 1 à 3, corrigés.
+Revue 3 : **prêt pour PR**, `verify --full` sur `4a785d0` sans nouvel échec. Restent des notes
+suivies dans les risques de `pr.md` et la tâche T-612 (revue 2 n° 5, 6, 9).

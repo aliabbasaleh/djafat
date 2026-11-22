@@ -1,16 +1,16 @@
 # FEAT-020 — Avancement
 
-| Étape                   | Statut             | Date       | Notes                                                                                                              |
-| ----------------------- | ------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------ |
-| Intake                  | fait               | 2026-11-21 | `pnpm check:specs` : 0 erreur ; 3 maquettes lues ; correspondances ci-dessous                                      |
-| Specs                   | fait               | 2026-11-21 | SPEC-020-01 à 10 ; chaque critère couvert ; `check:specs` 0 erreur                                                 |
-| Grill-me                | fait               | 2026-11-21 | Q10 à Q25 en hypothèses techniques, aucune question bloquante ouverte ; specs `clarified` v1                       |
-| Brief                   | fait               | 2026-11-21 | épingle SPEC-020-01@1 à SPEC-020-10@1 ; aucune arête de DAG nouvelle                                               |
-| Tests dérivés des specs | fait               | 2026-11-21 | chaque scénario automatisable cité par un test (voir « Tests »)                                                    |
-| Implémentation          | fait               | 2026-11-21 | API, migration 0040, SDK, site, application ; `pnpm verify:fast` vert                                              |
-| Visuel                  | fait               | 2026-11-21 | 13 captures d'exécution (site), refaites le 2026-11-22 avec les icônes SVG ; mobile indisponible (MOB-01)          |
-| Revue qualité           | corrections faites | 2026-11-22 | revue 1 (sous-agent `spec-reviewer`) : 2 bloquants, 4 majeurs, tous traités (`review.md`) ; revue 2 ciblée à venir |
-| PR                      | préparée           | 2026-11-22 | `pr.md` mis à jour ; ouverture sur GitHub après la revue 2 (l'utilisateur a demandé « Ship it now »)               |
+| Étape                   | Statut   | Date       | Notes                                                                                                     |
+| ----------------------- | -------- | ---------- | --------------------------------------------------------------------------------------------------------- |
+| Intake                  | fait     | 2026-11-21 | `pnpm check:specs` : 0 erreur ; 3 maquettes lues ; correspondances ci-dessous                             |
+| Specs                   | fait     | 2026-11-21 | SPEC-020-01 à 10 ; chaque critère couvert ; `check:specs` 0 erreur                                        |
+| Grill-me                | fait     | 2026-11-21 | Q10 à Q25 en hypothèses techniques, aucune question bloquante ouverte ; specs `clarified` v1              |
+| Brief                   | fait     | 2026-11-21 | épingle SPEC-020-01@1 à SPEC-020-10@1 ; aucune arête de DAG nouvelle                                      |
+| Tests dérivés des specs | fait     | 2026-11-21 | chaque scénario automatisable cité par un test (voir « Tests »)                                           |
+| Implémentation          | fait     | 2026-11-21 | API, migration 0040, SDK, site, application ; `pnpm verify:fast` vert                                     |
+| Visuel                  | fait     | 2026-11-21 | 13 captures d'exécution (site), refaites le 2026-11-22 avec les icônes SVG ; mobile indisponible (MOB-01) |
+| Revue qualité           | fait     | 2026-11-22 | trois revues du sous-agent `spec-reviewer` : corrections faites, revue 3 « prêt pour PR » (`review.md`)   |
+| PR                      | préparée | 2026-11-22 | `pr.md` mis à jour ; ouverture sur GitHub après la revue 2 (l'utilisateur a demandé « Ship it now »)      |
 
 ## Intake (2026-11-21)
 
@@ -192,13 +192,15 @@ et `prisma migrate dev` refuserait une migration appliquée dont le contenu a ch
 
 ## Dernière vérification
 
-`node scripts/pipeline/verify.mjs --full` sur `96a88d3` + modifications (2026-11-22, base neuve
-`djafat_verify` pour l'intégration, `NODE_ENV` non exporté comme en CI) : `format`, `specs`,
+`node scripts/pipeline/verify.mjs --full` sur `4a785d0` (2026-11-22T14:34Z, base neuve `djafat_verify`,
+e-mail et SMS en faux pour les tests, `NODE_ENV` non exporté comme en CI) : `format`, `specs`,
 `hygiene`, `arch`, `pipeline-tooling`, `prisma`, `typecheck` 24/24, `lint` 24/24, `test` 24/24,
-`build` 16/16, `audit`, `test:int` — tous **pass** ; `e2e` **indisponible** (pas de suite E2E
-versionnée). Verdict : aucun nouvel échec, pas « tout vert » (1 indisponible). Rapport complet :
-`verification.md`.
+`build` 16/16, `audit`, `test:int` (57 s) — tous **pass** ; `e2e` **indisponible** (pas de suite E2E
+versionnée). Verdict : aucun nouvel échec, pas « tout vert » (1 indisponible). Les « modifications
+non commitées » du rapport sont les images de l'utilisateur sous `djafat/`, sans rapport avec la
+feature. Rapport complet : `verification.md`.
 
 ## Reste à faire
 
-- Revue 3 ciblée sur les trois dernières corrections, `verify --full` sur le commit, puis la PR GitHub.
+- Ouvrir la PR GitHub, fusionner quand les vérifications Linux et Windows sont vertes (accord de
+  l'utilisateur, « Ship it now »), puis mettre à jour le serveur.
