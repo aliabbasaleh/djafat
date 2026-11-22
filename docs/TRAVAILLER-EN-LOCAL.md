@@ -80,7 +80,7 @@ Pour envoyer de **vrais e-mails** depuis le Gmail officiel de DJAFAT :
 2. Dans `.env` : `SMTP_USER` = l'adresse Gmail, `SMTP_PASSWORD` = le mot de passe
    d'application : les 16 lettres **sans espaces** (ou entre guillemets :
    `SMTP_PASSWORD="abcd efgh ijkl mnop"` — des espaces sans guillemets cassent le
-   chargement du `.env`), puis `EMAIL_PROVIDER=smtp`.
+   chargement du `.env`), puis `EMAIL_PROVIDER=smtp`. Laisser `EMAIL_FROM` **vide** : les clients voient alors « DJAFAT » comme expéditeur (une adresse seule s'afficherait telle quelle).
 3. Relancer l'API. Ce mot de passe ne va **jamais** dans Git ni dans un message.
 
 Un compte Gmail gratuit envoie environ 500 e-mails par jour.

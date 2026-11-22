@@ -24,8 +24,7 @@ prêts et s'activent par la configuration quand DJAFAT aura une API.
 SPEC-020-01 à SPEC-020-10 (v1, `clarified`), les 15 critères FEAT-020-AC01 à AC15. Matrice :
 `node scripts/pipeline/check-specs.mjs --matrix FEAT-020` — chaque scénario a un test, sauf les
 preuves manuelles : captures du site (SPEC-020-07-SC01, SC06 ; SPEC-020-09-SC03 ;
-SPEC-020-10-SC03), envoi Gmail réel (SPEC-020-01-SC06, mot de passe d'application à fournir par
-l'utilisateur), écran mobile (SPEC-020-08-SC03, indisponible : MOB-01) ; SPEC-020-01-SC07 en revue.
+SPEC-020-10-SC03), envoi Gmail réel (SPEC-020-01-SC06 : code reçu dans la boîte Gmail de DJAFAT le 22 novembre 2026), écran mobile (SPEC-020-08-SC03, indisponible : MOB-01) ; SPEC-020-01-SC07 en revue.
 
 ## Changements d'architecture
 
@@ -63,7 +62,7 @@ FEAT-020 remplace l'ancienne page `/connexion` qu'il modifiait.
 ## Risques, exceptions, migrations, limites
 
 - **Avant la production** : coller l'adresse Gmail et son mot de passe d'application dans
-  `.env.prod` (`EMAIL_PROVIDER=smtp`), puis appliquer la migration 0040 (l'installation le fait).
+  `.env.prod` (`EMAIL_PROVIDER=smtp`, `EMAIL_FROM` laissé vide pour l'expéditeur « DJAFAT »), puis appliquer la migration 0040 (l'installation le fait).
   Sans SMTP, l'API démarre mais l'inscription répond 503 `EMAIL_UNAVAILABLE`.
 - Gmail gratuit : environ 500 e-mails par jour ; le code n'est demandé qu'aux nouveaux appareils.
 - Hypothèses à confirmer (clarifications.md) : profil mobile absent (Q09), « Se déconnecter

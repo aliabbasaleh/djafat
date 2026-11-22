@@ -112,7 +112,7 @@ SPEC-020-01-SC06 : l'utilisateur a renseigné l'adresse Gmail officielle et son 
 d'application dans `.env` (jamais lus ni affichés par l'agent : seules leur présence et leur
 forme ont été contrôlées). Une inscription vers l'adresse de DJAFAT elle-même a produit dans le
 journal de l'API « OTP email accepted by SMTP server for d\*\*\*@gmail.com » (RUN) : Gmail a accepté
-l'authentification et le message. L'arrivée dans la boîte reste à confirmer par l'utilisateur.
+l'authentification et le message. **Arrivée confirmée** par l'utilisateur à 02:15 : capture de la boîte Gmail de DJAFAT (montrée dans la conversation, non versionnée : elle affiche l'adresse). Le message est rangé dans « Boîte de réception » (pas en spam) ; objet « Confirmez votre adresse e-mail DJAFAT » ; texte identique à `providers/email-otp-text.ts` (salutation, code à 6 chiffres, « Il est valable 5 min. », mise en garde, « Si vous n'avez rien demandé… », signature). **SPEC-020-01-SC06 : prouvé.** Écart vu sur la capture : l'expéditeur affiché était l'adresse seule et non « DJAFAT », parce que le `.env` local donnait `EMAIL_FROM` = l'adresse, ce qui remplace la valeur par défaut `DJAFAT <SMTP_USER>` (R4 : comportement voulu). `EMAIL_FROM` a été vidé dans ce `.env` et l'API relancée ; `.env.example` et le guide disent maintenant de le laisser vide.
 Piège trouvé : un mot de passe collé avec ses espaces et sans guillemets casse `source .env` (le
 shell n'en garde rien) ; `.env.example` et le guide disent maintenant « sans espaces ou entre
 guillemets ».
