@@ -260,13 +260,17 @@ export function apiEnvConsistencyIssues(env: ApiEnv): string[] {
       'SMS_PROVIDER: "mock" is not allowed in production — no SMS would be sent and nobody could log in. Configure SMS_PROVIDER=http and SMS_HTTP_URL.',
     );
   }
+  // FEAT-021 (SPEC-021-01 R1, replaces SPEC-008-01 R3): since FEAT-020 an account
+  // can be created and opened by e-mail, so SMS may be switched off as long as one
+  // real login channel remains — SMS over HTTP, WhatsApp Cloud or e-mail over SMTP.
   if (
     env.NODE_ENV === 'production' &&
     env.SMS_PROVIDER === 'disabled' &&
-    env.WHATSAPP_PROVIDER !== 'cloud'
+    env.WHATSAPP_PROVIDER !== 'cloud' &&
+    env.EMAIL_PROVIDER !== 'smtp'
   ) {
     issues.push(
-      'SMS_PROVIDER: "disabled" in production needs WHATSAPP_PROVIDER=cloud — otherwise nobody could log in with a phone number.',
+      'SMS_PROVIDER: "disabled" in production needs another real login channel — configure SMS_PROVIDER=http, WHATSAPP_PROVIDER=cloud or EMAIL_PROVIDER=smtp, otherwise nobody could log in.',
     );
   }
   if (env.WHATSAPP_PROVIDER === 'cloud') {

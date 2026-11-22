@@ -134,6 +134,35 @@ migrations appliquées et (mode démo) les données de démonstration ajoutées.
   (numéros publiés, dont un super_admin) ne sont **jamais** créés hors mode démo :
   le script de démo refuse de tourner en production sans `SEED_DEMO=1`.
 
+### Couper le SMS : tout le monde se connecte par e-mail _(ajouté le 22 nov. 2026, FEAT-021)_
+
+Tant que DJAFAT n'a pas de passerelle SMS, le SMS est coupé : clients, administrateurs,
+restaurants et livreurs se connectent par **e-mail et mot de passe** (un code par e-mail sur un
+appareil inconnu). Les boutons SMS et WhatsApp s'affichent « Bientôt disponible » et s'allument
+seuls le jour où leurs réglages sont remplis. **Dans cet ordre**, sinon quelqu'un reste dehors :
+
+1. **L'e-mail marche.** Dans `.env.prod` : `EMAIL_PROVIDER=smtp`, `SMTP_HOST=smtp.gmail.com`,
+   `SMTP_PORT=465`, `SMTP_USER=` l'adresse Gmail de DJAFAT, `SMTP_PASSWORD=` son **mot de passe
+   d'application** (sans espaces, ou entre guillemets), `EMAIL_FROM` **vide** (les clients voient
+   alors « DJAFAT »). Relancer, puis créer un compte de test sur le site : le code doit arriver.
+2. **Chaque membre de l'équipe a un e-mail vérifié et un mot de passe.** Tant que le code
+   téléphone marche encore (boîte de test ci-dessus), il se connecte sur le site, ajoute et
+   confirme son e-mail dans « Mon profil », puis y définit son mot de passe. Si son e-mail est
+   déjà vérifié, « Mot de passe oublié ? » dans son application suffit. Faire la liste et cocher :
+   un compte sans e-mail vérifié ne pourra plus se connecter à l'étape 3.
+3. **Couper le SMS.** Dans `.env.prod` : `SMS_PROVIDER=disabled`, et supprimer `SMS_HTTP_URL`
+   et `SMS_HTTP_API_KEY`. La boîte de test (`mock-sms`) ne sert plus.
+4. **Relancer** l'API (`docker compose --env-file .env.prod -f docker-compose.prod.yml up -d api`).
+   Elle refuse de démarrer s'il ne reste aucun canal réel (SMS, WhatsApp ou e-mail) : c'est voulu.
+5. **Contrôler** : `curl -s https://api.<domaine>/v1/auth/methods` répond `"sms"` et
+   `"whatsapp"` avec `"available":false`, `"email"` avec `"available":true` ; puis se connecter
+   par e-mail et mot de passe à la console admin, à la console restaurant et à l'application
+   livreur.
+
+**Retour en arrière** : remettre `SMS_PROVIDER=http` et `SMS_HTTP_URL`, puis relancer.
+**Le jour où une vraie passerelle SMS existe** : `SMS_PROVIDER=http` avec ses réglages
+(`docs/39-comptes-externes.md` §1), sans changer le code.
+
 ## 5. Au quotidien
 
 Mettre à jour après un nouveau commit (depuis le dossier `djafat`) :

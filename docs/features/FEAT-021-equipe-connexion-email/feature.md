@@ -1,7 +1,7 @@
 ---
 id: FEAT-021
 title: Équipe — connexion par e-mail et mot de passe, SMS coupé tant qu'il n'a pas d'API
-status: draft
+status: ready
 type: change
 ui: yes
 ---

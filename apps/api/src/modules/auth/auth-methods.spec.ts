@@ -96,3 +96,22 @@ describe('SPEC-008-01 — a disabled SMS channel never touches budgets or the co
     expect(create).not.toHaveBeenCalled();
   });
 });
+
+// FEAT-021 — docs/features/FEAT-021-equipe-connexion-email (SPEC-021-01).
+describe('SPEC-021-01 — login methods with SMS off and e-mail on', () => {
+  // SPEC-021-01-SC01
+  it('SPEC-021-01-SC01 — production, SMS disabled, WhatsApp not linked, e-mail on SMTP: only email is available', () => {
+    expect(
+      listAuthMethods({
+        NODE_ENV: 'production',
+        SMS_PROVIDER: 'disabled',
+        EMAIL_PROVIDER: 'smtp',
+        WHATSAPP_PROVIDER: 'mock',
+      }),
+    ).toEqual([
+      { id: 'whatsapp', available: false },
+      { id: 'sms', available: false },
+      { id: 'email', available: true },
+    ]);
+  });
+});

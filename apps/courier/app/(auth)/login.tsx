@@ -1,54 +1,206 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import {
+  RESEND_COOLDOWN_SECONDS,
+  accountErrorMessage,
+  phoneCodeButtons,
+  teamPasswordLogin,
+  teamResetPassword,
+  teamVerifyCode,
+  validateNewPassword,
+  type ChannelButton,
+} from '@djafat/sdk';
 import { tokens } from '@djafat/tokens';
 import { Screen } from '../../components/Screen';
 import { BigButton } from '../../components/BigButton';
 import { api } from '../../lib/api';
-import { hasCourierAccess, type StoredCourierUser } from '../../lib/auth-storage';
+import {
+  courierSessionKeeper,
+  hasCourierAccess,
+  loadDeviceToken,
+  type StoredCourierUser,
+} from '../../lib/auth-storage';
 import { useAuth } from '../../lib/auth-context';
 
-type Step = 'phone' | 'code';
+type PhoneChannel = 'sms' | 'whatsapp';
+type Step =
+  | { readonly kind: 'password' }
+  | { readonly kind: 'code'; readonly challengeId: string; readonly destination: string }
+  | { readonly kind: 'forgot' }
+  | { readonly kind: 'reset' }
+  | { readonly kind: 'phone'; readonly channel: PhoneChannel }
+  | { readonly kind: 'phone-code'; readonly channel: PhoneChannel };
+
+const DENIED = 'Ce compte n’est pas enregistré comme livreur DJAFAT.';
+const HOME = '/(app)/home';
+const FALLBACK = 'Connexion impossible pour le moment.';
 
 /**
- * Courier login (Bloc 11, docs/04 §4.7, same bounded OTP flow as every other
- * app in this repo). The one app-specific check: a successful OTP whose
- * account does NOT hold `courier` is refused HERE, client-side — the API
- * would reject every subsequent `/couriers/me/*` call anyway, but failing
- * fast is a better experience than a signed-in shell showing only errors.
+ * Courier login (Bloc 11, docs/04 §4.7; FEAT-021, SPEC-021-04): e-mail and
+ * password with the FEAT-020 rules — a code by e-mail on a device this app
+ * does not remember, « Mot de passe oublié ? » — and the phone code only when
+ * the server offers SMS or WhatsApp (SPEC-021-02 R5). An account without the
+ * `courier` role is refused HERE and nothing is kept: every `/couriers/me/*`
+ * call would fail anyway.
  */
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
-  const [step, setStep] = useState<Step>('phone');
-  const [phone, setPhone] = useState('');
+  const keeper = useMemo(() => courierSessionKeeper(signIn), [signIn]);
+  const [step, setStep] = useState<Step>({ kind: 'password' });
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [code, setCode] = useState('');
+  const [remember, setRemember] = useState(true);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{
+    password?: string | undefined;
+    confirm?: string | undefined;
+  }>({});
+  const [phone, setPhone] = useState('');
+  const [phoneButtons, setPhoneButtons] = useState<ChannelButton[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
-  async function requestCode() {
+  useEffect(() => {
+    let cancelled = false;
+    api.auth.methods().then(
+      (res) => {
+        if (!cancelled) setPhoneButtons(phoneCodeButtons(res.methods));
+      },
+      () => {
+        if (!cancelled) setPhoneButtons(phoneCodeButtons(null));
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (cooldown <= 0) return undefined;
+    const timer = setTimeout(() => setCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
+
+  function go(next: Step, message: string | null = null) {
+    setError(null);
+    setNotice(message);
+    setCode('');
+    setFieldErrors({});
+    setStep(next);
+  }
+
+  /** R2: an error disappears as soon as a field changes. */
+  function typed(setter: (value: string) => void) {
+    return (value: string) => {
+      setter(value);
+      setError(null);
+    };
+  }
+
+  const digits = (value: string) => value.replace(/\D/g, '').slice(0, 6);
+
+  async function run(action: () => Promise<void>) {
     setError(null);
     setLoading(true);
     try {
-      await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
-      setStep('code');
-    } catch {
-      setError("Impossible d'envoyer le code. Vérifiez le numéro (+235XXXXXXXX).");
+      await action();
+    } catch (err) {
+      setError(accountErrorMessage(err, FALLBACK));
     } finally {
       setLoading(false);
     }
   }
 
-  async function verifyCode() {
-    setError(null);
-    setLoading(true);
-    try {
+  function finish(outcome: 'signed_in' | 'denied') {
+    if (outcome === 'signed_in') router.replace(HOME);
+    else setError(DENIED);
+  }
+
+  function login() {
+    void run(async () => {
+      const next = await teamPasswordLogin(
+        api.auth,
+        { email, password, deviceToken: await loadDeviceToken() },
+        keeper,
+      );
+      if (next.kind === 'code') {
+        setCooldown(RESEND_COOLDOWN_SECONDS);
+        go({ kind: 'code', challengeId: next.challengeId, destination: next.destination });
+      } else {
+        finish(next.kind);
+      }
+    });
+  }
+
+  function verify(challengeId: string) {
+    void run(async () => {
+      finish(
+        await teamVerifyCode(api.auth, { challengeId, code, rememberDevice: remember }, keeper),
+      );
+    });
+  }
+
+  function resendLoginCode(challengeId: string) {
+    void run(async () => {
+      await api.auth.sendLoginCode(challengeId, 'email');
+      setCooldown(RESEND_COOLDOWN_SECONDS);
+      setNotice('Un nouveau code vient de partir.');
+    });
+  }
+
+  function askResetCode() {
+    void run(async () => {
+      await api.auth.forgotPassword(email);
+      setCooldown(RESEND_COOLDOWN_SECONDS);
+      go(
+        { kind: 'reset' },
+        'Si un compte DJAFAT utilise cette adresse, un code vient d’y être envoyé.',
+      );
+    });
+  }
+
+  function reset() {
+    const errors = validateNewPassword(newPassword, confirm, { email });
+    setFieldErrors(errors);
+    if (errors.password || errors.confirm) return;
+    void run(async () => {
+      finish(await teamResetPassword(api.auth, { email, code, password: newPassword }, keeper));
+    });
+  }
+
+  function choosePhone(button: ChannelButton) {
+    if (!button.enabled) return;
+    if (button.id === 'whatsapp') {
+      if (button.link) void Linking.openURL(button.link);
+      go({ kind: 'phone-code', channel: 'whatsapp' });
+    } else {
+      go({ kind: 'phone', channel: 'sms' });
+    }
+  }
+
+  function requestSmsCode() {
+    void run(async () => {
+      await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
+      go({ kind: 'phone-code', channel: 'sms' });
+    });
+  }
+
+  function verifyPhoneCode(channel: PhoneChannel) {
+    void run(async () => {
       const result = await api.http.post<{
         access: string;
         refresh: string;
         user: { id: string; phone: string; fullName: string | null; roles: string[] };
-      }>('/auth/otp/verify', { body: { phone, code, purpose: 'login' } });
-
+      }>(channel === 'whatsapp' ? '/auth/whatsapp/verify' : '/auth/otp/verify', {
+        body: channel === 'whatsapp' ? { phone, code } : { phone, code, purpose: 'login' },
+      });
       const user: StoredCourierUser = {
         id: result.user.id,
         phone: result.user.phone,
@@ -56,63 +208,254 @@ export default function LoginScreen() {
         roles: result.user.roles,
       };
       if (!hasCourierAccess(user)) {
-        setError('Ce compte n’est pas enregistré comme livreur DJAFAT.');
+        setError(DENIED);
         return;
       }
-
       await signIn({ access: result.access, refresh: result.refresh, user });
-      router.replace('/(app)/home');
-    } catch {
-      setError('Code invalide ou expiré.');
-    } finally {
-      setLoading(false);
-    }
+      router.replace(HOME);
+    });
   }
+
+  const subtitle =
+    step.kind === 'code'
+      ? `Code envoyé à ${step.destination}.`
+      : step.kind === 'forgot'
+        ? 'Recevez un code par e-mail pour choisir un nouveau mot de passe.'
+        : step.kind === 'reset'
+          ? `Saisissez le code reçu à ${email} et votre nouveau mot de passe.`
+          : step.kind === 'phone-code'
+            ? step.channel === 'whatsapp'
+              ? 'Envoyez « Code DJAFAT » sur WhatsApp, puis saisissez le code reçu.'
+              : `Code envoyé au ${phone}.`
+            : 'Connexion livreur.';
+
+  const back = (
+    <BigButton label="Retour" variant="ghost" onPress={() => go({ kind: 'password' })} />
+  );
+  const codeInput = (
+    <>
+      <Text style={styles.label}>Code à 6 chiffres</Text>
+      <TextInput
+        style={styles.input}
+        value={code}
+        onChangeText={(v) => typed(setCode)(digits(v))}
+        placeholder="123456"
+        placeholderTextColor={tokens.color.text.muted}
+        keyboardType="number-pad"
+        textContentType="oneTimeCode"
+        autoComplete="one-time-code"
+        maxLength={6}
+        accessibilityLabel="Code à 6 chiffres"
+        autoFocus
+      />
+    </>
+  );
+  const emailInput = (
+    <>
+      <Text style={styles.label}>E-mail</Text>
+      <TextInput
+        style={styles.input}
+        value={email}
+        onChangeText={typed(setEmail)}
+        placeholder="vous@gmail.com"
+        placeholderTextColor={tokens.color.text.muted}
+        keyboardType="email-address"
+        textContentType="emailAddress"
+        autoComplete="email"
+        autoCapitalize="none"
+        autoCorrect={false}
+        accessibilityLabel="E-mail"
+        autoFocus
+      />
+    </>
+  );
+  const phoneInput = (
+    <>
+      <Text style={styles.label}>Numéro de téléphone</Text>
+      <TextInput
+        style={styles.input}
+        value={phone}
+        onChangeText={typed(setPhone)}
+        placeholder="+23566000000"
+        placeholderTextColor={tokens.color.text.muted}
+        keyboardType="phone-pad"
+        textContentType="telephoneNumber"
+        accessibilityLabel="Numéro de téléphone"
+      />
+    </>
+  );
 
   return (
     <Screen>
       <View style={styles.header}>
         <Text style={styles.title}>DJAFAT Livreur</Text>
-        <Text style={styles.subtitle}>
-          {step === 'phone' ? 'Connexion livreur.' : `Code envoyé au ${phone}.`}
-        </Text>
+        <Text style={styles.subtitle}>{subtitle}</Text>
       </View>
 
+      {notice && !error && (
+        <View style={styles.noticeBox}>
+          <Text style={styles.noticeText}>{notice}</Text>
+        </View>
+      )}
       {error && (
-        <View style={styles.errorBox}>
+        <View style={styles.errorBox} accessibilityLiveRegion="polite">
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
 
-      {step === 'phone' ? (
+      {step.kind === 'password' && (
         <View style={styles.form}>
-          <Text style={styles.label}>Numéro de téléphone</Text>
+          {emailInput}
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>Mot de passe</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: showPassword }}
+              onPress={() => setShowPassword((v) => !v)}
+            >
+              <Text style={styles.toggle}>{showPassword ? 'Masquer' : 'Afficher'}</Text>
+            </Pressable>
+          </View>
           <TextInput
             style={styles.input}
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="+23566000000"
-            placeholderTextColor={tokens.color.text.muted}
-            keyboardType="phone-pad"
-            autoFocus
+            value={password}
+            onChangeText={typed(setPassword)}
+            secureTextEntry={!showPassword}
+            textContentType="password"
+            autoComplete="password"
+            autoCapitalize="none"
+            accessibilityLabel="Mot de passe"
           />
-          <BigButton label="Envoyer le code" onPress={() => void requestCode()} loading={loading} />
+          <BigButton label="Se connecter" onPress={login} loading={loading} />
+          <BigButton
+            label="Mot de passe oublié ?"
+            variant="ghost"
+            onPress={() => go({ kind: 'forgot' })}
+          />
+          {phoneButtons.length > 0 && (
+            <View style={styles.phoneCodes}>
+              <Text style={styles.divider}>ou recevoir un code par téléphone</Text>
+              <View style={styles.channels}>
+                {phoneButtons.map((button) => (
+                  <Pressable
+                    key={button.id}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !button.enabled }}
+                    accessibilityLabel={
+                      button.note ? `${button.label}, ${button.note}` : button.label
+                    }
+                    disabled={!button.enabled}
+                    onPress={() => choosePhone(button)}
+                    style={[styles.channel, !button.enabled && styles.channelDisabled]}
+                  >
+                    <Text style={[styles.channelText, !button.enabled && styles.textDisabled]}>
+                      {button.label}
+                    </Text>
+                    {button.note && (
+                      <Text style={[styles.channelNote, styles.textDisabled]}>{button.note}</Text>
+                    )}
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
-      ) : (
+      )}
+
+      {step.kind === 'code' && (
         <View style={styles.form}>
-          <Text style={styles.label}>Code à 6 chiffres</Text>
+          {codeInput}
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Se souvenir de cet appareil (30 jours)</Text>
+            <Switch
+              value={remember}
+              onValueChange={setRemember}
+              accessibilityLabel="Se souvenir de cet appareil (30 jours)"
+            />
+          </View>
+          <BigButton label="Vérifier" onPress={() => verify(step.challengeId)} loading={loading} />
+          <BigButton
+            label={cooldown > 0 ? `Renvoyer le code (dans ${cooldown} s)` : 'Renvoyer le code'}
+            variant="ghost"
+            disabled={cooldown > 0 || loading}
+            onPress={() => resendLoginCode(step.challengeId)}
+          />
+          {back}
+        </View>
+      )}
+
+      {step.kind === 'forgot' && (
+        <View style={styles.form}>
+          {emailInput}
+          <BigButton label="Recevoir un code" onPress={askResetCode} loading={loading} />
+          {back}
+        </View>
+      )}
+
+      {step.kind === 'reset' && (
+        <View style={styles.form}>
+          {codeInput}
+          <Text style={styles.label}>Nouveau mot de passe</Text>
           <TextInput
             style={styles.input}
-            value={code}
-            onChangeText={setCode}
-            placeholder="123456"
-            placeholderTextColor={tokens.color.text.muted}
-            keyboardType="number-pad"
-            maxLength={6}
-            autoFocus
+            value={newPassword}
+            onChangeText={(v) => {
+              typed(setNewPassword)(v);
+              setFieldErrors((f) => ({ ...f, password: undefined }));
+            }}
+            secureTextEntry
+            textContentType="newPassword"
+            autoComplete="password-new"
+            autoCapitalize="none"
+            accessibilityLabel="Nouveau mot de passe"
           />
-          <BigButton label="Vérifier" onPress={() => void verifyCode()} loading={loading} />
-          <BigButton label="Changer de numéro" variant="ghost" onPress={() => setStep('phone')} />
+          <Text style={fieldErrors.password ? styles.fieldError : styles.hint}>
+            {fieldErrors.password ?? 'Au moins 8 caractères.'}
+          </Text>
+          <Text style={styles.label}>Confirmer le mot de passe</Text>
+          <TextInput
+            style={styles.input}
+            value={confirm}
+            onChangeText={(v) => {
+              typed(setConfirm)(v);
+              setFieldErrors((f) => ({ ...f, confirm: undefined }));
+            }}
+            secureTextEntry
+            textContentType="newPassword"
+            autoComplete="password-new"
+            autoCapitalize="none"
+            accessibilityLabel="Confirmer le mot de passe"
+          />
+          {fieldErrors.confirm && <Text style={styles.fieldError}>{fieldErrors.confirm}</Text>}
+          <BigButton label="Changer le mot de passe" onPress={reset} loading={loading} />
+          <BigButton
+            label={cooldown > 0 ? `Renvoyer le code (dans ${cooldown} s)` : 'Renvoyer le code'}
+            variant="ghost"
+            disabled={cooldown > 0 || loading}
+            onPress={askResetCode}
+          />
+          {back}
+        </View>
+      )}
+
+      {step.kind === 'phone' && (
+        <View style={styles.form}>
+          {phoneInput}
+          <BigButton label="Envoyer le code" onPress={requestSmsCode} loading={loading} />
+          {back}
+        </View>
+      )}
+
+      {step.kind === 'phone-code' && (
+        <View style={styles.form}>
+          {step.channel === 'whatsapp' && phoneInput}
+          {codeInput}
+          <BigButton
+            label="Vérifier"
+            onPress={() => verifyPhoneCode(step.channel)}
+            loading={loading}
+          />
+          {back}
         </View>
       )}
     </Screen>
@@ -133,6 +476,12 @@ const styles = StyleSheet.create({
   },
   form: { gap: tokens.space['4'] },
   label: { fontSize: tokens.type.size.label, fontWeight: '600', color: tokens.color.text.primary },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  toggle: {
+    fontSize: tokens.type.size.label,
+    fontWeight: '600',
+    color: tokens.color.brand.primary,
+  },
   input: {
     minHeight: 56,
     borderWidth: 1,
@@ -143,6 +492,49 @@ const styles = StyleSheet.create({
     color: tokens.color.text.primary,
     backgroundColor: tokens.color.bg.surface,
   },
+  hint: { fontSize: tokens.type.size.caption, color: tokens.color.text.secondary },
+  fieldError: { fontSize: tokens.type.size.caption, color: tokens.color.state.danger },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.space['3'],
+  },
+  switchLabel: { flex: 1, fontSize: tokens.type.size.body, color: tokens.color.text.primary },
+  phoneCodes: { gap: tokens.space['2'] },
+  divider: {
+    textAlign: 'center',
+    fontSize: tokens.type.size.caption,
+    color: tokens.color.text.secondary,
+  },
+  channels: { flexDirection: 'row', gap: tokens.space['2'] },
+  channel: {
+    flex: 1,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingVertical: tokens.space['2'],
+    borderWidth: 2,
+    borderColor: tokens.color.border.default,
+    borderRadius: tokens.radius.md,
+    backgroundColor: tokens.color.bg.surface,
+  },
+  channelDisabled: { backgroundColor: tokens.color.bg.surfaceAlt },
+  channelText: {
+    fontSize: tokens.type.size.body,
+    fontWeight: '700',
+    color: tokens.color.text.primary,
+  },
+  channelNote: { fontSize: 11, fontWeight: '600' },
+  textDisabled: { color: tokens.color.text.disabled },
+  noticeBox: {
+    backgroundColor: tokens.color.state.infoBg,
+    borderRadius: tokens.radius.md,
+    padding: tokens.space['3'],
+    marginBottom: tokens.space['4'],
+  },
+  noticeText: { color: tokens.color.state.info, fontSize: tokens.type.size.body },
   errorBox: {
     backgroundColor: tokens.color.state.dangerBg,
     borderRadius: tokens.radius.md,

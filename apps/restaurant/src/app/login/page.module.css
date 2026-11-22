@@ -5,3 +5,56 @@
   justify-content: center;
   padding: calc(var(--djafat-space-6) * 1px) 0;
 }
+
+/* FEAT-021 (SPEC-021-03, FEAT-021-VIS02): « Afficher » on the password label's line,
+   then the row « ou recevoir un code par téléphone » (same look as apps/web's /compte). */
+.passwordRow {
+  position: relative;
+}
+.toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--djafat-color-brand-primary);
+  font-weight: 600;
+  font-size: calc(var(--djafat-type-size-caption) * 1px);
+  cursor: pointer;
+}
+.divider {
+  margin: 0;
+  text-align: center;
+  color: var(--djafat-color-text-secondary);
+  font-size: calc(var(--djafat-type-size-caption) * 1px);
+}
+.channels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.channel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: calc(var(--djafat-touch-target-min) * 1px);
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 2px solid var(--djafat-color-border-default);
+  background: var(--djafat-color-bg-surface);
+  color: var(--djafat-color-text-primary);
+  font-weight: 700;
+  cursor: pointer;
+}
+.channel:disabled {
+  background: var(--djafat-color-bg-surface-alt);
+  color: var(--djafat-color-text-disabled);
+  cursor: not-allowed;
+}
+.channelNote {
+  font-size: 11px;
+  font-weight: 600;
+}

@@ -1,4 +1,5 @@
 import * as SecureStoreNative from 'expo-secure-store';
+import type { TeamSessionKeeper } from '@djafat/sdk';
 import { Platform } from 'react-native';
 import { pickSessionStore } from './session-store';
 
@@ -80,4 +81,39 @@ export async function clearSession(): Promise<void> {
 /** Deny-by-default gate — an account without the `courier` role never reaches the app shell. */
 export function hasCourierAccess(user: StoredCourierUser | null): boolean {
   return !!user && user.roles.includes('courier');
+}
+
+/** FEAT-021 (SPEC-021-04 R2): this phone's (or browser's) remembered device — `clearSession` leaves it. */
+const DEVICE_KEY = 'djafat_courier_device';
+
+export async function loadDeviceToken(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(DEVICE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export async function saveDeviceToken(token: string): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(DEVICE_KEY, token);
+  } catch {
+    // Ignore: the next login on this device simply asks for a code again.
+  }
+}
+
+/** FEAT-021 (SPEC-021-02 R3): what the login screen does with a session — the `courier` role only. */
+export function courierSessionKeeper(
+  signIn: (session: StoredSession) => Promise<void>,
+): TeamSessionKeeper {
+  return {
+    hasAccess: (user) => hasCourierAccess(user),
+    saveSession: ({ access, refresh, user }) =>
+      signIn({
+        access,
+        refresh,
+        user: { id: user.id, phone: user.phone, fullName: user.fullName, roles: user.roles },
+      }),
+    saveDeviceToken,
+  };
 }
