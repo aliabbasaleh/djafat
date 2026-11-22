@@ -10,6 +10,15 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-037 — 2026-11-22 — our docs commit on the FEAT-020 branch (0.24.2)
+
+Short entry (our own commit `d6481b8`, already described): the user received the registration code in DJAFAT's
+Gmail inbox (Inbox, not spam), so SPEC-020-01-SC06 is proven locally (MANUAL, screenshot shown in the session, not
+versioned); a bare `EMAIL_FROM` replaces the « DJAFAT » sender name, so `.env.example` and the local guide now say to
+leave it empty. No new finding; no change on GitHub besides our branch.
+
+---
+
 ## S-036 — 2026-11-22 — our docs fix on the FEAT-020 branch (0.24.1)
 
 Short entry (our own commit, already described): the app password must be pasted without spaces or quoted;

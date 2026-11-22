@@ -8,6 +8,16 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-22 — Sync S-037: first registration code received in a real inbox (FEAT-020, 0.24.2)
+
+**Verified:** the user received « Confirmez votre adresse e-mail DJAFAT » in DJAFAT's Gmail inbox (Inbox, not spam),
+with the text of `email-otp-text.ts` (MANUAL, screenshot shown in the session): SPEC-020-01-SC06 is proven on the
+local `.env`; on the server it remains to do (T-611). **Learned:** `EMAIL_FROM` set to the bare address hides the
+« DJAFAT » sender name (the default `DJAFAT <SMTP_USER>` only applies when it is empty); `.env.example` and the local
+guide now say to leave it empty.
+
+---
+
 ## 2026-11-22 — Sync S-036: the Gmail app password, first real send (FEAT-020, 0.24.1)
 
 **Verified:** with the official Gmail address and its app password in the local `.env` (set by the user, never
