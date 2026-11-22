@@ -38,6 +38,13 @@ const RegistrationPayload = z.object({
 const otpInvalid = () =>
   new UnauthorizedException({ code: 'OTP_INVALID', message: 'Invalid or expired code.' });
 
+/** What a used address's pending registration holds: nothing that could create an account (R13). */
+const DECOY_PAYLOAD = { decoy: true } as const;
+
+function isDecoy(payload: unknown): boolean {
+  return typeof payload === 'object' && payload !== null && 'decoy' in payload;
+}
+
 /**
  * Create an account with a name, a phone, an email and a password, confirmed
  * by a code sent to the email (FEAT-020, SPEC-020-03). Nothing is written to
@@ -45,13 +52,6 @@ const otpInvalid = () =>
  * `auth_challenges`, and its code is bound to it (`context`), so two pending
  * registrations for one address can never complete each other.
  */
-/** What a used address's pending registration holds: nothing that could create an account (R12). */
-const DECOY_PAYLOAD = { decoy: true } as const;
-
-function isDecoy(payload: unknown): boolean {
-  return typeof payload === 'object' && payload !== null && 'decoy' in payload;
-}
-
 @Injectable()
 export class RegistrationService {
   constructor(
@@ -84,7 +84,7 @@ export class RegistrationService {
     const expiresAt = new Date(Date.now() + REGISTRATION_TTL_MS);
     const target = { channel: 'email' as const, target: input.email };
 
-    // R3, R12 (FEAT-020-Q16, review #3): an address already used gets a notice
+    // R3, R13 (FEAT-020-Q16, review #3): an address already used gets a notice
     // instead of a code, and nothing tells it from a free one — not the answer,
     // not a lock (checked first for both), not the time (both hash and store a
     // pending registration), not what follows (`resend` and `verify` take the
@@ -159,7 +159,7 @@ export class RegistrationService {
     if (!row) return;
     const target = { channel: 'email' as const, target: row.email };
     if (isDecoy(row.payload)) {
-      // R12: the same budgets, lock and outcome as the code below.
+      // R13: the same budgets, lock and outcome as the code below.
       if (ip) await this.otp.consumeIpBudget(ip);
       await this.sendAlreadyRegistered(target);
       return;
@@ -167,7 +167,7 @@ export class RegistrationService {
     await this.otp.requestCode(target, 'register', ip, { context: row.id });
   }
 
-  /** R3, R12: the decoy's "send" — same budget and lock as a code, same 503 when it cannot leave. */
+  /** R3, R13: the decoy's "send" — same budget and lock as a code, same 503 when it cannot leave. */
   private async sendAlreadyRegistered(target: { channel: 'email'; target: string }): Promise<void> {
     await this.otp.consumeTargetBudget(target);
     await this.otp.assertNotLocked(target.target);

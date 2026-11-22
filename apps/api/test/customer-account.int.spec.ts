@@ -355,4 +355,23 @@ describe('FEAT-020 review corrections on PostgreSQL and Redis', () => {
       .send({ email: newEmail, currentPassword: input.password })
       .expect(202);
   });
+
+  // SPEC-020-12-SC07
+  it('SPEC-020-12-SC07 — a verify_email code asked by another account is refused on this one (401)', async () => {
+    const pirateInput = fresh();
+    const pirate = await register(pirateInput);
+    const victim = await register(fresh());
+    const address = `feat020-pirate-${randomUUID().slice(0, 8)}@example.td`;
+    await request(server)
+      .post('/v1/me/email')
+      .set('Authorization', `Bearer ${pirate.access}`)
+      .send({ email: address, currentPassword: pirateInput.password })
+      .expect(202);
+    const code = await lastEmailCode(address);
+    await request(server)
+      .post('/v1/me/email/verify')
+      .set('Authorization', `Bearer ${victim.access}`)
+      .send({ email: address, code })
+      .expect(401);
+  });
 });

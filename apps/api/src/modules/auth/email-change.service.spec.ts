@@ -138,4 +138,21 @@ describe('SPEC-020-12 — changing the e-mail of an account with a password', ()
       service.request('u-awa', { email: NEW, currentPassword: PASSWORD }, META.ip),
     ).rejects.toMatchObject({ response: { code: 'OTP_LOCKED' } });
   });
+
+  // SPEC-020-12-SC07
+  it('SPEC-020-12-SC07 — a code another account asked for never confirms the address here: 401, e-mail unchanged', async () => {
+    const { service, otp, users, notices } = build([
+      account({ passwordHash: HASH }),
+      account({ id: 'u-pirate', phone: '+23566000077', email: 'pirate@example.td' }),
+    ]);
+    // The attacker asks a code for their own address from their own account (no password there)…
+    await service.request('u-pirate', { email: NEW }, META.ip);
+    const code = otp.sent[0]?.code ?? '';
+    // …then tries it with the victim's stolen session.
+    await expect(service.confirm('u-awa', { email: NEW, code }, META)).rejects.toMatchObject({
+      response: { code: 'OTP_INVALID' },
+    });
+    expect(users.accounts.find((a) => a.id === 'u-awa')?.email).toBe('awa@example.td');
+    expect(notices.sent).toHaveLength(0);
+  });
 });

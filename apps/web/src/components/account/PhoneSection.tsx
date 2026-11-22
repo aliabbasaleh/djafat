@@ -76,13 +76,16 @@ export function PhoneSection(props: PhoneSectionProps) {
       firstRender.current = false;
       return;
     }
-    sectionRef.current
-      ?.querySelector<HTMLElement>('input:not([disabled]), button:not([disabled])')
-      ?.focus();
+    const section = sectionRef.current;
+    // After a confirmation nothing is left to press: the section itself takes the focus.
+    (
+      section?.querySelector<HTMLElement>('input:not([disabled]), button:not([disabled])') ??
+      section
+    )?.focus();
   }, [channel]);
 
   return (
-    <section ref={sectionRef} className={cx(props.cardClassName)}>
+    <section ref={sectionRef} tabIndex={-1} className={cx(props.cardClassName)}>
       <p className={cx(props.labelClassName)}>Téléphone</p>
       <p className={cx(props.valueClassName)}>
         {me.phone}{' '}

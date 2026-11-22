@@ -82,6 +82,14 @@ FEAT-020 remplace l'ancienne page `/connexion` qu'il modifiait.
   manqué est journalisé, l'écran ne le dit pas (on peut redemander un code) — c'est ce qui empêche de
   deviner qu'une adresse a un compte (Q30).
 - Le jeton d'accès d'une session révoquée reste valable jusqu'à 15 minutes (antérieur, docs/19 §13).
+- **Fraude possible au paiement à la livraison** : un e-mail vérifié s'obtient facilement ; plusieurs
+  comptes T1 (10 000 XAF chacun) restent possibles, freinés seulement par les limites d'inscription
+  et par deux absences qui ramènent à T0. À surveiller : les absences des nouveaux comptes e-mail.
+- **Compte créé par code, sans mot de passe** : avec une session volée, on peut encore déplacer
+  l'e-mail puis poser un premier mot de passe ; le titulaire ne garde que la connexion par téléphone.
+  Une décision reste à prendre (par exemple un code au numéro confirmé avant ces deux actions).
+- Un envoi d'e-mail manqué (SMTP en panne) ne s'affiche plus : prévoir une alerte d'exploitation sur
+  ce message du journal.
 - **Conflit attendu avec `fix/login-method-icons`** (0.23.6, non fusionnée) : `connexion/page.tsx`
   (garder la redirection de FEAT-020 ; ses icônes sont déjà reprises), `docs/ROADMAP.md` (garder les
   deux lignes du journal) et `package.json` (garder 0.24.0).

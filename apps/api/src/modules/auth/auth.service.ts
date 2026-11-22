@@ -81,11 +81,13 @@ export class AuthService {
 
   /** Send a `verify_email` code to an address the authenticated user wants to add. */
   requestEmailVerification(userId: string, email: string, ip: string | null): Promise<void> {
-    void userId; // the code goes to the mailbox: only its owner can read it (FEAT-007-Q07)
+    // FEAT-020 (SPEC-020-12 R4, review 2 #3): the code is bound to the account that asked
+    // for it — a code another account requested never confirms an address here.
     return this.otp.requestCode(
       { channel: 'email', target: normalizeEmail(email) },
       'verify_email',
       ip,
+      { context: userId },
     );
   }
 
@@ -97,7 +99,9 @@ export class AuthService {
     ip: string | null,
   ): Promise<MeDto> {
     const target = normalizeEmail(email);
-    await this.otp.verifyCode({ channel: 'email', target }, code, 'verify_email', ip); // throws OTP_INVALID / OTP_LOCKED
+    await this.otp.verifyCode({ channel: 'email', target }, code, 'verify_email', ip, {
+      context: userId,
+    }); // throws OTP_INVALID / OTP_LOCKED
     const user = await this.users.setVerifiedEmail(userId, target); // throws EMAIL_ALREADY_USED
     return this.users.toMeDto(user, await this.users.getRoles(userId));
   }

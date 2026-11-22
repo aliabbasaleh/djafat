@@ -93,7 +93,7 @@ export class OtpService {
   }
 
   /**
-   * FEAT-020 (review #3, #4; SPEC-020-03 R12, SPEC-020-05 R1, AC08): a code to an
+   * FEAT-020 (review #3, #4; SPEC-020-03 R14, SPEC-020-05 R1, AC08): a code to an
    * address that may or may not belong to an account. Both cases spend the same
    * budgets and meet the same lock first; the code itself then leaves in the
    * background and a delivery failure is only logged — so neither the answer,

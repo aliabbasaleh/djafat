@@ -43,6 +43,15 @@ describe('SPEC-020-07 — the account page', () => {
     expect(safeRedirect('/ /evil.example')).toBe('/%20/evil.example');
     expect(safeRedirect('/panier?etape=2#adresse')).toBe('/panier?etape=2#adresse');
     expect(compteHref('/\t/evil.example')).toBe('/compte');
+    // Review 2: dot segments must not collapse into a leading « // » after normalising.
+    for (const sneaky of [
+      '/..//evil.example',
+      '/.//evil.example',
+      '/%2e%2e//evil.example',
+      '/x/..//evil.example/p',
+    ]) {
+      expect(safeRedirect(sneaky)).toBe('/');
+    }
   });
 
   // SPEC-020-07-SC03

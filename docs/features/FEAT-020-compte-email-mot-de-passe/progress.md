@@ -140,6 +140,36 @@ site et application : typage et tests verts ; intégration complète sur base ne
 dont `customer-account.int.spec.ts` 9/9 (6 cas nouveaux). Deux anciens cas d'intégration attendaient
 le code tout de suite : ils l'attendent maintenant, l'envoi étant en arrière-plan (même oracle).
 
+### Revue 2 et captures (2026-11-22)
+
+Revue 2 : trois corrections demandées, faites (redirection par segments `..`, test de couverture de
+`core`, codes `verify_email` liés au compte) ; détails dans `review.md`. Captures d'exécution de
+« Mon profil » (Chrome sans tête, 390×844, API locale avec l'e-mail en faux), ouvertes et vérifiées :
+`assets/exec-SPEC-020-12-SC06-profil-390.png` montre « Mot de passe actuel » dans la carte de
+l'e-mail, sous la nouvelle adresse ; `assets/exec-SPEC-020-12-SC06-erreur-390.png` montre « Mot de
+passe actuel incorrect. » après un faux mot de passe. Le même passage confirme « Vérifier » sur
+l'étape du code (SPEC-020-07 R5). Le rond « N » en bas à gauche est l'indicateur de `next dev`, pas
+l'application.
+
+### Migration 0040 — retour arrière (SQL)
+
+Dans cet ordre (les mots de passe sont perdus ; les comptes restent joignables par code e-mail) :
+
+```sql
+DROP TABLE trusted_devices;
+DROP TABLE auth_challenges;
+DELETE FROM otp_codes WHERE purpose IN ('login_device', 'reset_password', 'verify_phone');
+ALTER TABLE otp_codes DROP CONSTRAINT otp_codes_purpose_check;
+ALTER TABLE otp_codes ADD CONSTRAINT otp_codes_purpose_check
+  CHECK (purpose IN ('login', 'register', 'change_phone', 'verify_email')); -- comme dans 0030
+ALTER TABLE otp_codes DROP COLUMN context;
+ALTER TABLE users DROP COLUMN password_updated_at, DROP COLUMN password_hash;
+DELETE FROM _prisma_migrations WHERE migration_name = '0040_customer_accounts';
+```
+
+Le fichier de migration lui-même n'est pas modifié : il est déjà appliqué sur des bases locales,
+et `prisma migrate dev` refuserait une migration appliquée dont le contenu a changé (revue 2 n° 4).
+
 ## Trouvés en route (2026-11-21)
 
 - **CORS (préexistant, corrigé ici)** : `@fastify/cors` n'autorise par défaut que GET, HEAD,
@@ -171,5 +201,4 @@ versionnée). Verdict : aucun nouvel échec, pas « tout vert » (1 indisponible
 
 ## Reste à faire
 
-- Revue 2 ciblée sur les corrections, `verify --full`, capture de « Mon profil » (SPEC-020-12-SC06),
-  puis la PR GitHub.
+- Revue 3 ciblée sur les trois dernières corrections, `verify --full` sur le commit, puis la PR GitHub.

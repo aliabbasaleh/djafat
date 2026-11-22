@@ -52,7 +52,10 @@ export function safeRedirect(target: string | null | undefined): string {
     return '/';
   }
   if (url.origin !== LOCAL_ORIGIN) return '/';
-  return url.pathname + url.search + url.hash;
+  const path = url.pathname + url.search + url.hash;
+  // Review 2: normalising dot segments can turn `/..//x` into `//x`, another site.
+  if (path.startsWith('//') || new URL(path, LOCAL_ORIGIN).origin !== LOCAL_ORIGIN) return '/';
+  return path;
 }
 
 /** `/compte`, keeping a safe `redirect` (SPEC-020-07: the old `/connexion?redirect=X`). */

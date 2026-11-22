@@ -36,6 +36,8 @@ export function RegisterPanel({ onSignedIn, onGoToLogin }: RegisterPanelProps) {
   const [general, setGeneral] = useState<string | null>(null);
   /** The last API error's code: the « Se connecter » link under the number depends on it. */
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  /** Review 2 (WCAG 2.4.3): back from the code step, the form's first field takes the focus. */
+  const [returned, setReturned] = useState(false);
   const [busy, setBusy] = useState(false);
   const [registration, setRegistration] = useState<{ id: string; email: string } | null>(null);
 
@@ -105,6 +107,7 @@ export function RegisterPanel({ onSignedIn, onGoToLogin }: RegisterPanelProps) {
           }
         }}
         onBack={() => {
+          setReturned(true);
           setRegistration(null);
           setGeneral(null);
         }}
@@ -125,6 +128,7 @@ export function RegisterPanel({ onSignedIn, onGoToLogin }: RegisterPanelProps) {
     >
       {general && <Alert tone="danger">{general}</Alert>}
       <Input
+        autoFocus={returned}
         label="Nom complet"
         autoComplete="name"
         placeholder="Prénom Nom"
