@@ -106,6 +106,17 @@ application Expo ne se construit encore (MOB-01). Handoff : sur un appareil, qua
 existera, vérifier l'écran « Mon compte » (deux onglets), l'inscription avec le code, la connexion
 par mot de passe et le mot de passe oublié. La logique est couverte par `apps/mobile/lib/account.spec.ts`.
 
+## Envoi Gmail réel (2026-11-22)
+
+SPEC-020-01-SC06 : l'utilisateur a renseigné l'adresse Gmail officielle et son mot de passe
+d'application dans `.env` (jamais lus ni affichés par l'agent : seules leur présence et leur
+forme ont été contrôlées). Une inscription vers l'adresse de DJAFAT elle-même a produit dans le
+journal de l'API « OTP email accepted by SMTP server for d\*\*\*@gmail.com » (RUN) : Gmail a accepté
+l'authentification et le message. L'arrivée dans la boîte reste à confirmer par l'utilisateur.
+Piège trouvé : un mot de passe collé avec ses espaces et sans guillemets casse `source .env` (le
+shell n'en garde rien) ; `.env.example` et le guide disent maintenant « sans espaces ou entre
+guillemets ».
+
 ## Trouvés en route (2026-11-21)
 
 - **CORS (préexistant, corrigé ici)** : `@fastify/cors` n'autorise par défaut que GET, HEAD,

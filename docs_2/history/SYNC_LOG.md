@@ -10,6 +10,13 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-036 — 2026-11-22 — our docs fix on the FEAT-020 branch (0.24.1)
+
+Short entry (our own commit, already described): the app password must be pasted without spaces or quoted;
+first real Gmail send accepted (RUN). No new finding; no change on GitHub besides our branch.
+
+---
+
 ## S-035 — 2026-11-21/22 — the collaborator's `fix/login-method-icons`; our FEAT-020 branch
 
 |                 |                                                                                                                                         |

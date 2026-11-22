@@ -8,6 +8,16 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-22 — Sync S-036: the Gmail app password, first real send (FEAT-020, 0.24.1)
+
+**Verified:** with the official Gmail address and its app password in the local `.env` (set by the user, never
+displayed), a registration to DJAFAT's own address was accepted by Gmail's SMTP server (API log, RUN); arrival in
+the inbox is for the user to confirm. **Learned:** an app password pasted with its spaces and no quotes breaks
+`source .env` (the shell keeps nothing of it, the API refuses to start); `.env.example` and the local guide now say
+"without spaces, or quoted".
+
+---
+
 ## 2026-11-21 — Sync S-035: customer accounts by e-mail and password (FEAT-020), CORS fix (API-02)
 
 **Changed (branch `feat/compte-email-password`, version 0.24.0, not on `main` yet):** at the user's request,
