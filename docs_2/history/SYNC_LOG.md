@@ -10,6 +10,16 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-044 — 2026-11-23 — FEAT-022 specs on `feat/inscription-par-type`; two branches followed
+
+Short entry (our own docs commits): `8a37b2e` (intake of FEAT-022: every criterion mapped to the code; nothing stores
+files yet — `ObjectStoragePort`'s adapter is a placeholder) and `b792d43` (nine specs, the user's decisions Q01 to Q06,
+the brief in four slices). No code. Branches now followed: `origin/feat/equipe-connexion-email` (`1ce673a`, PR #28,
+reviewed in S-043) and `origin/ci/cheaper-runs` (`d5c6500`, PR #29, reviewed in S-042 on that branch). No new
+finding.
+
+---
+
 ## S-043 — 2026-11-23 — FEAT-020 on `main`; FEAT-021 team login, reviewed twice (0.25.0)
 
 Our own commits on `feat/equipe-connexion-email`, rebased onto `main` `038c723` (PR #27, FEAT-020). The rebase gave

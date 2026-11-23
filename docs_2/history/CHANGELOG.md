@@ -8,6 +8,15 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-23 — Sync S-044: sign-up by account type specified (FEAT-022)
+
+**Added (docs only):** FEAT-022's specs, decisions and brief on `feat/inscription-par-type`. **Decided by the user:**
+photos on the server disk (papers private), a neighbourhood list plus « Autre », a new Mobile Money number approved
+before use, couriers 18 or older with a birth date, a terms checkbox with a placeholder text. **Followed:** PR #28
+(FEAT-021) and PR #29 (cheaper CI) — no GitHub job runs on them until billing is fixed.
+
+---
+
 ## 2026-11-23 — Sync S-043: the team logs in by e-mail and password (FEAT-021, 0.25.0)
 
 **Added:** `packages/sdk/src/team-login.ts` (one role check for every way in, the FEAT-020 password rules before any
