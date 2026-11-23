@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RegistrationService } from './registration.service';
+import type {
+  CourierSignupRecord,
+  RestaurantSignupRecord,
+} from '../../common/ports/account-onboarding.port';
 import { verifyPassword } from './password-hash.util';
 import {
   META,
@@ -33,7 +37,36 @@ const INPUT = {
   password: 'kissar-boulou-27',
 };
 
-function build(initial: Account[] = []) {
+/** FEAT-022: the courier and restaurant ports, and the neighbourhood list (one active id). */
+function fakeOnboarding(options: { failRestaurant?: boolean } = {}) {
+  const couriers: Array<{ userId: string; signup: CourierSignupRecord }> = [];
+  const restaurants: Array<{ userId: string; signup: RestaurantSignupRecord }> = [];
+  return {
+    couriers,
+    restaurants,
+    courierPort: {
+      provisionCourier: vi.fn(async (_tx: unknown, userId: string, signup: CourierSignupRecord) => {
+        couriers.push({ userId, signup });
+      }),
+    },
+    restaurantPort: {
+      provisionRestaurant: vi.fn(
+        async (_tx: unknown, userId: string, signup: RestaurantSignupRecord) => {
+          if (options.failRestaurant) throw new Error('restaurant could not be created');
+          restaurants.push({ userId, signup });
+          return { restaurantId: 'r-new' };
+        },
+      ),
+    },
+    neighbourhoods: {
+      findActive: vi.fn(async (id: string) => (id === MOURSAL ? { id, name: 'Moursal' } : null)),
+    },
+  };
+}
+
+const MOURSAL = '11111111-1111-4111-8111-111111111111';
+
+function build(initial: Account[] = [], onboardingOptions: { failRestaurant?: boolean } = {}) {
   const otp = fakeOtp();
   const challenges = fakeChallenges();
   const users = fakeUsers(initial, { tx: challenges.prisma });
@@ -42,6 +75,7 @@ function build(initial: Account[] = []) {
   const notices = fakeNotices();
   const audit = fakeAudit();
   const auth = realAuth(otp, users, sessions, audit.service);
+  const onboarding = fakeOnboarding(onboardingOptions);
   const service = new RegistrationService(
     challenges.prisma,
     asOtp(otp),
@@ -50,8 +84,11 @@ function build(initial: Account[] = []) {
     asDevices(devices),
     notices,
     audit.service,
+    onboarding.courierPort,
+    onboarding.restaurantPort,
+    onboarding.neighbourhoods as never,
   );
-  return { service, otp, users, sessions, devices, notices, audit, challenges };
+  return { service, otp, users, sessions, devices, notices, audit, challenges, onboarding };
 }
 
 describe('SPEC-020-03 — create an account confirmed by an email code', () => {
@@ -293,6 +330,180 @@ describe('SPEC-020-03 R13 — a used address and a free one behave the same', ()
     vi.mocked(notices.send).mockResolvedValueOnce('unavailable');
     await expect(service.request(TAKEN, META.ip)).rejects.toMatchObject({
       response: { code: 'EMAIL_UNAVAILABLE' },
+    });
+  });
+});
+
+// FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte (SPEC-022-02, 03, 08).
+
+/** A birth date `years` years before today in N'Djamena (UTC+1), shifted by `days`. */
+function birthDate(years: number, days = 0): string {
+  const now = new Date(Date.now() + 60 * 60 * 1000);
+  const d = new Date(
+    Date.UTC(now.getUTCFullYear() - years, now.getUTCMonth(), now.getUTCDate() + days),
+  );
+  return d.toISOString().slice(0, 10);
+}
+
+const COURIER = {
+  ...INPUT,
+  signup: {
+    type: 'courier' as const,
+    vehicle: 'moto' as const,
+    neighbourhoodId: MOURSAL,
+    neighbourhoodOther: null,
+    birthDate: birthDate(25),
+  },
+};
+const RESTAURANT = {
+  ...INPUT,
+  signup: {
+    type: 'restaurant' as const,
+    restaurantName: 'Chez Fatimé',
+    neighbourhoodId: null,
+    neighbourhoodOther: 'Klémat Nord',
+  },
+};
+
+describe('SPEC-022-02 — sign up as a courier', () => {
+  // SPEC-022-02-SC01
+  it('SPEC-022-02-SC01 — the right code creates the account, the courier « to complete » and its role, in one transaction', async () => {
+    const { service, otp, users, onboarding, challenges, audit } = build();
+    const { registrationId } = await service.request(COURIER, META.ip);
+    const stored = challenges.rows[0]?.payload as { signup: Record<string, unknown> };
+    expect(stored.signup).toMatchObject({
+      type: 'courier',
+      vehicle: 'moto',
+      neighbourhoodId: MOURSAL,
+    });
+    expect(JSON.stringify(stored)).not.toContain(INPUT.password);
+
+    const res = await service.verify(registrationId, otp.lastCode().code, META);
+    const userId = users.accounts[0]?.id;
+    expect(res.user.id).toBe(userId);
+    expect(onboarding.couriers).toEqual([
+      {
+        userId,
+        signup: {
+          vehicle: 'moto',
+          birthDate: COURIER.signup.birthDate,
+          neighbourhoodId: MOURSAL,
+          neighbourhoodOther: null,
+          termsAcceptedAt: expect.any(Date),
+        },
+      },
+    ]);
+    expect(users.grants).toEqual([{ userId, role: 'courier', restaurantId: null }]);
+    const registered = audit.log.mock.calls
+      .map((c) => c[0] as { action: string; metadata?: unknown })
+      .find((e) => e.action === 'AUTH_REGISTERED');
+    expect(registered?.metadata).toEqual({ accountType: 'courier' });
+  });
+
+  // SPEC-022-02-SC02
+  it('SPEC-022-02-SC02 — under 18 is refused with 422 UNDERAGE before anything is stored or sent; 18 exactly passes', async () => {
+    const { service, otp, challenges } = build();
+    const young = { ...COURIER, signup: { ...COURIER.signup, birthDate: birthDate(18, 1) } };
+    await expect(service.request(young, META.ip)).rejects.toMatchObject({
+      status: 422,
+      response: {
+        code: 'UNDERAGE',
+        message: 'Il faut avoir au moins 18 ans pour livrer avec DJAFAT.',
+      },
+    });
+    expect(challenges.rows).toHaveLength(0);
+    expect(otp.sent).toHaveLength(0);
+
+    const eighteen = { ...COURIER, signup: { ...COURIER.signup, birthDate: birthDate(18) } };
+    await expect(service.request(eighteen, META.ip)).resolves.toMatchObject({
+      registrationId: expect.any(String),
+    });
+  });
+
+  // SPEC-022-02-SC05
+  it('SPEC-022-02-SC05 — no code, or a wrong one: no account, no courier, no role', async () => {
+    const { service, users, onboarding } = build();
+    const { registrationId } = await service.request(COURIER, META.ip);
+    expect(onboarding.couriers).toHaveLength(0);
+    await expect(service.verify(registrationId, '000000', META)).rejects.toMatchObject({
+      response: { code: 'OTP_INVALID' },
+    });
+    expect(users.accounts).toHaveLength(0);
+    expect(onboarding.couriers).toHaveLength(0);
+    expect(users.grants).toHaveLength(0);
+  });
+
+  it('refuses a neighbourhood that is not in the list (422 NEIGHBOURHOOD_UNKNOWN)', async () => {
+    const { service, challenges } = build();
+    const unknown = {
+      ...COURIER,
+      signup: { ...COURIER.signup, neighbourhoodId: '22222222-2222-4222-8222-222222222222' },
+    };
+    await expect(service.request(unknown, META.ip)).rejects.toMatchObject({
+      status: 422,
+      response: { code: 'NEIGHBOURHOOD_UNKNOWN' },
+    });
+    expect(challenges.rows).toHaveLength(0);
+  });
+});
+
+describe('SPEC-022-03 — sign up a restaurant', () => {
+  // SPEC-022-03-SC01
+  it('SPEC-022-03-SC01 — the right code creates the account, the draft restaurant and the owner role limited to it', async () => {
+    const { service, otp, users, onboarding } = build();
+    const { registrationId } = await service.request(RESTAURANT, META.ip);
+    await service.verify(registrationId, otp.lastCode().code, META);
+    const userId = users.accounts[0]?.id;
+    expect(onboarding.restaurants).toEqual([
+      {
+        userId,
+        signup: {
+          restaurantName: 'Chez Fatimé',
+          neighbourhoodId: null,
+          neighbourhoodOther: 'Klémat Nord',
+          termsAcceptedAt: expect.any(Date),
+        },
+      },
+    ]);
+    expect(users.grants).toEqual([{ userId, role: 'restaurant_owner', restaurantId: 'r-new' }]);
+  });
+
+  // SPEC-022-03-SC03
+  it('SPEC-022-03-SC03 — sent but never confirmed: no account, no restaurant, no role; a failure creating it undoes the account', async () => {
+    const pending = build();
+    await pending.service.request(RESTAURANT, META.ip);
+    expect(pending.users.accounts).toHaveLength(0);
+    expect(pending.onboarding.restaurants).toHaveLength(0);
+
+    const failing = build([], { failRestaurant: true });
+    const { registrationId } = await failing.service.request(RESTAURANT, META.ip);
+    await expect(
+      failing.service.verify(registrationId, failing.otp.lastCode().code, META),
+    ).rejects.toThrow('restaurant could not be created');
+    expect(failing.users.accounts).toHaveLength(0);
+    expect(failing.users.grants).toHaveLength(0);
+  });
+});
+
+describe('SPEC-022-08 — never a second account', () => {
+  // SPEC-022-08-SC04
+  it('SPEC-022-08-SC04 — a used address: FEAT-020’s answer, no code, nothing created; a used number: 409 PHONE_ALREADY_USED', async () => {
+    const existing = account({ email: 'awa@example.td', phone: '+23566999999' });
+    const { service, otp, notices, users, onboarding } = build([existing]);
+    const res = await service.request(COURIER, META.ip);
+    expect(res.registrationId).toEqual(expect.any(String));
+    expect(otp.sent).toHaveLength(0);
+    expect(notices.sent.map((n) => n.kind)).toEqual(['already_registered']);
+    await expect(service.verify(res.registrationId, '123456', META)).rejects.toMatchObject({
+      response: { code: 'OTP_INVALID' },
+    });
+    expect(onboarding.couriers).toHaveLength(0);
+    expect(users.accounts).toHaveLength(1);
+
+    const samePhone = { ...COURIER, email: 'autre@example.td', phone: '+23566999999' };
+    await expect(service.request(samePhone, META.ip)).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'PHONE_ALREADY_USED' },
     });
   });
 });

@@ -80,3 +80,101 @@ describe('SPEC-020-02 — the API refuses a weak password on its field', () => {
     );
   });
 });
+
+// FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte (SPEC-022-01, 02, 03).
+
+const ACCOUNT = {
+  fullName: 'Abakar Mahamat',
+  phone: '66 12 34 56',
+  email: 'abakar@example.td',
+  password: 'kissar-boulou-27',
+};
+const MOURSAL = '11111111-1111-4111-8111-111111111111';
+const COURIER = {
+  ...ACCOUNT,
+  accountType: 'courier',
+  vehicle: 'moto',
+  neighbourhoodId: MOURSAL,
+  birthDate: '2001-04-12',
+  acceptTerms: true,
+};
+const RESTAURANT = {
+  ...ACCOUNT,
+  accountType: 'restaurant',
+  restaurantName: '  Chez   Fatimé ',
+  neighbourhoodOther: 'Klémat Nord',
+  acceptTerms: true,
+};
+
+const fieldErrors = (input: unknown) => {
+  const r = RegisterSchema.safeParse(input);
+  return r.success
+    ? {}
+    : Object.fromEntries(r.error.issues.map((i) => [String(i.path[0]), i.message]));
+};
+
+describe('SPEC-022-01 — the customer registration does not change', () => {
+  // SPEC-022-01-SC03
+  it('SPEC-022-01-SC03 — FEAT-020’s body, without any type, is a customer; nothing else is added', () => {
+    const parsed = RegisterSchema.parse(ACCOUNT);
+    expect(parsed).toMatchObject({ email: 'abakar@example.td' });
+    expect(Object.keys(parsed).sort()).toEqual(['email', 'fullName', 'password', 'phone']);
+    // an explicit customer type comes out the same
+    expect(RegisterSchema.parse({ ...ACCOUNT, accountType: 'customer' })).toEqual(parsed);
+    // a customer cannot send the courier's fields
+    expect(RegisterSchema.safeParse({ ...ACCOUNT, vehicle: 'moto' }).success).toBe(false);
+  });
+});
+
+describe('SPEC-022-02 — the courier form', () => {
+  // SPEC-022-02-SC03
+  it('SPEC-022-02-SC03 — vehicle, neighbourhood (one of list or « Autre ») and the terms are required, each on its field', () => {
+    expect(RegisterSchema.parse(COURIER)).toMatchObject({
+      accountType: 'courier',
+      vehicle: 'moto',
+    });
+
+    const { vehicle: _v, ...noVehicle } = COURIER;
+    expect(fieldErrors(noVehicle)).toMatchObject({ vehicle: 'Choisissez votre véhicule.' });
+    const { neighbourhoodId: _n, ...noNeighbourhood } = COURIER;
+    expect(fieldErrors(noNeighbourhood)).toMatchObject({
+      neighbourhoodId: 'Choisissez votre quartier, ou « Autre » avec son nom.',
+    });
+    expect(fieldErrors({ ...COURIER, neighbourhoodOther: 'Gassi' })).toHaveProperty(
+      'neighbourhoodId',
+    );
+    const { neighbourhoodId: _m, ...other } = COURIER;
+    expect(fieldErrors({ ...other, neighbourhoodOther: ' a ' })).toHaveProperty(
+      'neighbourhoodOther',
+    );
+    expect(fieldErrors({ ...COURIER, acceptTerms: false })).toMatchObject({
+      acceptTerms: "Acceptez les conditions d'utilisation.",
+    });
+    expect(fieldErrors({ ...COURIER, vehicle: 'scooter' })).toHaveProperty('vehicle');
+  });
+
+  // SPEC-022-02-SC03 (« Erreurs et cas limites »)
+  it('SPEC-022-02-SC03 — a birth date that does not exist, in the future or before 1900 is invalid', () => {
+    for (const birthDate of ['2001-02-30', '2999-01-01', '1899-12-31', '12/04/2001']) {
+      expect(fieldErrors({ ...COURIER, birthDate }), birthDate).toMatchObject({
+        birthDate: 'Date de naissance invalide.',
+      });
+    }
+  });
+});
+
+describe('SPEC-022-03 — the restaurant form', () => {
+  // SPEC-022-03-SC03
+  it('SPEC-022-03-SC03 — the restaurant name and the terms are required; the name is tidied', () => {
+    expect(RegisterSchema.parse(RESTAURANT)).toMatchObject({
+      accountType: 'restaurant',
+      restaurantName: 'Chez Fatimé',
+      neighbourhoodOther: 'Klémat Nord',
+    });
+    expect(fieldErrors({ ...RESTAURANT, restaurantName: '   ' })).toMatchObject({
+      restaurantName: 'Indiquez le nom du restaurant.',
+    });
+    expect(fieldErrors({ ...RESTAURANT, acceptTerms: undefined })).toHaveProperty('acceptTerms');
+    expect(fieldErrors({ ...RESTAURANT, birthDate: '2001-04-12' })).not.toEqual({}); // strict
+  });
+});

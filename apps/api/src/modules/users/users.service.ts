@@ -174,6 +174,8 @@ export class UsersService {
     },
     /** Runs first, in the same transaction (FEAT-020 SPEC-020-03 R5: the registration is consumed with the account). */
     beforeCreate?: (tx: Prisma.TransactionClient) => Promise<void>,
+    /** Runs last, in the same transaction (FEAT-022: the courier or restaurant created with the account). */
+    afterCreate?: (tx: Prisma.TransactionClient, userId: string) => Promise<void>,
   ): Promise<{ userId: string }> {
     const now = new Date();
     try {
@@ -192,6 +194,7 @@ export class UsersService {
           select: { id: true },
         });
         await tx.$executeRaw`INSERT INTO user_roles (user_id, role) VALUES (${created.id}::uuid, 'customer')`;
+        if (afterCreate) await afterCreate(tx, created.id);
         return created;
       });
       return { userId: user.id };
@@ -209,6 +212,25 @@ export class UsersService {
         message: 'Cette adresse e-mail est déjà utilisée par un autre compte.',
       });
     }
+  }
+
+  /**
+   * FEAT-022 (SPEC-022-02 R4, SPEC-022-03 R2): a role granted inside the caller's
+   * transaction — `courier` (global) or `restaurant_owner` limited to the restaurant
+   * just created (`scope_restaurant_id`). Granting it twice changes nothing.
+   */
+  async grantRoleWithin(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    grant:
+      | { readonly role: 'courier' }
+      | { readonly role: 'restaurant_owner'; readonly restaurantId: string },
+  ): Promise<void> {
+    const scope = grant.role === 'restaurant_owner' ? grant.restaurantId : null;
+    await tx.$executeRaw`
+      INSERT INTO user_roles (user_id, role, scope_restaurant_id)
+      VALUES (${userId}::uuid, ${grant.role}, ${scope}::uuid)
+      ON CONFLICT DO NOTHING`;
   }
 
   /** FEAT-020: the stored hash, read only to verify a password — it never travels in a `UserRecord`. */

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { UsersModule } from '../users/users.module';
+import { GeoModule } from '../geo/geo.module';
 import { AuthController } from './auth.controller';
 import { MeController } from './me.controller';
 import { AuthService } from './auth.service';
@@ -50,7 +51,7 @@ import { PhoneLinkService } from './phone-link.service';
  * isn't enough (e.g. a controller resolving an ownership check manually).
  */
 @Module({
-  imports: [UsersModule],
+  imports: [UsersModule, GeoModule],
   controllers: [
     AuthController,
     MeController,

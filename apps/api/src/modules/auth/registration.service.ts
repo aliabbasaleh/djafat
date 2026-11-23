@@ -1,8 +1,29 @@
-import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
+import {
+  COURIER_SIGNUP_MESSAGES,
+  COURIER_VEHICLES,
+  checkCourierBirthDate,
+  ndjamenaDate,
+  type CourierVehicle,
+} from '@djafat/core';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { UsersService } from '../users/users.service';
+import { NeighbourhoodsService } from '../geo/neighbourhoods.service';
+import {
+  COURIER_ONBOARDING_PORT,
+  RESTAURANT_ONBOARDING_PORT,
+  type CourierOnboardingPort,
+  type RestaurantOnboardingPort,
+} from '../../common/ports/account-onboarding.port';
 import { ACCOUNT_NOTICE_PORT, type AccountNoticePort } from './account-notice.port';
 import { AuthService, type LoginResultDto, type RequestMeta } from './auth.service';
 import { emailDeliveryFailed, emailUnavailable } from './email-delivery-errors';
@@ -13,6 +34,23 @@ import { TrustedDeviceService } from './trusted-device.service';
 /** A pending registration lives 30 minutes; each of its codes, `otp_ttl_seconds`. */
 const REGISTRATION_TTL_MS = 30 * 60 * 1000;
 
+/** FEAT-022: what a courier or a restaurant adds to the account (SPEC-022-02 R1, SPEC-022-03 R1). */
+export type SignupDetails =
+  | {
+      readonly type: 'courier';
+      readonly vehicle: CourierVehicle;
+      readonly neighbourhoodId: string | null;
+      readonly neighbourhoodOther: string | null;
+      /** `YYYY-MM-DD`; 18 years or more (R2, checked here). */
+      readonly birthDate: string;
+    }
+  | {
+      readonly type: 'restaurant';
+      readonly restaurantName: string;
+      readonly neighbourhoodId: string | null;
+      readonly neighbourhoodOther: string | null;
+    };
+
 export interface RegistrationInput {
   readonly fullName: string;
   /** E.164, normalised by the schema (FEAT-005). */
@@ -20,6 +58,8 @@ export interface RegistrationInput {
   /** Lower-cased by the schema (FEAT-007). */
   readonly email: string;
   readonly password: string;
+  /** Absent: a customer (FEAT-020). */
+  readonly signup?: SignupDetails;
 }
 
 /** A login result plus the token of the device just remembered (SPEC-020-04 R9). */
@@ -29,11 +69,34 @@ export interface SignedInWithDeviceDto extends LoginResultDto {
 }
 
 /** What `auth_challenges.payload` holds for a registration — a hash, never a password. */
+const NeighbourhoodPayload = {
+  neighbourhoodId: z.string().nullable(),
+  neighbourhoodOther: z.string().nullable(),
+  /** When the terms box was ticked: at the request (FEAT-022-Q05). */
+  termsAcceptedAt: z.string(),
+};
 const RegistrationPayload = z.object({
   fullName: z.string(),
   phone: z.string(),
   passwordHash: z.string(),
+  /** FEAT-022: absent for a customer. */
+  signup: z
+    .discriminatedUnion('type', [
+      z.object({
+        type: z.literal('courier'),
+        vehicle: z.enum(COURIER_VEHICLES),
+        birthDate: z.string(),
+        ...NeighbourhoodPayload,
+      }),
+      z.object({
+        type: z.literal('restaurant'),
+        restaurantName: z.string(),
+        ...NeighbourhoodPayload,
+      }),
+    ])
+    .optional(),
 });
+type SignupPayload = NonNullable<z.infer<typeof RegistrationPayload>['signup']>;
 
 const otpInvalid = () =>
   new UnauthorizedException({ code: 'OTP_INVALID', message: 'Invalid or expired code.' });
@@ -62,6 +125,10 @@ export class RegistrationService {
     private readonly devices: TrustedDeviceService,
     @Inject(ACCOUNT_NOTICE_PORT) private readonly notices: AccountNoticePort,
     private readonly audit: AuditService,
+    @Inject(COURIER_ONBOARDING_PORT) private readonly courierOnboarding: CourierOnboardingPort,
+    @Inject(RESTAURANT_ONBOARDING_PORT)
+    private readonly restaurantOnboarding: RestaurantOnboardingPort,
+    private readonly neighbourhoods: NeighbourhoodsService,
   ) {}
 
   async request(
@@ -70,6 +137,8 @@ export class RegistrationService {
   ): Promise<{ registrationId: string; expiresAt: string }> {
     // R10: charged first, so even a 409 costs from the network's budget.
     if (ip) await this.otp.consumeIpBudget(ip);
+    // FEAT-022: the courier's age and the neighbourhood, before anything is stored.
+    await this.checkSignup(input.signup);
 
     // R2 (FEAT-020-Q06): one account per number, said openly.
     if (await this.users.findByPhone(input.phone)) {
@@ -98,7 +167,14 @@ export class RegistrationService {
         email: input.email,
         payload: taken
           ? DECOY_PAYLOAD
-          : { fullName: input.fullName, phone: input.phone, passwordHash },
+          : {
+              fullName: input.fullName,
+              phone: input.phone,
+              passwordHash,
+              ...(input.signup
+                ? { signup: { ...input.signup, termsAcceptedAt: new Date().toISOString() } }
+                : {}),
+            },
         expiresAt,
       },
       select: { id: true },
@@ -121,11 +197,12 @@ export class RegistrationService {
     }); // throws OTP_INVALID / OTP_LOCKED — a decoy has no code, so it always stops here
     if (isDecoy(row.payload)) throw otpInvalid();
 
-    const payload = RegistrationPayload.parse(row.payload);
+    const { signup, ...account } = RegistrationPayload.parse(row.payload);
     // R5, R8 (review #7): the account, its role and the consumed registration
-    // in ONE transaction; a number or address taken meanwhile -> 409.
+    // in ONE transaction; a number or address taken meanwhile -> 409. FEAT-022:
+    // the courier or restaurant and its role join the same transaction.
     const { userId } = await this.users.createRegisteredCustomer(
-      { ...payload, email: row.email },
+      { ...account, email: row.email },
       async (tx) => {
         const claimed = await tx.authChallenge.updateMany({
           where: { id: row.id, consumedAt: null },
@@ -133,6 +210,7 @@ export class RegistrationService {
         });
         if (claimed.count !== 1) throw otpInvalid();
       },
+      signup ? (tx, createdId) => this.provision(tx, createdId, signup) : undefined,
     );
     await this.audit.log({
       actorUserId: userId,
@@ -141,6 +219,7 @@ export class RegistrationService {
       entityId: userId,
       ip: meta.ip,
       userAgent: meta.userAgent,
+      metadata: { accountType: signup?.type ?? 'customer' },
     });
 
     const session = await this.auth.openSession(userId, meta);
@@ -174,6 +253,57 @@ export class RegistrationService {
     const outcome = await this.notices.send({ kind: 'already_registered', to: target.target });
     if (outcome === 'failed') throw emailDeliveryFailed();
     if (outcome === 'unavailable') throw emailUnavailable();
+  }
+
+  /**
+   * FEAT-022: SPEC-022-02 R2 — a courier is 18 or older on N'Djamena's date
+   * (422 `UNDERAGE`); SPEC-022-09 — a neighbourhood id names an active one
+   * (422 `NEIGHBOURHOOD_UNKNOWN`). Nothing here depends on whether an account exists.
+   */
+  private async checkSignup(signup: SignupDetails | undefined): Promise<void> {
+    if (!signup) return;
+    if (signup.type === 'courier') {
+      const verdict = checkCourierBirthDate(signup.birthDate, ndjamenaDate(new Date()));
+      if (!verdict.ok) {
+        throw new UnprocessableEntityException({
+          code: verdict.reason === 'underage' ? 'UNDERAGE' : 'VALIDATION_ERROR',
+          message: COURIER_SIGNUP_MESSAGES[verdict.reason],
+        });
+      }
+    }
+    if (signup.neighbourhoodId && !(await this.neighbourhoods.findActive(signup.neighbourhoodId))) {
+      throw new UnprocessableEntityException({
+        code: 'NEIGHBOURHOOD_UNKNOWN',
+        message: 'Ce quartier ne fait pas partie de la liste.',
+      });
+    }
+  }
+
+  /** FEAT-022 (SPEC-022-02 R4, SPEC-022-03 R2): in the account's transaction. */
+  private async provision(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    signup: SignupPayload,
+  ): Promise<void> {
+    const termsAcceptedAt = new Date(signup.termsAcceptedAt);
+    if (signup.type === 'courier') {
+      await this.courierOnboarding.provisionCourier(tx, userId, {
+        vehicle: signup.vehicle,
+        birthDate: signup.birthDate,
+        neighbourhoodId: signup.neighbourhoodId,
+        neighbourhoodOther: signup.neighbourhoodOther,
+        termsAcceptedAt,
+      });
+      await this.users.grantRoleWithin(tx, userId, { role: 'courier' });
+      return;
+    }
+    const { restaurantId } = await this.restaurantOnboarding.provisionRestaurant(tx, userId, {
+      restaurantName: signup.restaurantName,
+      neighbourhoodId: signup.neighbourhoodId,
+      neighbourhoodOther: signup.neighbourhoodOther,
+      termsAcceptedAt,
+    });
+    await this.users.grantRoleWithin(tx, userId, { role: 'restaurant_owner', restaurantId });
   }
 
   private pending(id: string) {
