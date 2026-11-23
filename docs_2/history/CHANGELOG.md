@@ -8,6 +8,23 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-23 — Sync S-041: PR #27 merged into `main` without GitHub's checks (FEAT-020, 0.24.4)
+
+**Changed:** at the user's request (« just merge it and comment it in the changelog »), PR #27 is merged although
+no GitHub job ran on it: the account that owns the repository has used up its Actions minutes for the month
+(« recent account payments have failed or your spending limit needs to be increased »; about 1,800 minutes used by
+this repository since 1 November, Windows jobs counting double).
+
+**Verified instead:** `verify --full` locally on `4a785d0`, without new failure (PostgreSQL + Redis integration
+included); on GitHub, Linux, integration, audit and gitleaks green on `379db20`; after it, only the time limits of
+four test files changed (`5818b77`), re-run locally: 45 tests out of 45. **Not verified:** the Windows job with those
+limits, and any check on `main` itself.
+
+**To do:** once the owner fixes billing (Settings → Billing and licensing), re-run every check on `main`
+(`docs/ROADMAP.md`, « à faire côté DJAFAT »).
+
+---
+
 ## 2026-11-23 — Sync S-040: Windows CI timeouts on PR #27 (FEAT-020, 0.24.3)
 
 **Learned:** real scrypt (N=2^15) in unit tests is slower on the Windows CI runner: two tests passed 5 s

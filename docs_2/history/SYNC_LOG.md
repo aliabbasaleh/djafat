@@ -10,6 +10,16 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-041 — 2026-11-23 — PR #27 merged without GitHub's checks (0.24.4)
+
+Short entry (our own docs commit `631b433`): version 0.24.4 records in `docs/ROADMAP.md` that PR #27 (FEAT-020) is
+merged at the user's request although GitHub started none of its jobs — the owner account's Actions minutes are used
+up. Evidence kept: the local full verify on `4a785d0`, hosted Linux, integration, audit and gitleaks green on
+`379db20`, and the four test files changed since then re-run locally. Not verified: the Windows job, and CI on
+`main`. No new code finding; `PROJECT_STATUS.md` and the backlog say CI must run again on `main`.
+
+---
+
 ## S-040 — 2026-11-23 — FEAT-020: Windows CI timeouts (0.24.3)
 
 Short entry (our own commit): on PR #27 the Windows runner timed out two tests that hash real passwords
