@@ -121,10 +121,16 @@ git add -A && git commit -m "fix(web): libellé du bouton commander"
 git push -u origin prenom/ce-que-je-change
 ```
 
-4. Ouvrir une _Pull Request_ vers `main` sur GitHub. Les contrôles
-   automatiques (Linux et Windows) tournent ; on ne fusionne **que si tout est
-   vert**, puis on supprime la branche. On ne travaille jamais directement sur
-   `main`.
+4. Ouvrir une _Pull Request_ vers `main` sur GitHub, **en brouillon**
+   (« Create draft pull request ») tant qu'on envoie encore des modifications :
+   sur un brouillon, les contrôles lourds ne tournent pas, ce qui économise les
+   minutes GitHub Actions du dépôt (privé, minutes comptées). Quand c'est prêt :
+   « Ready for review » ; les contrôles automatiques (Linux et Windows)
+   tournent, et on ne fusionne **que si tout est vert**, puis on supprime la
+   branche. Une PR qui ne touche que la documentation ne lance que le contrôle
+   du format et des specs ; l'analyse de sécurité tourne à chaque envoi.
+   Grouper ses envois : chaque envoi sur une PR prête relance les contrôles.
+   On ne travaille jamais directement sur `main`.
 
 **À chaque version envoyée** : ajouter une ligne au journal de
 [`ROADMAP.md`](ROADMAP.md), cocher ce qui est fait, et augmenter `version` dans
