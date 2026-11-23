@@ -12,6 +12,8 @@ import { RedisService } from '../src/common/redis/redis.service';
 import { PrismaService } from '../src/infra/prisma/prisma.service';
 import { PhotoStorage } from '../src/infra/storage/photo-storage';
 import { mockEmailOtpKey } from '../src/modules/auth/providers/mock-email-otp-delivery.provider';
+import { mockAccountNoticeKey } from '../src/modules/auth/providers/mock-account-notice.provider';
+import { mockOtpKey } from '../src/modules/auth/providers/mock-otp-delivery.provider';
 import { seedReferenceData } from '../prisma/reference-data';
 
 // FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte, on a real
@@ -85,6 +87,73 @@ async function neighbourhood(name: string): Promise<string> {
   ).neighbourhoods.find((n) => n.name === name);
   if (!found) throw new Error(`no neighbourhood ${name}`);
   return found.id;
+}
+
+/** Seeded staff (`prisma/seed.ts`), signed in by SMS code (mock). */
+const STAFF = { admin: '+23566000007', support: '+23566000005' } as const;
+
+async function staffToken(phone: string): Promise<string> {
+  await request(server).post('/v1/auth/otp/request').send({ phone, purpose: 'login' }).expect(202);
+  const code = await redis.client.get(mockOtpKey(phone));
+  if (!code) throw new Error(`no mock SMS code for ${phone}`);
+  const res = await request(server)
+    .post('/v1/auth/otp/verify')
+    .send({ phone, code, purpose: 'login' })
+    .expect(200);
+  return (res.body as { access: string }).access;
+}
+
+/** The smallest JPEG `PhotoStorage` accepts (SOI, a scan, EOI). */
+const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xda, 0x00, 0x04, 0x01, 0x02, 0x33, 0xff, 0xd9]);
+
+function upload(access: string, kind: string, body: Buffer, type = 'image/jpeg') {
+  return request(server)
+    .post(`/v1/couriers/me/application/files/${kind}`)
+    .set('Authorization', `Bearer ${access}`)
+    .set('Content-Type', type)
+    .send(body);
+}
+
+/** A courier who signed up (moto) — then, if asked, every item of the list filled (SPEC-022-06 R1). */
+async function motoCourier(
+  options: { complete?: boolean } = {},
+): Promise<SignedIn & { email: string }> {
+  const input = fresh();
+  const signedIn = await signUp({
+    ...input,
+    accountType: 'courier',
+    vehicle: 'moto',
+    neighbourhoodId: await neighbourhood('Moursal'),
+    birthDate: bornYearsAgo(25),
+    acceptTerms: true,
+  });
+  if (options.complete) {
+    for (const kind of [
+      'face',
+      'id_card',
+      'driving_licence',
+      'vehicle_registration',
+      'insurance',
+      'plate',
+    ]) {
+      await upload(signedIn.access, kind, JPEG).expect(200);
+    }
+    await request(server)
+      .put('/v1/couriers/me/application')
+      .set('Authorization', `Bearer ${signedIn.access}`)
+      .send({
+        mobileMoney: { provider: 'airtel', number: '66 00 00 01' },
+        emergencyContact: { name: 'Halimé Abakar', phone: '99 11 22 33' },
+      })
+      .expect(200);
+  }
+  return { ...signedIn, email: input.email };
+}
+
+async function submit(access: string) {
+  return request(server)
+    .post('/v1/couriers/me/application/submit')
+    .set('Authorization', `Bearer ${access}`);
 }
 
 async function roles(userId: string): Promise<Array<{ role: string; scope: string | null }>> {
@@ -268,5 +337,305 @@ describe('FEAT-022 — sign-up by account type on PostgreSQL and Redis', () => {
     const served = await request(server).get(`${link.pathname}${link.search}`).expect(200);
     expect(served.headers['content-type']).toContain('image/jpeg');
     expect(served.headers['cache-control']).toBe('private, no-store');
+  });
+});
+
+describe('FEAT-022 part 2 — the courier’s application and DJAFAT’s decision, over HTTP', () => {
+  // SPEC-022-04-SC03
+  it('SPEC-022-04-SC03 — a PDF sent as a photo: 415 UNSUPPORTED_FILE; 6 MB: 413 FILE_TOO_LARGE; nothing kept', async () => {
+    const courier = await motoCourier();
+    const pdf = Buffer.from('%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\n', 'latin1');
+
+    const refused = await upload(courier.access, 'id_card', pdf).expect(415);
+    expect(refused.body).toMatchObject({ error: { code: 'UNSUPPORTED_FILE' } });
+    const big = await upload(courier.access, 'id_card', Buffer.alloc(6 * 1024 * 1024, 0xff)).expect(
+      413,
+    );
+    expect(big.body).toMatchObject({ error: { code: 'FILE_TOO_LARGE' } });
+
+    const application = await prisma.courierApplication.findUniqueOrThrow({
+      where: { courierUserId: courier.user.id },
+    });
+    expect(application.idCardPhotoKey).toBeNull();
+  });
+
+  // SPEC-022-04-SC01, SPEC-022-04-SC02, SPEC-022-07-SC04
+  it('SPEC-022-04-SC01/SC02 — the ID photo opens for its owner and an admin only; SPEC-022-07-SC04 — support is refused', async () => {
+    const courier = await motoCourier();
+    const stranger = await motoCourier();
+    const sent = await upload(courier.access, 'id_card', JPEG).expect(200);
+    expect(sent.body).toMatchObject({
+      photos: expect.arrayContaining([{ kind: 'id_card', uploaded: true }]),
+    });
+    const key = (
+      await prisma.courierApplication.findUniqueOrThrow({
+        where: { courierUserId: courier.user.id },
+      })
+    ).idCardPhotoKey!;
+
+    // No public address; another courier only ever reaches their own application.
+    await request(server).get(`/v1/files/${key}`).expect(403);
+    await request(server)
+      .get('/v1/couriers/me/application/files/id_card')
+      .set('Authorization', `Bearer ${stranger.access}`)
+      .expect(404);
+
+    const mine = await request(server)
+      .get('/v1/couriers/me/application/files/id_card')
+      .set('Authorization', `Bearer ${courier.access}`)
+      .expect(200);
+    expect(mine.body).toMatchObject({ expiresInSeconds: 300 });
+    const ownLink = new URL((mine.body as { url: string }).url);
+    await request(server).get(`${ownLink.pathname}${ownLink.search}`).expect(200);
+    await request(server)
+      .get(`${ownLink.pathname}${ownLink.search.replace(/sig=./, 'sig=A')}`)
+      .expect(403);
+
+    const admin = await staffToken(STAFF.admin);
+    const adminLink = await request(server)
+      .get(`/v1/admin/applications/courier/${courier.user.id}/files/id_card`)
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(200);
+    const link = new URL((adminLink.body as { url: string }).url);
+    const image = await request(server).get(`${link.pathname}${link.search}`).expect(200);
+    expect(image.headers['content-type']).toContain('image/jpeg');
+
+    const support = await staffToken(STAFF.support);
+    await request(server)
+      .get(`/v1/admin/applications/courier/${courier.user.id}/files/id_card`)
+      .set('Authorization', `Bearer ${support}`)
+      .expect(403);
+    await request(server)
+      .get('/v1/admin/applications')
+      .set('Authorization', `Bearer ${support}`)
+      .expect(403);
+  });
+
+  // SPEC-022-06-SC02, SPEC-022-06-SC03
+  it('SPEC-022-06-SC02 — sent without the licence: 409 with ["driving_licence"]; SC03 — complete: pending_review, then locked', async () => {
+    const courier = await motoCourier();
+    for (const kind of ['face', 'id_card', 'vehicle_registration', 'insurance', 'plate']) {
+      await upload(courier.access, kind, JPEG).expect(200);
+    }
+    await request(server)
+      .put('/v1/couriers/me/application')
+      .set('Authorization', `Bearer ${courier.access}`)
+      .send({
+        mobileMoney: { provider: 'moov', number: '99 00 00 01' },
+        emergencyContact: { name: 'Halimé Abakar', phone: '99 11 22 33' },
+      })
+      .expect(200);
+
+    const incomplete = (await submit(courier.access)).body;
+    expect(incomplete).toMatchObject({
+      error: { code: 'APPLICATION_INCOMPLETE', details: { missing: ['driving_licence'] } },
+    });
+
+    await upload(courier.access, 'driving_licence', JPEG).expect(200);
+    const sent = await submit(courier.access);
+    expect(sent.status).toBe(200);
+    expect(sent.body).toMatchObject({ status: 'pending_review' });
+    const row = await prisma.courierApplication.findUniqueOrThrow({
+      where: { courierUserId: courier.user.id },
+    });
+    expect(row.status).toBe('pending_review');
+    expect(row.submittedAt).toBeInstanceOf(Date);
+
+    const changed = await request(server)
+      .put('/v1/couriers/me/application')
+      .set('Authorization', `Bearer ${courier.access}`)
+      .send({ vehicle: 'velo' })
+      .expect(409);
+    expect(changed.body).toMatchObject({ error: { code: 'APPLICATION_LOCKED' } });
+    await upload(courier.access, 'face', JPEG).expect(409);
+  });
+
+  it('SPEC-022-06 — a mistyped number and the courier’s own number as emergency contact: 422', async () => {
+    const courier = await motoCourier();
+    const own = await prisma.user.findUniqueOrThrow({ where: { id: courier.user.id } });
+
+    const typo = await request(server)
+      .put('/v1/couriers/me/application')
+      .set('Authorization', `Bearer ${courier.access}`)
+      .send({ mobileMoney: { provider: 'airtel', number: '66 00' } })
+      .expect(422);
+    expect(typo.body).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+    const self = await request(server)
+      .put('/v1/couriers/me/application')
+      .set('Authorization', `Bearer ${courier.access}`)
+      .send({ emergencyContact: { name: 'Moi-même', phone: own.phone } })
+      .expect(422);
+    expect(self.body).toMatchObject({
+      error: { code: 'VALIDATION_ERROR', details: [{ path: 'emergencyContact.phone' }] },
+    });
+  });
+
+  // SPEC-022-07-SC03
+  it('SPEC-022-07-SC03 — refused without a reason: 422; with « La photo du permis est floue. »: rejected, e-mailed, corrected and back in the queue', async () => {
+    const courier = await motoCourier({ complete: true });
+    await submit(courier.access);
+    const admin = await staffToken(STAFF.admin);
+    const reject = (reason: string | undefined) =>
+      request(server)
+        .post(`/v1/admin/applications/courier/${courier.user.id}/reject`)
+        .set('Authorization', `Bearer ${admin}`)
+        .send(reason === undefined ? {} : { reason });
+
+    expect((await reject(undefined)).status).toBe(422);
+    expect((await reject('Floue.')).status).toBe(422);
+    const refused = await reject('La photo du permis est floue.');
+    expect(refused.status).toBe(200);
+    expect(refused.body).toMatchObject({ status: 'rejected', email: 'sent' });
+
+    const notice = JSON.parse(
+      (await redis.client.get(mockAccountNoticeKey(courier.email))) ?? '{}',
+    );
+    expect(notice).toEqual({
+      kind: 'application_rejected',
+      subject: 'Votre demande de livreur DJAFAT est refusée',
+    });
+    const seen = await request(server)
+      .get('/v1/couriers/me/application')
+      .set('Authorization', `Bearer ${courier.access}`)
+      .expect(200);
+    expect(seen.body).toMatchObject({
+      status: 'rejected',
+      rejectionReason: 'La photo du permis est floue.',
+    });
+
+    await upload(courier.access, 'driving_licence', JPEG).expect(200);
+    expect((await submit(courier.access)).status).toBe(200);
+    const queue = await request(server)
+      .get('/v1/admin/applications?type=courier')
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(200);
+    expect((queue.body as { items: Array<{ id: string }> }).items.map((i) => i.id)).toContain(
+      courier.user.id,
+    );
+  });
+
+  // SPEC-022-07-SC06
+  it('SPEC-022-07-SC06 — two admins decide at the same time: one decision, the other 409 ALREADY_DECIDED', async () => {
+    const courier = await motoCourier({ complete: true });
+    await submit(courier.access);
+    const admin = await staffToken(STAFF.admin);
+    const path = `/v1/admin/applications/courier/${courier.user.id}`;
+
+    const [approve, reject] = await Promise.all([
+      request(server).post(`${path}/approve`).set('Authorization', `Bearer ${admin}`).send({}),
+      request(server)
+        .post(`${path}/reject`)
+        .set('Authorization', `Bearer ${admin}`)
+        .send({ reason: 'Le permis a expiré, merci.' }),
+    ]);
+
+    expect([approve.status, reject.status].sort()).toEqual([200, 409]);
+    const loser = approve.status === 409 ? approve : reject;
+    expect(loser.body).toMatchObject({ error: { code: 'ALREADY_DECIDED' } });
+    const row = await prisma.courierApplication.findUniqueOrThrow({
+      where: { courierUserId: courier.user.id },
+    });
+    expect(row.status).toBe(approve.status === 200 ? 'approved' : 'rejected');
+    const decisions = await prisma.auditLog.count({
+      where: {
+        entityId: courier.user.id,
+        action: { in: ['APPLICATION_APPROVED', 'APPLICATION_REJECTED'] },
+      },
+    });
+    expect(decisions).toBe(1);
+  });
+
+  // SPEC-022-06-SC04
+  it('SPEC-022-06-SC04 — « En ligne » refused while checked, accepted once approved; a courier without application works as before', async () => {
+    const courier = await motoCourier({ complete: true });
+    await submit(courier.access);
+    const goOnline = (access: string) =>
+      request(server)
+        .post('/v1/couriers/me/status')
+        .set('Authorization', `Bearer ${access}`)
+        .send({ status: 'online' });
+
+    const waiting = await goOnline(courier.access);
+    expect(waiting.status).toBe(409);
+    expect(waiting.body).toMatchObject({ error: { code: 'COURIER_NOT_APPROVED' } });
+
+    const admin = await staffToken(STAFF.admin);
+    await request(server)
+      .post(`/v1/admin/applications/courier/${courier.user.id}/approve`)
+      .set('Authorization', `Bearer ${admin}`)
+      .send({})
+      .expect(200);
+    const notice = JSON.parse(
+      (await redis.client.get(mockAccountNoticeKey(courier.email))) ?? '{}',
+    );
+    expect(notice).toMatchObject({ kind: 'application_approved' });
+    expect((await goOnline(courier.access)).status).toBe(201);
+
+    // A courier the team created has a role and a profile, no application.
+    const team = await motoCourier();
+    await prisma.courierApplication.delete({ where: { courierUserId: team.user.id } });
+    expect((await goOnline(team.access)).status).toBe(201);
+
+    for (const c of [courier, team]) {
+      await request(server)
+        .post('/v1/couriers/me/status')
+        .set('Authorization', `Bearer ${c.access}`)
+        .send({ status: 'offline' });
+    }
+  });
+
+  // SPEC-022-07-SC01
+  it('SPEC-022-07-SC01 — the restaurants sent are listed oldest first, a draft never; both tabs counted', async () => {
+    const klemat = await neighbourhood('Klémat');
+    const restaurants: string[] = [];
+    for (const name of ['Grill', 'Chez Fatimé', 'Brouillon']) {
+      const owner = await signUp({
+        ...fresh(),
+        accountType: 'restaurant',
+        restaurantName: `${name} ${randomUUID().slice(0, 6)}`,
+        neighbourhoodId: klemat,
+        acceptTerms: true,
+      });
+      const r = await prisma.restaurant.findFirstOrThrow({ where: { ownerUserId: owner.user.id } });
+      restaurants.push(r.id);
+    }
+    const [later, earlier, draft] = restaurants;
+    // Sent (the four steps come with SPEC-022-05): earlier first, even if created second.
+    await prisma.restaurantApplication.update({
+      where: { restaurantId: later! },
+      data: { status: 'pending_review', submittedAt: new Date('2026-11-22T10:02:00Z') },
+    });
+    await prisma.restaurantApplication.update({
+      where: { restaurantId: earlier! },
+      data: { status: 'pending_review', submittedAt: new Date('2026-11-22T09:14:00Z') },
+    });
+    const admin = await staffToken(STAFF.admin);
+
+    const res = await request(server)
+      .get('/v1/admin/applications?type=restaurant')
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(200);
+    const body = res.body as {
+      counts: { restaurant: number; courier: number };
+      items: Array<{ id: string; neighbourhood: string }>;
+    };
+    const ids = body.items.map((i) => i.id);
+    expect(ids.indexOf(earlier!)).toBeLessThan(ids.indexOf(later!));
+    expect(ids.indexOf(earlier!)).toBeGreaterThanOrEqual(0);
+    expect(ids).not.toContain(draft);
+    expect(body.counts.restaurant).toBe(body.items.length);
+    expect(body.items.find((i) => i.id === earlier)?.neighbourhood).toBe('Klémat');
+    const couriers = await request(server)
+      .get('/v1/admin/applications?type=courier')
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(200);
+    expect((couriers.body as { counts: unknown }).counts).toEqual(body.counts);
+
+    for (const id of [later!, earlier!]) {
+      await prisma.restaurantApplication.update({
+        where: { restaurantId: id },
+        data: { status: 'to_complete', submittedAt: null },
+      });
+    }
   });
 });

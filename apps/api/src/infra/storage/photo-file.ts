@@ -35,22 +35,20 @@ export function sniffPhotoType(bytes: Uint8Array): PhotoType | null {
   return null;
 }
 
-const unsupported = () =>
+export const unsupportedPhoto = () =>
   new UnsupportedMediaTypeException({
     code: 'UNSUPPORTED_FILE',
     message: 'Envoyez une photo JPEG, PNG ou WebP.',
   });
 
+export const photoTooLarge = () =>
+  new PayloadTooLargeException({ code: 'FILE_TOO_LARGE', message: 'La photo dépasse 5 Mo.' });
+
 /** R2: 413 `FILE_TOO_LARGE` above 5 MB, 415 `UNSUPPORTED_FILE` for anything but a photo. */
 export function assertPhoto(bytes: Uint8Array): PhotoType {
-  if (bytes.length > MAX_PHOTO_BYTES) {
-    throw new PayloadTooLargeException({
-      code: 'FILE_TOO_LARGE',
-      message: 'La photo dépasse 5 Mo.',
-    });
-  }
+  if (bytes.length > MAX_PHOTO_BYTES) throw photoTooLarge();
   const type = sniffPhotoType(bytes);
-  if (!type) throw unsupported();
+  if (!type) throw unsupportedPhoto();
   return type;
 }
 
@@ -69,7 +67,7 @@ function stripJpeg(bytes: Uint8Array): Uint8Array {
   const parts: Uint8Array[] = [bytes.subarray(0, 2)]; // SOI
   let i = 2;
   while (i < bytes.length) {
-    if (bytes[i] !== 0xff || i + 1 >= bytes.length) throw unsupported();
+    if (bytes[i] !== 0xff || i + 1 >= bytes.length) throw unsupportedPhoto();
     const marker = bytes[i + 1] as number;
     if (marker === 0xda) {
       parts.push(bytes.subarray(i)); // start of scan: image data to the end
@@ -79,14 +77,14 @@ function stripJpeg(bytes: Uint8Array): Uint8Array {
       parts.push(bytes.subarray(i, i + 2)); // end of image without a scan
       return concat(parts);
     }
-    if (i + 3 >= bytes.length) throw unsupported();
+    if (i + 3 >= bytes.length) throw unsupportedPhoto();
     const length = ((bytes[i + 2] as number) << 8) | (bytes[i + 3] as number);
     const end = i + 2 + length;
-    if (length < 2 || end > bytes.length) throw unsupported();
+    if (length < 2 || end > bytes.length) throw unsupportedPhoto();
     if (marker !== 0xe1 && marker !== 0xed) parts.push(bytes.subarray(i, end));
     i = end;
   }
-  throw unsupported();
+  throw unsupportedPhoto();
 }
 
 const PNG_DROPPED = new Set(['eXIf', 'tEXt', 'zTXt', 'iTXt', 'tIME']);
@@ -96,7 +94,7 @@ function stripPng(bytes: Uint8Array): Uint8Array {
   const parts: Uint8Array[] = [bytes.subarray(0, 8)];
   let i = 8;
   while (i < bytes.length) {
-    if (i + 8 > bytes.length) throw unsupported();
+    if (i + 8 > bytes.length) throw unsupportedPhoto();
     const length =
       (((bytes[i] as number) << 24) >>> 0) +
       ((bytes[i + 1] as number) << 16) +
@@ -104,12 +102,12 @@ function stripPng(bytes: Uint8Array): Uint8Array {
       (bytes[i + 3] as number);
     const type = ascii(bytes, i + 4, 4);
     const end = i + 12 + length; // length, type, data, CRC
-    if (end > bytes.length) throw unsupported();
+    if (end > bytes.length) throw unsupportedPhoto();
     if (!PNG_DROPPED.has(type)) parts.push(bytes.subarray(i, end));
     i = end;
     if (type === 'IEND') return concat(parts);
   }
-  throw unsupported();
+  throw unsupportedPhoto();
 }
 
 /** WebP: drop the EXIF and XMP chunks, clear their flags in VP8X, fix the RIFF size. */
@@ -117,7 +115,7 @@ function stripWebp(bytes: Uint8Array): Uint8Array {
   const chunks: Uint8Array[] = [];
   let i = 12;
   while (i < bytes.length) {
-    if (i + 8 > bytes.length) throw unsupported();
+    if (i + 8 > bytes.length) throw unsupportedPhoto();
     const fourcc = ascii(bytes, i, 4);
     const size =
       (bytes[i + 4] as number) |
@@ -125,7 +123,7 @@ function stripWebp(bytes: Uint8Array): Uint8Array {
       ((bytes[i + 6] as number) << 16) |
       (((bytes[i + 7] as number) << 24) >>> 0);
     const end = i + 8 + size + (size % 2); // chunks are padded to an even size
-    if (end > bytes.length) throw unsupported();
+    if (end > bytes.length) throw unsupportedPhoto();
     if (fourcc !== 'EXIF' && fourcc !== 'XMP ') {
       const chunk = bytes.slice(i, end);
       if (fourcc === 'VP8X' && chunk.length > 8) chunk[8] = (chunk[8] as number) & ~0x0c; // XMP 0x04, EXIF 0x08

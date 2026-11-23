@@ -9,6 +9,8 @@ import { RestaurantAvailabilityService } from './restaurant-availability.service
 import { RestaurantsManagementService } from './restaurants-management.service';
 import { MenuCategoriesService } from './menu-categories.service';
 import { ProductsManagementService } from './products-management.service';
+import { GeoModule } from '../geo/geo.module';
+import { RestaurantApplicationService } from './restaurant-application.service';
 
 /**
  * Catalog & Restaurant Discovery (Bloc 2, docs/20). Depends only on
@@ -21,7 +23,7 @@ import { ProductsManagementService } from './products-management.service';
  * in this module to need it injected rather than just the guards.
  */
 @Module({
-  imports: [UsersModule, AuthModule],
+  imports: [UsersModule, AuthModule, GeoModule],
   controllers: [CatalogController, CatalogManagementController, RestaurantsAdminController],
   providers: [
     CatalogService,
@@ -29,7 +31,9 @@ import { ProductsManagementService } from './products-management.service';
     RestaurantsManagementService,
     MenuCategoriesService,
     ProductsManagementService,
+    // FEAT-022: the restaurants' applications, read by `admin` (SPEC-022-07).
+    RestaurantApplicationService,
   ],
-  exports: [CatalogService],
+  exports: [CatalogService, RestaurantApplicationService],
 })
 export class CatalogModule {}

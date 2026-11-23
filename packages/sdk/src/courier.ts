@@ -2,6 +2,7 @@ import type { MoneyJson, Role } from '@djafat/types';
 import type { ApiHttp } from './http.js';
 import type { OwnerBalance } from './admin.js';
 import type { CourierPayout } from './payouts.js';
+import { createCourierApplicationClient } from './applications.js';
 
 /**
  * Bloc 11 — `apps/courier` client bindings (docs/04 §4.7, docs/25). Every
@@ -126,6 +127,8 @@ export interface CourierEarnings {
 export function createCourierClient(http: ApiHttp) {
   return {
     getProfile: () => http.get<CourierProfile>('/couriers/me'),
+    /** FEAT-022: « Avant votre première course » (SPEC-022-06). */
+    application: createCourierApplicationClient(http),
     getBalance: () => http.get<readonly OwnerBalance[]>('/couriers/me/balance'),
     getEarnings: () => http.get<CourierEarnings>('/couriers/me/earnings'),
     payouts: {

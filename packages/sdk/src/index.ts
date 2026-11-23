@@ -20,6 +20,7 @@ export * from './cart.js';
 export * from './orders.js';
 export * from './addresses.js';
 export * from './admin.js';
+export * from './applications.js';
 export * from './restaurant.js';
 export * from './courier.js';
 

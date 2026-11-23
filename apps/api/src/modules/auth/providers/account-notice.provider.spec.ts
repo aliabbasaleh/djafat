@@ -104,3 +104,50 @@ describe('SPEC-020-01 — account notices without a code', () => {
     expect(text).toContain('contactez DJAFAT');
   });
 });
+
+// FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte (SPEC-022-07 R5).
+describe('SPEC-022-07 — the e-mails of a decision', () => {
+  it('SPEC-022-07-SC03 — a refused courier reads the reason and how to send again', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'application_rejected',
+      to: 'abakar@example.td',
+      applicant: { type: 'courier' },
+      reason: 'La photo du permis est floue.',
+    });
+    expect(subject).toBe('Votre demande de livreur DJAFAT est refusée');
+    expect(text).toContain('Motif : La photo du permis est floue.');
+    expect(text).toContain('« Envoyer pour validation »');
+  });
+
+  it('SPEC-022-07-SC03 — an approved courier is told to go online', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'application_approved',
+      to: 'abakar@example.td',
+      applicant: { type: 'courier' },
+    });
+    expect(subject).toBe('Votre compte livreur DJAFAT est validé');
+    expect(text).toContain('« En ligne »');
+  });
+
+  it('SPEC-022-07-SC02 — « Votre restaurant est validé », named, now visible to customers', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'application_approved',
+      to: 'fatime@example.td',
+      applicant: { type: 'restaurant', restaurantName: 'Chez Fatimé' },
+    });
+    expect(subject).toBe('Votre restaurant « Chez Fatimé » est validé');
+    expect(text).toContain('visible des clients');
+  });
+
+  it('a refused restaurant reads the reason and where to correct it', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'application_rejected',
+      to: 'fatime@example.td',
+      applicant: { type: 'restaurant', restaurantName: 'Chez Fatimé' },
+      reason: 'Le numéro RCCM ne correspond pas à la photo.',
+    });
+    expect(subject).toBe('Le dossier de « Chez Fatimé » est refusé');
+    expect(text).toContain('Motif : Le numéro RCCM ne correspond pas à la photo.');
+    expect(text).toContain('console restaurant');
+  });
+});

@@ -1,4 +1,4 @@
-import type { AccountNotice } from '../account-notice.port';
+import type { AccountNotice, Applicant } from '../account-notice.port';
 
 /** Wording of the account notices (FEAT-020, SPEC-020-01 R6). Pure. */
 export function accountNoticeMessage(notice: AccountNotice): { subject: string; text: string } {
@@ -21,6 +21,10 @@ export function accountNoticeMessage(notice: AccountNotice): { subject: string; 
         "L'équipe DJAFAT",
       ].join('\n'),
     };
+  }
+  if (notice.kind === 'application_approved') return approvedMessage(notice.applicant);
+  if (notice.kind === 'application_rejected') {
+    return rejectedMessage(notice.applicant, notice.reason);
   }
   if (notice.kind === 'email_changed') {
     return {
@@ -47,6 +51,59 @@ export function accountNoticeMessage(notice: AccountNotice): { subject: string; 
       '',
       "Si c'est vous, il n'y a rien à faire.",
       "Si ce n'est pas vous, utilisez tout de suite « Mot de passe oublié ? » sur la page « Compte », puis contactez DJAFAT.",
+      '',
+      "L'équipe DJAFAT",
+    ].join('\n'),
+  };
+}
+
+/** FEAT-022 SPEC-022-07 R5: « Votre restaurant est validé ». */
+function approvedMessage(applicant: Applicant): { subject: string; text: string } {
+  if (applicant.type === 'courier') {
+    return {
+      subject: 'Votre compte livreur DJAFAT est validé',
+      text: [
+        'Bonjour,',
+        '',
+        'DJAFAT a vérifié votre dossier de livreur : il est validé.',
+        "Ouvrez l'application DJAFAT Livreur et passez « En ligne » pour recevoir vos premières courses.",
+        '',
+        "L'équipe DJAFAT",
+      ].join('\n'),
+    };
+  }
+  return {
+    subject: `Votre restaurant « ${applicant.restaurantName} » est validé`,
+    text: [
+      'Bonjour,',
+      '',
+      `DJAFAT a vérifié le dossier de « ${applicant.restaurantName} » : il est validé.`,
+      'Votre restaurant est maintenant visible des clients de DJAFAT.',
+      'Suivez vos commandes dans la console restaurant.',
+      '',
+      "L'équipe DJAFAT",
+    ].join('\n'),
+  };
+}
+
+/** FEAT-022 SPEC-022-07 R4, R5: « Votre demande de livreur est refusée : <motif> ». */
+function rejectedMessage(applicant: Applicant, reason: string): { subject: string; text: string } {
+  const courier = applicant.type === 'courier';
+  return {
+    subject: courier
+      ? 'Votre demande de livreur DJAFAT est refusée'
+      : `Le dossier de « ${applicant.restaurantName} » est refusé`,
+    text: [
+      'Bonjour,',
+      '',
+      courier
+        ? 'DJAFAT a vérifié votre dossier de livreur et ne peut pas le valider pour le moment.'
+        : `DJAFAT a vérifié le dossier de « ${applicant.restaurantName} » et ne peut pas le valider pour le moment.`,
+      `Motif : ${reason}`,
+      '',
+      courier
+        ? "Ouvrez l'application DJAFAT Livreur, corrigez ce qui est demandé, puis touchez « Envoyer pour validation »."
+        : 'Ouvrez la console restaurant, corrigez ce qui est demandé, puis touchez « Envoyer pour validation ».',
       '',
       "L'équipe DJAFAT",
     ].join('\n'),

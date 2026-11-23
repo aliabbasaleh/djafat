@@ -50,6 +50,37 @@ export function missingCourierItems(facts: CourierApplicationFacts): CourierItem
   return courierApplicationItems(facts.vehicle).filter((item) => !done[item]);
 }
 
+/** SPEC-022-06 (contract): the six photos of a courier's application, one upload each. */
+export const COURIER_DOCUMENT_KINDS = [
+  'face',
+  'id_card',
+  'driving_licence',
+  'vehicle_registration',
+  'insurance',
+  'plate',
+] as const;
+export type CourierDocumentKind = (typeof COURIER_DOCUMENT_KINDS)[number];
+
+export function isCourierDocumentKind(value: string): value is CourierDocumentKind {
+  return (COURIER_DOCUMENT_KINDS as readonly string[]).includes(value);
+}
+
+/** R1, R3: the photos asked for this vehicle — a bicycle or on foot, only the face and the ID. */
+export function courierDocumentKinds(vehicle: CourierVehicle): CourierDocumentKind[] {
+  return vehicleNeedsPapers(vehicle) ? [...COURIER_DOCUMENT_KINDS] : ['face', 'id_card'];
+}
+
+/** The item of the list a photo belongs to: the three vehicle papers make one item. */
+export function courierItemOfDocument(kind: CourierDocumentKind): CourierItem {
+  return kind === 'vehicle_registration' || kind === 'insurance' || kind === 'plate'
+    ? 'vehicle_papers'
+    : kind;
+}
+
+/** Where earnings are paid (SPEC-022-05, SPEC-022-06 R1). */
+export const MOBILE_MONEY_PROVIDERS = ['airtel', 'moov'] as const;
+export type MobileMoneyProvider = (typeof MOBILE_MONEY_PROVIDERS)[number];
+
 /** SPEC-022-05 R1, in the order of the console's list (FEAT-022-VIS04). */
 export const RESTAURANT_STEPS = ['location', 'hours_menu', 'photos', 'papers'] as const;
 export type RestaurantStep = (typeof RESTAURANT_STEPS)[number];

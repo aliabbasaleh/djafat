@@ -126,6 +126,13 @@ import { PhoneLinkService } from './phone-link.service';
       inject: [AppConfigService, RedisService],
     },
   ],
-  exports: [ActorResolverService, SessionService, TokenService, WhatsappTextReplyService],
+  // FEAT-022: `admin` e-mails DJAFAT's decision on an application through the same notices.
+  exports: [
+    ActorResolverService,
+    SessionService,
+    TokenService,
+    WhatsappTextReplyService,
+    ACCOUNT_NOTICE_PORT,
+  ],
 })
 export class AuthModule {}

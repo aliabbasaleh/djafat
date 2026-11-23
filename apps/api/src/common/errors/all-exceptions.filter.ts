@@ -115,7 +115,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const code: ApiErrorCode = isApiErrorCode(explicitCode)
         ? explicitCode
         : this.httpStatusToCode(status);
-      return { status, code, message };
+      // FEAT-022: what the thrower attached for the client (e.g. the missing items of an
+      // application, the cart line at fault) — it used to be dropped here.
+      const details = respObj?.['details'];
+      return { status, code, message, ...(details !== undefined ? { details } : {}) };
     }
     // Framework client errors (Fastify FST_ERR_*: empty JSON body, malformed
     // JSON, payload too large…) carry their own 4xx `statusCode`. They are the

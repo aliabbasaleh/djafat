@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   courierApplicationItems,
+  courierDocumentKinds,
+  courierItemOfDocument,
+  isCourierDocumentKind,
   missingCourierItems,
   missingRestaurantSteps,
   restaurantStepsDone,
@@ -105,5 +108,29 @@ describe('SPEC-022-05 — the restaurant’s four steps', () => {
   // SPEC-022-05-SC01
   it('SPEC-022-05-SC01 — only the logo missing: the list is ["photos"]', () => {
     expect(missingRestaurantSteps({ ...fullRestaurant, hasLogo: false })).toEqual(['photos']);
+  });
+});
+
+describe('SPEC-022-06 — the courier’s photos', () => {
+  // SPEC-022-06-SC01
+  it('SPEC-022-06-SC01 — Moto: six photos; Vélo and À pied: the face and the ID only', () => {
+    expect(courierDocumentKinds('moto')).toEqual([
+      'face',
+      'id_card',
+      'driving_licence',
+      'vehicle_registration',
+      'insurance',
+      'plate',
+    ]);
+    expect(courierDocumentKinds('voiture')).toHaveLength(6);
+    expect(courierDocumentKinds('velo')).toEqual(['face', 'id_card']);
+    expect(courierDocumentKinds('a_pied')).toEqual(['face', 'id_card']);
+  });
+
+  it('the three vehicle papers make the one « Papiers du véhicule » item', () => {
+    expect(courierItemOfDocument('insurance')).toBe('vehicle_papers');
+    expect(courierItemOfDocument('plate')).toBe('vehicle_papers');
+    expect(courierItemOfDocument('driving_licence')).toBe('driving_licence');
+    expect(isCourierDocumentKind('selfie')).toBe(false);
   });
 });

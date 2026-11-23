@@ -1,6 +1,7 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { VersioningType } from '@nestjs/common';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
+import { registerPhotoUploads } from './infra/storage/photo-upload';
 
 /**
  * The request-handling wiring shared by the real process (`main.ts`) and the
@@ -24,4 +25,7 @@ export function configureApp(app: NestFastifyApplication): void {
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
   app.useGlobalFilters(new AllExceptionsFilter());
+
+  // FEAT-022: photo uploads (`multipart/form-data`, 5 MB) for the applications.
+  registerPhotoUploads(app);
 }

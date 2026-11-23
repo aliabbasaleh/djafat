@@ -70,6 +70,14 @@ export const API_ERROR_CODES = [
   'FILE_NOT_FOUND',
   /** FEAT-022 — photos cannot be stored on this server yet (503, SPEC-022-04). */
   'STORAGE_NOT_CONFIGURED',
+  /** FEAT-022 — no application for this account, or no such application (404, SPEC-022-06, 07). */
+  'APPLICATION_NOT_FOUND',
+  /** FEAT-022 — sent with an item missing; `details.missing` lists them (409, SPEC-022-05, 06). */
+  'APPLICATION_INCOMPLETE',
+  /** FEAT-022 — being checked, or approved: no longer changed this way (409, SPEC-022-05, 06). */
+  'APPLICATION_LOCKED',
+  /** FEAT-022 — another admin already decided (409, SPEC-022-07 R7). */
+  'ALREADY_DECIDED',
   'MFA_INVALID',
   'MFA_REQUIRED',
   'ACCOUNT_INACTIVE',
