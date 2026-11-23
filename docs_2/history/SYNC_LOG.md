@@ -10,6 +10,31 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-047 — 2026-11-23 — `main` 0.24.5 (FEAT-020 live, MinIO re-checked); FEAT-022 part 2 (local branch)
+
+**`main`, a teammate's commit** `93252b8` (kcerha), merged as PR #30 (`c6e5ac1`, by the repository owner),
+documentation only (`docs/ROADMAP.md`, `package.json`). **Changed:** version 0.24.5; the roadmap says FEAT-020
+runs on djafat.com with DJAFAT's real Gmail (`EMAIL_PROVIDER=smtp`, a real code received), and the MinIO image is
+still refused on quay.io and Docker Hub (re-tested 2026-11-23). Evidence: CLAIM for both; for the e-mail, our own
+registration request to `api.djafat.com` was accepted earlier the same day (LIVE) and the user confirmed the
+mailbox receives it — the receipt itself was not seen by us. Statuses: T-611 done in production (above
+evidence); OPS-01 note added. **Consequence:** PR #29 (`ci/cheaper-runs`) also carries 0.24.5 and must take
+0.24.6 before its merge; PR #28 and the FEAT-022 branch need `main` merged in (roadmap journal, version line).
+
+**Our own commits** `9b246ba` to `08c1ae3` on `wip/feat-022-part1` (not pushed), described in
+`docs/features/FEAT-022-inscription-par-type-de-compte/progress.md` (part 2). **Added:** the courier's
+application (`/couriers/me/application`: form, photos sent as the request body, submit with the missing items),
+the admin queue « Demandes à vérifier » (both tabs, courier detail, approve or refuse with a reason, decision
+e-mails, 5-minute photo links for admins only), the courier app's « Avant votre première course », the console
+pages. **Fixed on the way:** `AllExceptionsFilter` dropped an `HttpException`'s `details`; Helmet's same-origin
+resource policy hid API images from the consoles; console sub-pages sent full admins to the first entry (since
+0.23.0); the courier app's `BigButton` never said « disabled » in a browser. STOR-01 partly addressed (private
+photos; logos in part 3; product photos not planned). **Verified:** unit tests, 15 integration tests of
+`account-onboarding.int.spec.ts` on a fresh database, a browser run (18 checks). **Not verified:** the full
+`verify` (running), a real phone (camera, gallery), the independent review (running).
+
+---
+
 ## S-046 — 2026-11-23 — FEAT-022 part 1: neighbourhoods, photos on disk, typed sign-up (local branch)
 
 Our own commits `dd1187c` to `5d68967` on `wip/feat-022-part1` (not pushed). **Added:** migration 0041

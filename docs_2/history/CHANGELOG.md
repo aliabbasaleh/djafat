@@ -8,6 +8,17 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-23 — Sync S-047: `main` 0.24.5; FEAT-022 part 2 (local branch, not pushed)
+
+**`main` (teammate, PR #30):** customer accounts by e-mail run on djafat.com with DJAFAT's real Gmail; the MinIO
+image is still locked (claims; our registration request was accepted by the live API). PR #29 must move to 0.24.6
+before its merge (`main` is 0.24.5). **FEAT-022 part 2:** couriers fill and send their application in the courier
+app; admins check it in « Demandes à vérifier » and approve or refuse with a reason, by e-mail; private photos open
+only through 5-minute links. Four older problems fixed on the way (error details, images across sub-domains,
+console sub-pages, disabled buttons in the courier app's browser build).
+
+---
+
 ## 2026-11-23 — Sync S-046: FEAT-022 part 1 (local branch, not pushed)
 
 **Added:** the N'Djamena neighbourhood list (admin-editable, never reset by a reinstall), photos on the server disk

@@ -414,7 +414,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-503 · File upload and image handling
 
-- **Area:** `apps/api` storage, restaurant console · **Priority:** Medium · **Why:** [`STOR-01`](../FINDINGS.md#stor-01) · **Status:** Not started
+- **Area:** `apps/api` storage, restaurant console · **Priority:** Medium · **Why:** [`STOR-01`](../FINDINGS.md#stor-01) · **Status:** In progress on a local branch (FEAT-022: disk storage, private photo uploads; logos in part 3) _(updated 2026-11-23, sync S-047)_
 - **Test:** upload a product photo.
 
 ### T-504 · Pricing: zones or distance, taxes, promotions
@@ -493,6 +493,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 ### T-611 · Customer accounts by e-mail and password (FEAT-020) _(added 2026-11-21, sync S-035)_
 
 - **Area:** `auth`, `users`, migration 0040, `@djafat/sdk`, `apps/web`, `apps/mobile` · **Priority:** High · **Why:** the user's request of 2026-11-21 (`docs/features/FEAT-020-compte-email-mot-de-passe`) · **Status:** Implemented, verified on the branch `feat/compte-email-password` (unit, real PostgreSQL + Redis integration, browser run) — not on `main`; _(updated 2026-11-22, sync S-037)_ a real registration code reached DJAFAT's Gmail inbox (SPEC-020-01-SC06, local `.env`); _(updated 2026-11-22, sync S-039)_ reviewed three times, corrected, `verify --full` without new failure — pull request next _(updated 2026-11-23, sync S-041)_ **merged into `main` by PR #27 (0.24.4) without GitHub's checks** — the owner account's Actions minutes are used up, merged at the user's request; re-run CI on `main` once billing is fixed; the server is not updated yet.
+- **Sync S-047 (2026-11-23):** done in production — merged in 0.24.4; the roadmap (0.24.5, `93252b8`) says the real Gmail is set on the server and a real code arrived (CLAIM); our registration request to `api.djafat.com` was accepted the same day (LIVE) and the user confirmed the mailbox receives it. Not moved to the completed list: the receipt was not seen by us.
 - **Done when:** merged into `main`; the official Gmail address and its Google app password set in the server's `.env.prod` (`EMAIL_PROVIDER=smtp`, `SMTP_USER`, `SMTP_PASSWORD`); a real registration code received in a real mailbox (SPEC-020-01-SC06, only the user holds the password).
 - **Test:** `pnpm --filter @djafat/api test:int -- test/customer-account.int.spec.ts`; on the server, register with a real address.
 

@@ -742,6 +742,9 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Sync S-021 re-check (2026-11-18), CODE:** unchanged in `infra/docker-compose.yml`:
   `postgis/postgis:16-3.5` has no ARM64 image and MinIO is pinned to `RELEASE.2024-12-18…` (which
   the owner reports can no longer be pulled). Not re-run on a clean machine.
+- **Sync S-047 note (2026-11-23), CLAIM:** a teammate re-tested the MinIO image on quay.io **and** Docker Hub:
+  still refused (roadmap 0.24.5, `93252b8`). FEAT-022 (local branch) keeps photos on the server disk instead
+  (FEAT-022-Q01), so photos no longer wait for MinIO; the development compose file is unchanged. Open.
 
 ### OPS-02
 
@@ -1184,6 +1187,11 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Consequence:** logos, covers and product photos are free-text URLs typed into forms.
 - **Fix:** S3-compatible adapter, signed uploads, image variants.
 - **Verify:** upload a product photo from the restaurant console.
+- **Sync S-047 note (2026-11-23), CODE + RUN, branch only (`wip/feat-022-part1`, not pushed):** FEAT-022 adds a
+  disk adapter behind `ObjectStoragePort` (`FilesystemObjectStorage`), `GET /files/:key` (private files only by a
+  5-minute HMAC link), and the courier's photo uploads (body = the photo, 5 MB, type from its bytes, metadata
+  removed); tested in integration and in a browser. Restaurant logos and covers come with FEAT-022 part 3; product
+  photos are not planned. Status unchanged until merged: Not Implemented on `main`.
 
 ### OBS-01
 
