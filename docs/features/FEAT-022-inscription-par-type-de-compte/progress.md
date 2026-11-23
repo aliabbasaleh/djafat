@@ -7,16 +7,16 @@ Un résultat de vérification n'est valable que pour le commit indiqué :
 après toute modification de code, spec, capture ou config qualité, relancer.
 -->
 
-| Étape                   | Statut  | Date       | Notes                                                                                          |
-| ----------------------- | ------- | ---------- | ---------------------------------------------------------------------------------------------- |
-| Intake                  | fait    | 2026-11-23 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous ; six maquettes texte lues |
-| Specs                   | fait    | 2026-11-23 | SPEC-022-01 à 09 (clarifiées v1)                                                               |
-| Grill-me                | fait    | 2026-11-23 | Q01 à Q06 tranchées par l'utilisateur, Q07 à Q12 hypothèses techniques                         |
-| Brief                   | fait    | 2026-11-23 | quatre tranches, une PR chacune                                                                |
-| Tests dérivés des specs | à faire |            |                                                                                                |
-| Implémentation          | à faire |            |                                                                                                |
-| Revue qualité           | à faire |            |                                                                                                |
-| PR                      | à faire |            | branche `feat/inscription-par-type`, partie de FEAT-021 (préalable, PR #28)                    |
+| Étape                   | Statut   | Date       | Notes                                                                                                                                                        |
+| ----------------------- | -------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Intake                  | fait     | 2026-11-23 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous ; six maquettes texte lues                                                               |
+| Specs                   | fait     | 2026-11-23 | SPEC-022-01 à 09 (clarifiées v1)                                                                                                                             |
+| Grill-me                | fait     | 2026-11-23 | Q01 à Q06 tranchées par l'utilisateur, Q07 à Q12 hypothèses techniques                                                                                       |
+| Brief                   | fait     | 2026-11-23 | quatre tranches, une PR chacune                                                                                                                              |
+| Tests dérivés des specs | en cours | 2026-11-23 | partie 1 : règles du domaine, services, stockage, intégration réelle (7 scénarios) ; restent les écrans (parties 2 à 4)                                      |
+| Implémentation          | en cours | 2026-11-23 | partie 1 faite (branche `wip/feat-022-part1`) : quartiers, stockage sur disque, migration 0041, inscription typée, « En ligne » réservé aux livreurs validés |
+| Revue qualité           | à faire  |            |                                                                                                                                                              |
+| PR                      | à faire  |            | branche `feat/inscription-par-type`, partie de FEAT-021 (préalable, PR #28)                                                                                  |
 
 ## Intake (2026-11-23)
 
@@ -62,4 +62,24 @@ Constats :
 
 ## Dernière vérification
 
-Aucune (pas encore de code).
+Partie 1, commit `869d70d` (2026-11-23) : `pnpm verify:fast` — format, specs, hygiene, arch, lint,
+typecheck et tests unitaires 22/22 réussis. Intégration sur une base neuve (`djafat_wip`, fournisseurs
+simulés) : 14 fichiers, 129 tests réussis, dont les 7 de `account-onboarding.int.spec.ts`. Pas encore
+de `verify --full` ni de revue indépendante (à la fin de la partie 2, avant la première PR).
+
+## Partie 1 — ce qui est fait (2026-11-23)
+
+- SPEC-022-09 : liste des quartiers (données de référence à codes stables), `GET /geo/neighbourhoods`,
+  `GET/POST/PATCH /admin/neighbourhoods`.
+- SPEC-022-04 : photos sur le disque du serveur derrière `ObjectStoragePort`, `GET /files/:key`
+  (public par adresse, privé par lien signé de 5 minutes), métadonnées retirées sans réencoder ;
+  volume `uploads` en production (fichier compose), sauvegardé chaque nuit et vérifié par
+  `restore-check.sh`.
+- SPEC-022-02, 03 (API) : `POST /auth/register` typé ; le bon code crée le livreur ou le restaurant
+  dans la transaction du compte (ports de `common/ports`), avec le rôle ; moins de 18 ans → 422
+  `UNDERAGE`.
+- SPEC-022-06 R5 : « En ligne » refusé tant que le dossier n'est pas validé ; un livreur créé par
+  l'équipe (sans dossier) n'est pas concerné (v2).
+- Constats en route : un import interdit de `dto/` d'un autre module (déplacé dans
+  `@djafat/validation`) ; les nouveaux codes d'erreur devaient être inscrits dans `ApiErrorCode`
+  (sinon le filtre les remplace) ; la route du statut livreur est `POST` (SPEC-022-02 v3).
