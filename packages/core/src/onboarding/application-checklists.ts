@@ -1,0 +1,96 @@
+import { vehicleNeedsPapers, type CourierVehicle } from './courier-signup.js';
+
+/**
+ * FEAT-022: what a courier or a restaurant must fill before « Envoyer pour
+ * validation ». Pure facts in, missing items out — the API refuses an
+ * incomplete application with that list (409 `APPLICATION_INCOMPLETE`), and
+ * the apps show the same list (SPEC-022-05 R1, R6; SPEC-022-06 R1, R3, R4).
+ */
+
+/** SPEC-022-06 R1, in the order of the courier app's list (FEAT-022-VIS05). */
+export const COURIER_ITEMS = [
+  'face',
+  'id_card',
+  'driving_licence',
+  'vehicle_papers',
+  'mobile_money',
+  'emergency_contact',
+] as const;
+export type CourierItem = (typeof COURIER_ITEMS)[number];
+
+export interface CourierApplicationFacts {
+  readonly vehicle: CourierVehicle;
+  readonly hasFacePhoto: boolean;
+  readonly hasIdCardPhoto: boolean;
+  readonly hasDrivingLicencePhoto: boolean;
+  /** Vehicle registration, insurance and plate: the three photos. */
+  readonly hasRegistrationPhoto: boolean;
+  readonly hasInsurancePhoto: boolean;
+  readonly hasPlatePhoto: boolean;
+  readonly hasMobileMoney: boolean;
+  readonly hasEmergencyContact: boolean;
+}
+
+/** R1, R3: six items for a moto or a car, four for a bicycle or on foot. */
+export function courierApplicationItems(vehicle: CourierVehicle): CourierItem[] {
+  return vehicleNeedsPapers(vehicle)
+    ? [...COURIER_ITEMS]
+    : COURIER_ITEMS.filter((item) => item !== 'driving_licence' && item !== 'vehicle_papers');
+}
+
+export function missingCourierItems(facts: CourierApplicationFacts): CourierItem[] {
+  const done: Record<CourierItem, boolean> = {
+    face: facts.hasFacePhoto,
+    id_card: facts.hasIdCardPhoto,
+    driving_licence: facts.hasDrivingLicencePhoto,
+    vehicle_papers: facts.hasRegistrationPhoto && facts.hasInsurancePhoto && facts.hasPlatePhoto,
+    mobile_money: facts.hasMobileMoney,
+    emergency_contact: facts.hasEmergencyContact,
+  };
+  return courierApplicationItems(facts.vehicle).filter((item) => !done[item]);
+}
+
+/** SPEC-022-05 R1, in the order of the console's list (FEAT-022-VIS04). */
+export const RESTAURANT_STEPS = ['location', 'hours_menu', 'photos', 'papers'] as const;
+export type RestaurantStep = (typeof RESTAURANT_STEPS)[number];
+
+export interface RestaurantApplicationFacts {
+  /** A point on the map (`restaurants.geom`) — required even when the address is typed. */
+  readonly hasLocationPoint: boolean;
+  readonly addressText: string | null;
+  /** At least one opening slot. */
+  readonly hasOpeningHours: boolean;
+  /** Dishes with a price above zero. */
+  readonly pricedProducts: number;
+  readonly hasLogo: boolean;
+  readonly hasCover: boolean;
+  /** RCCM or NIF number. */
+  readonly registryNumber: string | null;
+  readonly hasRegistryPhoto: boolean;
+  readonly hasOwnerIdPhoto: boolean;
+  readonly hasMobileMoney: boolean;
+}
+
+function filled(value: string | null): boolean {
+  return value !== null && value.trim().length > 0;
+}
+
+export function restaurantStepsDone(
+  facts: RestaurantApplicationFacts,
+): Record<RestaurantStep, boolean> {
+  return {
+    location: facts.hasLocationPoint && filled(facts.addressText),
+    hours_menu: facts.hasOpeningHours && facts.pricedProducts > 0,
+    photos: facts.hasLogo && facts.hasCover,
+    papers:
+      filled(facts.registryNumber) &&
+      facts.hasRegistryPhoto &&
+      facts.hasOwnerIdPhoto &&
+      facts.hasMobileMoney,
+  };
+}
+
+export function missingRestaurantSteps(facts: RestaurantApplicationFacts): RestaurantStep[] {
+  const done = restaurantStepsDone(facts);
+  return RESTAURANT_STEPS.filter((step) => !done[step]);
+}
