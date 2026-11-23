@@ -208,6 +208,12 @@ Merge them in that order, each only once its Linux and Windows checks are green.
 owner's review (the mobile app is their area), and the later ones wait with it; #18 to #22 can be
 re-stacked on #16 if needed. #19 also waits for DJAFAT's decision on the refund policy (`docs/37`).
 
+## 2e. `feat/compte-email-password`, pull request #27 _(added 2026-11-23, sync S-042)_ — merged into `main` on 2026-11-23 (`038c723`)
+
+FEAT-020 (customer accounts by e-mail and password, 0.24.0 to 0.24.4). Merged at the user's request **without
+GitHub's checks**: the owner account's Actions minutes for the month are used up, so no job started (S-041). The
+remote branch is deleted.
+
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
 
 ### What it adds

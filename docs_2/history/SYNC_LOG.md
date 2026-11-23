@@ -10,6 +10,18 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-042 — 2026-11-23 — PR #27 merged into `main`; cheaper CI on `ci/cheaper-runs` (0.24.5)
+
+Our own commits. `origin/main` moved to `038c723`, the merge of PR #27 (FEAT-020, 0.24.4), merged without GitHub's
+checks (S-041); the remote branch `feat/compte-email-password` is deleted. On the new branch `ci/cheaper-runs`:
+`3f5d5ad` adds a `scope` job to the CI and Windows workflows (`scripts/pipeline/ci-scope.mjs`, 7 tests) — nothing
+heavy on a draft pull request, only the format and spec checks when the whole pull request is documentation — and
+Security now cancels a pull-request run replaced by a newer push. Verified locally: `pnpm check:pipeline` 78/78,
+`verify:fast` all pass, the three workflows parse with the intended jobs. Not verified: a real GitHub run (no job
+starts until the owner fixes billing). No new finding.
+
+---
+
 ## S-041 — 2026-11-23 — PR #27 merged without GitHub's checks (0.24.4)
 
 Short entry (our own docs commit `631b433`): version 0.24.4 records in `docs/ROADMAP.md` that PR #27 (FEAT-020) is

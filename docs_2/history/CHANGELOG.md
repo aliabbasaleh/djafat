@@ -8,6 +8,21 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-23 — Sync S-042: PR #27 merged; CI that spends fewer Actions minutes (0.24.5)
+
+**Changed:** `main` is `038c723` (PR #27 merged, FEAT-020). Branch `ci/cheaper-runs`, at the user's request (« make CI
+cheaper »): a `scope` job decides which jobs a run needs — every check on `main` and on a manual run, nothing heavy on
+a draft pull request (« Ready for review » runs them), only `format:check` and `check:specs` when the whole pull
+request is documentation (the root version bump included). It judges the whole pull request, never the last push
+alone, so code is always tested before merge. Security cancels a superseded pull-request run.
+`docs/TRAVAILLER-EN-LOCAL.md` asks teammates to open pull requests as drafts and to group their pushes.
+
+**Verified:** `scripts/pipeline/test/ci-scope.test.mjs` (7 tests, one runs the script on a real git history),
+`pnpm check:pipeline` 78/78, `verify:fast` all pass. **Not verified:** a real GitHub run — none starts until billing is
+fixed.
+
+---
+
 ## 2026-11-23 — Sync S-041: PR #27 merged into `main` without GitHub's checks (FEAT-020, 0.24.4)
 
 **Changed:** at the user's request (« just merge it and comment it in the changelog »), PR #27 is merged although
