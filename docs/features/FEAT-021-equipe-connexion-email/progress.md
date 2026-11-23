@@ -61,7 +61,9 @@ Captures prises par un script Chrome sans tête (protocole DevTools, aucune dép
 puis chaque image ouverte et regardée. _Reprises après `81d3289` (corrections de la revue 1 : « 👁 Afficher »,
 focus) : les 10 captures dont l'écran a changé, refaites avec les mêmes scripts — l'application
 livreur reconstruite depuis le worktree et servie sur le port 8098 — puis rouvertes une à une ; les
-5 autres (écrans connectés, écran téléphone) sont identiques à l'octet._
+5 autres (écrans connectés, écran téléphone) sont identiques à l'octet._ _Après la revue 2 (`.channel` dans la police de la page) : les 6 captures
+qui montrent les boutons SMS et WhatsApp (SC06, 1280 et 390, et « SMS proposé ») reprises et
+rouvertes ; les autres sont inchangées._
 
 - Consoles admin et restaurant : le code de cette branche, servi depuis un worktree sur des ports
   libres (API 3011, admin 3012, restaurant 3013). E-mail toujours simulé (`EMAIL_PROVIDER=mock`,
