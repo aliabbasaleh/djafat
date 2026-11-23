@@ -4,13 +4,13 @@ import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { RequireAuth, RequireRole } from '../auth/decorators';
 import { NeighbourhoodsService } from '../geo/neighbourhoods.service';
 import {
+  AdminNeighbourhoodsQuerySchema,
   CreateNeighbourhoodSchema,
-  ListNeighbourhoodsQuerySchema,
   UpdateNeighbourhoodSchema,
+  type AdminNeighbourhoodsQueryInput,
   type CreateNeighbourhoodInput,
-  type ListNeighbourhoodsQueryInput,
   type UpdateNeighbourhoodInput,
-} from '../geo/dto/neighbourhoods.schema';
+} from './dto/neighbourhoods-admin.schema';
 
 /**
  * FEAT-022 (SPEC-022-09 R4): DJAFAT edits N'Djamena's neighbourhood list —
@@ -25,8 +25,8 @@ export class NeighbourhoodsAdminController {
   @RequireAuth()
   @RequireRole('admin', 'super_admin')
   async list(
-    @Query(new ZodValidationPipe(ListNeighbourhoodsQuerySchema))
-    query: ListNeighbourhoodsQueryInput,
+    @Query(new ZodValidationPipe(AdminNeighbourhoodsQuerySchema))
+    query: AdminNeighbourhoodsQueryInput,
   ) {
     return { neighbourhoods: await this.neighbourhoods.listAll(query.city) };
   }

@@ -50,6 +50,20 @@ const ObjectStorageSchema = z.object({
     .string()
     .optional()
     .transform((v) => v === 'true'),
+  /**
+   * FEAT-022 (SPEC-022-04): where photos are kept — `filesystem`, the server's
+   * disk (a volume in the nightly backup), or `none`, the Bloc 0 placeholder
+   * (storing fails). A service compatible with S3 can come later, here (R7).
+   */
+  OBJECT_STORAGE_DRIVER: z.enum(['none', 'filesystem']).default('filesystem'),
+  /**
+   * Absolute folder of the files (`filesystem`). Production without it still
+   * boots, but storing answers 503 (never a temp folder there: files would be
+   * lost); elsewhere it defaults to `<tmp>/djafat-uploads`.
+   */
+  OBJECT_STORAGE_DIR: optionalUnlessEmpty(z.string().min(1)),
+  /** Key of the 5-minute links to private files (HMAC); derived from `JWT_ACCESS_SECRET` when unset. */
+  FILE_URL_SECRET: optionalUnlessEmpty(z.string().min(32)),
 });
 
 const ApiSchema = z.object({
