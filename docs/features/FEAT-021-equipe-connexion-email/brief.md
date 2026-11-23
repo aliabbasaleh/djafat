@@ -1,13 +1,13 @@
 ---
 feature: FEAT-021
-specs: [SPEC-021-01@1, SPEC-021-02@1, SPEC-021-03@1, SPEC-021-04@1, SPEC-021-05@2]
+specs: [SPEC-021-01@1, SPEC-021-02@2, SPEC-021-03@1, SPEC-021-04@1, SPEC-021-05@2]
 ---
 
 # FEAT-021 — Brief d'exécution
 
 ## Sources
 
-- Feature : `feature.md` — Specs : `specs/SPEC-021-01.md` à `SPEC-021-04.md` (v1), `SPEC-021-05.md` (v2)
+- Feature : `feature.md` — Specs : `specs/SPEC-021-01.md`, `SPEC-021-03.md`, `SPEC-021-04.md` (v1), `SPEC-021-02.md` et `SPEC-021-05.md` (v2)
 - Références visuelles : FEAT-021-VIS01 (actuel), FEAT-021-VIS02 (attendu, faisant foi)
 - Règles : `CLAUDE.md`, `docs/pipeline/architecture-policy.md`, `docs/pipeline/quality-rules.md`
 
@@ -25,9 +25,10 @@ specs: [SPEC-021-01@1, SPEC-021-02@1, SPEC-021-03@1, SPEC-021-04@1, SPEC-021-05@
 | `apps/courier/app/(auth)/login.tsx`                        | téléphone puis code                                       | comme les consoles, en React Native                                                                                    | présentation  |
 | `infra/deploy/README.md`, `docs/39-comptes-externes.md` §1 | réglages SMS                                              | procédure de bascule (SPEC-021-05)                                                                                     | documentation |
 
-Réutilisé sans changement : routes `/auth/password/*` et `/auth/methods`, méthodes du SDK
-(`passwordLogin`, `sendLoginCode`, `verifyLoginCode`, `forgotPassword`, `resetPassword`,
-`methods`), `accountErrorMessage`, `validateNewPassword`, `maskEmail`, `RESEND_COOLDOWN_SECONDS`,
+Réutilisé sans changement : routes `/auth/password/*`, `/auth/methods` et celles du code par
+téléphone, méthodes du SDK (`passwordLogin`, `sendLoginCode`, `verifyLoginCode`, `forgotPassword`,
+`resetPassword`, `methods`) ; deux méthodes ajoutées à la revue 1 (`requestPhoneLoginCode`,
+`verifyPhoneLoginCode`, SPEC-021-02 v2), `accountErrorMessage`, `validateNewPassword`, `maskEmail`, `RESEND_COOLDOWN_SECONDS`,
 `COMING_SOON`, les contrôles d'accès de chaque application. Aucune nouvelle arête entre modules.
 
 ## Stratégie de test dérivée des specs

@@ -53,6 +53,7 @@
   border: 2px solid var(--djafat-color-border-default);
   background: var(--djafat-color-bg-surface);
   color: var(--djafat-color-text-primary);
+  font: inherit;
   font-weight: 700;
   cursor: pointer;
 }

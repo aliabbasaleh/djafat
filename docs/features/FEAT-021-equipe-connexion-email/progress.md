@@ -1,16 +1,16 @@
 # FEAT-021 — Avancement
 
-| Étape                   | Statut   | Date       | Notes                                                                                                                                                              |
-| ----------------------- | -------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Intake                  | fait     | 2026-11-22 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous                                                                                                |
-| Specs                   | fait     | 2026-11-22 | SPEC-021-01 à 05                                                                                                                                                   |
-| Grill-me                | fait     | 2026-11-22 | aucune question bloquante : décisions de l'utilisateur du 2026-11-22                                                                                               |
-| Brief                   | fait     | 2026-11-22 |                                                                                                                                                                    |
-| Tests dérivés des specs | fait     | 2026-11-22 | SPEC-021-01 : la règle de démarrage échouait avant le changement (SC01, SC02), puis passe ; 4 tests SDK, 4 par application                                         |
-| Implémentation          | fait     | 2026-11-22 | `env.ts`, `team-login.ts` (SDK), trois écrans de connexion, procédure de bascule ; `verify:fast` sans échec après correction du formatage                          |
-| Validation visuelle     | fait     | 2026-11-23 | 15 captures (SPEC-021-03 SC05, SC06 ; SPEC-021-04 SC05, SC06), chacune ouverte et regardée ; marge latérale des consoles corrigée                                  |
-| Revue qualité           | en cours | 2026-11-23 | revue 1 (sous-agent spec-reviewer) : 1 bloquant, 1 majeur (décision FEAT-021-Q11), 5 mineurs, 3 notes — tous corrigés ou consignés (`review.md`) ; revue 2 à faire |
-| PR                      | à faire  |            | après la fusion de FEAT-020 (cette branche part de `feat/compte-email-password`)                                                                                   |
+| Étape                   | Statut  | Date       | Notes                                                                                                                                                                             |
+| ----------------------- | ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Intake                  | fait    | 2026-11-22 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous                                                                                                               |
+| Specs                   | fait    | 2026-11-22 | SPEC-021-01 à 05                                                                                                                                                                  |
+| Grill-me                | fait    | 2026-11-22 | aucune question bloquante : décisions de l'utilisateur du 2026-11-22                                                                                                              |
+| Brief                   | fait    | 2026-11-22 |                                                                                                                                                                                   |
+| Tests dérivés des specs | fait    | 2026-11-22 | SPEC-021-01 : la règle de démarrage échouait avant le changement (SC01, SC02), puis passe ; 4 tests SDK, 4 par application                                                        |
+| Implémentation          | fait    | 2026-11-22 | `env.ts`, `team-login.ts` (SDK), trois écrans de connexion, procédure de bascule ; `verify:fast` sans échec après correction du formatage                                         |
+| Validation visuelle     | fait    | 2026-11-23 | 15 captures (SPEC-021-03 SC05, SC06 ; SPEC-021-04 SC05, SC06), chacune ouverte et regardée ; marge latérale des consoles corrigée                                                 |
+| Revue qualité           | fait    | 2026-11-23 | revue 1 : 1 bloquant, 1 majeur (décision FEAT-021-Q11), 5 mineurs, 3 notes ; revue 2 : aucun bloquant ni majeur, 4 mineurs et 4 notes — tout corrigé ou consigné dans `review.md` |
+| PR                      | à faire |            | FEAT-020 fusionnée (PR #27, 0.24.4) : branche rebasée sur `main`, version 0.25.0                                                                                                  |
 
 ## Intake (2026-11-22)
 
@@ -105,4 +105,4 @@ Conforme à SC02 : elle liste les comptes à risque et aucun de ceux qui ont les
 
 ## Reste à faire
 
-- Revue, audit de synchronisation, version 0.25.0, PR (après la fusion de FEAT-020).
+- Audit de synchronisation, version 0.25.0, PR (FEAT-020 est fusionnée).

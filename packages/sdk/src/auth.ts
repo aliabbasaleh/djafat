@@ -192,7 +192,8 @@ export function createAuthClient(http: ApiHttp) {
       http.post<SignedIn>('/auth/email/verify', { body: { email, code } }),
     /**
      * Login by a phone code, when the server offers SMS (`GET /auth/methods`):
-     * the code goes by SMS. Always accepted (202).
+     * the code goes by SMS. 202 whether the number has an account or not; 503
+     * `SMS_UNAVAILABLE` when SMS is off, 429 when asked too often.
      */
     requestPhoneLoginCode: (phone: string) =>
       http.post<{ status: 'sent' }>('/auth/otp/request', { body: { phone, purpose: 'login' } }),

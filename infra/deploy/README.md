@@ -121,9 +121,9 @@ migrations appliquées et (mode démo) les données de démonstration ajoutées.
   À chaque installation, la base reçoit ses **données de référence** (rôles,
   permissions, comptes du grand livre, réglages ; jamais de compte de test, et
   un réglage changé sur le serveur n'est jamais remis à sa valeur par défaut).
-  **Premier administrateur** _(ajouté le 18 nov. 2026)_ : la personne se
-  connecte une fois sur le site avec son numéro (cela crée son compte), puis,
-  depuis `infra/deploy` :
+  **Premier administrateur** _(ajouté le 18 nov. 2026, mis à jour le 23 nov.)_ : la
+  personne crée son compte sur le site (nom, numéro, e-mail et mot de passe) — ou, tant
+  que le SMS marche, s'y connecte une fois avec son numéro —, puis, depuis `infra/deploy` :
 
   ```bash
   docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm migrate node_modules/.bin/tsx prisma/create-super-admin.ts +235XXXXXXXX
@@ -160,6 +160,9 @@ seuls le jour où leurs réglages sont remplis. **Dans cet ordre**, sinon quelqu
    Chaque ligne est un compte d'équipe qui serait **bloqué** (sans e-mail vérifié, il ne peut plus
    se connecter) ou **exposé** (sans mot de passe, une session volée suffirait pour changer son
    e-mail puis poser un premier mot de passe). Tant qu'il reste une ligne, ne pas couper le SMS.
+   Après la coupure aussi : relancer cette requête après chaque rôle d'équipe accordé ou compte
+   réactivé depuis la console ; un compte d'équipe suspendu doit avoir un e-mail vérifié et un mot
+   de passe avant d'être réactivé.
 
 3. **Couper le SMS.** Dans `.env.prod` : `SMS_PROVIDER=disabled`, et mettre en commentaire (`#`
    en début de ligne) `SMS_HTTP_URL` et `SMS_HTTP_API_KEY`, sans les effacer : le retour en

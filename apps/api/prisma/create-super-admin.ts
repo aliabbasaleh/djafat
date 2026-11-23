@@ -1,8 +1,9 @@
 /**
  * The first super_admin of a live server (audit findings SEC-02, OPS-05). A live server
  * has no fixture accounts, so nobody can open the admin console until someone is given
- * the role. The person first signs in once on the site with their own phone number
- * (that creates their account, through the normal sign-up path), then, on the server:
+ * the role. The person first creates their account on the site with their own phone
+ * number (sign-up: name, number, e-mail, password — FEAT-020) or, while SMS works, signs
+ * in once with that number; then, on the server:
  *
  *   docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm migrate \
  *     node_modules/.bin/tsx prisma/create-super-admin.ts +235XXXXXXXX
@@ -42,8 +43,8 @@ async function main(prisma: PrismaClient): Promise<void> {
   });
   if (!user) {
     fail(
-      `Aucun compte avec le numéro ${masked(phone)}. La personne doit d'abord se connecter une fois ` +
-        'sur le site avec ce numéro (cela crée son compte), puis relancer cette commande.',
+      `Aucun compte avec le numéro ${masked(phone)}. La personne doit d'abord créer son compte sur ` +
+        'le site avec ce numéro (nom, numéro, e-mail, mot de passe), puis relancer cette commande.',
     );
   }
   if (user.status !== 'active') {

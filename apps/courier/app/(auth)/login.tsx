@@ -396,7 +396,12 @@ export default function LoginScreen() {
             autoCapitalize="none"
             accessibilityLabel="Nouveau mot de passe"
           />
-          <Text style={fieldErrors.password ? styles.fieldError : styles.hint}>
+          <Text
+            style={fieldErrors.password ? styles.fieldError : styles.hint}
+            {...(fieldErrors.password
+              ? { accessibilityRole: 'alert' as const, accessibilityLiveRegion: 'polite' as const }
+              : {})}
+          >
             {fieldErrors.password ?? 'Au moins 8 caractères.'}
           </Text>
           <Text style={styles.label}>Confirmer le mot de passe</Text>
@@ -413,7 +418,15 @@ export default function LoginScreen() {
             autoCapitalize="none"
             accessibilityLabel="Confirmer le mot de passe"
           />
-          {fieldErrors.confirm && <Text style={styles.fieldError}>{fieldErrors.confirm}</Text>}
+          {fieldErrors.confirm && (
+            <Text
+              style={styles.fieldError}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+            >
+              {fieldErrors.confirm}
+            </Text>
+          )}
           <BigButton label="Changer le mot de passe" onPress={reset} loading={loading} />
           <BigButton
             label={cooldown > 0 ? `Renvoyer le code (dans ${cooldown} s)` : 'Renvoyer le code'}

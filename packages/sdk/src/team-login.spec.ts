@@ -162,7 +162,7 @@ describe('SPEC-021-02 — team apps login rules', () => {
     expect(courier.saveDeviceToken).not.toHaveBeenCalled(); // a phone code remembers no device
     expect(courier.clearSession).not.toHaveBeenCalled();
 
-    // The existing phone-login contracts (FEAT-001 SMS, FEAT-008 WhatsApp).
+    // The existing phone-login contracts (SMS login since Bloc 1, FEAT-008 WhatsApp).
     expect(posts).toEqual([
       { path: '/auth/otp/request', body: { phone: PHONE, purpose: 'login' } },
       { path: '/auth/otp/verify', body: { phone: PHONE, code: '123456', purpose: 'login' } },
