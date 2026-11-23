@@ -7,16 +7,16 @@ Un résultat de vérification n'est valable que pour le commit indiqué :
 après toute modification de code, spec, capture ou config qualité, relancer.
 -->
 
-| Étape                   | Statut   | Date       | Notes                                                                                                      |
-| ----------------------- | -------- | ---------- | ---------------------------------------------------------------------------------------------------------- |
-| Intake                  | fait     | 2026-11-23 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous ; six maquettes texte lues             |
-| Specs                   | à faire  |            | après les réponses aux questions bloquantes                                                                |
-| Grill-me                | en cours | 2026-11-23 | questions de produit posées à l'utilisateur (stockage des photos, quartiers, changements après validation) |
-| Brief                   | à faire  |            |                                                                                                            |
-| Tests dérivés des specs | à faire  |            |                                                                                                            |
-| Implémentation          | à faire  |            |                                                                                                            |
-| Revue qualité           | à faire  |            |                                                                                                            |
-| PR                      | à faire  |            | branche `feat/inscription-par-type`, partie de FEAT-021 (préalable, PR #28)                                |
+| Étape                   | Statut  | Date       | Notes                                                                                          |
+| ----------------------- | ------- | ---------- | ---------------------------------------------------------------------------------------------- |
+| Intake                  | fait    | 2026-11-23 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous ; six maquettes texte lues |
+| Specs                   | fait    | 2026-11-23 | SPEC-022-01 à 09 (clarifiées v1)                                                               |
+| Grill-me                | fait    | 2026-11-23 | Q01 à Q06 tranchées par l'utilisateur, Q07 à Q12 hypothèses techniques                         |
+| Brief                   | fait    | 2026-11-23 | quatre tranches, une PR chacune                                                                |
+| Tests dérivés des specs | à faire |            |                                                                                                |
+| Implémentation          | à faire |            |                                                                                                |
+| Revue qualité           | à faire |            |                                                                                                |
+| PR                      | à faire |            | branche `feat/inscription-par-type`, partie de FEAT-021 (préalable, PR #28)                    |
 
 ## Intake (2026-11-23)
 
@@ -57,10 +57,8 @@ Constats :
 
 ## Bloquants
 
-- Stockage des photos (AC05 étape 3, AC06, AC10) : aucun adaptateur réel ; décision de l'utilisateur
-  attendue.
-- Questions ouvertes de la feature (quartiers, changements après validation, âge, conditions
-  d'utilisation) : décisions de produit.
+- Aucun pour construire : les questions de produit sont tranchées (FEAT-022-Q01 à Q06).
+- Pour fusionner : FEAT-021 d'abord (PR #28), puis la facturation GitHub Actions.
 
 ## Dernière vérification
 

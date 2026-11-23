@@ -1,7 +1,7 @@
 ---
 id: FEAT-022
 title: Inscription par type de compte — client, livreur ou restaurant — puis validation par DJAFAT
-status: draft
+status: ready
 type: new
 ui: yes
 ---
