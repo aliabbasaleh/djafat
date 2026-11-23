@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -8,7 +8,7 @@ import { FilesystemObjectStorage } from './filesystem-object-storage';
 import { PhotoStorage } from './photo-storage';
 import { FilesController } from './files.controller';
 import { fileStoreDir, fileUrlSecret, NotConfiguredObjectStorage } from './object-storage.module';
-import { stripPhotoMetadata, sniffPhotoType } from './photo-file';
+import { exifOrientation, stripPhotoMetadata, sniffPhotoType } from './photo-file';
 
 // FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte (SPEC-022-04).
 // A real temporary folder; the clock is controlled to test the 5-minute links.
@@ -45,6 +45,29 @@ function jpegWithGps(): Uint8Array {
   const scan = bytes([0xff, 0xda, 0x00, 0x08, 1, 2, 3, 4, 5, 6], [0x11, 0x22, 0x33], [0xff, 0xd9]);
   return bytes([0xff, 0xd8], [...app0], [...app1], [...scan]);
 }
+
+/** A big-endian EXIF payload: the orientation, a GPS pointer, and where the photo was taken. */
+function exifPayload(orientation: number): number[] {
+  return [
+    ...bytes(
+      'Exif\0\0',
+      [0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08],
+      [0x00, 0x02],
+      [0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, orientation, 0x00, 0x00],
+      [0x88, 0x25, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x26],
+      [0x00, 0x00, 0x00, 0x00],
+      'GPS secret place',
+    ),
+  ];
+}
+const app1 = (payload: number[]) => [
+  0xff,
+  0xe1,
+  ((payload.length + 2) >> 8) & 0xff,
+  (payload.length + 2) & 0xff,
+  ...payload,
+];
+const SCAN = [0xff, 0xda, 0x00, 0x08, 1, 2, 3, 4, 5, 6];
 
 function pngChunk(type: string, data: string): number[] {
   const len = data.length;
@@ -187,6 +210,96 @@ describe('SPEC-022-04 — photos on the server disk', () => {
     expect(Buffer.from(webp).readUInt32LE(4)).toBe(webp.length - 8); // RIFF size fixed
     // a truncated file is refused, never stored half-cleaned
     expect(() => stripPhotoMetadata(jpegWithGps().slice(0, 9), 'jpg')).toThrow();
+  });
+
+  it('SPEC-022-04 « Erreurs et cas limites » — what a phone appends after the image (extra images with their EXIF) is dropped, and the MPF index', async () => {
+    const photo = bytes(
+      [0xff, 0xd8],
+      [0xff, 0xe2, 0x00, 0x0a],
+      'MPF\0',
+      [0, 0, 0, 0],
+      SCAN,
+      [0x11, 0xff, 0x00, 0x22, 0xff, 0xd0, 0x33], // a stuffed 0xFF and a restart marker inside the data
+      [0xff, 0xd9],
+    );
+    const appended = bytes([0xff, 0xd8], app1(exifPayload(1)), SCAN, [0x44], [0xff, 0xd9]);
+    const clean = stripPhotoMetadata(Uint8Array.from([...photo, ...appended]), 'jpg');
+
+    expect(text(clean)).not.toContain('secret');
+    expect(text(clean)).not.toContain('MPF');
+    expect([...clean]).toEqual([
+      0xff,
+      0xd8,
+      ...SCAN,
+      0x11,
+      0xff,
+      0x00,
+      0x22,
+      0xff,
+      0xd0,
+      0x33,
+      0xff,
+      0xd9,
+    ]);
+    // without an end of image, the file is refused — never stored half-cleaned
+    expect(() => stripPhotoMetadata(photo.slice(0, -2), 'jpg')).toThrow();
+  });
+
+  it('a progressive JPEG keeps every scan and the tables between them', async () => {
+    const progressive = bytes(
+      [0xff, 0xd8],
+      SCAN,
+      [0x11],
+      [0xff, 0xc4, 0x00, 0x04, 0xaa, 0xbb],
+      SCAN,
+      [0x22],
+      [0xff, 0xd9],
+    );
+    expect([...stripPhotoMetadata(progressive, 'jpg')]).toEqual([...progressive]);
+  });
+
+  it('SPEC-022-07 R2 — a portrait photo keeps its orientation, and only that', async () => {
+    const portrait = stripPhotoMetadata(
+      bytes([0xff, 0xd8], app1(exifPayload(6)), SCAN, [0x11], [0xff, 0xd9]),
+      'jpg',
+    );
+    expect(text(portrait)).not.toContain('secret');
+    expect([...portrait.subarray(2, 4)]).toEqual([0xff, 0xe1]);
+    expect(exifOrientation(portrait.subarray(6, 6 + 32))).toBe(6);
+    // the normal orientation needs no EXIF at all
+    const upright = stripPhotoMetadata(
+      bytes([0xff, 0xd8], app1(exifPayload(1)), SCAN, [0x11], [0xff, 0xd9]),
+      'jpg',
+    );
+    expect(text(upright)).not.toContain('Exif');
+    // a little-endian EXIF reads the same
+    const little = bytes(
+      'Exif\0\0',
+      [0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00],
+      [0x01, 0x00],
+      [0x12, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00],
+    );
+    expect(exifOrientation(little)).toBe(8);
+  });
+
+  it('SPEC-022-04 « Erreurs et cas limites » — a full disk answers 507 STORAGE_FULL and keeps nothing, not even half a file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'djafat-files-'));
+    dirs.push(dir);
+    const full = new FilesystemObjectStorage(
+      dir,
+      'https://api.djafat.test/',
+      SECRET,
+      () => Date.now(),
+      async (path) => {
+        writeFileSync(path, 'half a photo');
+        throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' });
+      },
+    );
+
+    await expect(
+      full.putObject('private-00000000-0000-4000-8000-000000000001.jpg', bytes([1]), 'image/jpeg'),
+    ).rejects.toMatchObject({ status: 507, response: { code: 'STORAGE_FULL' } });
+    expect(readdirSync(dir)).toEqual([]);
   });
 
   it('stores atomically, deletes, and refuses a key outside its shape', async () => {

@@ -9,6 +9,10 @@ export interface BigButtonProps {
   readonly variant?: BigButtonVariant;
   readonly disabled?: boolean;
   readonly loading?: boolean;
+  /** Why it does what it does — or why it is unavailable — read after the label. */
+  readonly hint?: string;
+  /** `nativeID` of a visible text that explains it (the browser reads it as aria-describedby). */
+  readonly describedBy?: string;
 }
 
 const VARIANT_BG: Record<BigButtonVariant, string> = {
@@ -36,6 +40,8 @@ export function BigButton({
   variant = 'primary',
   disabled = false,
   loading = false,
+  hint,
+  describedBy,
 }: BigButtonProps) {
   const isDisabled = disabled || loading;
   return (
@@ -45,6 +51,8 @@ export function BigButton({
       // react-native-web ignores `accessibilityState`: `disabled` is what says « indisponible »
       // in the browser (aria-disabled) — found by FEAT-022's run of the app in the browser.
       disabled={isDisabled}
+      accessibilityHint={hint}
+      aria-describedby={describedBy}
       onPress={isDisabled ? undefined : onPress}
       style={({ pressed }) => [
         styles.base,

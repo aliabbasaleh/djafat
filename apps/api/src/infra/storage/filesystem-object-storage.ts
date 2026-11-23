@@ -1,6 +1,7 @@
 import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { HttpException, HttpStatus } from '@nestjs/common';
 import type { ObjectStoragePort } from '@djafat/types';
 import { parseFileKey, signFileKey, verifyFileSignature, type FileFamily } from './file-keys';
 import { PHOTO_CONTENT_TYPES } from './photo-file';
@@ -29,14 +30,38 @@ export class FilesystemObjectStorage implements ObjectStoragePort {
     private readonly publicBaseUrl: string,
     private readonly secret: string,
     private readonly nowMs: () => number = () => Date.now(),
+    /** Writes the temporary file — replaced in tests to simulate a full disk. */
+    private readonly writeTemporary: (path: string, body: Uint8Array) => Promise<void> = (
+      path,
+      body,
+    ) => writeFile(path, body, { mode: 0o600 }),
   ) {}
 
+  /**
+   * « Erreurs et cas limites »: a full disk answers 507 `STORAGE_FULL` and leaves
+   * nothing behind — not even the temporary file, which the backup would copy.
+   */
   async putObject(key: string, body: Uint8Array, _contentType: string): Promise<{ key: string }> {
     this.keyOrThrow(key);
     await mkdir(this.dir, { recursive: true });
     const temporary = join(this.dir, `.upload-${randomUUID()}`);
-    await writeFile(temporary, body, { mode: 0o600 });
-    await rename(temporary, join(this.dir, key));
+    try {
+      await this.writeTemporary(temporary, body);
+      await rename(temporary, join(this.dir, key));
+    } catch (err) {
+      await rm(temporary, { force: true }).catch(() => undefined);
+      const code = (err as NodeJS.ErrnoException | null)?.code;
+      if (code === 'ENOSPC' || code === 'EDQUOT') {
+        throw new HttpException(
+          {
+            code: 'STORAGE_FULL',
+            message: "Le serveur n'a plus de place pour les photos : réessayez plus tard.",
+          },
+          HttpStatus.INSUFFICIENT_STORAGE,
+        );
+      }
+      throw err;
+    }
     return { key };
   }
 

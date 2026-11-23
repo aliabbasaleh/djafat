@@ -221,4 +221,22 @@ _(Ajouté le 18 nov. 2026.)_ Deux scripts, à programmer avec `crontab -e` sur l
 - `healthcheck.sh` : sites, API, conteneurs, disque, âge de la sauvegarde, dernier test de
   restauration ; alerte `ALERT_NTFY_URL` (dans `.env.prod`) quand l'état change.
 - `restore-check.sh` : restaure la dernière sauvegarde dans une base à part, la vérifie, puis la
-  supprime. La base en service n'est jamais modifiée.
+  supprime. La base en service n'est jamais modifiée. _(FEAT-022)_ Il vérifie aussi que chaque
+  photo citée par la base restaurée est dans l'archive `uploads-*.tar.gz` de la même nuit, et
+  échoue sinon ; `backup.sh` écrit « files backup FAILED » si le volume des photos n'est pas monté.
+
+### Photos des dossiers (FEAT-022) sur un serveur déjà installé
+
+_(Ajouté le 23 nov. 2026.)_ Les photos des livreurs et des restaurants sont sur le disque du
+serveur (volume `uploads`, monté sur `/data/uploads` par `docker-compose.prod.yml`) et entrent dans
+la sauvegarde de la nuit. `gen-secrets.sh` ne réécrit jamais un `.env.prod` existant : sur un serveur
+déjà installé, ajouter à la main dans `.env.prod`, avant `./install.sh` :
+
+```bash
+FILE_URL_SECRET=$(openssl rand -hex 32)   # coller la valeur obtenue, pas la commande
+```
+
+Sans cette ligne, les liens de 5 minutes des photos privées sont signés avec une clé tirée de
+`JWT_ACCESS_SECRET` : ça marche, mais changer ce secret-là invaliderait aussi les liens. Rien
+d'autre à régler : `OBJECT_STORAGE_DRIVER` vaut `filesystem` par défaut et le dossier est fixé par
+le fichier compose.

@@ -8,16 +8,22 @@ import { firstFreeSlug, slugifyRestaurantName } from './restaurant-slug';
 function fakeTx(existingSlugs: string[] = []) {
   const restaurants: Array<Record<string, unknown>> = existingSlugs.map((slug) => ({ slug }));
   const applications: Array<Record<string, unknown>> = [];
+  const calls: string[] = [];
   const tx = {
+    $executeRaw: vi.fn(async (sql: TemplateStringsArray, ...values: unknown[]) => {
+      calls.push(`lock ${String(values[0])}`);
+      return 1;
+    }),
     city: {
       findFirstOrThrow: vi.fn(async () => ({ id: 'city-ndj', countryId: 'country-td' })),
     },
     restaurant: {
-      findMany: vi.fn(async ({ where }: { where: { slug: { startsWith: string } } }) =>
-        restaurants
+      findMany: vi.fn(async ({ where }: { where: { slug: { startsWith: string } } }) => {
+        calls.push(`read ${where.slug.startsWith}`);
+        return restaurants
           .filter((r) => String(r['slug']).startsWith(where.slug.startsWith))
-          .map((r) => ({ slug: r['slug'] })),
-      ),
+          .map((r) => ({ slug: r['slug'] }));
+      }),
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         const row = { id: `r-${restaurants.length + 1}`, ...data };
         restaurants.push(row);
@@ -31,7 +37,7 @@ function fakeTx(existingSlugs: string[] = []) {
       }),
     },
   };
-  return { tx: tx as unknown as Prisma.TransactionClient, restaurants, applications };
+  return { tx: tx as unknown as Prisma.TransactionClient, restaurants, applications, calls };
 }
 
 const SIGNUP = {
@@ -69,9 +75,15 @@ describe('SPEC-022-03 — the restaurant created at sign-up', () => {
 
   // SPEC-022-03-SC04
   it('SPEC-022-03-SC04 — a second « Chez Fatimé » gets its own address, suffixed, without error', async () => {
-    const { tx, restaurants } = fakeTx(['chez-fatime', 'chez-fatime-2', 'chez-fatime-grill']);
+    const { tx, restaurants, calls } = fakeTx([
+      'chez-fatime',
+      'chez-fatime-2',
+      'chez-fatime-grill',
+    ]);
     await new RestaurantOnboardingService().provisionRestaurant(tx, 'u-other', SIGNUP);
     expect(restaurants.at(-1)?.['slug']).toBe('chez-fatime-3');
+    // two at once: the address is locked before the taken ones are read
+    expect(calls).toEqual(['lock restaurant-slug:chez-fatime', 'read chez-fatime']);
   });
 
   it('turns any name into an address: accents, punctuation, length; never empty', () => {

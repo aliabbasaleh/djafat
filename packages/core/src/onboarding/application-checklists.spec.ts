@@ -105,8 +105,7 @@ describe('SPEC-022-05 — the restaurant’s four steps', () => {
     expect(missing({ hasMobileMoney: false, hasLogo: false })).toEqual(['photos', 'papers']);
   });
 
-  // SPEC-022-05-SC01
-  it('SPEC-022-05-SC01 — only the logo missing: the list is ["photos"]', () => {
+  it('SPEC-022-05 R1, R6 — only the logo missing: the list is ["photos"]', () => {
     expect(missingRestaurantSteps({ ...fullRestaurant, hasLogo: false })).toEqual(['photos']);
   });
 });

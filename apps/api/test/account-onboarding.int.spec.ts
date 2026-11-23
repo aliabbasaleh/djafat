@@ -259,6 +259,35 @@ describe('FEAT-022 — sign-up by account type on PostgreSQL and Redis', () => {
     await request(server).get(`/v1/restaurants/${restaurant.slug}`).expect(404);
   });
 
+  // SPEC-022-03-SC02 (review of parts 1-2, finding 1)
+  it('SPEC-022-03-SC02 — its owner cannot publish it: « active » and « paused » are refused until DJAFAT approves', async () => {
+    const owner = await signUp({
+      ...fresh(),
+      accountType: 'restaurant',
+      restaurantName: `Chez Fatimé ${randomUUID().slice(0, 6)}`,
+      neighbourhoodId: await neighbourhood('Klémat'),
+      acceptTerms: true,
+    });
+    const restaurant = await prisma.restaurant.findFirstOrThrow({
+      where: { ownerUserId: owner.user.id },
+    });
+
+    for (const status of ['paused', 'active']) {
+      const refused = await request(server)
+        .patch(`/v1/restaurants/${restaurant.id}`)
+        .set('Authorization', `Bearer ${owner.access}`)
+        .send({ status })
+        .expect(409);
+      expect(refused.body).toMatchObject({ error: { code: 'RESTAURANT_NOT_APPROVED' } });
+    }
+    expect(
+      (await prisma.restaurant.findUniqueOrThrow({ where: { id: restaurant.id } })).status,
+    ).toBe('draft');
+    const list = await request(server).get('/v1/restaurants').expect(200);
+    expect(JSON.stringify(list.body)).not.toContain(restaurant.id);
+    await request(server).get(`/v1/restaurants/${restaurant.slug}`).expect(404);
+  });
+
   // SPEC-022-02-SC05, SPEC-022-03-SC03
   it('SPEC-022-03-SC03 — sent but never confirmed: no account, no restaurant, no role', async () => {
     const input = fresh();
@@ -277,8 +306,8 @@ describe('FEAT-022 — sign-up by account type on PostgreSQL and Redis', () => {
     expect(await prisma.restaurant.count({ where: { name } })).toBe(0);
   });
 
-  // SPEC-022-09-SC02
-  it('SPEC-022-09-SC02 — « Autre » keeps the typed name, without a neighbourhood from the list', async () => {
+  // SPEC-022-09 R2 (SC02's console half — the names to add — comes with the « Quartiers » page, part 3)
+  it('SPEC-022-09 R2 — « Autre » keeps the typed name, without a neighbourhood from the list', async () => {
     const input = fresh();
     const signedIn = await signUp({
       ...input,
@@ -389,9 +418,10 @@ describe('FEAT-022 part 2 — the courier’s application and DJAFAT’s decisio
     expect(mine.body).toMatchObject({ expiresInSeconds: 300 });
     const ownLink = new URL((mine.body as { url: string }).url);
     await request(server).get(`${ownLink.pathname}${ownLink.search}`).expect(200);
-    await request(server)
-      .get(`${ownLink.pathname}${ownLink.search.replace(/sig=./, 'sig=A')}`)
-      .expect(403);
+    const forged = new URL(ownLink.toString());
+    const sig = forged.searchParams.get('sig') ?? '';
+    forged.searchParams.set('sig', `${sig.slice(0, -1)}${sig.endsWith('A') ? 'B' : 'A'}`);
+    await request(server).get(`${forged.pathname}${forged.search}`).expect(403);
 
     const admin = await staffToken(STAFF.admin);
     const adminLink = await request(server)

@@ -79,8 +79,7 @@ export default function OnboardingScreen() {
       }
       setFailed(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- same convention as home.tsx (FU-REACT-01): `signOut` and `router` are stable for the screen's life.
-  }, []);
+  }, [router, signOut]);
 
   useEffect(() => {
     void load();
@@ -153,17 +152,15 @@ export default function OnboardingScreen() {
         <Badge tone={banner.tone} label={banner.text} />
       </View>
 
-      {application.vehicle ? (
-        <ItemRow
-          title={`Véhicule : ${VEHICLE_LABELS[application.vehicle]}`}
-          state={editable ? 'Changer' : ''}
-          mark={VEHICLE_MARKS[application.vehicle]}
-          onPress={editable ? () => setOpen(open === 'vehicle' ? null : 'vehicle') : undefined}
-        />
-      ) : null}
+      <ItemRow
+        title={`Véhicule : ${application.vehicle ? VEHICLE_LABELS[application.vehicle] : 'à choisir'}`}
+        state={editable ? 'Changer' : ''}
+        mark={application.vehicle ? VEHICLE_MARKS[application.vehicle] : '❔'}
+        onPress={editable ? () => setOpen(open === 'vehicle' ? null : 'vehicle') : undefined}
+      />
       {open === 'vehicle' && editable ? (
         <View style={styles.panel}>
-          <View style={styles.choices}>
+          <View style={styles.choices} accessibilityRole="radiogroup" accessibilityLabel="Véhicule">
             {COURIER_VEHICLES.map((vehicle) => (
               <Choice
                 key={vehicle}
@@ -213,7 +210,12 @@ export default function OnboardingScreen() {
       </View>
 
       {error ? (
-        <Text accessibilityRole="alert" style={styles.error}>
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          aria-live="polite"
+          style={styles.error}
+        >
           {error}
         </Text>
       ) : null}
@@ -230,8 +232,17 @@ export default function OnboardingScreen() {
       )}
 
       <View style={styles.online}>
-        <BigButton label="En ligne" variant="secondary" disabled onPress={() => undefined} />
-        <Text style={styles.note}>Impossible tant que DJAFAT ne vous a pas validé.</Text>
+        <BigButton
+          label="En ligne"
+          variant="secondary"
+          disabled
+          onPress={() => undefined}
+          hint="Impossible tant que DJAFAT ne vous a pas validé."
+          describedBy="online-why"
+        />
+        <Text nativeID="online-why" style={styles.note}>
+          Impossible tant que DJAFAT ne vous a pas validé.
+        </Text>
       </View>
 
       <Modal
@@ -306,7 +317,8 @@ function Choice({
   return (
     <Pressable
       accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      // `aria-checked`: what a radio says on a phone and in a browser (aria-selected is not a radio's state).
+      aria-checked={selected}
       onPress={onPress}
       style={[styles.choice, selected ? styles.choiceSelected : null]}
     >
@@ -340,7 +352,11 @@ function ItemEditor({
   if (item === 'mobile_money') {
     return (
       <View style={styles.panel}>
-        <View style={styles.choices}>
+        <View
+          style={styles.choices}
+          accessibilityRole="radiogroup"
+          accessibilityLabel="Opérateur Mobile Money"
+        >
           {MOBILE_MONEY_PROVIDERS.map((p) => (
             <Choice
               key={p}

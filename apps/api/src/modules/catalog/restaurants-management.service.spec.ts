@@ -6,9 +6,14 @@ import type { AuditService } from '../../common/audit/audit.service';
 import type { UsersService } from '../users/users.service';
 import type { RestaurantAvailabilityService } from './restaurant-availability.service';
 
-function prismaStub(restaurant: { status: string; ownerUserId: string | null } | null) {
+function prismaStub(
+  restaurant: { status: string; ownerUserId: string | null } | null,
+  // FEAT-022: a restaurant's application; none = created by the team (as before FEAT-022).
+  application: { status: string } | null = null,
+) {
   const state = restaurant ? { ...restaurant, id: 'r1', slug: 'r1-slug', name: 'R1' } : null;
   return {
+    restaurantApplication: { findUnique: vi.fn().mockResolvedValue(application) },
     restaurant: {
       findUnique: vi.fn().mockResolvedValue(state),
       findUniqueOrThrow: vi.fn().mockResolvedValue(state),
@@ -189,6 +194,56 @@ describe('update — status transition rules (docs/20 §6, §35)', () => {
     await expect(svc.update('owner-1', 'missing', { name: 'X' }, false)).rejects.toThrow(
       NotFoundException,
     );
+  });
+});
+
+// FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte (review of parts 1-2, finding 1).
+describe('update — a restaurant that signed up opens only once DJAFAT approved it (SPEC-022-03 R3)', () => {
+  it.each(['active', 'paused'] as const)(
+    'SPEC-022-03-SC02 — its owner cannot set %s while the application is not approved (409), nothing changes',
+    async (status) => {
+      for (const pending of ['to_complete', 'pending_review', 'rejected']) {
+        const prisma = prismaStub({ status: 'draft', ownerUserId: 'owner-1' }, { status: pending });
+        const svc = new RestaurantsManagementService(
+          prisma,
+          auditStub(),
+          usersStub(new Set(['owner-1:r1'])),
+          availabilityStub(),
+        );
+        await expect(svc.update('owner-1', 'r1', { status }, false)).rejects.toMatchObject({
+          response: { code: 'RESTAURANT_NOT_APPROVED' },
+        });
+        expect(prisma.restaurant.update).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it('once approved, its owner pauses and reopens it as any restaurant', async () => {
+    const prisma = prismaStub({ status: 'active', ownerUserId: 'owner-1' }, { status: 'approved' });
+    const svc = new RestaurantsManagementService(
+      prisma,
+      auditStub(),
+      usersStub(new Set(['owner-1:r1'])),
+      availabilityStub(),
+    );
+    expect((await svc.update('owner-1', 'r1', { status: 'paused' }, false)).status).toBe('paused');
+    expect((await svc.update('owner-1', 'r1', { status: 'active' }, false)).status).toBe('active');
+  });
+
+  it('its owner can still rename it and keep it as a draft before the approval', async () => {
+    const prisma = prismaStub(
+      { status: 'draft', ownerUserId: 'owner-1' },
+      { status: 'to_complete' },
+    );
+    const svc = new RestaurantsManagementService(
+      prisma,
+      auditStub(),
+      usersStub(new Set(['owner-1:r1'])),
+      availabilityStub(),
+    );
+    await expect(
+      svc.update('owner-1', 'r1', { name: 'Chez Fatimé', status: 'draft' }, false),
+    ).resolves.toMatchObject({ name: 'Chez Fatimé', status: 'draft' });
   });
 });
 

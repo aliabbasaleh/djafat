@@ -13,6 +13,7 @@ import {
   maskNationalPhone,
   missingCourierItems,
   ndjamenaDate,
+  vehicleNeedsPapers,
   type ApplicationStatus,
   type CourierDocumentKind,
   type CourierItem,
@@ -159,13 +160,24 @@ export class CourierApplicationService {
         ]);
       }
     }
-    await this.prisma.$transaction(async (tx) => {
+    const dropped = await this.prisma.$transaction(async (tx) => {
       const application = await this.lockedRow(tx, userId);
       if (!applicationIsEditable(this.statusOf(application))) throw locked();
       const now = new Date();
+      // R3: on a bicycle or on foot, the licence and the vehicle papers are neither asked nor
+      // kept — their photos go with the change (review of FEAT-022 parts 1-2, note 18).
+      const unneeded =
+        input.vehicle && !vehicleNeedsPapers(input.vehicle)
+          ? (['driving_licence', 'vehicle_registration', 'insurance', 'plate'] as const)
+          : [];
+      const droppedKeys = unneeded.flatMap((kind) => {
+        const key = application[PHOTO_COLUMN[kind]];
+        return key ? [key] : [];
+      });
       await tx.courierApplication.update({
         where: { courierUserId: userId },
         data: {
+          ...Object.fromEntries(unneeded.map((kind) => [PHOTO_COLUMN[kind], null])),
           ...(input.mobileMoney
             ? {
                 mobileMoneyProvider: input.mobileMoney.provider,
@@ -187,7 +199,9 @@ export class CourierApplicationService {
           data: { vehicleType: input.vehicle, updatedAt: now },
         });
       }
+      return droppedKeys;
     });
+    for (const key of dropped) await this.removeQuietly(key);
     return this.getMine(userId);
   }
 
@@ -344,7 +358,14 @@ export class CourierApplicationService {
     if (!user || user.status === 'deleted') throw notFound();
     await this.prisma.$transaction(async (tx) => {
       const application = await this.lockedRow(tx, userId);
-      if (!applicationIsDecidable(this.statusOf(application))) {
+      const status = this.statusOf(application);
+      if (status === 'to_complete') {
+        throw new ConflictException({
+          code: 'APPLICATION_NOT_SUBMITTED',
+          message: "Ce dossier n'a pas encore été envoyé par le livreur.",
+        });
+      }
+      if (!applicationIsDecidable(status)) {
         throw new ConflictException({
           code: 'ALREADY_DECIDED',
           message: 'Ce dossier a déjà été décidé par un autre administrateur.',

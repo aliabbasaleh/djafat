@@ -80,7 +80,7 @@ export default function HomeScreen() {
       setState('error');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- PRE-EXISTING (FU-REACT-01): `signOut` is read stale; adding it changes the callback identity, review separately.
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     void load();

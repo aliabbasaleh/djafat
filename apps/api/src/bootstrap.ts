@@ -26,6 +26,6 @@ export function configureApp(app: NestFastifyApplication): void {
 
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  // FEAT-022: photo uploads (`multipart/form-data`, 5 MB) for the applications.
+  // FEAT-022: a photo sent as the request's body (5 MB) on the applications' upload routes.
   registerPhotoUploads(app);
 }

@@ -46,6 +46,28 @@ describe('SPEC-022-06 — the courier fills and sends the application', () => {
     expect(world.couriers.get('u-abakar')?.vehicleType).toBe('velo');
   });
 
+  it('SPEC-022-06 R3 — switched to Vélo, the licence and vehicle papers are not kept: their photos are deleted', async () => {
+    const world = courierWorld();
+    world.signedUp('u-abakar', { vehicle: 'moto', application: COMPLETE_MOTO });
+
+    await world.service.updateMine('u-abakar', { vehicle: 'velo' });
+
+    expect(world.applications.get('u-abakar')).toMatchObject({
+      facePhotoKey: 'private-face.jpg',
+      idCardPhotoKey: 'private-id.jpg',
+      drivingLicencePhotoKey: null,
+      vehicleRegistrationPhotoKey: null,
+      insurancePhotoKey: null,
+      platePhotoKey: null,
+    });
+    expect(world.removed.sort()).toEqual([
+      'private-insurance.jpg',
+      'private-licence.jpg',
+      'private-plate.jpg',
+      'private-registration.jpg',
+    ]);
+  });
+
   // SPEC-022-06-SC02
   it('SPEC-022-06-SC02 — a moto without the licence photo: 409 APPLICATION_INCOMPLETE with ["driving_licence"]', async () => {
     const world = courierWorld();
@@ -109,7 +131,7 @@ describe('SPEC-022-06 — the courier fills and sends the application', () => {
     expect(saved.items.find((i) => i.item === 'emergency_contact')?.done).toBe(true);
   });
 
-  it('SPEC-022-04 R6 — before the decision, a replaced photo is deleted once the new one is saved', async () => {
+  it('SPEC-022-06 (Contrats, v3) — before the decision, a replaced photo is deleted once the new one is saved', async () => {
     const world = courierWorld();
     world.signedUp('u-abakar', { application: { facePhotoKey: 'private-old-face.jpg' } });
 
@@ -273,6 +295,17 @@ describe('SPEC-022-07 — DJAFAT decides on a courier', () => {
       rejectionReason: null,
     });
     expect(world.audits.map((a) => a.action)).toEqual(['APPLICATION_APPROVED']);
+  });
+
+  it('SPEC-022-07 R7 — an application never sent is not decided, and says so (409 APPLICATION_NOT_SUBMITTED)', async () => {
+    const world = courierWorld();
+    world.signedUp('u-abakar');
+
+    expect(await rejection(world.service.approve('u-abakar', 'u-admin'))).toMatchObject({
+      status: 409,
+      body: { code: 'APPLICATION_NOT_SUBMITTED' },
+    });
+    expect(world.applications.get('u-abakar')?.status).toBe('to_complete');
   });
 
   it('SPEC-022-07 — an application of a deleted account is not decided (404)', async () => {

@@ -1,14 +1,14 @@
 ---
 feature: FEAT-022
 # prettier-ignore
-specs: [SPEC-022-01@2, SPEC-022-02@3, SPEC-022-03@1, SPEC-022-04@3, SPEC-022-05@1, SPEC-022-06@3, SPEC-022-07@2, SPEC-022-08@2, SPEC-022-09@1]
+specs: [SPEC-022-01@2, SPEC-022-02@3, SPEC-022-03@2, SPEC-022-04@4, SPEC-022-05@1, SPEC-022-06@4, SPEC-022-07@3, SPEC-022-08@2, SPEC-022-09@1]
 ---
 
 # FEAT-022 — Brief d'exécution
 
 ## Sources
 
-- Feature : `feature.md` — Specs : `specs/SPEC-022-01.md` à `SPEC-022-09.md` (clarifiées ; 01, 07 et 08 en v2, 02, 04 et 06 en v3).
+- Feature : `feature.md` — Specs : `specs/SPEC-022-01.md` à `SPEC-022-09.md` (clarifiées ; 01, 03 et 08 en v2, 02 et 07 en v3, 04 et 06 en v4).
 - Décisions : `clarifications.md` (Q01 à Q06 de l'utilisateur, Q07 à Q12 hypothèses techniques).
 - Intake : `progress.md` ; règles : `README.md` (« Règles non négociables »),
   `docs/pipeline/architecture-policy.md` ; graphe des modules : `packages/eslint-config/api-boundaries.js`.
@@ -113,7 +113,9 @@ parcours « À compléter » existe.
 2. **Livreurs** — dossier dans l'application livreur (SPEC-022-06), file et décisions des livreurs
    dans la console admin (SPEC-022-07).
 3. **Restaurants** — quatre étapes dans la console restaurant (SPEC-022-05), décisions des
-   restaurants, changements après validation (SPEC-022-07 R6).
+   restaurants, changements après validation (SPEC-022-07 R6), et la page « Quartiers » de la
+   console admin (SPEC-022-09 R3, R4, SC02 : liste, ajout, renommage, désactivation, noms saisis sous
+   « Autre ») — l'API de cette page existe depuis la tranche 1.
 4. **Inscription par type** — écrans du site et de l'application client, pied de page, liens des
    écrans de connexion, page « Conditions », « Mon profil » (SPEC-022-01, 02, 03, 08).
 

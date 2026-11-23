@@ -21,6 +21,13 @@ import type { ReplaceRestaurantHoursInput } from './dto/restaurant-hours.schema'
 /** Statuses an owner may set themselves — anything else needs `admin:write` (docs/20 §6, §35). */
 const OWNER_SELF_SERVICE_STATUSES: readonly RestaurantStatus[] = ['draft', 'active', 'paused'];
 
+/**
+ * FEAT-022 (SPEC-022-03 R3, SPEC-022-07 R3): statuses customers see. A restaurant that
+ * signed up reaches them only through DJAFAT's approval, never by its owner's hand
+ * (found by the FEAT-022 review: « Fermer maintenant » then « Rouvrir » published it).
+ */
+const PUBLIC_STATUSES: readonly RestaurantStatus[] = ['active', 'paused'];
+
 export interface RestaurantAdminDto {
   readonly id: string;
   readonly slug: string;
@@ -236,6 +243,19 @@ export class RestaurantsManagementService {
         code: 'FORBIDDEN',
         message: `Setting status "${input.status}" requires admin:write.`,
       });
+    }
+    if (input.status !== undefined && !isAdminTier && PUBLIC_STATUSES.includes(input.status)) {
+      // No application: created by the team, works as before FEAT-022.
+      const application = await this.prisma.restaurantApplication.findUnique({
+        where: { restaurantId },
+        select: { status: true },
+      });
+      if (application && application.status !== 'approved') {
+        throw new ConflictException({
+          code: 'RESTAURANT_NOT_APPROVED',
+          message: "Votre restaurant n'est pas encore validé par DJAFAT.",
+        });
+      }
     }
 
     const updated = await this.prisma.restaurant.update({

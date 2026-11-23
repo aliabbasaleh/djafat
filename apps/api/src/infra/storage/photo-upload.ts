@@ -1,3 +1,5 @@
+import type { Readable } from 'node:stream';
+import { UnauthorizedException, UnsupportedMediaTypeException } from '@nestjs/common';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
@@ -10,8 +12,9 @@ import {
 /**
  * FEAT-022 (SPEC-022-04 R2, FEAT-022-Q08): a photo is sent as the body of its
  * request — `Content-Type: image/jpeg`, `image/png` or `image/webp` (or
- * `application/octet-stream`), one photo per request, 5 MB at most. The rest
- * of the API keeps its 1 MB JSON limit. What the bytes really are is checked
+ * `application/octet-stream`), one photo per request, 5 MB at most, on the
+ * upload routes only — every other route keeps its 1 MB JSON limit and answers
+ * these types 415 without reading them. What the bytes really are is checked
  * when the photo is stored (`PhotoStorage.store`), never trusted from the type.
  *
  * Not `multipart/form-data` (`@fastify/multipart`): its parser's type
@@ -32,37 +35,73 @@ export const PHOTO_UPLOAD_CONTENT_TYPES: readonly string[] = [
  */
 const DRAIN_LIMIT_BYTES = 4 * MAX_PHOTO_BYTES;
 
+/** The routes that take a photo as their body: `…/application/files/:kind` (couriers; restaurants next). */
+export function isPhotoUploadRoute(url: string | undefined): boolean {
+  return url !== undefined && /\/application\/files\/:kind$/.test(url);
+}
+
+type ParserDone = (err: Error | null, body?: Buffer) => void;
+
+/**
+ * Reads one photo body. Only an upload route reads anything, and only for a
+ * caller with a session: every other route answers 415 as before, and an
+ * upload without a token is refused before its first byte — the guard would
+ * refuse it anyway, but only after 5 MB (review of FEAT-022 parts 1-2, finding 2).
+ */
+export function readPhotoBody(
+  req: Pick<FastifyRequest, 'headers' | 'routeOptions'>,
+  payload: Readable,
+  done: ParserDone,
+): void {
+  let settled = false;
+  const finish = (err: Error | null, body?: Buffer) => {
+    if (settled) return;
+    settled = true;
+    done(err, body);
+  };
+  if (!isPhotoUploadRoute(req.routeOptions.url)) {
+    finish(
+      new UnsupportedMediaTypeException({
+        code: 'VALIDATION_ERROR',
+        message: `Unsupported Media Type: ${String(req.headers['content-type'] ?? '')}`,
+      }),
+    );
+    return;
+  }
+  if (!/^Bearer\s+\S/i.test(String(req.headers.authorization ?? ''))) {
+    finish(
+      new UnauthorizedException({ code: 'UNAUTHENTICATED', message: 'Missing bearer token.' }),
+    );
+    return;
+  }
+  if (Number(req.headers['content-length'] ?? 0) > DRAIN_LIMIT_BYTES) {
+    finish(photoTooLarge());
+    return;
+  }
+  const chunks: Buffer[] = [];
+  let size = 0;
+  payload.on('data', (chunk: Buffer) => {
+    size += chunk.length;
+    if (size > DRAIN_LIMIT_BYTES) {
+      finish(photoTooLarge());
+      payload.destroy();
+    } else if (size <= MAX_PHOTO_BYTES) {
+      chunks.push(chunk);
+    }
+  });
+  payload.on('end', () => {
+    if (size > MAX_PHOTO_BYTES) finish(photoTooLarge());
+    else finish(null, Buffer.concat(chunks));
+  });
+  payload.on('error', (err) => finish(err));
+}
+
 /** Registered by `configureApp`, so the real process and the integration tests read uploads the same way. */
 export function registerPhotoUploads(app: NestFastifyApplication): void {
   const fastify: FastifyInstance = app.getHttpAdapter().getInstance();
-  fastify.addContentTypeParser([...PHOTO_UPLOAD_CONTENT_TYPES], (req, payload, done) => {
-    let settled = false;
-    const finish = (err: Error | null, body?: Buffer) => {
-      if (settled) return;
-      settled = true;
-      done(err, body);
-    };
-    if (Number(req.headers['content-length'] ?? 0) > DRAIN_LIMIT_BYTES) {
-      finish(photoTooLarge());
-      return;
-    }
-    const chunks: Buffer[] = [];
-    let size = 0;
-    payload.on('data', (chunk: Buffer) => {
-      size += chunk.length;
-      if (size > DRAIN_LIMIT_BYTES) {
-        finish(photoTooLarge());
-        payload.destroy();
-      } else if (size <= MAX_PHOTO_BYTES) {
-        chunks.push(chunk);
-      }
-    });
-    payload.on('end', () => {
-      if (size > MAX_PHOTO_BYTES) finish(photoTooLarge());
-      else finish(null, Buffer.concat(chunks));
-    });
-    payload.on('error', (err) => finish(err));
-  });
+  fastify.addContentTypeParser([...PHOTO_UPLOAD_CONTENT_TYPES], (req, payload, done) =>
+    readPhotoBody(req, payload, done),
+  );
 }
 
 /** The uploaded photo's bytes; anything else (no body, JSON…) is 415 `UNSUPPORTED_FILE`. */

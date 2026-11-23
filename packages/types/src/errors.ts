@@ -78,6 +78,12 @@ export const API_ERROR_CODES = [
   'APPLICATION_LOCKED',
   /** FEAT-022 — another admin already decided (409, SPEC-022-07 R7). */
   'ALREADY_DECIDED',
+  /** FEAT-022 — an application not sent yet cannot be decided (409, SPEC-022-07 R7). */
+  'APPLICATION_NOT_SUBMITTED',
+  /** FEAT-022 — a signed-up restaurant opens to customers only once approved (409, SPEC-022-03 R3). */
+  'RESTAURANT_NOT_APPROVED',
+  /** FEAT-022 — the server has no room left for photos; nothing was kept (507, SPEC-022-04). */
+  'STORAGE_FULL',
   'MFA_INVALID',
   'MFA_REQUIRED',
   'ACCOUNT_INACTIVE',

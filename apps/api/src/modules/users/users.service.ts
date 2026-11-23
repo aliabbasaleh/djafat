@@ -207,10 +207,14 @@ export class UsersService {
             "Ce numéro a déjà un compte. Connectez-vous avec ce numéro ou avec l'e-mail de ce compte.",
         });
       }
-      throw new ConflictException({
-        code: 'EMAIL_ALREADY_USED',
-        message: 'Cette adresse e-mail est déjà utilisée par un autre compte.',
-      });
+      if (await this.findByEmail(input.email)) {
+        throw new ConflictException({
+          code: 'EMAIL_ALREADY_USED',
+          message: 'Cette adresse e-mail est déjà utilisée par un autre compte.',
+        });
+      }
+      // Another unique key (e.g. what `afterCreate` created): never blamed on a free address.
+      throw err;
     }
   }
 

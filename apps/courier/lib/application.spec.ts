@@ -63,6 +63,8 @@ describe('SPEC-022-06 — « Avant votre première course »', () => {
     expect(canSubmit(filled)).toBe(true);
     expect(canSubmit({ ...filled, status: 'rejected' })).toBe(true);
     expect(canSubmit({ ...filled, status: 'pending_review' })).toBe(false);
+    // no vehicle: no list to fill, nothing to send (review of FEAT-022 parts 1-2, note 23)
+    expect(canSubmit({ ...filled, vehicle: null, items: [] })).toBe(false);
   });
 
   it('the vehicle papers item gathers its three photos', () => {

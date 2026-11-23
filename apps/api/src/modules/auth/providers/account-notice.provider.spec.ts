@@ -129,7 +129,7 @@ describe('SPEC-022-07 — the e-mails of a decision', () => {
     expect(text).toContain('« En ligne »');
   });
 
-  it('SPEC-022-07-SC02 — « Votre restaurant est validé », named, now visible to customers', () => {
+  it('SPEC-022-07 R5 — « Votre restaurant est validé », named, now visible to customers', () => {
     const { subject, text } = accountNoticeMessage({
       kind: 'application_approved',
       to: 'fatime@example.td',

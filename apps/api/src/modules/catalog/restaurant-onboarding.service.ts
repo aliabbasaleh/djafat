@@ -25,6 +25,9 @@ export class RestaurantOnboardingService implements RestaurantOnboardingPort {
       select: { id: true, countryId: true },
     });
     const base = slugifyRestaurantName(signup.restaurantName);
+    // Two « Chez Fatimé » signing up at once: the second waits for the first's address
+    // (held until the sign-up's transaction ends), then takes the next suffix (SPEC-022-03-SC04).
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`restaurant-slug:${base}`}))`;
     const taken = await tx.restaurant.findMany({
       where: { slug: { startsWith: base } },
       select: { slug: true },

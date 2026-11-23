@@ -62,29 +62,136 @@ function concat(parts: Uint8Array[]): Uint8Array {
   return out;
 }
 
-/** JPEG: drop APP1 (EXIF, XMP) and APP13 (IPTC) segments; everything from the scan on is kept as is. */
+/** The end of the JPEG segment starting at `i` (a marker with its 2-byte length). */
+function segmentEnd(bytes: Uint8Array, i: number): number {
+  if (i + 3 >= bytes.length) throw unsupportedPhoto();
+  const length = ((bytes[i + 2] as number) << 8) | (bytes[i + 3] as number);
+  const end = i + 2 + length;
+  if (length < 2 || end > bytes.length) throw unsupportedPhoto();
+  return end;
+}
+
+/** APP2 « MPF »: the index of the extra images some phones append after the photo. */
+function isMultiPicture(bytes: Uint8Array, i: number): boolean {
+  return bytes[i + 1] === 0xe2 && ascii(bytes, i + 4, 4) === 'MPF\0';
+}
+
+/** What a JPEG segment between the image's start and its scans keeps: no EXIF/XMP, IPTC nor MPF. */
+function keepsSegment(bytes: Uint8Array, i: number): boolean {
+  const marker = bytes[i + 1] as number;
+  return marker !== 0xe1 && marker !== 0xed && !isMultiPicture(bytes, i);
+}
+
+/** The EXIF orientation (1–8) in an APP1 payload (`Exif\0\0` + TIFF), or null. */
+export function exifOrientation(payload: Uint8Array): number | null {
+  if (ascii(payload, 0, 6) !== 'Exif\0\0') return null;
+  const tiff = payload.subarray(6);
+  const little = ascii(tiff, 0, 2) === 'II';
+  if (!little && ascii(tiff, 0, 2) !== 'MM') return null;
+  const u16 = (o: number) =>
+    o + 2 > tiff.length
+      ? null
+      : little
+        ? (tiff[o] as number) | ((tiff[o + 1] as number) << 8)
+        : ((tiff[o] as number) << 8) | (tiff[o + 1] as number);
+  const u32 = (o: number) => {
+    const hi = u16(little ? o + 2 : o);
+    const lo = u16(little ? o : o + 2);
+    return hi === null || lo === null ? null : hi * 0x10000 + lo;
+  };
+  if (u16(2) !== 0x2a) return null;
+  const ifd = u32(4);
+  const count = ifd === null ? null : u16(ifd);
+  if (ifd === null || count === null) return null;
+  for (let k = 0; k < count; k += 1) {
+    const entry = ifd + 2 + 12 * k;
+    if (u16(entry) === 0x0112) {
+      const value = u16(entry + 8);
+      return value !== null && value >= 1 && value <= 8 ? value : null;
+    }
+  }
+  return null;
+}
+
+/** A minimal EXIF segment holding only the orientation, so a portrait photo still shows upright. */
+function orientationSegment(orientation: number): Uint8Array {
+  return Uint8Array.from([
+    ...[0xff, 0xe1, 0x00, 0x22],
+    ...Buffer.from('Exif\0\0', 'latin1'),
+    ...[0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08], // big-endian TIFF, IFD0 at 8
+    ...[0x00, 0x01], // one entry
+    ...[0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, orientation, 0x00, 0x00],
+    ...[0x00, 0x00, 0x00, 0x00], // no next IFD
+  ]);
+}
+
+/**
+ * JPEG (FEAT-022-Q09, SPEC-022-04 « Erreurs et cas limites »): the image, and
+ * nothing that says where or when it was taken. APP1 (EXIF, XMP) is replaced by
+ * a minimal EXIF holding only the orientation (when it is not the normal one);
+ * APP13 (IPTC) and APP2 « MPF » go; the scans are kept up to the image's end
+ * (EOI) — what some phones append after it (extra images with their own EXIF,
+ * trailers, videos) goes too (review of FEAT-022 parts 1-2, findings 5, 14).
+ */
 function stripJpeg(bytes: Uint8Array): Uint8Array {
-  const parts: Uint8Array[] = [bytes.subarray(0, 2)]; // SOI
-  let i = 2;
-  while (i < bytes.length) {
-    if (bytes[i] !== 0xff || i + 1 >= bytes.length) throw unsupportedPhoto();
+  const parts: Uint8Array[] = [];
+  let orientation: number | null = null;
+  let i = 2; // after SOI
+  // The segments before the first scan.
+  for (;;) {
+    if (i + 1 >= bytes.length || bytes[i] !== 0xff) throw unsupportedPhoto();
     const marker = bytes[i + 1] as number;
-    if (marker === 0xda) {
-      parts.push(bytes.subarray(i)); // start of scan: image data to the end
-      return concat(parts);
+    if (marker === 0xff) {
+      i += 1; // fill byte
+      continue;
     }
     if (marker === 0xd9) {
       parts.push(bytes.subarray(i, i + 2)); // end of image without a scan
-      return concat(parts);
+      return finishJpeg(parts, orientation);
     }
-    if (i + 3 >= bytes.length) throw unsupportedPhoto();
-    const length = ((bytes[i + 2] as number) << 8) | (bytes[i + 3] as number);
-    const end = i + 2 + length;
-    if (length < 2 || end > bytes.length) throw unsupportedPhoto();
-    if (marker !== 0xe1 && marker !== 0xed) parts.push(bytes.subarray(i, end));
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) throw unsupportedPhoto();
+    const end = segmentEnd(bytes, i);
+    if (marker === 0xe1) orientation ??= exifOrientation(bytes.subarray(i + 4, end));
+    if (keepsSegment(bytes, i)) parts.push(bytes.subarray(i, end));
     i = end;
+    if (marker === 0xda) break; // start of scan: its data follows
   }
-  throw unsupportedPhoto();
+  // The scans' data, and the segments between the scans of a progressive JPEG.
+  let start = i;
+  while (i + 1 < bytes.length) {
+    if (bytes[i] !== 0xff) {
+      i += 1;
+      continue;
+    }
+    const next = bytes[i + 1] as number;
+    if (next === 0x00 || next === 0x01 || (next >= 0xd0 && next <= 0xd7)) {
+      i += 2; // a stuffed 0xFF, or a marker without length inside the data
+      continue;
+    }
+    if (next === 0xff) {
+      i += 1; // fill byte before a marker
+      continue;
+    }
+    parts.push(bytes.subarray(start, i));
+    if (next === 0xd9) {
+      parts.push(bytes.subarray(i, i + 2)); // EOI: whatever follows is dropped
+      return finishJpeg(parts, orientation);
+    }
+    const end = segmentEnd(bytes, i);
+    if (keepsSegment(bytes, i)) parts.push(bytes.subarray(i, end)); // DHT, DQT, DRI, SOS…
+    i = end;
+    start = i;
+  }
+  throw unsupportedPhoto(); // no end of image: a truncated file is never stored
+}
+
+function finishJpeg(parts: Uint8Array[], orientation: number | null): Uint8Array {
+  const soi = Uint8Array.from([0xff, 0xd8]);
+  return concat(
+    orientation !== null && orientation !== 1
+      ? [soi, orientationSegment(orientation), ...parts]
+      : [soi, ...parts],
+  );
 }
 
 const PNG_DROPPED = new Set(['eXIf', 'tEXt', 'zTXt', 'iTXt', 'tIME']);

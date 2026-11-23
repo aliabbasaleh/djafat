@@ -9,6 +9,9 @@ while true; do
   if [ -d /data/uploads ]; then
     tar -czf "/backups/uploads-$now.tar.gz" -C /data uploads \
       && echo "files ok: uploads-$now.tar.gz" || echo "files backup FAILED at $now"
+  else
+    # Never silent: without the volume, the photos are not backed up at all.
+    echo "files backup FAILED at $now: /data/uploads is not mounted"
   fi
   find /backups -name 'djafat-*.dump' -mtime +14 -delete
   find /backups -name 'uploads-*.tar.gz' -mtime +14 -delete

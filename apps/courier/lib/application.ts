@@ -83,7 +83,12 @@ export function canEdit(application: CourierApplication): boolean {
 
 /** R4: « Envoyer pour validation » is active only when everything is filled. */
 export function canSubmit(application: CourierApplication): boolean {
-  return canEdit(application) && application.items.every((i) => i.done);
+  return (
+    canEdit(application) &&
+    application.vehicle !== null &&
+    application.items.length > 0 &&
+    application.items.every((i) => i.done)
+  );
 }
 
 /** The photos behind one item of the list (the vehicle papers are three). */
