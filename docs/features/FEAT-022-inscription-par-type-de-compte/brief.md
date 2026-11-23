@@ -1,14 +1,14 @@
 ---
 feature: FEAT-022
 # prettier-ignore
-specs: [SPEC-022-01@1, SPEC-022-02@1, SPEC-022-03@1, SPEC-022-04@1, SPEC-022-05@1, SPEC-022-06@1, SPEC-022-07@1, SPEC-022-08@1, SPEC-022-09@1]
+specs: [SPEC-022-01@2, SPEC-022-02@1, SPEC-022-03@1, SPEC-022-04@2, SPEC-022-05@1, SPEC-022-06@1, SPEC-022-07@1, SPEC-022-08@1, SPEC-022-09@1]
 ---
 
 # FEAT-022 — Brief d'exécution
 
 ## Sources
 
-- Feature : `feature.md` — Specs : `specs/SPEC-022-01.md` à `SPEC-022-09.md` (v1, clarifiées).
+- Feature : `feature.md` — Specs : `specs/SPEC-022-01.md` à `SPEC-022-09.md` (clarifiées ; 01 et 04 en v2).
 - Décisions : `clarifications.md` (Q01 à Q06 de l'utilisateur, Q07 à Q12 hypothèses techniques).
 - Intake : `progress.md` ; règles : `README.md` (« Règles non négociables »),
   `docs/pipeline/architecture-policy.md` ; graphe des modules : `packages/eslint-config/api-boundaries.js`.
@@ -57,6 +57,7 @@ livreur). Aucune nouvelle arête entre modules : `auth` passe par deux ports de 
 | SPEC-022-01-SC03 | client-logic | `apps/web/src/lib/account.spec.ts`                                   | « la requête `POST /auth/register` est celle de FEAT-020 (mêmes champs, aucun type ajouté), et la suite (code par e-mail, compte client) ne change pas » |
 | SPEC-022-01-SC04 | manuel       | capture d’exécution (`assets/exec-SPEC-022-01-SC04-*.png`)           | « `/compte` s'ouvre sur le formulaire livreur, puis sur le formulaire restaurant ; aucun des deux liens ne porte plus « Bientôt » »                      |
 | SPEC-022-01-SC05 | manuel       | capture d’exécution (`assets/exec-SPEC-022-01-SC05-*.png`)           | « les trois choix s'affichent, puis le formulaire restaurant »                                                                                           |
+| SPEC-022-01-SC06 | manuel       | capture d’exécution (`assets/exec-SPEC-022-01-SC06-*.png`)           | « le formulaire restaurant, puis le formulaire livreur du site s'ouvrent »                                                                               |
 | SPEC-022-02-SC01 | application  | `apps/api/src/modules/auth/registration.service.spec.ts`             | « le compte existe avec les rôles `customer` et `courier`, une ligne `couriers` (véhicule `moto`, quartier Moursal), un dossier `to_complete` avec… »    |
 | SPEC-022-02-SC02 | domain       | `packages/core/src/onboarding/courier-signup.spec.ts`                | « la première est refusée avec « Il faut avoir au moins 18 ans pour livrer avec DJAFAT. » (côté écran et, si elle arrive quand même, côté API : 422… »   |
 | SPEC-022-02-SC03 | domain       | `packages/core/src/onboarding/courier-signup.spec.ts`                | « chaque champ manquant affiche son message et rien n'est envoyé ; l'API refuse aussi (422, champs en erreur) »                                          |
@@ -102,17 +103,19 @@ livreur). Aucune nouvelle arête entre modules : `auth` passe par deux ports de 
 
 ## Livraison en tranches
 
-Une PR par tranche, chacune avec sa version, sa revue et son `verify` :
+Une PR par tranche, chacune avec sa version, sa revue et son `verify`. Les écrans d'inscription
+sortent en dernier : personne ne peut s'inscrire comme livreur ou restaurant avant que son
+parcours « À compléter » existe.
 
 1. **Fondations** — stockage sur disque et `GET /files/:key` (SPEC-022-04), quartiers (SPEC-022-09),
-   migration, règles du domaine, ports d'inscription, `POST /auth/register` typé (API de SPEC-022-02,
-   03).
-2. **Inscription par type** — écrans du site et de l'application client, pied de page, page
-   « Conditions », « Mon profil » (SPEC-022-01, 02, 03, 08).
-3. **Livreurs** — dossier dans l'application livreur, « En ligne » bloqué (SPEC-022-06), file et
-   décisions des livreurs dans la console admin (SPEC-022-07).
-4. **Restaurants** — quatre étapes dans la console restaurant (SPEC-022-05), décisions des restaurants,
-   changements après validation (SPEC-022-07 R6).
+   migration, règles du domaine, ports d'inscription, `POST /auth/register` typé, « En ligne »
+   réservé aux livreurs validés (API de SPEC-022-02, 03).
+2. **Livreurs** — dossier dans l'application livreur (SPEC-022-06), file et décisions des livreurs
+   dans la console admin (SPEC-022-07).
+3. **Restaurants** — quatre étapes dans la console restaurant (SPEC-022-05), décisions des
+   restaurants, changements après validation (SPEC-022-07 R6).
+4. **Inscription par type** — écrans du site et de l'application client, pied de page, liens des
+   écrans de connexion, page « Conditions », « Mon profil » (SPEC-022-01, 02, 03, 08).
 
 ## Commandes de vérification
 
