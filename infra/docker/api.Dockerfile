@@ -33,5 +33,8 @@ COPY --from=build /repo/apps/api/prisma ./apps/api/prisma
 # the root store (which also holds the generated Prisma client).
 COPY --from=build /repo/apps/api/node_modules ./apps/api/node_modules
 EXPOSE 3001
+# FEAT-022 (SPEC-022-04): photos live in /data/uploads — a volume in production. Created here,
+# owned by `node`, so a fresh named volume inherits a folder the API can write to.
+RUN mkdir -p /data/uploads && chown node:node /data/uploads
 USER node
 CMD ["node", "apps/api/dist/main.js"]

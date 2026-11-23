@@ -47,6 +47,13 @@ echo "migrations: $migrations (live: $live_migrations) · users: $users · unbal
 [ "$users" -gt 0 ] || fail "the restored database has no users"
 [ "$unbalanced" -eq 0 ] || fail "$unbalanced unbalanced ledger groups in the restored database"
 
+# FEAT-022 (SPEC-022-04 R5): the newest photos archive, once photos exist, must read back.
+FILES="$(ls -1t backups/uploads-*.tar.gz 2>/dev/null | head -1 || true)"
+if [ -n "$FILES" ]; then
+  tar -tzf "$FILES" >/dev/null 2>&1 || fail "the photos archive $FILES is unreadable"
+  echo "photos archive: $(basename "$FILES") · $(tar -tzf "$FILES" | grep -c '^uploads/.' || true) file(s)"
+fi
+
 $COMPOSE exec -T postgres dropdb -U djafat "$SCRATCH"
 printf 'OK %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "$DUMP")" > "$RESULT"
 echo "restore check OK: $DUMP is restorable"
