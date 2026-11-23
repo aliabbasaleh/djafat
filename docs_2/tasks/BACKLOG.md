@@ -501,6 +501,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Area:** `apps/mobile`, `auth` · **Priority:** Medium · **Why:** FEAT-020-Q09, Q21, Q23 · **Status:** Not started
 - **Done when:** a « Mon profil » screen in the app (password, number); a customer can change a mistyped number; deciding whether « Se déconnecter partout » also forgets remembered devices.
 - **Added from the FEAT-020 review** _(2026-11-22, sync S-039)_: an operational alert when an account e-mail cannot leave (codes now leave in the background); hide « Mot de passe oublié ? » when `/auth/methods` says e-mail is unavailable; decide how an account without a password guards its e-mail and first password against a stolen session; watch no-shows of new e-mail accounts (cash on delivery at T1).
+- **Added from FEAT-021** _(2026-11-23, sync S-043)_: a step-up code (MFA) before changing the e-mail or the password for roles enrolled in MFA (FEAT-021-Q11, deferred by the user); the contrast of « Bientôt disponible » (1.86:1, shared style of FEAT-020).
 - **Test:** each with its own feature and specs.
 
 ### T-613 · Deploy the CORS fix _(added 2026-11-21, sync S-035)_
@@ -511,7 +512,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-614 · Team log in by e-mail and password; SMS off (FEAT-021) _(added 2026-11-22, sync S-038)_
 
-- **Area:** `apps/admin`, `apps/restaurant`, `apps/courier`, `packages/config`, `auth` · **Priority:** High · **Why:** the user's decision of 2026-11-22 to switch SMS off until DJAFAT has an API (codes today land in a test box on the server); the three team apps only accept a phone code (`docs/features/FEAT-021-equipe-connexion-email`) · **Status:** Confirmed by the user, specs to write
+- **Area:** `apps/admin`, `apps/restaurant`, `apps/courier`, `packages/config`, `auth` · **Priority:** High · **Why:** the user's decision of 2026-11-22 to switch SMS off until DJAFAT has an API (codes today land in a test box on the server); the three team apps only accept a phone code (`docs/features/FEAT-021-equipe-connexion-email`) · **Status:** Implemented and reviewed twice on `feat/equipe-connexion-email` (0.25.0), verified locally (unit, browser screenshots, full verify) — pull request to merge; then switch SMS off on the server (`infra/deploy/README.md` §4) _(updated 2026-11-23, sync S-043)_
 - **Done when:** the three team apps log in by e-mail and password (code by e-mail on a new device); the API starts in production with `SMS_PROVIDER=disabled` when e-mail is configured; the server runs with SMS off.
 - **Test:** the FEAT-021 specs' tests; on the server, log in to each app with an e-mail and password.
 
@@ -527,4 +528,4 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Done when:** a customer logs in by sending the displayed code from WhatsApp, and DJAFAT sends no WhatsApp message.
 - **Test:** the FEAT-023 specs' tests.
 
-Last updated: 2026-11-23 (sync S-041)
+Last updated: 2026-11-23 (sync S-043)

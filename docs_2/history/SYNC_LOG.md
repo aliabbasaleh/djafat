@@ -10,6 +10,22 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-043 — 2026-11-23 — FEAT-020 on `main`; FEAT-021 team login, reviewed twice (0.25.0)
+
+Our own commits on `feat/equipe-connexion-email`, rebased onto `main` `038c723` (PR #27, FEAT-020). The rebase gave
+new hashes to commits already read: `d63658f` is the docs commit of S-038, `049a695` its sync; S-042 lives on the
+parallel branch `ci/cheaper-runs`. Read: `1f87e5c` and `7cf482a` (team login by e-mail and password in the admin
+console, the restaurant console and the courier app, through `packages/sdk/src/team-login.ts`; production may start
+with `SMS_PROVIDER=disabled` when `EMAIL_PROVIDER=smtp`; the SMS cut-over procedure), `6ca5b97` (the consoles'
+side margin at 390 px, a defect already on `main`), `d830024` and `3e3bc0d` (two independent reviews corrected:
+one role check for every way in, phone-code SDK methods, the pre-cut check FEAT-021-Q11), `ae07a59` and `2bf457c`
+(screenshots), `6ffb0d4` (0.25.0), and the PR content. Verified: `verify --full` on a fresh database, no new failure
+(e2e unavailable); the pre-cut query run read-only on the local database lists 13 seeded team accounts and none of
+the 5 with an e-mail and a password. No new finding; `AUTH-01` unchanged (no real SMS sender), but login no longer
+depends on it once SMS is switched off.
+
+---
+
 ## S-041 — 2026-11-23 — PR #27 merged without GitHub's checks (0.24.4)
 
 Short entry (our own docs commit `631b433`): version 0.24.4 records in `docs/ROADMAP.md` that PR #27 (FEAT-020) is

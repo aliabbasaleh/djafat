@@ -8,6 +8,24 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-23 — Sync S-043: the team logs in by e-mail and password (FEAT-021, 0.25.0)
+
+**Added:** `packages/sdk/src/team-login.ts` (one role check for every way in, the FEAT-020 password rules before any
+reset is sent), `requestPhoneLoginCode` / `verifyPhoneLoginCode` in the SDK client; the admin console, the restaurant
+console and the courier app log in by e-mail and password (a code by e-mail on a new device, « Mot de passe
+oublié ? »), SMS and WhatsApp shown « Bientôt disponible » until `/auth/methods` offers them; `infra/deploy/README.md`
+§4: how to switch SMS off, with a read-only pre-cut check. **Changed:** production accepts `SMS_PROVIDER=disabled`
+with `EMAIL_PROVIDER=smtp` (SPEC-021-01, supersedes SPEC-008-01 R3); the first admin creates an account on the site.
+**Fixed:** the consoles' login form touched the screen edges at 390 px (already on `main`).
+
+**Verified:** `verify --full` on a fresh database, no new failure (typecheck, lint, tests, build, audit, integration;
+e2e unavailable); 15 execution screenshots opened; the pre-cut query on the local database. **Decided:**
+FEAT-021-Q11 — SMS is switched off only once every active team account has a verified e-mail and a password; a
+step-up code on e-mail and password changes for MFA roles is deferred (T-612). **Not verified:** a GitHub run (no
+job starts until billing is fixed), the cut-over on the server.
+
+---
+
 ## 2026-11-23 — Sync S-041: PR #27 merged into `main` without GitHub's checks (FEAT-020, 0.24.4)
 
 **Changed:** at the user's request (« just merge it and comment it in the changelog »), PR #27 is merged although
