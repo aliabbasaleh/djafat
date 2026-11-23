@@ -8,6 +8,7 @@
 | Brief                   | fait    | 2026-11-22 |                                                                                                                                           |
 | Tests dérivés des specs | fait    | 2026-11-22 | SPEC-021-01 : la règle de démarrage échouait avant le changement (SC01, SC02), puis passe ; 4 tests SDK, 4 par application                |
 | Implémentation          | fait    | 2026-11-22 | `env.ts`, `team-login.ts` (SDK), trois écrans de connexion, procédure de bascule ; `verify:fast` sans échec après correction du formatage |
+| Validation visuelle     | fait    | 2026-11-23 | 15 captures (SPEC-021-03 SC05, SC06 ; SPEC-021-04 SC05, SC06), chacune ouverte et regardée ; marge latérale des consoles corrigée         |
 | Revue qualité           | à faire |            |                                                                                                                                           |
 | PR                      | à faire |            | après la fusion de FEAT-020 (cette branche part de `feat/compte-email-password`)                                                          |
 
@@ -38,6 +39,7 @@ Constats :
 
 ## Décisions
 
+- 2026-11-23 : branche rebasée sur `becd18e` (FEAT-020 0.24.3, synchronisation S-040), sans conflit.
 - 2026-11-22, l'utilisateur : SMS coupé tant que DJAFAT n'a pas d'API, plus de boîte de test du
   serveur, rien d'écrit en dur ; l'équipe se connecte par e-mail et mot de passe (question « Team
   login »).
@@ -51,9 +53,41 @@ Constats :
 
 `pnpm verify:fast` (2026-11-22, avant commit) : hygiene, arch, lint 17/17, typecheck 17/17,
 test:unit 17/17 ; un échec `format` sur `brief.md` et `clarifications.md` (fichiers modifiés après
-leur mise en forme), corrigé, puis `format:check` et `check:specs` passent. Captures (SC05, SC06 de
-SPEC-021-03 et 04) : à faire.
+leur mise en forme), corrigé, puis `format:check` et `check:specs` passent. Captures : voir « Validation visuelle » ci-dessous.
+
+## Validation visuelle (2026-11-23)
+
+Captures prises par un script Chrome sans tête (protocole DevTools, aucune dépendance ajoutée),
+puis chaque image ouverte et regardée.
+
+- Consoles admin et restaurant : le code de cette branche, servi depuis un worktree sur des ports
+  libres (API 3011, admin 3012, restaurant 3013). E-mail toujours simulé (`EMAIL_PROVIDER=mock`,
+  code lu dans Redis), jamais la vraie boîte Gmail. Comptes d'équipe de test créés par la vraie
+  inscription, rôle ajouté dans la base locale. Le serveur local de l'utilisateur (3000-3003) n'a
+  pas été touché.
+- Application livreur : version navigateur (`build:web`, `react-native-web`) servie sur le port
+  8099, captures du 2026-11-22 (écran inchangé depuis).
+- Passe « production d'aujourd'hui » : `SMS_PROVIDER=disabled`, sans numéro WhatsApp. Passe « SMS
+  proposé » : `SMS_PROVIDER=mock`.
+
+| Capture (`assets/`)                                                                                        | Scénario         | Ce que l'image montre                                                                                                                                                               | Verdict          |
+| ---------------------------------------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `exec-SPEC-021-03-SC06-admin-1280.png`, `…-admin-390.png`, `…-restaurant-1280.png`, `…-restaurant-390.png` | SPEC-021-03-SC06 | E-mail, mot de passe avec « Afficher », « Se connecter », « Mot de passe oublié ? », puis SMS et WhatsApp grisés « Bientôt disponible » (boutons désactivés)                        | conforme à VIS02 |
+| `exec-SPEC-021-03-SC06-admin-sms-actif-390.png`, `…-restaurant-sms-actif-390.png`                          | SPEC-021-03-SC06 | Le serveur propose le SMS : bouton SMS normal ; WhatsApp reste « Bientôt disponible »                                                                                               | conforme         |
+| `exec-SPEC-021-03-SC06-admin-sms-telephone-390.png`, `…-restaurant-sms-telephone-390.png`                  | SPEC-021-03-SC06 | Le bouton SMS ouvre l'écran téléphone actuel : « Numéro de téléphone », « Envoyer le code », « Retour »                                                                             | conforme         |
+| `exec-SPEC-021-03-SC05-admin-reinitialisation-390.png`, `…-restaurant-reinitialisation-390.png`            | SPEC-021-03-SC05 | « Mot de passe oublié ? » : avis neutre « Si un compte DJAFAT utilise cette adresse… », code, nouveau mot de passe, confirmation                                                    | conforme         |
+| `exec-SPEC-021-03-SC05-admin-connecte-390.png`, `…-restaurant-connecte-390.png`                            | SPEC-021-03-SC05 | Connecté après le nouveau mot de passe : tableau de bord admin ; espace restaurant, où « Impossible de charger les commandes » vient du compte de test, rattaché à aucun restaurant | conforme         |
+| `exec-SPEC-021-04-SC06-390.png`                                                                            | SPEC-021-04-SC06 | Application livreur dans le navigateur : SMS et WhatsApp « Bientôt disponible »                                                                                                     | conforme à VIS02 |
+| `exec-SPEC-021-04-SC05-reinitialisation-390.png`, `exec-SPEC-021-04-SC05-connecte-390.png`                 | SPEC-021-04-SC05 | Même parcours « Mot de passe oublié ? », jusqu'à l'accueil livreur                                                                                                                  | conforme         |
+
+Constat corrigé : à 390 px, le formulaire des deux consoles touchait les bords de l'écran. La
+règle `.main` de `login/page.module.css`, déjà présente sur `main` avant FEAT-021, annulait par
+`padding: … 0` la marge latérale du `Container` de `@djafat/ui` ; elle ne règle plus que la marge
+verticale (`padding-block`). Captures des consoles reprises après la correction ; à 1280 px le
+formulaire reste centré (372 px de contenu au lieu de 420). L'application livreur avait déjà sa
+marge. La pastille « N » en bas à gauche est l'indicateur du mode développement de Next.js,
+absent d'un build de production.
 
 ## Reste à faire
 
-- Tests, implémentation, captures, revue, PR (après la fusion de FEAT-020).
+- Revue, audit de synchronisation, version 0.25.0, PR (après la fusion de FEAT-020).

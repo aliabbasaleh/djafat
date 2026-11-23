@@ -3,7 +3,8 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: calc(var(--djafat-space-6) * 1px) 0;
+  /* Vertical only: the Container keeps its side margin on a phone (FEAT-021, 390x844). */
+  padding-block: calc(var(--djafat-space-6) * 1px);
 }
 
 /* FEAT-021 (SPEC-021-03, FEAT-021-VIS02): « Afficher » on the password label's line,
