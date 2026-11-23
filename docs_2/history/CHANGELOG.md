@@ -8,6 +8,13 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-23 — Sync S-040: Windows CI timeouts on PR #27 (FEAT-020, 0.24.3)
+
+**Learned:** real scrypt (N=2^15) in unit tests is slower on the Windows CI runner: two tests passed 5 s
+(vitest's default). The test files that hash real passwords now allow 30 s; what they check is unchanged.
+
+---
+
 ## 2026-11-22 — Sync S-039: FEAT-020 reviewed three times, corrected, ready for PR (0.24.2)
 
 **Verified:** `verify --full` on `4a785d0` (fresh database, mock e-mail): every check passes, e2e

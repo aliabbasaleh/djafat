@@ -10,6 +10,14 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-040 — 2026-11-23 — FEAT-020: Windows CI timeouts (0.24.3)
+
+Short entry (our own commit): on PR #27 the Windows runner timed out two tests that hash real passwords
+(5 s limit); the four such test files get 30 s, no assertion changed. Linux, integration, audit and secret
+scanning had passed. No new finding.
+
+---
+
 ## S-039 — 2026-11-22 — FEAT-020: independent review, corrections, ready for PR
 
 (S-038 belongs to the branch `feat/equipe-connexion-email`, not merged yet.)
