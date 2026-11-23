@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { vi, describe, expect, it } from 'vitest';
 import { hashPassword, verifyPassword } from './password-hash.util';
+
+// Real scrypt (N=2^15) on purpose: on the Windows CI runner, ten verifications take longer than
+// vitest's 5 s default (PR #27, « local setup on Windows »). A longer limit, not a weaker test.
+vi.setConfig({ testTimeout: 30_000 });
 
 // FEAT-020 — docs/features/FEAT-020-compte-email-mot-de-passe (SPEC-020-02 R7).
 // Real scrypt, no fake: this is the stored format.
