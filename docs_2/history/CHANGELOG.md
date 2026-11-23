@@ -8,6 +8,13 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-23 — Sync S-045: FEAT-022 specs adjusted
+
+**Changed (docs only):** sign-up reachable from every login screen (SPEC-022-01 v2), photo metadata stripped
+without a native image library (SPEC-022-04 v2), a taken phone number said openly as in FEAT-020 (SPEC-022-02, 08 v2).
+
+---
+
 ## 2026-11-23 — Sync S-044: sign-up by account type specified (FEAT-022)
 
 **Added (docs only):** FEAT-022's specs, decisions and brief on `feat/inscription-par-type`. **Decided by the user:**

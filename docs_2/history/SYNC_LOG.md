@@ -10,6 +10,15 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-045 — 2026-11-23 — FEAT-022 specs adjusted (docs only)
+
+Short entry (our own docs commits `8484208`, the next one): SPEC-022-01 v2 — the restaurant console and the courier app
+login screens open the matching sign-up form (the user: one scenario everywhere); SPEC-022-04 v2 — photo metadata
+stripped without re-encoding; SPEC-022-02 and 08 v2 — a taken phone number is said openly, as FEAT-020 does. No code,
+no new finding.
+
+---
+
 ## S-044 — 2026-11-23 — FEAT-022 specs on `feat/inscription-par-type`; two branches followed
 
 Short entry (our own docs commits): `8a37b2e` (intake of FEAT-022: every criterion mapped to the code; nothing stores
