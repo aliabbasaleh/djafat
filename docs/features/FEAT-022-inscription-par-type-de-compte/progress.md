@@ -83,3 +83,31 @@ de `verify --full` ni de revue indépendante (à la fin de la partie 2, avant la
 - Constats en route : un import interdit de `dto/` d'un autre module (déplacé dans
   `@djafat/validation`) ; les nouveaux codes d'erreur devaient être inscrits dans `ApiErrorCode`
   (sinon le filtre les remplace) ; la route du statut livreur est `POST` (SPEC-022-02 v3).
+
+## Partie 2 — ce qui est fait (2026-11-23)
+
+- SPEC-022-06 (implémentée) : « Avant votre première course » dans l'application livreur — les
+  éléments du véhicule (six pour moto et voiture, quatre pour vélo et à pied), photos par l'appareil
+  photo ou la galerie (`expo-image-picker`), Mobile Money, contact d'urgence, « Envoyer pour
+  validation » actif seulement quand tout est rempli, états « en vérification » et « refusé » avec le
+  motif, « En ligne » bloqué et expliqué. API : `GET/PUT /couriers/me/application`, photos envoyées
+  comme corps de la requête, lien de 5 minutes vers sa propre photo, envoi (409 avec `details.missing`).
+- SPEC-022-07 côté livreurs : « Demandes à vérifier » (deux onglets avec leur nombre, les plus
+  anciennes d'abord), détail du livreur (âge, véhicule, quartier, Mobile Money masqué, photos par
+  lien signé, texte de remplacement), « Valider » et « Refuser… » avec un motif de 10 à 500
+  caractères, e-mail de décision au mieux (le résultat de l'envoi est rendu à la console), deux
+  décisions en même temps : 409 `ALREADY_DECIDED`. L'onglet Restaurants liste déjà les dossiers
+  envoyés ; le détail et les décisions d'un restaurant (SC02), ainsi que le nouveau numéro Mobile
+  Money après la validation (SC05, R6), viennent en partie 3 — le test cité pour SC02 ne couvre que le
+  texte de l'e-mail.
+- Constats en route, corrigés : `@fastify/multipart` remplaçait par ses types toutes les surcharges
+  de `stream.Readable#on` dans l'API (FEAT-022-Q08 révisée : la photo est le corps de la requête,
+  sans dépendance) ; une photo de 6 Mo coupait la connexion au lieu d'un 413 (lue jusqu'au bout, puis
+  refusée) ; `AllExceptionsFilter` jetait les `details` d'une `HttpException` (les paniers en
+  envoyaient déjà) ; Helmet (`Cross-Origin-Resource-Policy: same-origin`) empêchait les consoles
+  d'afficher une photo de l'API (`same-site` pour un fichier privé) ; depuis 0.23.0, une sous-page de
+  la console admin (`/admin/users/<id>`) renvoyait un administrateur vers la première entrée ;
+  `BigButton` (application livreur) ne disait jamais « indisponible » dans le navigateur.
+- Vérification visuelle (navigateur sans interface, données créées par l'API, base jetable
+  `djafat_wip`) : 18 contrôles réussis, 14 captures `assets/exec-SPEC-022-06-*` et
+  `exec-SPEC-022-07-*` (390×844 pour l'application livreur, 1280×800 pour la console).

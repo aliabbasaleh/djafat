@@ -1,14 +1,14 @@
 ---
 feature: FEAT-022
 # prettier-ignore
-specs: [SPEC-022-01@2, SPEC-022-02@3, SPEC-022-03@1, SPEC-022-04@2, SPEC-022-05@1, SPEC-022-06@2, SPEC-022-07@1, SPEC-022-08@2, SPEC-022-09@1]
+specs: [SPEC-022-01@2, SPEC-022-02@3, SPEC-022-03@1, SPEC-022-04@3, SPEC-022-05@1, SPEC-022-06@3, SPEC-022-07@2, SPEC-022-08@2, SPEC-022-09@1]
 ---
 
 # FEAT-022 — Brief d'exécution
 
 ## Sources
 
-- Feature : `feature.md` — Specs : `specs/SPEC-022-01.md` à `SPEC-022-09.md` (clarifiées ; 01, 04, 06 et 08 en v2, 02 en v3).
+- Feature : `feature.md` — Specs : `specs/SPEC-022-01.md` à `SPEC-022-09.md` (clarifiées ; 01, 07 et 08 en v2, 02, 04 et 06 en v3).
 - Décisions : `clarifications.md` (Q01 à Q06 de l'utilisateur, Q07 à Q12 hypothèses techniques).
 - Intake : `progress.md` ; règles : `README.md` (« Règles non négociables »),
   `docs/pipeline/architecture-policy.md` ; graphe des modules : `packages/eslint-config/api-boundaries.js`.
@@ -27,8 +27,8 @@ specs: [SPEC-022-01@2, SPEC-022-02@3, SPEC-022-03@1, SPEC-022-04@2, SPEC-022-05@
 | `apps/api/src/common/ports/courier-onboarding.port.ts`, `restaurant-onboarding.port.ts` (_nouveaux_)                   | —                                         | création dans la transaction de l'inscription : `auth` n'atteint que `users` (même schéma que `RESTAURANT_MEMBERSHIP_PORT`, module fournisseur `@Global`)     | port                       |
 | `apps/api/src/modules/auth/registration.service.ts`, `dto/register.schema.ts`                                          | inscription client (FEAT-020)             | `accountType` et champs propres au type ; appel du port dans `createRegisteredCustomer` (`users.service.ts:168`, transaction)                                 | application, transport     |
 | `apps/api/src/modules/auth/role-signup.service.ts` (_nouveau_), `me.controller.ts`                                     | —                                         | `POST /me/roles/courier`, `/me/roles/restaurant` (SPEC-022-08)                                                                                                | application, transport     |
-| `apps/api/src/modules/couriers/`                                                                                       | profil, statut (`couriers.service.ts:87`) | `CourierOnboardingService` (port, dossier, envoi), `setStatus('online')` exige `approved`                                                                     | application, transport     |
-| `apps/api/src/modules/catalog/`                                                                                        | restaurants, horaires, menu               | `RestaurantOnboardingService` (port, étapes, envoi, `slug`)                                                                                                   | application, transport     |
+| `apps/api/src/modules/couriers/`                                                                                       | profil, statut (`couriers.service.ts:87`) | `CourierOnboardingService` (port d'inscription), `CourierApplicationService` (dossier, photos, envoi, décisions), `setStatus('online')` exige `approved`      | application, transport     |
+| `apps/api/src/modules/catalog/`                                                                                        | restaurants, horaires, menu               | `RestaurantOnboardingService` (port, `slug`), `RestaurantApplicationService` (file de l'administration ; étapes et envoi en partie 3)                         | application, transport     |
 | `apps/api/src/modules/admin/applications.service.ts` (_nouveau_)                                                       | —                                         | file, détail, décisions, changements en attente (SPEC-022-07) ; `@RequireRole('admin','super_admin')`, `@RequireStepUp()` pour un nouveau numéro Mobile Money | application, transport     |
 | `apps/api/src/modules/geo/neighbourhoods.service.ts` (_nouveau_)                                                       | —                                         | liste publique, gestion par l'administration (SPEC-022-09)                                                                                                    | application                |
 | `apps/api/src/modules/auth/account-notice.port.ts`                                                                     | avis de compte (FEAT-020)                 | avis `application_approved`, `application_rejected`, `change_decided`                                                                                         | port                       |
@@ -44,8 +44,8 @@ Réutilisé sans changement : la machine d'états des restaurants (`draft → pe
 docs/20 §6), `user_roles.scope_restaurant_id`, le parcours d'inscription de FEAT-020 (code, limites,
 anti-énumération), `@RequireAuth` / `@RequireRole` / `@RequireStepUp`, `AllExceptionsFilter`,
 `validateNewPassword`, le composant de carte du site client (FEAT-018). Nouvelles dépendances
-(justifiées dans `clarifications.md`) : `@fastify/multipart` (API), `expo-image-picker` (application
-livreur). Aucune nouvelle arête entre modules : `auth` passe par deux ports de `common/ports` ;
+(justifiée dans `clarifications.md`) : `expo-image-picker` (application livreur) ; l'API lit les photos
+sans dépendance (FEAT-022-Q08 révisée en partie 2). Aucune nouvelle arête entre modules : `auth` passe par deux ports de `common/ports` ;
 `admin` atteint déjà tous les modules ; `geo` est atteignable par tous.
 
 ## Stratégie de test dérivée des specs
@@ -80,8 +80,8 @@ livreur). Aucune nouvelle arête entre modules : `auth` passe par deux ports de 
 | SPEC-022-05-SC04 | application  | `apps/api/src/modules/catalog/restaurant-onboarding.service.spec.ts` | « il voit le motif, l'étape 4 se modifie, et le dossier repasse à `pending_review` »                                                                     |
 | SPEC-022-05-SC05 | manuel       | capture d’exécution (`assets/exec-SPEC-022-05-SC05-*.png`)           | « le texte d'introduction, les quatre étapes avec ✅ pour la première et ⬜ pour les autres, et « Envoyer pour validation » grisé (FEAT-022-VIS04) »     |
 | SPEC-022-06-SC01 | domain       | `packages/core/src/onboarding/courier-items.spec.ts`                 | « six éléments (visage, pièce, permis, papiers du véhicule, Mobile Money, contact), puis quatre (sans permis ni papiers du véhicule) »                   |
-| SPEC-022-06-SC02 | application  | `apps/api/src/modules/couriers/courier-onboarding.service.spec.ts`   | « 409 `APPLICATION_INCOMPLETE` avec `["driving_licence"]` »                                                                                              |
-| SPEC-022-06-SC03 | application  | `apps/api/src/modules/couriers/courier-onboarding.service.spec.ts`   | « le dossier passe à `pending_review` avec la date d'envoi, et ne se modifie plus (409 `APPLICATION_LOCKED`) »                                           |
+| SPEC-022-06-SC02 | application  | `apps/api/src/modules/couriers/courier-application.service.spec.ts`  | « 409 `APPLICATION_INCOMPLETE` avec `["driving_licence"]` »                                                                                              |
+| SPEC-022-06-SC03 | application  | `apps/api/src/modules/couriers/courier-application.service.spec.ts`  | « le dossier passe à `pending_review` avec la date d'envoi, et ne se modifie plus (409 `APPLICATION_LOCKED`) »                                           |
 | SPEC-022-06-SC04 | application  | `apps/api/src/modules/couriers/couriers.service.spec.ts`             | « 409 `COURIER_NOT_APPROVED` (statut `offline`), puis accepté (`online`) »                                                                               |
 | SPEC-022-06-SC05 | manuel       | capture d’exécution (`assets/exec-SPEC-022-06-SC05-*.png`)           | « les six éléments avec ✅ pour le visage, « Envoyer pour validation » grisé, et « En ligne » marqué impossible (FEAT-022-VIS05) »                       |
 | SPEC-022-07-SC01 | application  | `apps/api/src/modules/admin/applications.service.spec.ts`            | « Restaurants (2) et Livreurs (1), les plus anciens d'abord ; le `draft` n'apparaît pas »                                                                |
