@@ -248,7 +248,7 @@ describe('SPEC-008-01 — WhatsApp and switchable SMS configuration', () => {
   };
 
   // SPEC-008-01-SC04
-  it('SPEC-008-01-SC04 — production: SMS disabled needs WhatsApp Cloud; cloud needs all its variables', () => {
+  it('SPEC-008-01-SC04 — production: SMS disabled without WhatsApp Cloud (nor SMTP e-mail, SPEC-021-01 R1) is refused; cloud needs all its variables', () => {
     const prod = { ...baseEnv, NODE_ENV: 'production', SMS_PROVIDER: 'disabled' };
     expect(() => loadApiEnv(prod)).toThrowError(/SMS_PROVIDER/);
     const ok = loadApiEnv({ ...prod, ...cloud });

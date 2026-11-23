@@ -13,6 +13,7 @@ import {
   getDeviceToken,
   getStoredUser,
   setDeviceToken,
+  setSession,
 } from './auth-storage';
 
 // FEAT-021 — docs/features/FEAT-021-equipe-connexion-email (SPEC-021-03, admin console).
@@ -143,8 +144,32 @@ describe('SPEC-021-03 — admin console login by e-mail and password', () => {
     );
 
     expect(step).toEqual({ kind: 'denied' });
+    // The console's refusal message (SPEC-021-02-SC02; the screen uses the typographic apostrophe).
+    expect(adminSessionKeeper.deniedMessage.replace(/’/g, "'")).toBe(
+      "Ce compte n'a pas accès à l'administration DJAFAT.",
+    );
     expect(getAccessToken()).toBeNull();
     expect(getStoredUser()).toBeNull();
     expect(getDeviceToken()).toBeNull();
+  });
+
+  it('keeps the console rule: a refused account also drops the session this browser held', async () => {
+    setSession({
+      access: 'acc-old',
+      refresh: 'ref-old',
+      user: { id: 'u-old', phone: '+23566000009', fullName: null, roles: ['admin'] },
+    });
+    const step = await teamPasswordLogin(
+      {
+        passwordLogin: () =>
+          Promise.resolve({ status: 'signed_in' as const, ...signedIn(['customer'], 'device-x') }),
+      },
+      { email: EMAIL, password: PASSWORD, deviceToken: null },
+      adminSessionKeeper,
+    );
+
+    expect(step).toEqual({ kind: 'denied' });
+    expect(getAccessToken()).toBeNull();
+    expect(getStoredUser()).toBeNull();
   });
 });

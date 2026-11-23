@@ -108,6 +108,7 @@ export function courierSessionKeeper(
 ): TeamSessionKeeper {
   return {
     hasAccess: (user) => hasCourierAccess(user),
+    deniedMessage: 'Ce compte n’est pas enregistré comme livreur DJAFAT.',
     saveSession: ({ access, refresh, user }) =>
       signIn({
         access,

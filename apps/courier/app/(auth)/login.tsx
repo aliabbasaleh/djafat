@@ -8,19 +8,14 @@ import {
   teamPasswordLogin,
   teamResetPassword,
   teamVerifyCode,
-  validateNewPassword,
+  teamVerifyPhoneCode,
   type ChannelButton,
 } from '@djafat/sdk';
 import { tokens } from '@djafat/tokens';
 import { Screen } from '../../components/Screen';
 import { BigButton } from '../../components/BigButton';
 import { api } from '../../lib/api';
-import {
-  courierSessionKeeper,
-  hasCourierAccess,
-  loadDeviceToken,
-  type StoredCourierUser,
-} from '../../lib/auth-storage';
+import { courierSessionKeeper, loadDeviceToken } from '../../lib/auth-storage';
 import { useAuth } from '../../lib/auth-context';
 
 type PhoneChannel = 'sms' | 'whatsapp';
@@ -32,7 +27,6 @@ type Step =
   | { readonly kind: 'phone'; readonly channel: PhoneChannel }
   | { readonly kind: 'phone-code'; readonly channel: PhoneChannel };
 
-const DENIED = 'Ce compte n’est pas enregistré comme livreur DJAFAT.';
 const HOME = '/(app)/home';
 const FALLBACK = 'Connexion impossible pour le moment.';
 
@@ -120,7 +114,7 @@ export default function LoginScreen() {
 
   function finish(outcome: 'signed_in' | 'denied') {
     if (outcome === 'signed_in') router.replace(HOME);
-    else setError(DENIED);
+    else setError(keeper.deniedMessage);
   }
 
   function login() {
@@ -167,11 +161,18 @@ export default function LoginScreen() {
   }
 
   function reset() {
-    const errors = validateNewPassword(newPassword, confirm, { email });
-    setFieldErrors(errors);
-    if (errors.password || errors.confirm) return;
     void run(async () => {
-      finish(await teamResetPassword(api.auth, { email, code, password: newPassword }, keeper));
+      const result = await teamResetPassword(
+        api.auth,
+        { email, code, password: newPassword, confirm },
+        keeper,
+      );
+      if (result.kind === 'invalid') {
+        setFieldErrors(result.errors);
+        return;
+      }
+      setFieldErrors({});
+      finish(result.kind);
     });
   }
 
@@ -187,32 +188,14 @@ export default function LoginScreen() {
 
   function requestSmsCode() {
     void run(async () => {
-      await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
+      await api.auth.requestPhoneLoginCode(phone);
       go({ kind: 'phone-code', channel: 'sms' });
     });
   }
 
   function verifyPhoneCode(channel: PhoneChannel) {
     void run(async () => {
-      const result = await api.http.post<{
-        access: string;
-        refresh: string;
-        user: { id: string; phone: string; fullName: string | null; roles: string[] };
-      }>(channel === 'whatsapp' ? '/auth/whatsapp/verify' : '/auth/otp/verify', {
-        body: channel === 'whatsapp' ? { phone, code } : { phone, code, purpose: 'login' },
-      });
-      const user: StoredCourierUser = {
-        id: result.user.id,
-        phone: result.user.phone,
-        fullName: result.user.fullName,
-        roles: result.user.roles,
-      };
-      if (!hasCourierAccess(user)) {
-        setError(DENIED);
-        return;
-      }
-      await signIn({ access: result.access, refresh: result.refresh, user });
-      router.replace(HOME);
+      finish(await teamVerifyPhoneCode(api.auth, { channel, phone, code }, keeper));
     });
   }
 
@@ -232,7 +215,7 @@ export default function LoginScreen() {
   const back = (
     <BigButton label="Retour" variant="ghost" onPress={() => go({ kind: 'password' })} />
   );
-  const codeInput = (
+  const codeInput = (autoFocus = true) => (
     <>
       <Text style={styles.label}>Code à 6 chiffres</Text>
       <TextInput
@@ -246,7 +229,7 @@ export default function LoginScreen() {
         autoComplete="one-time-code"
         maxLength={6}
         accessibilityLabel="Code à 6 chiffres"
-        autoFocus
+        autoFocus={autoFocus}
       />
     </>
   );
@@ -269,7 +252,7 @@ export default function LoginScreen() {
       />
     </>
   );
-  const phoneInput = (
+  const phoneInput = (autoFocus = false) => (
     <>
       <Text style={styles.label}>Numéro de téléphone</Text>
       <TextInput
@@ -281,6 +264,7 @@ export default function LoginScreen() {
         keyboardType="phone-pad"
         textContentType="telephoneNumber"
         accessibilityLabel="Numéro de téléphone"
+        autoFocus={autoFocus}
       />
     </>
   );
@@ -298,7 +282,7 @@ export default function LoginScreen() {
         </View>
       )}
       {error && (
-        <View style={styles.errorBox} accessibilityLiveRegion="polite">
+        <View style={styles.errorBox} accessibilityRole="alert" accessibilityLiveRegion="polite">
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
@@ -310,9 +294,13 @@ export default function LoginScreen() {
             <Text style={styles.label}>Mot de passe</Text>
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={
+                showPassword ? 'Masquer : Mot de passe' : 'Afficher : Mot de passe'
+              }
+              hitSlop={8}
               onPress={() => setShowPassword((v) => !v)}
             >
-              <Text style={styles.toggle}>{showPassword ? 'Masquer' : 'Afficher'}</Text>
+              <Text style={styles.toggle}>👁 {showPassword ? 'Masquer' : 'Afficher'}</Text>
             </Pressable>
           </View>
           <TextInput
@@ -363,7 +351,7 @@ export default function LoginScreen() {
 
       {step.kind === 'code' && (
         <View style={styles.form}>
-          {codeInput}
+          {codeInput()}
           <View style={styles.switchRow}>
             <Text style={styles.switchLabel}>Se souvenir de cet appareil (30 jours)</Text>
             <Switch
@@ -393,7 +381,7 @@ export default function LoginScreen() {
 
       {step.kind === 'reset' && (
         <View style={styles.form}>
-          {codeInput}
+          {codeInput()}
           <Text style={styles.label}>Nouveau mot de passe</Text>
           <TextInput
             style={styles.input}
@@ -439,7 +427,7 @@ export default function LoginScreen() {
 
       {step.kind === 'phone' && (
         <View style={styles.form}>
-          {phoneInput}
+          {phoneInput(true)}
           <BigButton label="Envoyer le code" onPress={requestSmsCode} loading={loading} />
           {back}
         </View>
@@ -447,8 +435,8 @@ export default function LoginScreen() {
 
       {step.kind === 'phone-code' && (
         <View style={styles.form}>
-          {step.channel === 'whatsapp' && phoneInput}
-          {codeInput}
+          {step.channel === 'whatsapp' && phoneInput(true)}
+          {codeInput(step.channel !== 'whatsapp')}
           <BigButton
             label="Vérifier"
             onPress={() => verifyPhoneCode(step.channel)}

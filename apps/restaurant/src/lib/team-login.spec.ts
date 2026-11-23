@@ -13,6 +13,7 @@ import {
   getDeviceToken,
   getStoredUser,
   setDeviceToken,
+  setSession,
 } from './auth-storage';
 
 // FEAT-021 — docs/features/FEAT-021-equipe-connexion-email (SPEC-021-03, restaurant console).
@@ -143,8 +144,32 @@ describe('SPEC-021-03 — restaurant console login by e-mail and password', () =
     );
 
     expect(step).toEqual({ kind: 'denied' });
+    // The console's refusal message (FEAT-021-VIS02; the screen uses the typographic apostrophe).
+    expect(restaurantSessionKeeper.deniedMessage.replace(/’/g, "'")).toBe(
+      "Ce compte n'est rattaché à aucun restaurant DJAFAT.",
+    );
     expect(getAccessToken()).toBeNull();
     expect(getStoredUser()).toBeNull();
     expect(getDeviceToken()).toBeNull();
+  });
+
+  it('keeps the console rule: a refused account also drops the session this browser held', async () => {
+    setSession({
+      access: 'acc-old',
+      refresh: 'ref-old',
+      user: { id: 'u-old', phone: '+23566000009', fullName: null, roles: ['restaurant_owner'] },
+    });
+    const step = await teamPasswordLogin(
+      {
+        passwordLogin: () =>
+          Promise.resolve({ status: 'signed_in' as const, ...signedIn(['customer'], 'device-x') }),
+      },
+      { email: EMAIL, password: PASSWORD, deviceToken: null },
+      restaurantSessionKeeper,
+    );
+
+    expect(step).toEqual({ kind: 'denied' });
+    expect(getAccessToken()).toBeNull();
+    expect(getStoredUser()).toBeNull();
   });
 });

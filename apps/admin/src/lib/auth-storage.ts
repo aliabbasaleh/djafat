@@ -147,9 +147,15 @@ export function setDeviceToken(token: string): void {
   }
 }
 
-/** FEAT-021 (SPEC-021-02 R3): what the login screen does with a session — admin roles only. */
+/**
+ * FEAT-021 (SPEC-021-02 R3): what the login screen does with a session — admin
+ * roles only. A refused account also drops the session this browser held, as
+ * this console's login always did.
+ */
 export const adminSessionKeeper: TeamSessionKeeper = {
   hasAccess: (user) => hasAdminAccess(user),
+  deniedMessage: 'Ce compte n’a pas accès à l’administration DJAFAT.',
+  clearSession,
   saveSession: ({ access, refresh, user }) =>
     setSession({
       access,

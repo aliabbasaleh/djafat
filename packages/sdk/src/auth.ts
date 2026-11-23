@@ -190,6 +190,21 @@ export function createAuthClient(http: ApiHttp) {
       http.post<{ status: 'sent' }>('/auth/email/request', { body: { email } }),
     verifyEmailCode: (email: string, code: string) =>
       http.post<SignedIn>('/auth/email/verify', { body: { email, code } }),
+    /**
+     * Login by a phone code, when the server offers SMS (`GET /auth/methods`):
+     * the code goes by SMS. Always accepted (202).
+     */
+    requestPhoneLoginCode: (phone: string) =>
+      http.post<{ status: 'sent' }>('/auth/otp/request', { body: { phone, purpose: 'login' } }),
+    /** The SMS code, or the code WhatsApp replied to « Code DJAFAT » (FEAT-008): signs in. */
+    verifyPhoneLoginCode: (input: { channel: 'sms' | 'whatsapp'; phone: string; code: string }) =>
+      input.channel === 'whatsapp'
+        ? http.post<SignedIn>('/auth/whatsapp/verify', {
+            body: { phone: input.phone, code: input.code },
+          })
+        : http.post<SignedIn>('/auth/otp/verify', {
+            body: { phone: input.phone, code: input.code, purpose: 'login' },
+          }),
     /** « Mon profil »: set a first password, or change it (the current one is asked). */
     changePassword: (input: { currentPassword?: string; newPassword: string }) =>
       http.put<void>('/me/password', { body: input }),

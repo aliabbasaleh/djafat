@@ -1,16 +1,16 @@
 # FEAT-021 — Avancement
 
-| Étape                   | Statut  | Date       | Notes                                                                                                                                     |
-| ----------------------- | ------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Intake                  | fait    | 2026-11-22 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous                                                                       |
-| Specs                   | fait    | 2026-11-22 | SPEC-021-01 à 05                                                                                                                          |
-| Grill-me                | fait    | 2026-11-22 | aucune question bloquante : décisions de l'utilisateur du 2026-11-22                                                                      |
-| Brief                   | fait    | 2026-11-22 |                                                                                                                                           |
-| Tests dérivés des specs | fait    | 2026-11-22 | SPEC-021-01 : la règle de démarrage échouait avant le changement (SC01, SC02), puis passe ; 4 tests SDK, 4 par application                |
-| Implémentation          | fait    | 2026-11-22 | `env.ts`, `team-login.ts` (SDK), trois écrans de connexion, procédure de bascule ; `verify:fast` sans échec après correction du formatage |
-| Validation visuelle     | fait    | 2026-11-23 | 15 captures (SPEC-021-03 SC05, SC06 ; SPEC-021-04 SC05, SC06), chacune ouverte et regardée ; marge latérale des consoles corrigée         |
-| Revue qualité           | à faire |            |                                                                                                                                           |
-| PR                      | à faire |            | après la fusion de FEAT-020 (cette branche part de `feat/compte-email-password`)                                                          |
+| Étape                   | Statut   | Date       | Notes                                                                                                                                                              |
+| ----------------------- | -------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Intake                  | fait     | 2026-11-22 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous                                                                                                |
+| Specs                   | fait     | 2026-11-22 | SPEC-021-01 à 05                                                                                                                                                   |
+| Grill-me                | fait     | 2026-11-22 | aucune question bloquante : décisions de l'utilisateur du 2026-11-22                                                                                               |
+| Brief                   | fait     | 2026-11-22 |                                                                                                                                                                    |
+| Tests dérivés des specs | fait     | 2026-11-22 | SPEC-021-01 : la règle de démarrage échouait avant le changement (SC01, SC02), puis passe ; 4 tests SDK, 4 par application                                         |
+| Implémentation          | fait     | 2026-11-22 | `env.ts`, `team-login.ts` (SDK), trois écrans de connexion, procédure de bascule ; `verify:fast` sans échec après correction du formatage                          |
+| Validation visuelle     | fait     | 2026-11-23 | 15 captures (SPEC-021-03 SC05, SC06 ; SPEC-021-04 SC05, SC06), chacune ouverte et regardée ; marge latérale des consoles corrigée                                  |
+| Revue qualité           | en cours | 2026-11-23 | revue 1 (sous-agent spec-reviewer) : 1 bloquant, 1 majeur (décision FEAT-021-Q11), 5 mineurs, 3 notes — tous corrigés ou consignés (`review.md`) ; revue 2 à faire |
+| PR                      | à faire  |            | après la fusion de FEAT-020 (cette branche part de `feat/compte-email-password`)                                                                                   |
 
 ## Intake (2026-11-22)
 
@@ -87,6 +87,18 @@ verticale (`padding-block`). Captures des consoles reprises après la correction
 formulaire reste centré (372 px de contenu au lieu de 420). L'application livreur avait déjà sa
 marge. La pastille « N » en bas à gauche est l'indicateur du mode développement de Next.js,
 absent d'un build de production.
+
+## SPEC-021-05-SC02 — requête de contrôle (2026-11-23, preuve manuelle)
+
+La requête de l'étape 2 (`infra/deploy/README.md` §4), lancée en lecture seule (`BEGIN READ ONLY`)
+sur la base locale `djafat`, en n'affichant que des comptes et des rôles :
+
+| Résultat                                                           | Valeur                                                                                                                                                                     |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lignes renvoyées (comptes d'équipe bloqués ou exposés)             | 13 : admin 2, courier 1, finance 1, restaurant_owner 3, restaurant_staff 4, super_admin 1, support 1 — tous sans e-mail vérifié ni mot de passe (comptes de démonstration) |
+| Comptes d'équipe de test FEAT-021 (e-mail vérifié et mot de passe) | 5 dans la base, **0** dans le résultat                                                                                                                                     |
+
+Conforme à SC02 : elle liste les comptes à risque et aucun de ceux qui ont les deux.
 
 ## Reste à faire
 

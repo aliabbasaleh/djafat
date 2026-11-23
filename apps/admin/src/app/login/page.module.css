@@ -16,13 +16,19 @@
   position: absolute;
   top: 0;
   right: 0;
-  padding: 0;
+  min-height: 24px;
+  padding: 0 4px;
   border: none;
   background: none;
   color: var(--djafat-color-brand-primary);
-  font-weight: 600;
+  font: inherit;
+  font-weight: 700;
   font-size: calc(var(--djafat-type-size-caption) * 1px);
   cursor: pointer;
+}
+.toggle:focus-visible {
+  outline: 2px solid var(--djafat-color-focus-ring);
+  outline-offset: 1px;
 }
 .divider {
   margin: 0;

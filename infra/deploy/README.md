@@ -148,10 +148,22 @@ seuls le jour où leurs réglages sont remplis. **Dans cet ordre**, sinon quelqu
 2. **Chaque membre de l'équipe a un e-mail vérifié et un mot de passe.** Tant que le code
    téléphone marche encore (boîte de test ci-dessus), il se connecte sur le site, ajoute et
    confirme son e-mail dans « Mon profil », puis y définit son mot de passe. Si son e-mail est
-   déjà vérifié, « Mot de passe oublié ? » dans son application suffit. Faire la liste et cocher :
-   un compte sans e-mail vérifié ne pourra plus se connecter à l'étape 3.
-3. **Couper le SMS.** Dans `.env.prod` : `SMS_PROVIDER=disabled`, et supprimer `SMS_HTTP_URL`
-   et `SMS_HTTP_API_KEY`. La boîte de test (`mock-sms`) ne sert plus.
+   déjà vérifié, « Mot de passe oublié ? » dans son application suffit. **Contrôle avant
+   l'étape 3** _(ajouté le 23 nov. 2026, FEAT-021-Q11)_, en lecture seule depuis `infra/deploy` :
+   la requête doit ne renvoyer **aucune ligne**.
+
+   ```bash
+   docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T postgres \
+     psql -U djafat -d djafat -c "BEGIN READ ONLY; SELECT u.id, u.full_name, string_agg(r.role, ', ' ORDER BY r.role) AS roles, u.email_verified_at IS NOT NULL AS email_ok, u.password_hash IS NOT NULL AS mot_de_passe_ok FROM users u JOIN user_roles r ON r.user_id = u.id WHERE r.role <> 'customer' AND u.status = 'active' AND (u.email_verified_at IS NULL OR u.password_hash IS NULL) GROUP BY u.id ORDER BY u.full_name; COMMIT;"
+   ```
+
+   Chaque ligne est un compte d'équipe qui serait **bloqué** (sans e-mail vérifié, il ne peut plus
+   se connecter) ou **exposé** (sans mot de passe, une session volée suffirait pour changer son
+   e-mail puis poser un premier mot de passe). Tant qu'il reste une ligne, ne pas couper le SMS.
+
+3. **Couper le SMS.** Dans `.env.prod` : `SMS_PROVIDER=disabled`, et mettre en commentaire (`#`
+   en début de ligne) `SMS_HTTP_URL` et `SMS_HTTP_API_KEY`, sans les effacer : le retour en
+   arrière en a besoin. La boîte de test (`mock-sms`) ne sert plus.
 4. **Relancer** l'API (`docker compose --env-file .env.prod -f docker-compose.prod.yml up -d api`).
    Elle refuse de démarrer s'il ne reste aucun canal réel (SMS, WhatsApp ou e-mail) : c'est voulu.
 5. **Contrôler** : `curl -s https://api.<domaine>/v1/auth/methods` répond `"sms"` et
@@ -159,7 +171,9 @@ seuls le jour où leurs réglages sont remplis. **Dans cet ordre**, sinon quelqu
    par e-mail et mot de passe à la console admin, à la console restaurant et à l'application
    livreur.
 
-**Retour en arrière** : remettre `SMS_PROVIDER=http` et `SMS_HTTP_URL`, puis relancer.
+**Retour en arrière** : remettre `SMS_PROVIDER=http`, retirer le `#` devant `SMS_HTTP_URL` (en
+mode démo : `http://mock-sms:4020/send`, la boîte de test, qui tourne avec `--profile demo`) et
+devant `SMS_HTTP_API_KEY` (vide en mode démo), puis relancer l'API comme à l'étape 4.
 **Le jour où une vraie passerelle SMS existe** : `SMS_PROVIDER=http` avec ses réglages
 (`docs/39-comptes-externes.md` §1), sans changer le code.
 

@@ -136,6 +136,9 @@ export function setDeviceToken(token: string): void {
 /** FEAT-021 (SPEC-021-02 R3): what the login screen does with a session — restaurant roles only. */
 export const restaurantSessionKeeper: TeamSessionKeeper = {
   hasAccess: (user) => hasRestaurantAccess(user),
+  deniedMessage: 'Ce compte n’est rattaché à aucun restaurant DJAFAT.',
+  // A refused account also drops the session this browser held, as this console's login always did.
+  clearSession,
   saveSession: ({ access, refresh, user }) =>
     setSession({
       access,

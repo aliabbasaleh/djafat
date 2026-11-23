@@ -9,19 +9,13 @@ import {
   teamPasswordLogin,
   teamResetPassword,
   teamVerifyCode,
-  validateNewPassword,
+  teamVerifyPhoneCode,
   type ChannelButton,
 } from '@djafat/sdk';
 import { Container, Heading, Text, Stack, cx } from '@djafat/ui';
 import { Button, Input, Alert, Checkbox } from '@/components/ui-client';
 import { api } from '@/lib/api';
-import {
-  adminSessionKeeper,
-  clearSession,
-  getDeviceToken,
-  hasAdminAccess,
-  setSession,
-} from '@/lib/auth-storage';
+import { adminSessionKeeper, getDeviceToken } from '@/lib/auth-storage';
 import styles from './page.module.css';
 
 type PhoneChannel = 'sms' | 'whatsapp';
@@ -33,7 +27,6 @@ type View =
   | { readonly kind: 'phone'; readonly channel: PhoneChannel }
   | { readonly kind: 'phone-code'; readonly channel: PhoneChannel };
 
-const DENIED = 'Ce compte n’a pas accès à l’administration DJAFAT.';
 const HOME = '/admin';
 const FALLBACK = 'Connexion impossible pour le moment.';
 
@@ -117,7 +110,7 @@ export default function LoginPage() {
 
   function finish(outcome: 'signed_in' | 'denied') {
     if (outcome === 'signed_in') router.push(HOME);
-    else setError(DENIED);
+    else setError(adminSessionKeeper.deniedMessage);
   }
 
   function login() {
@@ -168,17 +161,18 @@ export default function LoginPage() {
   }
 
   function reset() {
-    const errors = validateNewPassword(newPassword, confirm, { email });
-    setFieldErrors(errors);
-    if (errors.password || errors.confirm) return;
     void run(async () => {
-      finish(
-        await teamResetPassword(
-          api.auth,
-          { email, code, password: newPassword },
-          adminSessionKeeper,
-        ),
+      const step = await teamResetPassword(
+        api.auth,
+        { email, code, password: newPassword, confirm },
+        adminSessionKeeper,
       );
+      if (step.kind === 'invalid') {
+        setFieldErrors(step.errors);
+        return;
+      }
+      setFieldErrors({});
+      finish(step.kind);
     });
   }
 
@@ -194,36 +188,14 @@ export default function LoginPage() {
 
   function requestSmsCode() {
     void run(async () => {
-      await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
+      await api.auth.requestPhoneLoginCode(phone);
       go({ kind: 'phone-code', channel: 'sms' });
     });
   }
 
   function verifyPhoneCode(channel: PhoneChannel) {
     void run(async () => {
-      const result = await api.http.post<{
-        access: string;
-        refresh: string;
-        user: { id: string; phone: string; fullName: string | null; roles: string[] };
-      }>(channel === 'whatsapp' ? '/auth/whatsapp/verify' : '/auth/otp/verify', {
-        body: channel === 'whatsapp' ? { phone, code } : { phone, code, purpose: 'login' },
-      });
-      if (!hasAdminAccess(result.user)) {
-        clearSession();
-        setError(DENIED);
-        return;
-      }
-      setSession({
-        access: result.access,
-        refresh: result.refresh,
-        user: {
-          id: result.user.id,
-          phone: result.user.phone,
-          fullName: result.user.fullName,
-          roles: result.user.roles,
-        },
-      });
-      router.push(HOME);
+      finish(await teamVerifyPhoneCode(api.auth, { channel, phone, code }, adminSessionKeeper));
     });
   }
 
@@ -245,7 +217,9 @@ export default function LoginPage() {
       <Stack gap="lg">
         <Stack gap="xs">
           <Heading level={1}>DJAFAT Admin</Heading>
-          <Text tone="secondary">{subtitle}</Text>
+          <Text tone="secondary">
+            <span id="login-subtitle">{subtitle}</span>
+          </Text>
         </Stack>
 
         {notice && !error && <Alert tone="info">{notice}</Alert>}
@@ -282,9 +256,10 @@ export default function LoginPage() {
                   <button
                     type="button"
                     className={cx(styles['toggle'])}
+                    aria-label={showPassword ? 'Masquer : Mot de passe' : 'Afficher : Mot de passe'}
                     onClick={() => setShowPassword((v) => !v)}
                   >
-                    {showPassword ? 'Masquer' : 'Afficher'}
+                    <span aria-hidden="true">👁</span> {showPassword ? 'Masquer' : 'Afficher'}
                   </button>
                 </div>
                 <Button type="submit" loading={loading} fullWidth>
@@ -335,6 +310,7 @@ export default function LoginPage() {
                 value={code}
                 onChange={(e) => typed(setCode)(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 maxLength={6}
+                aria-describedby="login-subtitle"
                 required
                 autoFocus
               />
@@ -416,6 +392,7 @@ export default function LoginPage() {
                 value={code}
                 onChange={(e) => typed(setCode)(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 maxLength={6}
+                aria-describedby="login-subtitle"
                 required
                 autoFocus
               />
@@ -515,7 +492,9 @@ export default function LoginPage() {
                   placeholder="+23566000000"
                   value={phone}
                   onChange={(e) => typed(setPhone)(e.target.value)}
+                  aria-describedby="login-subtitle"
                   required
+                  autoFocus
                 />
               )}
               <Input
@@ -526,8 +505,9 @@ export default function LoginPage() {
                 value={code}
                 onChange={(e) => typed(setCode)(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 maxLength={6}
+                {...(view.channel === 'whatsapp' ? {} : { 'aria-describedby': 'login-subtitle' })}
                 required
-                autoFocus
+                autoFocus={view.channel !== 'whatsapp'}
               />
               <Button type="submit" loading={loading} fullWidth>
                 Vérifier

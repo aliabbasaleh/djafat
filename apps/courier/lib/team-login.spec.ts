@@ -138,6 +138,10 @@ describe('SPEC-021-04 — courier app login by e-mail and password', () => {
     );
 
     expect(step).toEqual({ kind: 'denied' });
+    // SPEC-021-04-SC04's message (the screen uses the typographic apostrophe).
+    expect(courierSessionKeeper(signIn).deniedMessage.replace(/’/g, "'")).toBe(
+      "Ce compte n'est pas enregistré comme livreur DJAFAT.",
+    );
     expect(signIn).not.toHaveBeenCalled();
     expect(await loadDeviceToken()).toBeNull();
   });

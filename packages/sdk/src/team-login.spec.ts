@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { COMING_SOON, validateNewPassword } from './account-form.js';
-import type { SignedIn } from './auth.js';
+import { COMING_SOON } from './account-form.js';
+import { createAuthClient, type SignedIn } from './auth.js';
+import type { ApiHttp } from './http.js';
 import {
   phoneCodeButtons,
   teamPasswordLogin,
   teamResetPassword,
   teamVerifyCode,
+  teamVerifyPhoneCode,
   type TeamSessionKeeper,
 } from './team-login.js';
 
@@ -31,16 +33,21 @@ function signedIn(roles: string[], deviceToken?: string): SignedIn {
   };
 }
 
-function keeperFor(role: string) {
+function keeperFor(role: string, options: { clearsOnRefusal?: boolean } = {}) {
   const saveSession = vi.fn();
   const saveDeviceToken = vi.fn();
+  const clearSession = vi.fn();
   const keeper: TeamSessionKeeper = {
     hasAccess: (user) => user.roles.includes(role),
+    deniedMessage: 'Ce compte n’a pas accès à cette application.',
     saveSession,
     saveDeviceToken,
+    ...(options.clearsOnRefusal ? { clearSession } : {}),
   };
-  return { keeper, saveSession, saveDeviceToken };
+  return { keeper, saveSession, saveDeviceToken, clearSession };
 }
+
+const PHONE = '+23566000001';
 
 describe('SPEC-021-02 — team apps login rules', () => {
   // SPEC-021-02-SC01
@@ -89,13 +96,78 @@ describe('SPEC-021-02 — team apps login rules', () => {
     );
     const reset = await teamResetPassword(
       { resetPassword: async () => customer },
-      { email: 'hawa@djafat.td', code: '123456', password: 'Baobab-Moursal-77' },
+      {
+        email: 'hawa@djafat.td',
+        code: '123456',
+        password: 'Baobab-Moursal-77',
+        confirm: 'Baobab-Moursal-77',
+      },
+      keeper,
+    );
+    const sms = await teamVerifyPhoneCode(
+      { verifyPhoneLoginCode: async () => customer },
+      { channel: 'sms', phone: PHONE, code: '123456' },
+      keeper,
+    );
+    const whatsapp = await teamVerifyPhoneCode(
+      { verifyPhoneLoginCode: async () => customer },
+      { channel: 'whatsapp', phone: PHONE, code: '123456' },
       keeper,
     );
 
-    expect([login, code, reset]).toEqual([{ kind: 'denied' }, 'denied', 'denied']);
+    expect([login, code, reset, sms, whatsapp]).toEqual([
+      { kind: 'denied' },
+      'denied',
+      { kind: 'denied' },
+      'denied',
+      'denied',
+    ]);
     expect(saveSession).not.toHaveBeenCalled();
     expect(saveDeviceToken).not.toHaveBeenCalled();
+  });
+
+  // SPEC-021-02-SC02
+  it('SPEC-021-02-SC02 — a phone code goes through the same role check: a customer is refused, a courier is kept', async () => {
+    const posts: Array<{ path: string; body: unknown }> = [];
+    let answer: SignedIn = signedIn(['customer']);
+    const http = {
+      post: vi.fn(async (path: string, options?: { body?: unknown }) => {
+        posts.push({ path, body: options?.body });
+        return path === '/auth/otp/request' ? { status: 'sent' } : answer;
+      }),
+    } as unknown as ApiHttp;
+    const auth = createAuthClient(http);
+    // The consoles also drop a session they held when the account is refused.
+    const consoleKeeper = keeperFor('admin', { clearsOnRefusal: true });
+
+    await auth.requestPhoneLoginCode(PHONE);
+    const refused = await teamVerifyPhoneCode(
+      auth,
+      { channel: 'sms', phone: PHONE, code: '123456' },
+      consoleKeeper.keeper,
+    );
+    expect(refused).toBe('denied');
+    expect(consoleKeeper.clearSession).toHaveBeenCalledTimes(1);
+    expect(consoleKeeper.saveSession).not.toHaveBeenCalled();
+
+    answer = signedIn(['courier']);
+    const courier = keeperFor('courier');
+    const kept = await teamVerifyPhoneCode(
+      auth,
+      { channel: 'whatsapp', phone: PHONE, code: '654321' },
+      courier.keeper,
+    );
+    expect(kept).toBe('signed_in');
+    expect(courier.saveSession).toHaveBeenCalledWith(answer);
+    expect(courier.saveDeviceToken).not.toHaveBeenCalled(); // a phone code remembers no device
+    expect(courier.clearSession).not.toHaveBeenCalled();
+
+    // The existing phone-login contracts (FEAT-001 SMS, FEAT-008 WhatsApp).
+    expect(posts).toEqual([
+      { path: '/auth/otp/request', body: { phone: PHONE, purpose: 'login' } },
+      { path: '/auth/otp/verify', body: { phone: PHONE, code: '123456', purpose: 'login' } },
+      { path: '/auth/whatsapp/verify', body: { phone: PHONE, code: '654321' } },
+    ]);
   });
 
   // SPEC-021-02-SC03
@@ -158,26 +230,50 @@ describe('SPEC-021-02 — team apps login rules', () => {
   });
 
   // SPEC-021-02-SC04
-  it('SPEC-021-02-SC04 — forgotten password: a weak new password is refused before sending; the reset signs in', async () => {
-    expect(validateNewPassword('court', 'court').password).toBe('Au moins 8 caractères.');
-    expect(validateNewPassword('motdepasse', 'motdepasse').password).toBe(
-      'Ce mot de passe est trop courant : choisissez-en un autre.',
-    );
-    expect(validateNewPassword('Baobab-Moursal-77', 'Baobab-Moursal-77')).toEqual({});
-
+  it('SPEC-021-02-SC04 — forgotten password: too short or too common is refused before sending, with the FEAT-020 message; a valid one signs in', async () => {
     const { keeper, saveSession } = keeperFor('courier');
     const resetPassword = vi.fn(async () => signedIn(['courier'], 'device-c'));
-    const outcome = await teamResetPassword(
+    const base = { email: 'hawa@djafat.td', code: '111222' };
+
+    const short = await teamResetPassword(
       { resetPassword },
-      { email: 'hawa@djafat.td', code: '111222', password: 'Baobab-Moursal-77' },
+      { ...base, password: 'court', confirm: 'court' },
       keeper,
     );
+    const common = await teamResetPassword(
+      { resetPassword },
+      { ...base, password: 'motdepasse', confirm: 'motdepasse' },
+      keeper,
+    );
+    const mismatch = await teamResetPassword(
+      { resetPassword },
+      { ...base, password: 'Baobab-Moursal-77', confirm: 'Baobab-Moursal-78' },
+      keeper,
+    );
+    expect(short).toEqual({ kind: 'invalid', errors: { password: 'Au moins 8 caractères.' } });
+    expect(common).toEqual({
+      kind: 'invalid',
+      errors: { password: 'Ce mot de passe est trop courant : choisissez-en un autre.' },
+    });
+    expect(mismatch).toEqual({
+      kind: 'invalid',
+      errors: { confirm: 'Les mots de passe ne correspondent pas.' },
+    });
+    expect(resetPassword).not.toHaveBeenCalled(); // refused before sending
+    expect(saveSession).not.toHaveBeenCalled();
+
+    const outcome = await teamResetPassword(
+      { resetPassword },
+      { ...base, password: 'Baobab-Moursal-77', confirm: 'Baobab-Moursal-77' },
+      keeper,
+    );
+    expect(resetPassword).toHaveBeenCalledTimes(1);
     expect(resetPassword).toHaveBeenCalledWith({
       email: 'hawa@djafat.td',
       code: '111222',
       password: 'Baobab-Moursal-77',
     });
-    expect(outcome).toBe('signed_in');
+    expect(outcome).toEqual({ kind: 'signed_in' });
     expect(saveSession).toHaveBeenCalledTimes(1);
   });
 });
