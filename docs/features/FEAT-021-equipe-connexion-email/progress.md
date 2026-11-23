@@ -58,7 +58,10 @@ leur mise en forme), corrigé, puis `format:check` et `check:specs` passent. Cap
 ## Validation visuelle (2026-11-23)
 
 Captures prises par un script Chrome sans tête (protocole DevTools, aucune dépendance ajoutée),
-puis chaque image ouverte et regardée.
+puis chaque image ouverte et regardée. _Reprises après `81d3289` (corrections de la revue 1 : « 👁 Afficher »,
+focus) : les 10 captures dont l'écran a changé, refaites avec les mêmes scripts — l'application
+livreur reconstruite depuis le worktree et servie sur le port 8098 — puis rouvertes une à une ; les
+5 autres (écrans connectés, écran téléphone) sont identiques à l'octet._
 
 - Consoles admin et restaurant : le code de cette branche, servi depuis un worktree sur des ports
   libres (API 3011, admin 3012, restaurant 3013). E-mail toujours simulé (`EMAIL_PROVIDER=mock`,
@@ -72,7 +75,7 @@ puis chaque image ouverte et regardée.
 
 | Capture (`assets/`)                                                                                        | Scénario         | Ce que l'image montre                                                                                                                                                               | Verdict          |
 | ---------------------------------------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| `exec-SPEC-021-03-SC06-admin-1280.png`, `…-admin-390.png`, `…-restaurant-1280.png`, `…-restaurant-390.png` | SPEC-021-03-SC06 | E-mail, mot de passe avec « Afficher », « Se connecter », « Mot de passe oublié ? », puis SMS et WhatsApp grisés « Bientôt disponible » (boutons désactivés)                        | conforme à VIS02 |
+| `exec-SPEC-021-03-SC06-admin-1280.png`, `…-admin-390.png`, `…-restaurant-1280.png`, `…-restaurant-390.png` | SPEC-021-03-SC06 | E-mail, mot de passe avec « 👁 Afficher », « Se connecter », « Mot de passe oublié ? », puis SMS et WhatsApp grisés « Bientôt disponible » (boutons désactivés)                     | conforme à VIS02 |
 | `exec-SPEC-021-03-SC06-admin-sms-actif-390.png`, `…-restaurant-sms-actif-390.png`                          | SPEC-021-03-SC06 | Le serveur propose le SMS : bouton SMS normal ; WhatsApp reste « Bientôt disponible »                                                                                               | conforme         |
 | `exec-SPEC-021-03-SC06-admin-sms-telephone-390.png`, `…-restaurant-sms-telephone-390.png`                  | SPEC-021-03-SC06 | Le bouton SMS ouvre l'écran téléphone actuel : « Numéro de téléphone », « Envoyer le code », « Retour »                                                                             | conforme         |
 | `exec-SPEC-021-03-SC05-admin-reinitialisation-390.png`, `…-restaurant-reinitialisation-390.png`            | SPEC-021-03-SC05 | « Mot de passe oublié ? » : avis neutre « Si un compte DJAFAT utilise cette adresse… », code, nouveau mot de passe, confirmation                                                    | conforme         |
