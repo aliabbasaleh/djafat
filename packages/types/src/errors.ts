@@ -48,6 +48,28 @@ export const API_ERROR_CODES = [
   'EMAIL_REQUIRED',
   /** A phone code on an email account whose number was never confirmed (409) — FEAT-020. */
   'PHONE_NOT_CONFIRMED',
+  /** FEAT-022 — a courier who signs up is 18 or older (422, SPEC-022-02 R2). */
+  'UNDERAGE',
+  /** FEAT-022 — a courier whose application is not approved cannot go online (409, SPEC-022-06 R5). */
+  'COURIER_NOT_APPROVED',
+  /** FEAT-022 — a neighbourhood id that is not in the active list (422, SPEC-022-09). */
+  'NEIGHBOURHOOD_UNKNOWN',
+  /** FEAT-022 — an active neighbourhood already has that name (409, SPEC-022-09 R4). */
+  'NEIGHBOURHOOD_EXISTS',
+  /** FEAT-022 — no such neighbourhood (404, SPEC-022-09 R4). */
+  'NEIGHBOURHOOD_NOT_FOUND',
+  /** FEAT-022 — no such city (404, SPEC-022-09). */
+  'CITY_NOT_FOUND',
+  /** FEAT-022 — a photo above 5 MB (413, SPEC-022-04 R2). */
+  'FILE_TOO_LARGE',
+  /** FEAT-022 — not a JPEG, PNG or WebP photo, or a malformed one (415, SPEC-022-04 R2). */
+  'UNSUPPORTED_FILE',
+  /** FEAT-022 — a private file's link is missing, wrong or expired (403, SPEC-022-04 R3). */
+  'FILE_LINK_INVALID',
+  /** FEAT-022 — no such public file (404, SPEC-022-04 R4). */
+  'FILE_NOT_FOUND',
+  /** FEAT-022 — photos cannot be stored on this server yet (503, SPEC-022-04). */
+  'STORAGE_NOT_CONFIGURED',
   'MFA_INVALID',
   'MFA_REQUIRED',
   'ACCOUNT_INACTIVE',
