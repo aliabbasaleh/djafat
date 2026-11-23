@@ -8,6 +8,15 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-23 — Sync S-046: FEAT-022 part 1 (local branch, not pushed)
+
+**Added:** the N'Djamena neighbourhood list (admin-editable, never reset by a reinstall), photos on the server disk
+(private papers only through 5-minute signed links, metadata removed, nightly backup of the volume), sign-up as a
+courier or a restaurant on the API (created with the account, in one transaction). **Changed:** a courier who signed
+up goes online only once approved. **Verified:** fast checks; 129 integration tests on a fresh database.
+
+---
+
 ## 2026-11-23 — Sync S-045: FEAT-022 specs adjusted
 
 **Changed (docs only):** sign-up reachable from every login screen (SPEC-022-01 v2), photo metadata stripped

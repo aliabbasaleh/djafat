@@ -10,6 +10,21 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-046 — 2026-11-23 — FEAT-022 part 1: neighbourhoods, photos on disk, typed sign-up (local branch)
+
+Our own commits `dd1187c` to `5d68967` on `wip/feat-022-part1` (not pushed). **Added:** migration 0041
+(neighbourhoods, courier and restaurant applications, changes awaiting an admin — additive; existing couriers and
+restaurants get an approved application); `packages/core` onboarding rules (vehicles, 18-year minimum, checklists,
+place-name key); `GET /geo/neighbourhoods`, `/admin/neighbourhoods`; `FilesystemObjectStorage` behind
+`ObjectStoragePort`, `GET /files/:key` (private files only through a 5-minute HMAC link), an `uploads` volume in
+production, archived nightly; `POST /auth/register` typed (courier, restaurant) creating the courier or restaurant in
+the account's transaction through `common/ports`. **Changed:** a courier whose application is not approved cannot go
+online (409 `COURIER_NOT_APPROVED`); team-created couriers are unaffected. **Verified:** `verify:fast` all pass;
+integration on a fresh database 129/129 (7 new). **Not verified:** a real upload over HTTP (the upload routes come in
+part 2), the backup of the volume on the server. No new finding.
+
+---
+
 ## S-045 — 2026-11-23 — FEAT-022 specs adjusted (docs only)
 
 Short entry (our own docs commits `8484208`, the next one): SPEC-022-01 v2 — the restaurant console and the courier app
