@@ -51,9 +51,9 @@ Constats :
 
 ## Dernière vérification
 
-`pnpm verify:fast` (2026-11-22, avant commit) : hygiene, arch, lint 17/17, typecheck 17/17,
-test:unit 17/17 ; un échec `format` sur `brief.md` et `clarifications.md` (fichiers modifiés après
-leur mise en forme), corrigé, puis `format:check` et `check:specs` passent. Captures : voir « Validation visuelle » ci-dessous.
+`verify --full` sur une base neuve, commit `6ffb0d4` (2026-11-23) : aucun nouvel échec ; format, specs,
+hygiene, arch, pipeline-tooling, prisma, typecheck 24/24, lint 24/24, test 24/24, build 16/16, audit,
+test:int (59 s) ; e2e indisponible (aucune suite). Rapport : `verification.md`.
 
 ## Validation visuelle (2026-11-23)
 
