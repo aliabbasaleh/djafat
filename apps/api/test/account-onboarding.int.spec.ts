@@ -337,6 +337,8 @@ describe('FEAT-022 — sign-up by account type on PostgreSQL and Redis', () => {
     const served = await request(server).get(`${link.pathname}${link.search}`).expect(200);
     expect(served.headers['content-type']).toContain('image/jpeg');
     expect(served.headers['cache-control']).toBe('private, no-store');
+    // The consoles (admin., livreur.) show it; another site cannot (FEAT-022 part 2).
+    expect(served.headers['cross-origin-resource-policy']).toBe('same-site');
   });
 });
 

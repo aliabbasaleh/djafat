@@ -51,6 +51,13 @@ export class FilesController {
       found.family === 'public' ? 'public, max-age=31536000, immutable' : 'private, no-store',
     );
     reply.header('X-Content-Type-Options', 'nosniff');
+    // Helmet answers `same-origin`, which keeps the consoles (admin., livreur.)
+    // from showing an image of api.: a private photo opens for the sites of
+    // DJAFAT's own domain, a public logo for any page (FEAT-022 part 2).
+    reply.header(
+      'Cross-Origin-Resource-Policy',
+      found.family === 'public' ? 'cross-origin' : 'same-site',
+    );
     return new StreamableFile(createReadStream(found.path), {
       type: found.contentType,
       disposition: 'inline',

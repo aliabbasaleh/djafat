@@ -1,9 +1,12 @@
-import type {
-  ApplicationStatus,
-  CourierDocumentKind,
-  CourierItem,
-  CourierVehicle,
-  MobileMoneyProvider,
+import {
+  APPLICATION_MESSAGES,
+  REJECTION_REASON_LENGTH,
+  checkRejectionReason,
+  type ApplicationStatus,
+  type CourierDocumentKind,
+  type CourierItem,
+  type CourierVehicle,
+  type MobileMoneyProvider,
 } from '@djafat/core';
 import type { ApiHttp } from './http.js';
 
@@ -90,6 +93,15 @@ export interface ApplicationDecision {
   readonly status: 'approved' | 'rejected';
   /** The e-mail to the applicant: `sent`, or why not (the decision stands either way). */
   readonly email: 'sent' | 'unavailable' | 'failed' | 'no_address';
+}
+
+/** SPEC-022-07 R4: 10 to 500 characters — the API applies the same rule. */
+export { REJECTION_REASON_LENGTH };
+
+/** Why the rejection reason cannot be sent yet, or null when it can. */
+export function rejectionReasonError(text: string): string | null {
+  const checked = checkRejectionReason(text);
+  return checked.ok ? null : APPLICATION_MESSAGES[checked.error];
 }
 
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];

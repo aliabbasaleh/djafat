@@ -42,6 +42,9 @@ export function BigButton({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled }}
+      // react-native-web ignores `accessibilityState`: `disabled` is what says « indisponible »
+      // in the browser (aria-disabled) — found by FEAT-022's run of the app in the browser.
+      disabled={isDisabled}
       onPress={isDisabled ? undefined : onPress}
       style={({ pressed }) => [
         styles.base,

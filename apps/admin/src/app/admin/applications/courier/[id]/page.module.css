@@ -1,0 +1,58 @@
+.section {
+  border: 1px solid var(--djafat-color-border-default);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  padding: calc(var(--djafat-space-4) * 1px);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-2) * 1px);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: calc(var(--djafat-space-1) * 1px) calc(var(--djafat-space-4) * 1px);
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--djafat-color-text-secondary);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.photos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--djafat-space-2) * 1px);
+}
+
+.photoRow {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--djafat-space-2) * 1px);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--djafat-space-2) * 1px);
+}
+
+.photo {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  margin: 0 auto;
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+}
+
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-3) * 1px);
+}

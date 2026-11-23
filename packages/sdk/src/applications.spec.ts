@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { photoContentType } from './applications.js';
+import { photoContentType, rejectionReasonError } from './applications.js';
 import { createApiClient } from './index.js';
 
 // FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte (SPEC-022-04, 06, 07).
@@ -92,5 +92,15 @@ describe('photoContentType', () => {
     expect(photoContentType('image/jpeg; charset=binary')).toBe('image/jpeg');
     expect(photoContentType('application/pdf')).toBe('application/octet-stream');
     expect(photoContentType(undefined)).toBe('application/octet-stream');
+  });
+});
+
+describe('rejectionReasonError (SPEC-022-07 R4)', () => {
+  it('SPEC-022-07-SC03 — refuses an empty or too short reason, accepts « La photo du permis est floue. »', () => {
+    expect(rejectionReasonError('   ')).toBe('Écrivez le motif du refus (10 caractères au moins).');
+    expect(rejectionReasonError('La photo du permis est floue.')).toBeNull();
+    expect(rejectionReasonError('a'.repeat(501))).toBe(
+      'Le motif ne doit pas dépasser 500 caractères.',
+    );
   });
 });

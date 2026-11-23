@@ -8,6 +8,7 @@ import { Button } from '@/components/ui-client';
 import { StepUpProvider } from '@/components/StepUp';
 import { getStoredUser, hasAdminAccess, isFinance, isFullAdmin } from '@/lib/auth-storage';
 import { signOut } from '@/lib/session';
+import { isAllowedPath } from '@/lib/admin-nav';
 import styles from './layout.module.css';
 
 type Access = 'support' | 'finance';
@@ -16,6 +17,8 @@ type Access = 'support' | 'finance';
 const NAV_ITEMS: ReadonlyArray<{ label: string; href: string; access?: readonly Access[] }> = [
   { label: 'Commande par téléphone', href: '/admin/phone-order', access: ['support'] },
   { label: 'Tableau de bord', href: '/admin' },
+  // FEAT-022 (SPEC-022-07): full admins only — support and finance do not see the queue.
+  { label: 'Demandes', href: '/admin/applications' },
   { label: 'Utilisateurs', href: '/admin/users' },
   { label: 'Restaurants', href: '/admin/restaurants' },
   { label: 'Livreurs', href: '/admin/couriers' },
@@ -55,7 +58,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setAllowed(items);
     // Support lands on the phone order screen, finance on the finance page:
     // the first page of their job.
-    if (!items.some((i) => i.href === pathname)) {
+    if (!isAllowedPath(pathname, items)) {
       router.replace((items[0]?.href ?? '/login') as Route);
     }
     setChecked(true);
