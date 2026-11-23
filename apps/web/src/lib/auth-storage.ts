@@ -93,3 +93,29 @@ export function clearSession(): void {
 export function isAuthenticated(): boolean {
   return getAccessToken() !== null;
 }
+
+/**
+ * FEAT-020 (SPEC-020-10 R4): the token of this browser as a remembered device.
+ * It is NOT part of the session: `clearSession` (sign-out) keeps it, so the
+ * next password login here skips the email code. One per browser — the last
+ * account that chose « Se souvenir de cet appareil » (FEAT-020-Q20).
+ */
+const DEVICE_KEY = 'djafat.auth.device';
+
+export function getDeviceToken(): string | null {
+  if (!isBrowser()) return null;
+  try {
+    return window.localStorage.getItem(DEVICE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setDeviceToken(token: string): void {
+  if (!isBrowser()) return;
+  try {
+    window.localStorage.setItem(DEVICE_KEY, token);
+  } catch {
+    // Best-effort, like the session: a code will simply be asked again.
+  }
+}

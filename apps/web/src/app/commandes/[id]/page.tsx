@@ -38,7 +38,7 @@ export default function OrderConfirmationPage() {
    * REST response and never an event payload applied by hand.
    */
   const loadOrder = useCallback(async (): Promise<void> => {
-    const redirectTarget = `/connexion?redirect=${encodeURIComponent(`/commandes/${params.id}`)}`;
+    const redirectTarget = `/compte?redirect=${encodeURIComponent(`/commandes/${params.id}`)}`;
     try {
       const fetched = await api.orders.get(params.id);
       setOrder(fetched);
@@ -55,7 +55,7 @@ export default function OrderConfirmationPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      router.push(`/connexion?redirect=${encodeURIComponent(`/commandes/${params.id}`)}` as Route);
+      router.push(`/compte?redirect=${encodeURIComponent(`/commandes/${params.id}`)}` as Route);
       return;
     }
     void loadOrder();

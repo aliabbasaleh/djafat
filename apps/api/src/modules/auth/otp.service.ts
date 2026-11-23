@@ -6,7 +6,7 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { OtpDeliveryPort } from '@djafat/types';
+import type { OtpDeliveryPort, OtpDeliveryPurpose } from '@djafat/types';
 import { evaluateOtpAttempt } from '@djafat/core';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AppConfigService } from '../../common/config/config.service';
@@ -21,7 +21,22 @@ import {
   OTP_WHATSAPP_DELIVERY_PORT,
 } from './otp-delivery.token';
 
-export type OtpPurpose = 'login' | 'register' | 'change_phone' | 'verify_email';
+/** `@djafat/types` `OtpDeliveryPurpose` — one list for the DB CHECK, the transports and this service. */
+export type OtpPurpose = OtpDeliveryPurpose;
+
+/**
+ * FEAT-020 (SPEC-020-03 R7): a code can be bound to the request that asked it
+ * — a pending registration, a password login, an account. A bound code
+ * verifies only with the same `context`; an unbound one (the default, every
+ * flow before FEAT-020) only without one.
+ */
+export interface OtpRequestOptions {
+  readonly context?: string;
+  /** The caller already charged this request's network budget (`consumeIpBudget`). */
+  readonly ipCharged?: boolean;
+  /** The caller already charged this target's budget (`consumeTargetBudget`). */
+  readonly targetCharged?: boolean;
+}
 
 /**
  * Where a code goes (FEAT-007, FEAT-008). `target` is an E.164 phone for
@@ -77,31 +92,101 @@ export class OtpService {
     return this.verifyCode({ channel: 'sms', target: phone }, code, purpose, ip);
   }
 
-  async requestCode(to: OtpTarget, purpose: OtpPurpose, ip: string | null): Promise<void> {
+  /**
+   * FEAT-020 (review #3, #4; SPEC-020-03 R14, SPEC-020-05 R1, AC08): a code to an
+   * address that may or may not belong to an account. Both cases spend the same
+   * budgets and meet the same lock first; the code itself then leaves in the
+   * background and a delivery failure is only logged — so neither the answer,
+   * a 429 or 423, a 503 nor the response time tells whether the address has an
+   * account. The log line names the channel, never the address.
+   */
+  async requestCodeIfOwned(
+    to: OtpTarget,
+    purpose: OtpPurpose,
+    ip: string | null,
+    owned: boolean,
+    options: Pick<OtpRequestOptions, 'ipCharged'> = {},
+  ): Promise<void> {
+    if (ip && !options.ipCharged) await this.consumeIpBudget(ip);
+    await this.consumeTargetBudget(to);
+    await this.assertNotLocked(to.target);
+    if (!owned) return;
+    void this.requestCode(to, purpose, ip, { ipCharged: true, targetCharged: true }).catch(
+      (err: unknown) => {
+        const reason = err instanceof Error ? err.message : 'unknown error';
+        this.logger.warn(`Code "${purpose}" not sent by ${to.channel}: ${reason}`);
+      },
+    );
+  }
+
+  async requestCode(
+    to: OtpTarget,
+    purpose: OtpPurpose,
+    ip: string | null,
+    options: OtpRequestOptions = {},
+  ): Promise<void> {
     // FEAT-008 (SPEC-008-01-SC05): a switched-off SMS channel is refused BEFORE any
     // budget or write — otherwise SMS requests for someone's number would burn the
     // per-number budget their WhatsApp codes share.
     if (to.channel === 'sms' && this.config.get('SMS_PROVIDER') === 'disabled') {
       throw smsUnavailable();
     }
-    if (ip) {
-      const ipLimit = await this.platform.getOtpRateLimitPerIp();
-      const r = await this.rateLimiter.consume(
-        `otp:ip:${ip}`,
-        ipLimit.limit,
-        ipLimit.windowSeconds,
+    if (ip && !options.ipCharged) await this.consumeIpBudget(ip);
+    if (!options.targetCharged) await this.consumeTargetBudget(to);
+
+    await this.assertNotLocked(to.target);
+
+    const code = generateOtpCode();
+    const codeHash = hashOtpCode(code, this.config.get('OTP_HASH_SECRET'));
+    const ttlSeconds = await this.platform.getOtpTtlSeconds();
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+
+    await this.prisma.otpCode.create({
+      data: {
+        target: to.target,
+        channel: to.channel,
+        codeHash,
+        purpose,
+        expiresAt,
+        context: options.context ?? null,
+      },
+    });
+    const transport = {
+      sms: this.delivery,
+      email: this.emailDelivery,
+      whatsapp: this.whatsappDelivery,
+    }[to.channel];
+    await transport.send({ to: to.target, code, ttlSeconds, locale: 'fr', purpose });
+
+    await this.audit.log({
+      action: 'AUTH_OTP_REQUESTED',
+      entityType: targetKind(to),
+      ip,
+      metadata: { purpose }, // phone is the actor here but has no user id yet — kept out of metadata too (not a secret, but unnecessary to duplicate; entityId is reserved for uuids)
+    });
+  }
+
+  /** Codes requested from this network (`otp_rate_limit_per_ip`): 429 `RATE_LIMITED` once spent. */
+  async consumeIpBudget(ip: string): Promise<void> {
+    const ipLimit = await this.platform.getOtpRateLimitPerIp();
+    const r = await this.rateLimiter.consume(`otp:ip:${ip}`, ipLimit.limit, ipLimit.windowSeconds);
+    if (!r.allowed) {
+      throw new HttpException(
+        {
+          code: 'RATE_LIMITED',
+          message: 'Too many requests from this network. Try again later.',
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
       );
-      if (!r.allowed) {
-        throw new HttpException(
-          {
-            code: 'RATE_LIMITED',
-            message: 'Too many requests from this network. Try again later.',
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
     }
-    // Same per-target budget for both channels (setting historically named "per phone").
+  }
+
+  /**
+   * Messages sent to this phone or address (setting historically named "per
+   * phone"): 429 once spent. FEAT-020 charges it for an account notice too, so
+   * nobody can flood a mailbox through the registration form.
+   */
+  async consumeTargetBudget(to: OtpTarget): Promise<void> {
     const phoneLimit = await this.platform.getOtpRateLimitPerPhone();
     const pr = await this.rateLimiter.consume(
       `otp:${targetKind(to)}:${to.target}`,
@@ -120,30 +205,6 @@ export class OtpService {
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
-
-    await this.assertNotLocked(to.target);
-
-    const code = generateOtpCode();
-    const codeHash = hashOtpCode(code, this.config.get('OTP_HASH_SECRET'));
-    const ttlSeconds = await this.platform.getOtpTtlSeconds();
-    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-
-    await this.prisma.otpCode.create({
-      data: { target: to.target, channel: to.channel, codeHash, purpose, expiresAt },
-    });
-    const transport = {
-      sms: this.delivery,
-      email: this.emailDelivery,
-      whatsapp: this.whatsappDelivery,
-    }[to.channel];
-    await transport.send({ to: to.target, code, ttlSeconds, locale: 'fr' });
-
-    await this.audit.log({
-      action: 'AUTH_OTP_REQUESTED',
-      entityType: targetKind(to),
-      ip,
-      metadata: { purpose }, // phone is the actor here but has no user id yet — kept out of metadata too (not a secret, but unnecessary to duplicate; entityId is reserved for uuids)
-    });
   }
 
   /** Throws on any failure (never reveals WHY — wrong code, expired, exhausted, and "no challenge at all" are indistinguishable). */
@@ -152,7 +213,9 @@ export class OtpService {
     code: string,
     purpose: OtpPurpose,
     ip: string | null,
+    options: Pick<OtpRequestOptions, 'context'> = {},
   ): Promise<void> {
+    const context = options.context ?? null;
     await this.assertNotLocked(to.target);
 
     const maxAttempts = await this.platform.getOtpMaxAttempts();
@@ -162,6 +225,7 @@ export class OtpService {
       const rows = await tx.$queryRaw<OtpCodeRow[]>`
         SELECT id, code_hash, attempts, expires_at FROM otp_codes
         WHERE channel = ${to.channel} AND target = ${to.target} AND purpose = ${purpose}
+          AND context IS NOT DISTINCT FROM ${context}::text
           AND consumed_at IS NULL
         ORDER BY created_at DESC LIMIT 1 FOR UPDATE
       `;
@@ -206,7 +270,11 @@ export class OtpService {
     });
   }
 
-  private async assertNotLocked(target: string): Promise<void> {
+  /**
+   * The durable lock of a phone or address (`auth_target_locks`). Public since
+   * FEAT-020: password attempts count on the same lock (SPEC-020-04 R2).
+   */
+  async assertNotLocked(target: string): Promise<void> {
     const lock = await this.prisma.authTargetLock.findUnique({ where: { target } });
     if (lock?.lockedUntil && lock.lockedUntil.getTime() > Date.now()) {
       await this.audit.log({ action: 'AUTH_OTP_LOCKED', entityType: 'phone', metadata: {} });
@@ -217,7 +285,7 @@ export class OtpService {
     }
   }
 
-  private async registerFailedAttempt(target: string): Promise<void> {
+  async registerFailedAttempt(target: string): Promise<void> {
     const threshold = await this.platform.getPhoneLockThreshold();
     const durationSeconds = await this.platform.getPhoneLockDurationSeconds();
     const row = await this.prisma.authTargetLock.upsert({
@@ -234,7 +302,7 @@ export class OtpService {
     }
   }
 
-  private async clearLock(target: string): Promise<void> {
+  async clearLock(target: string): Promise<void> {
     await this.prisma.authTargetLock.updateMany({
       where: { target },
       data: { failedCount: 0, lockedUntil: null },

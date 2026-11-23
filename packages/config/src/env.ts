@@ -8,6 +8,12 @@ import { z } from 'zod';
 
 const nonEmpty = z.string().min(1);
 const url = z.string().url();
+/**
+ * An optional variable whose empty value (`SMTP_USER=` in a template still to
+ * fill) means "not set" rather than "invalid" (FEAT-020-Q11).
+ */
+const optionalUnlessEmpty = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((v) => (v === '' ? undefined : v), schema.optional());
 const intFromString = (def: number) =>
   z
     .string()
@@ -91,12 +97,22 @@ const OtpSchema = z.object({
   /** `mock` (dev/CI, Redis) | `smtp` (any SMTP provider) — FEAT-007. Optional feature. */
   EMAIL_PROVIDER: z.enum(['mock', 'smtp']).default('mock'),
   /** `smtp://` or `smtps://user:pass@host:port` — secret, environment only. */
-  SMTP_URL: z
-    .string()
-    .regex(/^smtps?:\/\//, 'SMTP_URL must start with smtp:// or smtps://')
-    .optional(),
-  /** Sender, e.g. `DJAFAT <no-reply@djafat.td>`. */
-  EMAIL_FROM: z.string().min(3).optional(),
+  SMTP_URL: optionalUnlessEmpty(
+    z.string().regex(/^smtps?:\/\//, 'SMTP_URL must start with smtp:// or smtps://'),
+  ),
+  /**
+   * FEAT-020: the same server as separate fields, so a Gmail app password is
+   * pasted as is (`SMTP_URL` wins when both are given). Gmail:
+   * `smtp.gmail.com`, port 465, the Gmail address, a 16-letter app password.
+   */
+  SMTP_HOST: optionalUnlessEmpty(z.string().min(1)),
+  /** 465 = TLS from the start; 587 = STARTTLS. */
+  SMTP_PORT: intFromString(465),
+  SMTP_USER: optionalUnlessEmpty(z.string().min(1)),
+  /** Secret, environment only. */
+  SMTP_PASSWORD: optionalUnlessEmpty(z.string().min(1)),
+  /** Sender, e.g. `DJAFAT <no-reply@djafat.td>`; defaults to `DJAFAT <SMTP_USER>`. */
+  EMAIL_FROM: optionalUnlessEmpty(z.string().min(3)),
   /** `mock` (dev/CI, Redis) | `cloud` (Meta WhatsApp Cloud API) — FEAT-008. */
   WHATSAPP_PROVIDER: z.enum(['mock', 'cloud']).default('mock'),
   /** Graph API base, version included (Meta changes versions regularly). */
@@ -268,9 +284,22 @@ export function apiEnvConsistencyIssues(env: ApiEnv): string[] {
     issues.push('SMS_HTTP_URL: required when SMS_PROVIDER=http');
   }
   if (env.EMAIL_PROVIDER === 'smtp' && !env.SMTP_URL) {
-    issues.push('SMTP_URL: required when EMAIL_PROVIDER=smtp');
+    if (!env.SMTP_HOST) {
+      issues.push(
+        'SMTP_URL (or SMTP_HOST, SMTP_USER and SMTP_PASSWORD): required when EMAIL_PROVIDER=smtp',
+      );
+    } else {
+      // FEAT-020 (SPEC-020-01 R1): a host alone cannot log in.
+      if (!env.SMTP_USER)
+        issues.push('SMTP_USER: required with SMTP_HOST when EMAIL_PROVIDER=smtp');
+      if (!env.SMTP_PASSWORD) {
+        issues.push(
+          'SMTP_PASSWORD: required with SMTP_HOST when EMAIL_PROVIDER=smtp (Gmail: an app password)',
+        );
+      }
+    }
   }
-  if (env.EMAIL_PROVIDER === 'smtp' && !env.EMAIL_FROM) {
+  if (env.EMAIL_PROVIDER === 'smtp' && !env.EMAIL_FROM && !env.SMTP_USER) {
     issues.push('EMAIL_FROM: required when EMAIL_PROVIDER=smtp');
   }
   return issues;

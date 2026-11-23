@@ -54,7 +54,7 @@ export default function PanierPage() {
 
   const load = useCallback(async () => {
     if (!isAuthenticated()) {
-      router.push('/connexion?redirect=%2Fpanier' as Route);
+      router.push('/compte?redirect=%2Fpanier' as Route);
       return;
     }
     setState('loading');
@@ -93,7 +93,7 @@ export default function PanierPage() {
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
         clearSession();
-        router.push('/connexion?redirect=%2Fpanier' as Route);
+        router.push('/compte?redirect=%2Fpanier' as Route);
         return;
       }
       setState('error');

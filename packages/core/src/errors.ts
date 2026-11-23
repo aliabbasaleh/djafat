@@ -60,3 +60,16 @@ export class DeliveryTransitionError extends Error {
     this.to = to;
   }
 }
+
+/**
+ * A rule an application checks on one request field after its schema passed
+ * (FEAT-020: a password close to the account's own name, e-mail or number).
+ * The API answers it exactly like a schema failure — 422 `VALIDATION_ERROR`
+ * with `details` per field — without a service building a transport type.
+ */
+export class FieldValidationError extends Error {
+  constructor(readonly issues: ReadonlyArray<{ readonly path: string; readonly message: string }>) {
+    super('Request validation failed');
+    this.name = 'FieldValidationError';
+  }
+}

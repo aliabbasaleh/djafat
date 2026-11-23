@@ -11,6 +11,7 @@ import { createCourierClient } from './courier.js';
 
 export * from './http.js';
 export * from './auth.js';
+export * from './account-form.js';
 export * from './catalog.js';
 export * from './payments.js';
 export * from './payouts.js';

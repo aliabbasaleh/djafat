@@ -169,6 +169,69 @@ describe('SPEC-007-01 — email provider configuration', () => {
   });
 });
 
+// FEAT-020 — docs/features/FEAT-020-compte-email-mot-de-passe (SPEC-020-01).
+describe('SPEC-020-01 — sending through the official Gmail account', () => {
+  const gmail = {
+    EMAIL_PROVIDER: 'smtp',
+    SMTP_HOST: 'smtp.gmail.com',
+    SMTP_USER: 'djafat@gmail.com',
+    SMTP_PASSWORD: 'abcd efgh ijkl mnop',
+  };
+
+  // SPEC-020-01-SC01 (configuration part; the transport options are in apps/api smtp-options.spec.ts)
+  it('SPEC-020-01-SC01 — a Gmail host, address and app password are accepted, port 465 by default, no EMAIL_FROM needed', () => {
+    const env = loadApiEnv({ ...baseEnv, ...gmail });
+    expect(env.EMAIL_PROVIDER).toBe('smtp');
+    expect(env.SMTP_HOST).toBe('smtp.gmail.com');
+    expect(env.SMTP_PORT).toBe(465);
+    expect(env.SMTP_USER).toBe('djafat@gmail.com');
+    expect(env.SMTP_PASSWORD).toBe('abcd efgh ijkl mnop');
+    expect(env.EMAIL_FROM).toBeUndefined();
+    expect(env.SMTP_URL).toBeUndefined();
+  });
+
+  // SPEC-020-01-SC02
+  it('SPEC-020-01-SC02 — a host without password (then without user) is refused, naming the missing variable', () => {
+    expect(() => loadApiEnv({ ...baseEnv, ...gmail, SMTP_PASSWORD: undefined })).toThrowError(
+      /SMTP_PASSWORD/,
+    );
+    expect(() => loadApiEnv({ ...baseEnv, ...gmail, SMTP_USER: undefined })).toThrowError(
+      /SMTP_USER/,
+    );
+    // FEAT-020-Q11: an empty value counts as missing, it does not pass as a password.
+    expect(() => loadApiEnv({ ...baseEnv, ...gmail, SMTP_PASSWORD: '' })).toThrowError(
+      /SMTP_PASSWORD/,
+    );
+  });
+
+  // FEAT-020-Q11
+  it('SPEC-020-01-SC02 — the empty Gmail block of a fresh .env does not stop the API on the mock provider', () => {
+    const env = loadApiEnv({
+      ...baseEnv,
+      EMAIL_PROVIDER: 'mock',
+      SMTP_URL: '',
+      SMTP_HOST: 'smtp.gmail.com',
+      SMTP_PORT: '',
+      SMTP_USER: '',
+      SMTP_PASSWORD: '',
+      EMAIL_FROM: '',
+    });
+    expect(env.EMAIL_PROVIDER).toBe('mock');
+    expect(env.SMTP_URL).toBeUndefined();
+    expect(env.SMTP_PORT).toBe(465);
+    expect(env.SMTP_USER).toBeUndefined();
+    expect(env.EMAIL_FROM).toBeUndefined();
+  });
+
+  it('SPEC-020-04 R2, R9 — the new platform defaults for password login', () => {
+    expect(PLATFORM_SETTINGS_DEFAULTS.password_login_rate_limit_per_ip).toEqual({
+      limit: 50,
+      window_seconds: 900,
+    });
+    expect(PLATFORM_SETTINGS_DEFAULTS.trusted_device_ttl_seconds).toBe(30 * 24 * 3600);
+  });
+});
+
 describe('SPEC-008-01 — WhatsApp and switchable SMS configuration', () => {
   const cloud = {
     WHATSAPP_PROVIDER: 'cloud',

@@ -1,0 +1,32 @@
+FEAT-020-VIS02 — apps/web /compte, onglet « Créer un compte », 390x844 (mobile)
+Nature : attendu. Champs demandés par l'utilisateur le 2026-11-21 (« full
+name, phone number, email, password, confirm password »).
+
+ DJAFAT                      [👤 Compte]
+ ───────────────────────────────────────
+  Mon compte
+
+    Se connecter    [ Créer un compte ]
+                    ═══════════════════
+
+  Nom complet
+  [ Prénom Nom                       ]
+  Numéro de téléphone
+  [ 66 12 34 56                      ]
+  E-mail
+  [ vous@gmail.com                   ]
+  Mot de passe (8 caractères minimum)
+  [ ••••••••                      👁 ]
+  Confirmer le mot de passe
+  [ ••••••••                      👁 ]
+
+  [         Créer mon compte         ]
+
+  Un code de confirmation sera envoyé
+  à votre adresse e-mail.
+
+Notes :
+- Chaque erreur s'affiche sous son champ (confirmation différente, mot de
+  passe trop court ou trop courant, numéro ou e-mail invalide, numéro déjà
+  utilisé par un compte).
+- Après « Créer mon compte » : l'étape du code (FEAT-020-VIS03).

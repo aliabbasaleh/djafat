@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { ApiClientError, type MeProfile } from '@djafat/sdk';
+import { ApiClientError, accountErrorMessage, type MeProfile } from '@djafat/sdk';
 import { Container, Heading, Text, Stack, cx } from '@djafat/ui';
 import { Alert, Button, Input } from '@/components/ui-client';
 import { api } from '@/lib/api';
@@ -16,21 +16,28 @@ import {
   setSession,
 } from '@/lib/auth-storage';
 import { signOut } from '@/lib/session';
+import type { AuthMethods } from '@/components/account/LoginPanel';
+import { PasswordSection } from '@/components/account/PasswordSection';
+import { PhoneSection } from '@/components/account/PhoneSection';
 import styles from './page.module.css';
 
 /**
  * "Mon profil": the name shown to the courier and the restaurant, the phone
  * number, and the e-mail (Gmail…) — adding and verifying it with a code makes
  * it usable to log in (FEAT-007). Sign-out lives here, out of the header.
+ * FEAT-020 (SPEC-020-09): set or change the password, confirm the number.
  */
 export default function ProfilePage() {
   const router = useRouter();
   const [me, setMe] = useState<MeProfile | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  /** FEAT-020 SPEC-020-12 R1: an account with a password gives it to change its e-mail. */
+  const [emailPassword, setEmailPassword] = useState('');
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [methods, setMethods] = useState<AuthMethods | undefined>(undefined);
   const [message, setMessage] = useState<{
     tone: 'success' | 'danger' | 'info';
     text: string;
@@ -44,14 +51,21 @@ export default function ProfilePage() {
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
         clearSession();
-        router.push('/connexion?redirect=/profil' as Route);
+        router.push('/compte?redirect=/profil' as Route);
       }
     }
   }, [router]);
 
   useEffect(() => {
+    api.auth
+      .methods()
+      .then((res) => setMethods(res.methods))
+      .catch(() => setMethods(null));
+  }, []);
+
+  useEffect(() => {
     if (!isAuthenticated()) {
-      router.push('/connexion?redirect=/profil' as Route);
+      router.push('/compte?redirect=/profil' as Route);
       return;
     }
     void load();
@@ -86,11 +100,14 @@ export default function ProfilePage() {
     setBusy(true);
     setMessage(null);
     try {
-      await api.auth.requestEmailVerification(email);
+      await api.auth.requestEmailVerification(email, me?.hasPassword ? emailPassword : undefined);
       setCodeSent(true);
       setMessage({ tone: 'info', text: `Un code à 6 chiffres a été envoyé à ${email}.` });
-    } catch {
-      setMessage({ tone: 'danger', text: "Impossible d'envoyer le code. Vérifiez l'adresse." });
+    } catch (err) {
+      setMessage({
+        tone: 'danger',
+        text: accountErrorMessage(err, "Impossible d'envoyer le code. Vérifiez l'adresse."),
+      });
     } finally {
       setBusy(false);
     }
@@ -100,14 +117,18 @@ export default function ProfilePage() {
     setBusy(true);
     setMessage(null);
     try {
+      const replaced = Boolean(me?.email && me.emailVerified);
       const profile = await api.auth.confirmEmail(email, code);
       setMe(profile);
       setCodeSent(false);
       setCode('');
       setEmail('');
+      setEmailPassword('');
       setMessage({
         tone: 'success',
-        text: 'E-mail vérifié : vous pouvez maintenant vous connecter avec lui.',
+        text: replaced
+          ? 'E-mail changé : votre ancienne adresse a reçu une alerte, et vos appareils mémorisés vous redemanderont un code.'
+          : 'E-mail vérifié : vous pouvez maintenant vous connecter avec lui.',
       });
     } catch (err) {
       setMessage({
@@ -136,10 +157,19 @@ export default function ProfilePage() {
         <Heading level={1}>Mon profil</Heading>
         {message && <Alert tone={message.tone}>{message.text}</Alert>}
 
-        <section className={cx(styles['card'])}>
-          <p className={cx(styles['label'])}>Téléphone</p>
-          <p className={cx(styles['value'])}>{me.phone}</p>
-        </section>
+        <PhoneSection
+          me={me}
+          methods={methods}
+          onUpdated={(profile) => {
+            setMe(profile);
+            setMessage({ tone: 'success', text: 'Numéro confirmé.' });
+          }}
+          cardClassName={styles['card'] ?? ''}
+          labelClassName={styles['label'] ?? ''}
+          valueClassName={styles['value'] ?? ''}
+          okClassName={styles['ok'] ?? ''}
+          mutedClassName={styles['muted'] ?? ''}
+        />
 
         <section className={cx(styles['card'])}>
           <form
@@ -190,6 +220,16 @@ export default function ProfilePage() {
                 disabled={codeSent}
                 required
               />
+              {me.hasPassword && !codeSent && (
+                <Input
+                  label="Mot de passe actuel"
+                  type="password"
+                  autoComplete="current-password"
+                  value={emailPassword}
+                  onChange={(e) => setEmailPassword(e.target.value)}
+                  required
+                />
+              )}
               {codeSent && (
                 <Input
                   label="Code reçu par e-mail"
@@ -212,6 +252,14 @@ export default function ProfilePage() {
             </Stack>
           </form>
         </section>
+
+        <PasswordSection
+          me={me}
+          onChanged={() => void load()}
+          cardClassName={styles['card'] ?? ''}
+          labelClassName={styles['label'] ?? ''}
+          mutedClassName={styles['muted'] ?? ''}
+        />
 
         <Button variant="ghost" fullWidth onClick={() => void signOut()}>
           Se déconnecter

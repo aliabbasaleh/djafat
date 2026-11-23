@@ -1,13 +1,18 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createTransport, type Transporter } from 'nodemailer';
-import type { OtpDeliveryPort } from '@djafat/types';
+import type { OtpDeliveryPort, OtpDeliveryPurpose } from '@djafat/types';
 import { AppConfigService } from '../../../common/config/config.service';
+import { emailDeliveryFailed } from '../email-delivery-errors';
+import { maskEmail } from '../masking';
 import { emailOtpMessage } from './email-otp-text';
+import { smtpSender, smtpSettingsFrom, smtpTransportOptions } from './smtp-options';
 
 /**
  * Sends login / verification codes by email through any SMTP provider
  * (FEAT-007): Brevo, Mailgun, SES, Workspace… — `SMTP_URL`
- * (`smtp://` or `smtps://user:pass@host:port`) and `EMAIL_FROM`.
+ * (`smtp://` or `smtps://user:pass@host:port`), or since FEAT-020 the
+ * official Gmail account (`SMTP_HOST`, `SMTP_USER`, app password), and
+ * `EMAIL_FROM`. The wording follows the code's purpose (SPEC-020-01 R5).
  * Never logs the code, the full address or the SMTP credentials.
  */
 @Injectable()
@@ -23,16 +28,13 @@ export class SmtpEmailOtpDeliveryProvider implements OtpDeliveryPort {
     code: string;
     ttlSeconds: number;
     locale: string;
+    purpose?: OtpDeliveryPurpose;
   }): Promise<void> {
-    const { subject, text } = emailOtpMessage(input.code, input.ttlSeconds);
-    const to = redactEmail(input.to);
+    const { subject, text } = emailOtpMessage(input.code, input.ttlSeconds, input.purpose);
+    const to = maskEmail(input.to);
+    const settings = smtpSettingsFrom(this.config);
     try {
-      await this.transport().sendMail({
-        from: this.config.get('EMAIL_FROM'),
-        to: input.to,
-        subject,
-        text,
-      });
+      await this.transport().sendMail({ from: smtpSender(settings), to: input.to, subject, text });
       this.logger.log(`OTP email accepted by SMTP server for ${to}`);
     } catch (err) {
       const reason =
@@ -40,37 +42,12 @@ export class SmtpEmailOtpDeliveryProvider implements OtpDeliveryPort {
           ? String((err as { code: unknown }).code)
           : 'smtp error';
       this.logger.error(`OTP email delivery failed for ${to}: ${reason}`);
-      throw new HttpException(
-        {
-          code: 'OTP_DELIVERY_FAILED',
-          message: "Impossible d'envoyer l'e-mail, réessayez dans un instant.",
-        },
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
+      throw emailDeliveryFailed();
     }
   }
 
   private transport(): Transporter {
-    if (!this.transporter) {
-      const url = this.config.get('SMTP_URL');
-      if (!url) throw new Error('SMTP_URL is not configured');
-      // Timeouts are TRANSPORT options (connection), so they go with the URL
-      // in the first argument; the second argument of createTransport is
-      // per-message defaults and would silently ignore them.
-      this.transporter = createTransport({
-        url,
-        connectionTimeout: 10_000,
-        greetingTimeout: 10_000,
-        socketTimeout: 15_000,
-        logger: false,
-      });
-    }
+    this.transporter ??= createTransport(smtpTransportOptions(smtpSettingsFrom(this.config)));
     return this.transporter;
   }
-}
-
-/** `awa@example.td` -> `a***@example.td` */
-export function redactEmail(email: string): string {
-  const at = email.indexOf('@');
-  return at > 0 ? `${email[0]}***${email.slice(at)}` : '***';
 }

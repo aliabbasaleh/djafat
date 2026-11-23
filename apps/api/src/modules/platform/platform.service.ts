@@ -119,6 +119,22 @@ export class PlatformService {
     );
   }
 
+  /** FEAT-020: password attempts from one network (SPEC-020-04 R2). */
+  getPasswordLoginRateLimitPerIp(): Promise<{ limit: number; windowSeconds: number }> {
+    return this.getRateLimitSetting(
+      'password_login_rate_limit_per_ip',
+      PLATFORM_SETTINGS_DEFAULTS.password_login_rate_limit_per_ip,
+    );
+  }
+
+  /** FEAT-020: how long a remembered device skips the email code (SPEC-020-04 R9). */
+  getTrustedDeviceTtlSeconds(): Promise<number> {
+    return this.getNumberSetting(
+      'trusted_device_ttl_seconds',
+      PLATFORM_SETTINGS_DEFAULTS.trusted_device_ttl_seconds,
+    );
+  }
+
   /** `platform_settings['mfa_verify_rate_limit_per_user']` — throttles step-up TOTP verification (docs/31 §5.2). */
   getMfaVerifyRateLimitPerUser(): Promise<{ limit: number; windowSeconds: number }> {
     return this.getRateLimitSetting(

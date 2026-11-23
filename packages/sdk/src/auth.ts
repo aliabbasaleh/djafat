@@ -27,8 +27,59 @@ export interface MeProfile {
   readonly phone: string;
   readonly email: string | null;
   readonly emailVerified: boolean;
+  /** FEAT-020: the number was confirmed by a code; only then do phone codes open the account. */
+  readonly phoneVerified: boolean;
+  /** FEAT-020: the account can log in with its email and a password. */
+  readonly hasPassword: boolean;
   readonly fullName: string | null;
   readonly roles: readonly string[];
+}
+
+/**
+ * FEAT-020 — what every login route returns (`/auth/register/verify`,
+ * `/auth/password/*`, `/auth/email/verify`…): the session, and the token of
+ * the device just remembered, when there is one. The app keeps that token
+ * (it survives sign-out) and sends it with the next password login.
+ */
+export interface SignedIn {
+  readonly access: string;
+  readonly accessExpiresAt: string;
+  readonly refresh: string;
+  readonly refreshExpiresAt: string;
+  readonly user: MeProfile;
+  readonly deviceToken?: string;
+  readonly deviceTokenExpiresAt?: string;
+}
+
+export type CodeChannelId = 'email' | 'sms' | 'whatsapp';
+
+/** A way to receive a code; `available: false` = « Bientôt disponible » (FEAT-020-Q05). */
+export interface CodeChannel {
+  readonly id: CodeChannelId;
+  readonly available: boolean;
+  /** Masked destination (`a***@gmail.com`, `+235 •• •• 34 56`). */
+  readonly destination?: string;
+  /** WhatsApp: DJAFAT's chat with « Code DJAFAT » pre-filled (FEAT-008). */
+  readonly link?: string;
+}
+
+/** `POST /auth/password/login`: signed in on a remembered device, or a code to type. */
+export type PasswordLoginResult =
+  | ({ readonly status: 'signed_in' } & SignedIn)
+  | {
+      readonly status: 'code_required';
+      readonly challengeId: string;
+      readonly expiresAt: string;
+      readonly sentTo: { readonly channel: 'email'; readonly destination: string };
+      readonly channels: readonly CodeChannel[];
+    };
+
+export interface RegistrationRequest {
+  readonly fullName: string;
+  /** As typed: the API accepts Chad-style numbers (FEAT-005). */
+  readonly phone: string;
+  readonly email: string;
+  readonly password: string;
 }
 
 /** ADM-03: the caller's MFA state (`GET /auth/mfa/status`). */
@@ -79,9 +130,14 @@ export function createAuthClient(http: ApiHttp) {
     me: () => http.get<MeProfile>('/me'),
     /** "Mon profil": the name shown to the courier and the restaurant. */
     updateName: (fullName: string) => http.patch<MeProfile>('/me', { body: { fullName } }),
-    /** Add an e-mail (Gmail…): a 6-digit code is sent to it (FEAT-007). */
-    requestEmailVerification: (email: string) =>
-      http.post<{ status: 'sent' }>('/me/email', { body: { email } }),
+    /**
+     * Add an e-mail (Gmail…): a 6-digit code is sent to it (FEAT-007). An account
+     * with a password gives it first (FEAT-020 SPEC-020-12).
+     */
+    requestEmailVerification: (email: string, currentPassword?: string) =>
+      http.post<{ status: 'sent' }>('/me/email', {
+        body: { email, ...(currentPassword ? { currentPassword } : {}) },
+      }),
     /** The code makes the address verified: it can then be used to log in. */
     confirmEmail: (email: string, code: string) =>
       http.post<MeProfile>('/me/email/verify', { body: { email, code } }),
@@ -95,6 +151,54 @@ export function createAuthClient(http: ApiHttp) {
     mfaSetup: () => http.post<MfaEnrolment>('/auth/mfa/setup'),
     mfaVerify: (code: string) =>
       http.post<{ justEnabled: boolean }>('/auth/mfa/verify', { body: { code } }),
+    // ── FEAT-020 — accounts with an email and a password ───────────────────
+    /** Create an account: a code goes to the email; nothing exists before it. */
+    register: (input: RegistrationRequest) =>
+      http.post<{ registrationId: string; expiresAt: string }>('/auth/register', { body: input }),
+    /** The right code creates the account and signs in (the device is remembered). */
+    verifyRegistration: (registrationId: string, code: string) =>
+      http.post<SignedIn>('/auth/register/verify', { body: { registrationId, code } }),
+    resendRegistration: (registrationId: string) =>
+      http.post<{ status: 'sent' }>('/auth/register/resend', { body: { registrationId } }),
+    /** Email + password (+ the remembered device's token, if this device has one). */
+    passwordLogin: (input: { email: string; password: string; deviceToken?: string | null }) =>
+      http.post<PasswordLoginResult>('/auth/password/login', {
+        body: {
+          email: input.email,
+          password: input.password,
+          ...(input.deviceToken ? { deviceToken: input.deviceToken } : {}),
+        },
+      }),
+    /** A new device's code again, or by another channel (email, SMS to a confirmed number). */
+    sendLoginCode: (challengeId: string, channel: 'email' | 'sms') =>
+      http.post<{ status: 'sent' }>('/auth/password/challenge/send', {
+        body: { challengeId, channel },
+      }),
+    verifyLoginCode: (input: {
+      challengeId: string;
+      channel: CodeChannelId;
+      code: string;
+      rememberDevice: boolean;
+    }) => http.post<SignedIn>('/auth/password/challenge/verify', { body: input }),
+    /** « Mot de passe oublié ? » — always accepted; a code only for a known address. */
+    forgotPassword: (email: string) =>
+      http.post<{ status: 'sent' }>('/auth/password/forgot', { body: { email } }),
+    resetPassword: (input: { email: string; code: string; password: string }) =>
+      http.post<SignedIn>('/auth/password/reset', { body: input }),
+    /** Login with a code only (FEAT-007), for an address verified on an account. */
+    requestEmailCode: (email: string) =>
+      http.post<{ status: 'sent' }>('/auth/email/request', { body: { email } }),
+    verifyEmailCode: (email: string, code: string) =>
+      http.post<SignedIn>('/auth/email/verify', { body: { email, code } }),
+    /** « Mon profil »: set a first password, or change it (the current one is asked). */
+    changePassword: (input: { currentPassword?: string; newPassword: string }) =>
+      http.put<void>('/me/password', { body: input }),
+    /** « Mon profil »: confirm the account's number by an SMS code. */
+    requestPhoneCode: () =>
+      http.post<{ status: 'sent' }>('/me/phone/request', { body: { channel: 'sms' } }),
+    /** The SMS code, or the code WhatsApp replied to « Code DJAFAT ». */
+    verifyPhone: (channel: 'sms' | 'whatsapp', code: string) =>
+      http.post<MeProfile>('/me/phone/verify', { body: { channel, code } }),
     /** Login methods available on this deployment (FEAT-008): WhatsApp, SMS, e-mail. */
     methods: () =>
       http.get<{

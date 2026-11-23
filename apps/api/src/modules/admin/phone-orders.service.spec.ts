@@ -16,6 +16,8 @@ const body = (over: Partial<PhoneOrderBody> = {}): PhoneOrderBody => ({
 function harness(opts: {
   isNew?: boolean;
   fullName?: string | null;
+  /** FEAT-020: the state of an existing account (created online or by phone). */
+  account?: { phoneVerifiedAt?: Date | null; emailVerifiedAt?: Date | null; hasPassword?: boolean };
   addresses?: Array<Record<string, unknown>>;
   methods?: Array<{ providerCode: string; methodCode: string; capabilities: unknown }>;
   orderStatus?: string;
@@ -23,7 +25,12 @@ function harness(opts: {
 }) {
   const users = {
     findOrCreateByPhone: vi.fn(async () => ({ userId: 'cust-1', isNew: opts.isNew ?? true })),
-    getByIdOrThrow: vi.fn(async () => ({ fullName: opts.fullName ?? null })),
+    getByIdOrThrow: vi.fn(async () => ({
+      fullName: opts.fullName ?? null,
+      phoneVerifiedAt: opts.account?.phoneVerifiedAt ?? null,
+      emailVerifiedAt: opts.account?.emailVerifiedAt ?? null,
+      hasPassword: opts.account?.hasPassword ?? false,
+    })),
     updateFullName: vi.fn(async () => ({})),
     markPhoneVerified: vi.fn(async () => undefined),
   };
@@ -246,5 +253,38 @@ describe('FEAT-011 / SPEC-011-01 — order taken on the phone by an operator', (
     const r = await h.service.confirmTransfer('ord-1', 'CI2.B');
     expect(h.receipts.claimForOrder).toHaveBeenCalledWith('ord-1', 'CI2.B');
     expect(r.transfer).toBe('pending');
+  });
+});
+
+// FEAT-020 — docs/features/FEAT-020-compte-email-mot-de-passe (SPEC-020-06 R7, review #2).
+describe('SPEC-020-06 — a phone order never confirms a number only typed at e-mail sign-up', () => {
+  // SPEC-020-06-SC08
+  it('SPEC-020-06-SC08 — number typed on an e-mail account, never confirmed: 409 PHONE_NOT_CONFIRMED, nothing filed', async () => {
+    const h = harness({
+      isNew: false,
+      account: { emailVerifiedAt: new Date('2026-11-21T10:00:00Z'), hasPassword: true },
+    });
+
+    await expect(h.service.place(body(), OPERATOR, 'key-typed')).rejects.toMatchObject({
+      response: { code: 'PHONE_NOT_CONFIRMED' },
+    });
+    expect(h.users.markPhoneVerified).not.toHaveBeenCalled();
+    expect(h.users.updateFullName).not.toHaveBeenCalled();
+    expect(h.addresses.create).not.toHaveBeenCalled();
+    expect(h.orders.createOrder).not.toHaveBeenCalled();
+  });
+
+  // SPEC-020-06-SC08
+  it('SPEC-020-06-SC08 — the same e-mail account once its number is confirmed: the order is taken', async () => {
+    const h = harness({
+      isNew: false,
+      account: {
+        emailVerifiedAt: new Date('2026-11-21T10:00:00Z'),
+        hasPassword: true,
+        phoneVerifiedAt: new Date('2026-11-21T11:00:00Z'),
+      },
+    });
+    await h.service.place(body(), OPERATOR, 'key-confirmed');
+    expect(h.orders.createOrder).toHaveBeenCalledTimes(1);
   });
 });

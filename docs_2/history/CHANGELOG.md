@@ -8,6 +8,88 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-23 — Sync S-041: PR #27 merged into `main` without GitHub's checks (FEAT-020, 0.24.4)
+
+**Changed:** at the user's request (« just merge it and comment it in the changelog »), PR #27 is merged although
+no GitHub job ran on it: the account that owns the repository has used up its Actions minutes for the month
+(« recent account payments have failed or your spending limit needs to be increased »; about 1,800 minutes used by
+this repository since 1 November, Windows jobs counting double).
+
+**Verified instead:** `verify --full` locally on `4a785d0`, without new failure (PostgreSQL + Redis integration
+included); on GitHub, Linux, integration, audit and gitleaks green on `379db20`; after it, only the time limits of
+four test files changed (`5818b77`), re-run locally: 45 tests out of 45. **Not verified:** the Windows job with those
+limits, and any check on `main` itself.
+
+**To do:** once the owner fixes billing (Settings → Billing and licensing), re-run every check on `main`
+(`docs/ROADMAP.md`, « à faire côté DJAFAT »).
+
+---
+
+## 2026-11-23 — Sync S-040: Windows CI timeouts on PR #27 (FEAT-020, 0.24.3)
+
+**Learned:** real scrypt (N=2^15) in unit tests is slower on the Windows CI runner: two tests passed 5 s
+(vitest's default). The test files that hash real passwords now allow 30 s; what they check is unchanged.
+
+---
+
+## 2026-11-22 — Sync S-039: FEAT-020 reviewed three times, corrected, ready for PR (0.24.2)
+
+**Verified:** `verify --full` on `4a785d0` (fresh database, mock e-mail): every check passes, e2e
+unavailable — no new failure; the third review found nothing left to fix. **Fixed before merge:** an
+open redirect after login; phone orders filing a caller's order into an e-mail account whose number
+was only typed; three ways to learn whether an address had an account; an e-mail change that needed
+neither the password nor an alert. **Changed by the user's decisions:** a verified e-mail opens cash on
+delivery at level T1; phone orders are refused for such numbers until confirmed. **Learned:** a fix can
+open its own hole (the first redirect fix normalised `/..//x` into `//x`) — the second review caught it.
+
+---
+
+## 2026-11-22 — Sync S-037: first registration code received in a real inbox (FEAT-020, 0.24.2)
+
+**Verified:** the user received « Confirmez votre adresse e-mail DJAFAT » in DJAFAT's Gmail inbox (Inbox, not spam),
+with the text of `email-otp-text.ts` (MANUAL, screenshot shown in the session): SPEC-020-01-SC06 is proven on the
+local `.env`; on the server it remains to do (T-611). **Learned:** `EMAIL_FROM` set to the bare address hides the
+« DJAFAT » sender name (the default `DJAFAT <SMTP_USER>` only applies when it is empty); `.env.example` and the local
+guide now say to leave it empty.
+
+---
+
+## 2026-11-22 — Sync S-036: the Gmail app password, first real send (FEAT-020, 0.24.1)
+
+**Verified:** with the official Gmail address and its app password in the local `.env` (set by the user, never
+displayed), a registration to DJAFAT's own address was accepted by Gmail's SMTP server (API log, RUN); arrival in
+the inbox is for the user to confirm. **Learned:** an app password pasted with its spaces and no quotes breaks
+`source .env` (the shell keeps nothing of it, the API refuses to start); `.env.example` and the local guide now say
+"without spaces, or quoted".
+
+---
+
+## 2026-11-21 — Sync S-035: customer accounts by e-mail and password (FEAT-020), CORS fix (API-02)
+
+**Changed (branch `feat/compte-email-password`, version 0.24.0, not on `main` yet):** at the user's request,
+« Connexion » becomes « Compte »: registration with name, phone, e-mail and password, confirmed by an e-mail
+code; login by password with a code on a device not remembered (30 days), or by a code alone; forgotten
+password; « Mon profil » sets or changes the password and confirms the number. WhatsApp and SMS stay available
+as code channels and show « Bientôt disponible » while switched off. E-mails go through the official Gmail account
+(`SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` — the app password is set by the user in `.env`, never in Git).
+Migration 0040 (password hash, pending challenges, remembered devices, codes bound to their request).
+
+**Verified:** `pnpm verify:fast` green; unit tests of every scenario; the three FEAT-020 integration scenarios and
+the whole integration suite (13 files, 115 tests) on a fresh PostgreSQL database; a real browser run of the site
+(registration, new device, remembered device, wrong password, reset, profile) with 13 screenshots
+(`docs/features/FEAT-020-compte-email-mot-de-passe/progress.md`). Not verified: a real Gmail delivery (needs the
+user's app password) and the app's screen (no Expo build, `MOB-01`).
+
+**Reviewed (collaborator):** `origin/fix/login-method-icons` `628dce4` (kcerha, 0.23.6) — SVG icons instead of
+emoji on the old login page; reused in FEAT-020's account screens, which replace that page (CODE + RUN in the
+browser pass of 2026-11-22). The two branches conflict on `connexion/page.tsx`, `docs/ROADMAP.md`, `package.json`.
+
+**Learned:** [`API-02`](../FINDINGS.md#api-02) — `@fastify/cors` allows only GET, HEAD and POST by default: browsers
+refused every PUT, PATCH and DELETE from another origin, LIVE on `api.djafat.com` (profile name, cart quantities,
+addresses, the restaurant console's edits). Fixed on the same branch.
+
+---
+
 ## 2026-11-18 — Sync S-034: everything merged — `main` is DJAFAT 0.23.4
 
 **Verified:** at the user's request, #17 to #24 were merged in order, each only after its five checks were green

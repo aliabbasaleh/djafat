@@ -213,6 +213,22 @@ export class SessionService {
     return result.count;
   }
 
+  /**
+   * FEAT-020 (SPEC-020-05 R7): a password change logs out every OTHER session —
+   * the one that changed it stays signed in.
+   */
+  async revokeAllForUserExcept(
+    userId: string,
+    keepSessionId: string,
+    reason: string,
+  ): Promise<number> {
+    const result = await this.prisma.session.updateMany({
+      where: { userId, revokedAt: null, id: { not: keepSessionId } },
+      data: { revokedAt: new Date(), revokedReason: reason },
+    });
+    return result.count;
+  }
+
   async getActiveSession(sessionId: string): Promise<SessionRow | null> {
     const s = await this.prisma.session.findFirst({ where: { id: sessionId, revokedAt: null } });
     if (!s) return null;

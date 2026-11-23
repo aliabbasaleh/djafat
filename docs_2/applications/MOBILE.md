@@ -50,6 +50,8 @@ login calls. Nothing else.
 | Offline queue, data-saver mode                    | Not Implemented (called for by the design brief)  |
 | Stay logged in                                    | Not Implemented ([`FE-02`](../FINDINGS.md#fe-02)) |
 
+**FEAT-020** _(updated 2026-11-21, sync S-035)_: on the branch `feat/compte-email-password`, the signed-out screen becomes « Mon compte » (sign-in by password or code, registration, forgotten password). Its logic is unit-tested (shared with the site through `@djafat/sdk`); the screen itself could not be seen — no Expo build exists yet ([`MOB-01`](../FINDINGS.md#mob-01)).
+
 ## 3. Assessment
 
 This app is a thinner copy of the website and shares its dead end at payment. Since the website is
@@ -62,4 +64,4 @@ alternative and should get the bundling fix first.
 T-210 (bundle, device build) → T-201 (payment) → T-208 (delivery code) → T-207 (token refresh) →
 T-217 (history, profile) → T-502 (push).
 
-Last updated: 2026-11-11 (evidence collected 2026-11-10)
+Last updated: 2026-11-21 (sync S-035)

@@ -60,7 +60,7 @@ export function ProductOptionsForm({ product }: { readonly product: ProductDetai
 
   async function submit(replaceCart: boolean) {
     if (!isAuthenticated()) {
-      router.push(`/connexion?redirect=${encodeURIComponent(pathname)}` as Route);
+      router.push(`/compte?redirect=${encodeURIComponent(pathname)}` as Route);
       return;
     }
     setError(null);

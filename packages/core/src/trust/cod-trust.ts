@@ -6,6 +6,12 @@
  */
 export interface CustomerTrustSignals {
   readonly phoneVerified: boolean;
+  /**
+   * FEAT-020 (FEAT-020-Q26, SPEC-020-11): customers who sign up by e-mail start
+   * with an unconfirmed number; a verified e-mail proves who they are just as
+   * well for the first trust level. Counted once, not added to the phone.
+   */
+  readonly emailVerified: boolean;
   readonly deliveredOrders: number;
   /** Deliveries that failed at the door (customer absent, refused, unreachable). */
   readonly noShows: number;
@@ -21,15 +27,16 @@ export type TrustTier = 'T0' | 'T1' | 'T2' | 'T3';
 const NO_SHOW_LIMIT = 2;
 
 export function scoreCustomerTrust(s: CustomerTrustSignals): { score: number; tier: TrustTier } {
+  const identityVerified = s.phoneVerified || s.emailVerified;
   const score = Math.round(
-    (s.phoneVerified ? 40 : 0) +
+    (identityVerified ? 40 : 0) +
       Math.min(s.deliveredOrders, 10) * 4 +
       Math.min(s.accountAgeDays, 30) / 3 -
       s.noShows * 35 -
       s.cancelAfterDispatch * 10 -
       (s.night && s.deliveredOrders === 0 ? 15 : 0),
   );
-  if (!s.phoneVerified || s.noShows >= NO_SHOW_LIMIT || score < 30) return { score, tier: 'T0' };
+  if (!identityVerified || s.noShows >= NO_SHOW_LIMIT || score < 30) return { score, tier: 'T0' };
   if (score < 60) return { score, tier: 'T1' };
   if (score < 85) return { score, tier: 'T2' };
   return { score, tier: 'T3' };

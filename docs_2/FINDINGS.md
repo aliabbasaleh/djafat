@@ -83,6 +83,7 @@ verified.
 | [FE-04](#fe-04)       | Customer web has no order history or profile page                                           | Not Implemented     | Medium   | LIVE     |
 | [PAY-08](#pay-08)     | Cash settlement posts ledger groups in the wrong order                                      | Needs Verification  | Medium   | CODE     |
 | [API-01](#api-01)     | Several client mistakes are answered with HTTP 500                                          | Needs Improvement   | Medium   | LIVE     |
+| [API-02](#api-02)     | Browsers cannot send PUT, PATCH or DELETE to the API from another origin                    | Broken              | High     | LIVE     |
 | [DOC-03](#doc-03)     | The local guide's placeholder secrets block local deliveries                                | Broken              | Medium   | CODE     |
 | [TEST-04](#test-04)   | The API integration suite fails intermittently on a local machine                           | Needs Improvement   | Medium   | RUN      |
 | [FE-05](#fe-05)       | Seeded restaurant and product images do not render                                          | Broken              | Low      | LIVE     |
@@ -1222,6 +1223,16 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Sync S-012 note (2026-11-17), BRANCH + RUN:** on the NestJS 11 / Fastify 5 branch (`862ad24`), a
   2 MB body now answers 413 (checked on the built API); the other cases were not re-run.
 - **Sync S-013 note (2026-11-17):** the 413 case is on `main` (pull request #7, `75db772`).
+
+### API-02
+
+**Browsers cannot send PUT, PATCH or DELETE to the API from another origin** · Broken · High · LIVE · Status: Fixed on branch `feat/compte-email-password` (FEAT-020, version 0.24.0), not on `main` yet _(added 2026-11-21, sync S-035)_
+
+- **Where:** `apps/api/src/main.ts`, the `@fastify/cors` registration: no `methods`, and that plugin's default is `GET,HEAD,POST`.
+- **Observed (LIVE, 2026-11-21):** a preflight to `https://api.djafat.com/v1/me` from `https://djafat.com` for `PATCH` answers `access-control-allow-methods: GET,HEAD,POST`; the same locally (site :3000, API :3001). Production serves every app from its own subdomain and calls `https://api.<domain>/v1` (`infra/deploy/docker-compose.prod.yml`), so it is cross-origin there too.
+- **Impact:** in a browser, every SDK call with those verbs is refused before reaching the API — « Mon profil » name (`PATCH /me`), the cart's quantity and removal (`PATCH`/`DELETE /carts/items/…`), address edit and deletion, the voice note, the restaurant's profile, hours, categories, products, availability and option groups, the admin's role revocation, and FEAT-020's `PUT /me/password`. Found when FEAT-020's browser run could not change a password.
+- **Fix:** `methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']` (branch above).
+- **Verify:** the preflight lists the six methods (RUN, locally, after the fix); FEAT-020's browser run then changed a password from « Mon profil » (RUN). After deployment: the same preflight on `api.<domain>`.
 
 ### DOC-03
 

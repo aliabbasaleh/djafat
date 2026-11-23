@@ -1,0 +1,33 @@
+FEAT-020-VIS01 — apps/web /compte, onglet « Se connecter », 390x844 (mobile)
+Nature : attendu. Maquette texte choisie par l'utilisateur le 2026-11-21
+(question « Layout » : « One page, two tabs »), complétée des canaux de code
+(question « Channels » : canaux inactifs grisés « Bientôt disponible »).
+
+ DJAFAT                      [👤 Compte]
+ ───────────────────────────────────────
+  Mon compte
+
+  [ Se connecter ]    Créer un compte
+  ════════════════
+
+  E-mail
+  [ vous@gmail.com                   ]
+  Mot de passe
+  [ ••••••••                      👁 ]
+
+  [           Se connecter           ]
+
+  Mot de passe oublié ?
+
+  ──────── ou recevoir un code ────────
+  [ ✉️ E-mail ] [ WhatsApp ]  [  SMS   ]
+                 Bientôt       Bientôt
+                 disponible    disponible
+
+Notes :
+- L'onglet « Se connecter » est ouvert par défaut ; « Créer un compte » est
+  l'autre onglet de la même page.
+- Un canal inactif (WhatsApp, SMS) est grisé, non cliquable, et porte
+  « Bientôt disponible ». Il devient un bouton normal dès que le serveur le
+  déclare actif.
+- 👁 affiche ou masque le mot de passe.

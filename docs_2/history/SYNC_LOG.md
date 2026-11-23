@@ -10,6 +10,112 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-041 — 2026-11-23 — PR #27 merged without GitHub's checks (0.24.4)
+
+Short entry (our own docs commit `631b433`): version 0.24.4 records in `docs/ROADMAP.md` that PR #27 (FEAT-020) is
+merged at the user's request although GitHub started none of its jobs — the owner account's Actions minutes are used
+up. Evidence kept: the local full verify on `4a785d0`, hosted Linux, integration, audit and gitleaks green on
+`379db20`, and the four test files changed since then re-run locally. Not verified: the Windows job, and CI on
+`main`. No new code finding; `PROJECT_STATUS.md` and the backlog say CI must run again on `main`.
+
+---
+
+## S-040 — 2026-11-23 — FEAT-020: Windows CI timeouts (0.24.3)
+
+Short entry (our own commit): on PR #27 the Windows runner timed out two tests that hash real passwords
+(5 s limit); the four such test files get 30 s, no assertion changed. Linux, integration, audit and secret
+scanning had passed. No new finding.
+
+---
+
+## S-039 — 2026-11-22 — FEAT-020: independent review, corrections, ready for PR
+
+(S-038 belongs to the branch `feat/equipe-connexion-email`, not merged yet.)
+
+|                 |                                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Trigger**     | The user chose « Ship it now »: independent review, then pull request                                         |
+| **Range**       | `origin/main` unchanged (`96a88d3`, fetched); our branch `feat/compte-email-password`, `44d0fa4` to `610ca13` |
+| **Size**        | 3 commits: auth, web, admin (phone orders), core (trust rule), types, SDK, docs                               |
+| **Evidence**    | RUN — `verify --full` on `4a785d0`: no new failure, e2e unavailable; review 3 « prêt pour PR »                |
+| **Reviewed by** | Claude, in the session that wrote FEAT-020; three rounds of the `spec-reviewer` sub-agent                     |
+
+### Fixed (on the branch, before any merge)
+
+- An open redirect after login (a tab, a newline or `/..//` in `?redirect=`), measured by the reviewer.
+- A phone order confirmed a number only typed at an e-mail sign-up and filed the caller's order in that
+  account; it is now refused, 409 `PHONE_NOT_CONFIRMED` (user's decision FEAT-020-Q27).
+- Registration, « Mot de passe oublié ? » and e-mail code login told whether an address had an account
+  (lock, budget, delivery error, timing); they now behave the same for any address.
+- Changing the e-mail of an account with a password asked nothing: it now asks the current password,
+  alerts the old address and forgets remembered devices; its codes are bound to the account (Q28).
+
+### Changed
+
+- Cash on delivery: a verified e-mail counts like a confirmed number for trust level T1 (Q26).
+
+### Not verified
+
+- The production server (no access from here); the « Mon profil » screen was checked by screenshot only.
+
+---
+
+## S-037 — 2026-11-22 — our docs commit on the FEAT-020 branch (0.24.2)
+
+Short entry (our own commit `d6481b8`, already described): the user received the registration code in DJAFAT's
+Gmail inbox (Inbox, not spam), so SPEC-020-01-SC06 is proven locally (MANUAL, screenshot shown in the session, not
+versioned); a bare `EMAIL_FROM` replaces the « DJAFAT » sender name, so `.env.example` and the local guide now say to
+leave it empty. No new finding; no change on GitHub besides our branch.
+
+---
+
+## S-036 — 2026-11-22 — our docs fix on the FEAT-020 branch (0.24.1)
+
+Short entry (our own commit, already described): the app password must be pasted without spaces or quoted;
+first real Gmail send accepted (RUN). No new finding; no change on GitHub besides our branch.
+
+---
+
+## S-035 — 2026-11-21/22 — the collaborator's `fix/login-method-icons`; our FEAT-020 branch
+
+|                 |                                                                                                                                         |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Trigger**     | The user asked to pull the collaborator's work, then to build customer accounts (FEAT-020)                                              |
+| **Range**       | `origin/main` unchanged since S-034 (`96a88d3`); new `origin/fix/login-method-icons` `628dce4`; our branch `feat/compte-email-password` |
+| **Size**        | 0 new commits on GitHub; our change: auth, users, migration 0040, SDK, web, mobile, docs                                                |
+| **Evidence**    | RUN — `git fetch -v` up to date; FEAT-020 checks in its `progress.md`; API-02 LIVE preflight                                            |
+| **Reviewed by** | Claude, in the session that wrote FEAT-020                                                                                              |
+
+### Added
+
+- `origin/fix/login-method-icons` (kcerha, 2026-11-21, version 0.23.6, not merged, no pull request seen):
+  `628dce4` replaces the emoji of the login method tabs (`apps/web/src/app/connexion/page.tsx`) by three
+  inline SVG icons (no dependency); roadmap line and version. Reviewed from the diff (CODE); our FEAT-020
+  replaces that page by a redirect, so the icons were moved into `components/account/ChannelIcons.tsx`
+  and shown in the account screens' channel buttons (RUN: browser pass of 2026-11-22). Merging both
+  branches conflicts on `connexion/page.tsx`, `docs/ROADMAP.md` and `package.json` (resolution in the
+  FEAT-020 `pr.md`).
+- FEAT-020 on its branch (see `history/CHANGELOG.md`); tasks T-611 to T-613.
+
+### Removed
+
+- none
+
+### Fixed
+
+- On the branch: [`API-02`](../FINDINGS.md#api-02) (CORS methods).
+
+### Changed
+
+- The branch's version is 0.24.0; it carries migration 0040, so a server or a local copy updated to it must run its
+  migrations.
+
+### New findings
+
+- [`API-02`](../FINDINGS.md#api-02) — Broken, High, LIVE.
+
+---
+
 ## S-034 — 2026-11-18 — pull requests #17 to #24 merged
 
 |                 |                                                                             |

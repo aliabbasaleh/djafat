@@ -24,6 +24,13 @@ export type AuditAction =
   | 'AUTH_MFA_DISABLED'
   | 'AUTH_MFA_FAILED'
   | 'AUTH_STEP_UP_VERIFIED'
+  // FEAT-020 — customer accounts with an email and a password.
+  | 'AUTH_REGISTERED'
+  | 'AUTH_DEVICE_TRUSTED'
+  | 'AUTH_PASSWORD_CHANGED'
+  | 'AUTH_PASSWORD_RESET'
+  | 'AUTH_EMAIL_CHANGED'
+  | 'AUTH_PHONE_VERIFIED'
   | 'ROLE_GRANTED'
   | 'ROLE_REVOKED'
   | 'USER_SUSPENDED'

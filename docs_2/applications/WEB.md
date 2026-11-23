@@ -56,6 +56,8 @@ behind login runs in the browser.
 | Installable / offline-tolerant web app                           | Not Implemented             | No manifest or service worker in the source                    |
 | Minimum-order message in the cart                                | Not Implemented             | [`ORD-03`](../FINDINGS.md#ord-03)                              |
 
+**FEAT-020** _(updated 2026-11-21, sync S-035)_: on the branch `feat/compte-email-password`, the header's « Connexion » becomes « 👤 Compte » → `/compte` (tabs « Se connecter » / « Créer un compte »; `/connexion` redirects there), and « Mon profil » gains the password and phone sections. Verified in a real browser (13 execution screenshots in the feature folder).
+
 ## 3. Observations
 
 - Session data — access token, 30-day refresh token, user — is kept in `localStorage`
@@ -82,4 +84,4 @@ T-101 (SDK) → T-201 (payment step) → T-208 (delivery code) → T-207 (token 
 (cancellation) → T-217 (history, profile) → T-209 (minimum order) → T-307 (token storage, CSP) →
 T-501 (polish) → T-602 (browser tests) → T-506 (accessibility, performance).
 
-Last updated: 2026-11-11 (evidence collected 2026-11-10)
+Last updated: 2026-11-21 (sync S-035)

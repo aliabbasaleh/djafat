@@ -38,6 +38,21 @@ export function hashRefreshToken(token: string, secret: string): string {
   return createHmac('sha256', secret).update(token).digest('hex');
 }
 
+// ── Trusted devices (FEAT-020, SPEC-020-04 R9) ───────────────────────────
+
+/** 32 random bytes, base64url — the token a remembered device presents. */
+export function generateDeviceToken(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+/**
+ * HMAC of a device token — what `trusted_devices.token_hash` stores. Its own
+ * prefix keeps it apart from a refresh-token hash made with the same secret.
+ */
+export function hashDeviceToken(token: string, secret: string): string {
+  return createHmac('sha256', secret).update(`trusted-device:${token}`).digest('hex');
+}
+
 // ── Constant-time comparison ─────────────────────────────────────────────
 
 /** Constant-time hex-string comparison — never `===` on a secret-derived hash. */

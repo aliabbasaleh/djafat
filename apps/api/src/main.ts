@@ -47,6 +47,12 @@ async function bootstrap(): Promise<void> {
   await app.register(cors as never, {
     origin: config.get('API_CORS_ORIGINS').length > 0 ? config.get('API_CORS_ORIGINS') : false,
     credentials: true,
+    // @fastify/cors allows only GET, HEAD and POST by default: from another
+    // origin (the site on :3000, the API on :3001) the browser refused every
+    // PUT, PATCH and DELETE — « Mon profil » could not save a name (PATCH /me)
+    // nor a password (PUT /me/password, FEAT-020). Found by FEAT-020's
+    // browser run.
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
   });
 
   app.enableShutdownHooks();
