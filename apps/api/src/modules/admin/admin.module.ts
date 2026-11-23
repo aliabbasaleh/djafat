@@ -11,6 +11,8 @@ import { PhoneOrdersService } from './phone-orders.service';
 import { OfflineOrdersService } from './offline-orders.service';
 import { CatalogModule } from '../catalog/catalog.module';
 import { UsersAdminController } from './users-admin.controller';
+import { GeoModule } from '../geo/geo.module';
+import { NeighbourhoodsAdminController } from './neighbourhoods-admin.controller';
 
 /**
  * Skeleton (Bloc 0) + guard-stack proof endpoints (Bloc 1, see
@@ -31,8 +33,14 @@ import { UsersAdminController } from './users-admin.controller';
     CatalogModule,
     OrdersModule,
     PaymentsModule,
+    GeoModule,
   ],
-  controllers: [AdminController, UsersAdminController, PhoneOrdersController],
+  controllers: [
+    AdminController,
+    UsersAdminController,
+    PhoneOrdersController,
+    NeighbourhoodsAdminController,
+  ],
   providers: [PhoneOrdersService, OfflineOrdersService],
 })
 export class AdminModule {}
