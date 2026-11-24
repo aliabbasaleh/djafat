@@ -62,10 +62,11 @@ Constats :
 
 ## Dernière vérification
 
-Partie 1, commit `869d70d` (2026-11-23) : `pnpm verify:fast` — format, specs, hygiene, arch, lint,
-typecheck et tests unitaires 22/22 réussis. Intégration sur une base neuve (`djafat_wip`, fournisseurs
-simulés) : 14 fichiers, 129 tests réussis, dont les 7 de `account-onboarding.int.spec.ts`. Pas encore
-de `verify --full` ni de revue indépendante (à la fin de la partie 2, avant la première PR).
+Parties 1 et 2, `230d5eb` (2026-11-24) : `verify --full` sans nouvel échec — format, specs, hygiène,
+architecture, outillage, Prisma, typecheck 24/24, lint 24/24, tests 24/24, build 16/16, audit,
+intégration (base neuve) ; E2E indisponible (pas de suite versionnée). Le premier passage au même
+commit avait rencontré un test instable hors de la feature (`TEST-06`, voir `review.md`). Navigateur :
+23 contrôles, 15 captures.
 
 ## Partie 1 — ce qui est fait (2026-11-23)
 

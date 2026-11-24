@@ -11,7 +11,27 @@ Périmètre : tranches 1 (fondations) et 2 (livreurs) de `brief.md` — base `78
 
 ## 1. Résultats déterministes
 
-<!-- VERIFY_REPORT -->
+**verify:full** sur `230d5eb` — 2026-11-24T04:18:18.911Z
+
+| Vérification       | Résultat        | Détail                                                                            |
+| ------------------ | --------------- | --------------------------------------------------------------------------------- |
+| `format`           | ✅ pass         | 6s                                                                                |
+| `specs`            | ✅ pass         | 0s                                                                                |
+| `hygiene`          | ✅ pass         | 0s                                                                                |
+| `arch`             | ✅ pass         | 1s                                                                                |
+| `pipeline-tooling` | ✅ pass         | 2s                                                                                |
+| `prisma`           | ✅ pass         | 1s                                                                                |
+| `typecheck`        | ✅ pass         | 24/24 tasks ok                                                                    |
+| `lint`             | ✅ pass         | 24/24 tasks ok                                                                    |
+| `test`             | ✅ pass         | 24/24 tasks ok                                                                    |
+| `build`            | ✅ pass         | 16/16 tasks ok                                                                    |
+| `audit`            | ✅ pass         | no advisory beyond the baseline                                                   |
+| `test:int`         | ✅ pass         | 66s                                                                               |
+| `e2e`              | ⚪ indisponible | no versioned E2E suite yet — the 19-step pilot is a manual runbook (docs/36 §6.4) |
+
+**Verdict** : no new failure — NOT all green (0 pre-existing failure(s), 1 unavailable, 0 skipped)
+
+Premier passage à `230d5eb` (04:09Z) : un échec dans `test` — `apps/api/src/modules/deliveries/delivery-code-retrieval.spec.ts:68`, hors de la feature (module non modifié) : le code de livraison tiré au hasard (« 6731 ») figurait par hasard dans l'empreinte hexadécimale (`9579fed16c7fe6731713…`), environ une fois sur mille. Test non modifié ici ; consigné comme constat `TEST-06` (docs_2, sync S-048). Le passage répété, ci-dessous, est celui retenu.
 
 ## 2. Constats de revue
 
@@ -72,4 +92,4 @@ superflues · critères visuels et accessibilité.
 
 ## 3. Verdict
 
-<!-- VERDICT -->
+**Prêt pour PR.** Aucun constat bloquant ni majeur ouvert après deux tours ; `verify --full` sans nouvel échec à `230d5eb` (E2E indisponible : pas de suite versionnée). Limites connues : pas essayé sur un vrai téléphone (appareil photo, galerie) ; `restore-check.sh` non exécuté sur le serveur ; tranches 3 et 4 à venir (page « Quartiers », restaurants, changements après validation, écrans d'inscription).
