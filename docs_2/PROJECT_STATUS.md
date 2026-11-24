@@ -3,13 +3,13 @@
 **The single source of truth for where DJAFAT stands.** Update it with every meaningful change
 (rules in [`README.md`](README.md)). Details live in the linked documents; this page points.
 
-|                        |                                                                                                                                                                                                                                    |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Last updated**       | 2026-11-21                                                                                                                                                                                                                         |
-| **Branch described**   | `main` @ `afaa7c2` (DJAFAT 0.23.4) — pull requests #13 to #24 merged on 2026-11-18 _(sync S-034)_                                                                                                                                  |
-| **Evidence collected** | 2026-11-10 for the old `main`; 2026-11-13 end-to-end run of the code now on `main`; hosted CI                                                                                                                                      |
-| **Last synced**        | S-048, 2026-11-24 — `main` is `c6e5ac1` (0.24.5). Open: PR #29 (0.24.6, `main` merged in), PR #28 (FEAT-021, 0.25.0), and FEAT-022 parts 1-2 (0.26.0, reviewed twice, on top of #28). GitHub's checks still do not start (billing) |
-| **Updated by**         | Initial full audit; syncs S-001 to S-034                                                                                                                                                                                           |
+|                        |                                                                                                                                                                                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Last updated**       | 2026-11-21                                                                                                                                                                                                                                                                               |
+| **Branch described**   | `main` @ `afaa7c2` (DJAFAT 0.23.4) — pull requests #13 to #24 merged on 2026-11-18 _(sync S-034)_                                                                                                                                                                                        |
+| **Evidence collected** | 2026-11-10 for the old `main`; 2026-11-13 end-to-end run of the code now on `main`; hosted CI                                                                                                                                                                                            |
+| **Last synced**        | S-049, 2026-11-24 — `main` is `c6e5ac1` (0.24.5). Open: PR #29 (0.24.6), PR #28 (FEAT-021, 0.25.0), PR #31 (FEAT-022 parts 1-2, 0.26.0) and, above it, FEAT-024 + FEAT-022 part 4 (0.27.0, three review rounds; to merge with part 3 only). GitHub's checks still do not start (billing) |
+| **Updated by**         | Initial full audit; syncs S-001 to S-034                                                                                                                                                                                                                                                 |
 
 ---
 

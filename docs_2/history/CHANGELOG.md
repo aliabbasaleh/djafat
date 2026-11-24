@@ -8,6 +8,16 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-24 — Sync S-049: checked inputs (FEAT-024) and sign-up screens (FEAT-022 part 4), 0.27.0
+
+**Added (branch, PR to come):** no SMS code abroad — a foreign number uses WhatsApp (when in service) or
+the e-mail; no fixed line for an account or a code; Mobile Money in Chad; names in letters; help for a
+mistyped e-mail; « +235 » in every phone field. Courier and restaurant sign-up screens, welcome e-mail,
+« Devenir livreur » and « Inscrire mon restaurant » in « Mon profil ». **Fixed:** a malformed phone could
+crash the sign-up (AUTH-03). To merge with FEAT-022 part 3 only.
+
+---
+
 ## 2026-11-24 — Sync S-048: FEAT-022 parts 1-2 reviewed and corrected (0.26.0); PR #29 is 0.24.6
 
 **Fixed (review):** a restaurant that signed up could be made visible by its owner without DJAFAT — refused

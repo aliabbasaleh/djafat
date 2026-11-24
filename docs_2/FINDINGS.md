@@ -77,6 +77,7 @@ verified.
 | [TEST-03](#test-03)   | Worker integration tests fail on a seeded database and are not in CI                        | Broken              | Medium   | RUN      |
 | [ARCH-02](#arch-02)   | Dispatch logic exists twice (API and worker)                                                | Needs Improvement   | Medium   | CODE     |
 | [AUTH-02](#auth-02)   | No profile update, phone change or account deletion                                         | Not Implemented     | Medium   | CODE     |
+| [AUTH-03](#auth-03)   | A malformed phone with a valid password crashed the registration (500)                      | Broken              | Medium   | RUN      |
 | [NOTIF-01](#notif-01) | Notifications are stored but never shown or pushed                                          | Partially Completed | Medium   | LIVE     |
 | [STOR-01](#stor-01)   | No file upload: object storage is a stub                                                    | Not Implemented     | Medium   | CODE     |
 | [OBS-01](#obs-01)     | No error tracking, metrics or tracing; request IDs are not propagated                       | Not Implemented     | Medium   | LIVE     |
@@ -1165,6 +1166,21 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Why it matters:** a rule changed in one copy silently diverges; this already caused a pilot defect that had to be fixed twice.
 - **Fix:** one implementation — shared SQL in a package, or the worker as the only dispatcher.
 - **Verify:** a single source for the candidate query.
+
+### AUTH-03
+
+**A malformed phone with a valid password crashed the registration (500)** · Broken · Medium · RUN · Status: fixed on `feat/inscription-ecrans` (`b9e7ef2` and before, PR to come; not on `main`) _(added 2026-11-24, sync S-049)_
+
+- **Where:** `apps/api/src/modules/auth/dto/register.schema.ts` (FEAT-020): the personal-password rule
+  ran in a `superRefine` even when the phone (or name) had failed its own check, and received zod's
+  `NEVER` instead of a string.
+- **Observed:** a unit test of `RegisterSchema.safeParse({ …, phone: '12' })` with a valid password threw
+  `TypeError: (context.phone ?? "").replace is not a function` on the code before the fix — the API
+  would answer 500 instead of 422 on the phone field.
+- **Fix (branch):** only the fields that passed their check reach the rule; regression test at the end of
+  `register.schema.spec.ts`.
+- **Verify:** the test passes on the branch; after the merge, `POST /auth/register` with `phone: "12"`
+  and a valid password answers 422 on `phone`.
 
 ### AUTH-02
 

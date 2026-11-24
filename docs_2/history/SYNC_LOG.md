@@ -10,6 +10,27 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-049 — 2026-11-24 — FEAT-024 (checked inputs) and FEAT-022 part 4 (sign-up screens), version 0.27.0
+
+**Our own commits** `be136f8` to `5a3cf4a` on `feat/inscription-ecrans` (above PR #31), described in
+`docs/features/FEAT-024-saisies-verifiees` and `docs/features/FEAT-022-inscription-par-type-de-compte`
+(`review.md`, `progress.md`, `verification.md`, `pr.md`). **Added:** SMS login codes go only to a Chad
+mobile (a foreign number is offered WhatsApp when in service, or the e-mail; a fixed line 22… is
+refused), checked at the single SMS sending point; foreign numbers stay accepted for accounts; the number
+of an account cannot be a fixed line; Mobile Money is a Chad mobile; person names are letters only;
+« Vouliez-vous dire … ? » for a mistyped e-mail provider; « +235 » in front of every phone field (five
+apps). Sign-up by account type on the site and in the customer app (customer, courier, restaurant),
+welcome e-mail, footer links, « Pas encore de compte ? » on the team logins, a provisional terms page,
+« Devenir livreur » / « Inscrire mon restaurant » in « Mon profil » (`POST /me/roles/*`). **Fixed:** a
+malformed phone with a valid password crashed the registration schema (500 instead of 422, new finding
+AUTH-03, fixed on the branch); an admin can no longer decide their own courier application (403).
+**Verified:** `verify --full` at `83c65db` (no new failure, E2E unavailable), 25 integration tests of the
+features on a fresh database, a browser run (30 checks). Independent review in three rounds, ready for
+PR. **Not verified:** the customer app's new screens (no web build of `apps/mobile`); real e-mail
+delivery. **Merge condition:** together with FEAT-022 part 3 only (user's decision).
+
+---
+
 ## S-048 — 2026-11-24 — FEAT-022 parts 1-2 reviewed, corrected, version 0.26.0; PR #29 becomes 0.24.6
 
 **Our own commits** `ad01d05` to the reports commit on `wip/feat-022-part1` (pushed as
