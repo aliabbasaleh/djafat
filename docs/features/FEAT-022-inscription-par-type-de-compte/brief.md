@@ -1,7 +1,7 @@
 ---
 feature: FEAT-022
 # prettier-ignore
-specs: [SPEC-022-01@3, SPEC-022-02@4, SPEC-022-03@3, SPEC-022-04@4, SPEC-022-05@1, SPEC-022-06@4, SPEC-022-07@3, SPEC-022-08@3, SPEC-022-09@1]
+specs: [SPEC-022-01@3, SPEC-022-02@4, SPEC-022-03@3, SPEC-022-04@4, SPEC-022-05@1, SPEC-022-06@4, SPEC-022-07@4, SPEC-022-08@3, SPEC-022-09@1]
 ---
 
 # FEAT-022 — Brief d'exécution
@@ -92,6 +92,7 @@ sans dépendance (FEAT-022-Q08 révisée en partie 2). Aucune nouvelle arête en
 | SPEC-022-07-SC04 | application  | `apps/api/src/modules/admin/applications.service.spec.ts`            | « l'image s'ouvre par un lien signé de 5 minutes ; `support` est refusé (403) »                                                                          |
 | SPEC-022-07-SC05 | application  | `apps/api/src/modules/admin/applications.service.spec.ts`            | « jusqu'à l'accord, les gains vont au 66 00 00 01 et le changement est dans la file ; après, au 66 00 00 02 ; il n'a jamais cessé de pouvoir passer… »   |
 | SPEC-022-07-SC06 | application  | `apps/api/src/modules/admin/applications.service.spec.ts`            | « la seconde décision reçoit 409 `ALREADY_DECIDED` et rien ne change »                                                                                   |
+| SPEC-022-07-SC08 | application  | `apps/api/src/modules/couriers/courier-application.service.spec.ts`  | « 403 les deux fois, le dossier reste `pending_review` et rien n'est audité »                                                                            |
 | SPEC-022-07-SC07 | manuel       | capture d’exécution (`assets/exec-SPEC-022-07-SC07-*.png`)           | « conformes à FEAT-022-VIS06 : onglets avec nombres, lignes, détail, « Valider » et « Refuser… » avec le motif »                                         |
 | SPEC-022-08-SC01 | application  | `apps/api/src/modules/auth/role-signup.service.spec.ts`              | « le même compte a désormais `customer` et `courier`, un dossier `to_complete` ; aucun autre compte n'existe avec son e-mail ou son téléphone »          |
 | SPEC-022-08-SC02 | application  | `apps/api/src/modules/auth/role-signup.service.spec.ts`              | « 409 `EMAIL_NOT_VERIFIED` avec « Confirmez d'abord votre adresse e-mail. », rien n'est créé »                                                           |

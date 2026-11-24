@@ -13,11 +13,15 @@ const emailNotVerified = () =>
     message: "Confirmez d'abord votre adresse e-mail.",
   });
 
-const roleAlreadyHeld = (type: SignupDetails['type']) =>
+const roleAlreadyHeld = (type: SignupDetails['type'], revoked: boolean) =>
   new ConflictException({
     code: 'ROLE_ALREADY_HELD',
-    message:
-      type === 'courier'
+    // A role the team removed leaves its rows: the app would not open — say so (SPEC-020-10 R5).
+    message: revoked
+      ? type === 'courier'
+        ? 'Ce compte a déjà été livreur : contactez DJAFAT pour reprendre.'
+        : 'Ce compte a déjà un restaurant enregistré : contactez DJAFAT.'
+      : type === 'courier'
         ? 'Ce compte est déjà livreur : ouvrez l’application livreur.'
         : 'Ce compte a déjà un restaurant : ouvrez la console restaurant.',
   });
@@ -79,11 +83,10 @@ export class RoleSignupService {
       // Two clicks, two tabs: one at a time per account, then the role is read again.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`role-signup:${userId}`}))`;
       // R3, R5: the role — or what it left behind (a courier row, an owned restaurant).
-      if (
-        (await this.users.hasRoleWithin(tx, userId, role)) ||
-        (await this.registration.alreadyProvisioned(tx, userId, signup.type))
-      ) {
-        throw roleAlreadyHeld(signup.type);
+      if (await this.users.hasRoleWithin(tx, userId, role))
+        throw roleAlreadyHeld(signup.type, false);
+      if (await this.registration.alreadyProvisioned(tx, userId, signup.type)) {
+        throw roleAlreadyHeld(signup.type, true);
       }
       await this.registration.provisionSignup(tx, userId, {
         ...signup,

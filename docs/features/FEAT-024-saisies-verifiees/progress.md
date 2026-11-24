@@ -7,16 +7,16 @@ Un résultat de vérification n'est valable que pour le commit indiqué :
 après toute modification de code, spec, capture ou config qualité, relancer.
 -->
 
-| Étape                   | Statut  | Date       | Notes                                                                                                |
-| ----------------------- | ------- | ---------- | ---------------------------------------------------------------------------------------------------- |
-| Intake                  | fait    | 2026-11-24 | audit des connexions et inscriptions des cinq applications ; chaque critère relié au code ci-dessous |
-| Specs                   | fait    | 2026-11-24 | SPEC-024-01 à 04 (clarifiées v1)                                                                     |
-| Grill-me                | fait    | 2026-11-24 | Q01 à Q04 tranchées par l'utilisateur, Q05 à Q11 hypothèses techniques                               |
-| Brief                   | fait    | 2026-11-24 | livrée avec la partie 4 de FEAT-022 (branche `feat/inscription-ecrans`)                              |
-| Tests dérivés des specs | à faire |            |                                                                                                      |
-| Implémentation          | à faire |            |                                                                                                      |
-| Revue qualité           | à faire |            |                                                                                                      |
-| PR                      | à faire |            | même PR que la partie 4 de FEAT-022                                                                  |
+| Étape                   | Statut   | Date       | Notes                                                                                                |
+| ----------------------- | -------- | ---------- | ---------------------------------------------------------------------------------------------------- |
+| Intake                  | fait     | 2026-11-24 | audit des connexions et inscriptions des cinq applications ; chaque critère relié au code ci-dessous |
+| Specs                   | fait     | 2026-11-24 | SPEC-024-01 à 04 (clarifiées ; 03 et 04 en v2 après la revue)                                        |
+| Grill-me                | fait     | 2026-11-24 | Q01 à Q04 tranchées par l'utilisateur, Q05 à Q11 hypothèses techniques                               |
+| Brief                   | fait     | 2026-11-24 | livrée avec la partie 4 de FEAT-022 (branche `feat/inscription-ecrans`)                              |
+| Tests dérivés des specs | fait     | 2026-11-24 | domaine, schémas, services, logique cliente, intégration réelle ; chaque scénario cité par un test   |
+| Implémentation          | fait     | 2026-11-24 | API et cinq applications ; voir ci-dessous                                                           |
+| Revue qualité           | en cours | 2026-11-24 | tour 1 : corrections requises (2 majeurs), corrigées dans `b9e7ef2` ; tour 2 en cours                |
+| PR                      | à faire  |            | même PR que la partie 4 de FEAT-022 ; ne pas fusionner sans la tranche 3 (FEAT-022-Q14)              |
 
 ## Intake (2026-11-24)
 
@@ -57,6 +57,23 @@ envoyée par SMS.
 - Aucun pour construire. Pour fusionner : les PR précédentes (#29, #28, #31) et la facturation GitHub
   Actions.
 
+## Implémentation (2026-11-24)
+
+- Domaine (`packages/core`) : `phoneKind` (portable, fixe, étranger), `readPhoneInput` selon l'usage
+  (`account`, `contact`, `mobile_money`), `LAUNCH_PHONE_MARKET`, messages ; `checkPersonName` ;
+  `suggestEmailFix`.
+- API : refus du SMS vers un numéro étranger ou fixe dans `OtpService.requestCode`, avant tout le
+  reste (422 `SMS_FOREIGN_NUMBER`, `PHONE_FIXED_LINE`) ; pas de SMS proposé à un nouvel appareil dans
+  ce cas ; numéro d'un compte sans fixe, Mobile Money portable du Tchad, noms en lettres (schémas).
+- Écrans : « +235 » devant chaque champ de numéro (composant partagé `Input`, champs des applications),
+  messages sous les champs, « Vouliez-vous dire … ? » sur tous les formulaires d'e-mail, focus sur le
+  champ concerné après chaque contrôle.
+- Correctif trouvé en route : un numéro mal formé avec un mot de passe valide faisait planter le
+  schéma d'inscription (TypeError, 500 au lieu de 422) ; test de régression, échec constaté sur le
+  code d'avant.
+
 ## Dernière vérification
 
-Aucune pour l'instant.
+À refaire sur le commit final (après le tour 2 de la revue) : `verify --full` au propre, sans serveur
+de développement qui partage `.next`. Déjà obtenu sur le contenu de `b9e7ef2` : `verify:fast` sans
+échec, intégration `account-onboarding.int.spec.ts` 25/25 sur une base neuve, navigateur 30/30.

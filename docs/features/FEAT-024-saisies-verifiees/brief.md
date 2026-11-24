@@ -1,7 +1,7 @@
 ---
 feature: FEAT-024
 # prettier-ignore
-specs: [SPEC-024-01@1, SPEC-024-02@1, SPEC-024-03@2, SPEC-024-04@2]
+specs: [SPEC-024-01@1, SPEC-024-02@1, SPEC-024-03@2, SPEC-024-04@3]
 ---
 
 # FEAT-024 — Brief d'exécution

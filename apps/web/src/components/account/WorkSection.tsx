@@ -140,6 +140,7 @@ export function WorkSection({
           onChange(e.target.checked);
           clear('acceptTerms');
         }}
+        {...(errors.acceptTerms ? { 'aria-invalid': true } : {})}
       />
       <Link className={styles['linkButton']} href="/conditions" target="_blank">
         Lire les conditions d’utilisation

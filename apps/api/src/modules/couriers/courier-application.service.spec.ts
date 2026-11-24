@@ -308,7 +308,7 @@ describe('SPEC-022-07 — DJAFAT decides on a courier', () => {
     expect(world.applications.get('u-abakar')?.status).toBe('to_complete');
   });
 
-  it('FEAT-022-Q17 — an admin never decides their own application (403), nothing changes', async () => {
+  it('SPEC-022-07-SC08 — an admin never decides their own application (403), nothing changes (FEAT-022-Q17)', async () => {
     const world = courierWorld();
     world.signedUp('u-admin', {
       application: { status: 'pending_review', submittedAt: new Date() },

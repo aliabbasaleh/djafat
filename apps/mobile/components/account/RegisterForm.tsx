@@ -117,6 +117,9 @@ export function RegisterForm({
   const [done, setDone] = useState<{ type: 'courier' | 'restaurant' } | null>(null);
   /** Focus targets (review of FEAT-024, notes 1 and 16). */
   const title = useRef<Text>(null);
+  const choiceTitle = useRef<Text>(null);
+  /** « ← Changer de type » was touched: the choice's title takes the focus again (SPEC-022-01 « UI »). */
+  const [cameBack, setCameBack] = useState(false);
   const fields = {
     fullName: useRef<TextInput>(null),
     phone: useRef<TextInput>(null),
@@ -146,10 +149,14 @@ export function RegisterForm({
     };
   }, [type, neighbourhoods]);
 
-  // SPEC-022-01 « UI »: the form's title takes the screen reader's focus when it opens.
+  // SPEC-022-01 « UI »: the form's title takes the screen reader's focus when it opens,
+  // and the choice's title when « ← Changer de type » brings it back.
   useEffect(() => {
     if (type && title.current) AccessibilityInfo.sendAccessibilityEvent(title.current, 'focus');
-  }, [type]);
+    if (!type && cameBack && choiceTitle.current) {
+      AccessibilityInfo.sendAccessibilityEvent(choiceTitle.current, 'focus');
+    }
+  }, [type, cameBack]);
 
   /** After a refusal: the first field in error takes the focus, or its message is read out. */
   function focusFirstError(found: FieldErrors<FormField>) {
@@ -279,7 +286,7 @@ export function RegisterForm({
   if (!type) {
     return (
       <View style={s.form}>
-        <Text style={s.heading} accessibilityRole="header">
+        <Text ref={choiceTitle} style={s.heading} accessibilityRole="header">
           Quel compte voulez-vous créer ?
         </Text>
         {ACCOUNT_TYPES.map((choice) => (
@@ -385,6 +392,7 @@ export function RegisterForm({
           setFlow((f) => backToAccountTypes(f));
           setErrors({});
           setGeneral(null);
+          setCameBack(true);
         }}
       >
         <Text style={s.link}>← Changer de type</Text>

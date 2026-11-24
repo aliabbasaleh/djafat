@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -394,6 +394,16 @@ function ItemEditor({
   } | null>(null);
   const messageFor = (field: 'number' | 'name' | 'phone') =>
     invalid?.field === field ? invalid.message : null;
+  /** The refused field takes the focus (review of FEAT-024, round 2, note 3). */
+  const refs = {
+    number: useRef<TextInput>(null),
+    name: useRef<TextInput>(null),
+    phone: useRef<TextInput>(null),
+  };
+  const refuse = (field: 'number' | 'name' | 'phone', message: string) => {
+    setInvalid({ field, message });
+    refs[field].current?.focus();
+  };
   const nameMessage = messageFor('name');
 
   if (item === 'mobile_money') {
@@ -419,6 +429,7 @@ function ItemEditor({
           label="Numéro Mobile Money"
           use="mobile_money"
           inputStyle={styles.input}
+          inputRef={refs.number}
           error={messageFor('number')}
           value={number}
           onChangeText={(text) => {
@@ -433,7 +444,7 @@ function ItemEditor({
           onPress={() => {
             const why = phoneFieldError(number, 'mobile_money', 'Indiquez le numéro Mobile Money.');
             if (why) {
-              setInvalid({ field: 'number', message: why });
+              refuse('number', why);
               return;
             }
             onSave({ mobileMoney: { provider, number } });
@@ -447,6 +458,7 @@ function ItemEditor({
       <View style={styles.panel}>
         <Text style={styles.label}>Nom de la personne à prévenir</Text>
         <TextInput
+          ref={refs.name}
           accessibilityLabel="Nom de la personne à prévenir"
           style={styles.input}
           value={name}
@@ -473,6 +485,7 @@ function ItemEditor({
           label="Téléphone de la personne à prévenir"
           use="contact"
           inputStyle={styles.input}
+          inputRef={refs.phone}
           error={messageFor('phone')}
           value={phone}
           onChangeText={(text) => {
@@ -488,12 +501,12 @@ function ItemEditor({
             // SPEC-024-03 R3: a person's name, letters only — each message under its own field.
             const nameWhy = personNameError(name, 'Écrivez le nom de la personne à prévenir.');
             if (nameWhy) {
-              setInvalid({ field: 'name', message: nameWhy });
+              refuse('name', nameWhy);
               return;
             }
             const phoneWhy = phoneFieldError(phone, 'contact', 'Indiquez son téléphone.');
             if (phoneWhy) {
-              setInvalid({ field: 'phone', message: phoneWhy });
+              refuse('phone', phoneWhy);
               return;
             }
             onSave({ emergencyContact: { name, phone } });

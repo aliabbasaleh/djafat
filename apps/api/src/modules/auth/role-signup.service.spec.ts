@@ -172,7 +172,10 @@ describe('SPEC-022-08 — add a role to one’s own account', () => {
     await expect(formerCourier.service.becomeCourier(USER.id, COURIER, META)).rejects.toMatchObject(
       {
         status: 409,
-        response: { code: 'ROLE_ALREADY_HELD' },
+        response: {
+          code: 'ROLE_ALREADY_HELD',
+          message: 'Ce compte a déjà été livreur : contactez DJAFAT pour reprendre.',
+        },
       },
     );
     expect(formerCourier.provisioned).toHaveLength(0);

@@ -7,16 +7,16 @@ Un résultat de vérification n'est valable que pour le commit indiqué :
 après toute modification de code, spec, capture ou config qualité, relancer.
 -->
 
-| Étape                   | Statut   | Date       | Notes                                                                                                                                                        |
-| ----------------------- | -------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Intake                  | fait     | 2026-11-23 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous ; six maquettes texte lues                                                               |
-| Specs                   | fait     | 2026-11-23 | SPEC-022-01 à 09 (clarifiées v1)                                                                                                                             |
-| Grill-me                | fait     | 2026-11-23 | Q01 à Q06 tranchées par l'utilisateur, Q07 à Q12 hypothèses techniques                                                                                       |
-| Brief                   | fait     | 2026-11-23 | quatre tranches, une PR chacune                                                                                                                              |
-| Tests dérivés des specs | en cours | 2026-11-23 | partie 1 : règles du domaine, services, stockage, intégration réelle (7 scénarios) ; restent les écrans (parties 2 à 4)                                      |
-| Implémentation          | en cours | 2026-11-23 | partie 1 faite (branche `wip/feat-022-part1`) : quartiers, stockage sur disque, migration 0041, inscription typée, « En ligne » réservé aux livreurs validés |
-| Revue qualité           | à faire  |            |                                                                                                                                                              |
-| PR                      | à faire  |            | branche `feat/inscription-par-type`, partie de FEAT-021 (préalable, PR #28)                                                                                  |
+| Étape                   | Statut   | Date       | Notes                                                                                                                                                            |
+| ----------------------- | -------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Intake                  | fait     | 2026-11-23 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous ; six maquettes texte lues                                                                   |
+| Specs                   | fait     | 2026-11-24 | SPEC-022-01 à 09 clarifiées ; 01, 03 et 08 en v3, 02 et 07 en v4, 04 et 06 en v4 (06 implémentée)                                                                |
+| Grill-me                | fait     | 2026-11-23 | Q01 à Q06 tranchées par l'utilisateur, Q07 à Q12 hypothèses techniques                                                                                           |
+| Brief                   | fait     | 2026-11-24 | quatre tranches, une PR chacune ; ordre revu : la 4 avant la 3, mises en ligne ensemble (FEAT-022-Q14)                                                           |
+| Tests dérivés des specs | en cours | 2026-11-24 | parties 1, 2 et 4 : chaque scénario lié à un test ou à une capture ; restent ceux de la partie 3 (SPEC-022-05, 07-SC02, 07-SC05, 09-SC02)                        |
+| Implémentation          | en cours | 2026-11-24 | parties 1, 2 (PR #31) et 4 (branche `feat/inscription-ecrans`, avec FEAT-024) faites ; reste la partie 3 (restaurants)                                           |
+| Revue qualité           | en cours | 2026-11-24 | parties 1-2 : deux tours, « Prêt pour PR » (PR #31) ; partie 4 (avec FEAT-024) : deux tours, corrections faites — voir `../FEAT-024-saisies-verifiees/review.md` |
+| PR                      | en cours | 2026-11-24 | parties 1-2 : PR #31 ; partie 4 : branche `feat/inscription-ecrans` (avec FEAT-024), à fusionner avec la partie 3                                                |
 
 ## Intake (2026-11-23)
 
@@ -67,6 +67,24 @@ architecture, outillage, Prisma, typecheck 24/24, lint 24/24, tests 24/24, build
 intégration (base neuve) ; E2E indisponible (pas de suite versionnée). Le premier passage au même
 commit avait rencontré un test instable hors de la feature (`TEST-06`, voir `review.md`). Navigateur :
 23 contrôles, 15 captures.
+
+## Partie 4 — ce qui est fait (2026-11-24, avant la partie 3 : FEAT-022-Q14)
+
+- SPEC-022-01 : « Quel compte voulez-vous créer ? » sur le site et dans l'application client ;
+  « ← Changer de type » garde ce qui est saisi ; `?inscription=livreur | restaurant` ; liens du pied
+  de page ; « Pas encore de compte ? » sur la console restaurant et l'application livreur ; liens
+  entre applications tirés de l'adresse de l'API (FEAT-022-Q15) ; page « Conditions d'utilisation »
+  provisoire.
+- SPEC-022-02, 03 (écrans) : formulaires livreur (véhicule, quartier, date de naissance, conditions)
+  et restaurant (« Vous (responsable) », « Votre restaurant ») ; écrans de fin avec le lien vers
+  l'application ; e-mail « Bienvenue sur DJAFAT » après le bon code (FEAT-022-Q13, R8 et R6).
+- SPEC-022-08 : `POST /me/roles/courier` et `/me/roles/restaurant` (e-mail vérifié, un à la fois par
+  compte, rôle ou restes d'un rôle retiré → 409) ; « Travailler avec DJAFAT » dans « Mon profil ».
+- Règles de FEAT-024 dès la sortie des formulaires (FEAT-022-Q16).
+- Revue (avec FEAT-024) : tour 1, corrections faites dans `b9e7ef2` ; un administrateur ne décide pas
+  de son propre dossier (FEAT-022-Q17).
+- Non fait ici : capture de l'application client (pas de version web : `react-native-web` n'est pas
+  une dépendance de `apps/mobile`) — à vérifier sur un téléphone.
 
 ## Partie 1 — ce qui est fait (2026-11-23)
 

@@ -28,14 +28,31 @@ export const KNOWN_EMAIL_DOMAINS = [
   'protonmail.ch',
   'orange.fr',
   'laposte.net',
+  // Real national domains of providers present in many countries (review of
+  // FEAT-024, round 2): never corrected — but « hotmail.con » or « yahoo.ft »,
+  // which exist nowhere, still are, by distance.
+  'hotmail.be',
+  'hotmail.ca',
+  'hotmail.ch',
+  'hotmail.co.uk',
+  'hotmail.de',
+  'hotmail.es',
+  'hotmail.it',
+  'outlook.be',
+  'outlook.de',
+  'outlook.es',
+  'outlook.it',
+  'live.be',
+  'live.ca',
+  'live.co.uk',
+  'live.de',
+  'live.it',
+  'yahoo.ca',
+  'yahoo.co.uk',
+  'yahoo.de',
+  'yahoo.es',
+  'yahoo.it',
 ] as const;
-
-/**
- * Providers with a domain in many countries (hotmail.be, outlook.de, yahoo.ca,
- * live.co.uk…): their exact name with another ending is a real address, never
- * corrected (review of FEAT-024, note 18).
- */
-const NATIONAL_PROVIDERS: ReadonlySet<string> = new Set(['hotmail', 'outlook', 'live', 'yahoo']);
 
 /** Providers that exist under one domain only: « gmail.fr » can only be « gmail.com ». */
 const SINGLE_DOMAIN_PROVIDERS: Readonly<Record<string, string>> = {
@@ -102,7 +119,6 @@ export function suggestEmailFix(raw: string): string | null {
   const local = email.slice(0, at);
   const domain = email.slice(at + 1);
   if (KNOWN.has(domain)) return null;
-  if (NATIONAL_PROVIDERS.has(domain.split('.')[0] ?? '') && domain.includes('.')) return null;
 
   const dot = domain.lastIndexOf('.');
   // « abakar@gmail » : the provider's name alone.

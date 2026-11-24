@@ -17,6 +17,12 @@ describe('SPEC-024-04 — « Vouliez-vous dire … ? »', () => {
     expect(suggestEmailFix('abakar@ymail')).toBe('abakar@ymail.com');
     expect(suggestEmailFix('abakar@mail')).toBe('abakar@mail.com');
     expect(suggestEmailFix('abakar@hotmial')).toBe('abakar@hotmail.fr');
+    // endings that exist nowhere are still typos (review of FEAT-024, round 2)
+    expect(suggestEmailFix('abakar@yahoo.ft')).toBe('abakar@yahoo.fr');
+    expect(suggestEmailFix('abakar@yahoo.frr')).toBe('abakar@yahoo.fr');
+    expect(suggestEmailFix('abakar@hotmail.con')).toBe('abakar@hotmail.com');
+    expect(suggestEmailFix('abakar@outlook.con')).toBe('abakar@outlook.com');
+    expect(suggestEmailFix('abakar@live.fe')).toBe('abakar@live.fr');
   });
 
   it('SPEC-024-04-SC02 — no suggestion for a right or a faraway address', () => {
