@@ -7,16 +7,16 @@ Un résultat de vérification n'est valable que pour le commit indiqué :
 après toute modification de code, spec, capture ou config qualité, relancer.
 -->
 
-| Étape                   | Statut   | Date       | Notes                                                                                                |
-| ----------------------- | -------- | ---------- | ---------------------------------------------------------------------------------------------------- |
-| Intake                  | fait     | 2026-11-24 | audit des connexions et inscriptions des cinq applications ; chaque critère relié au code ci-dessous |
-| Specs                   | fait     | 2026-11-24 | SPEC-024-01 à 04 (clarifiées ; 03 et 04 en v2 après la revue)                                        |
-| Grill-me                | fait     | 2026-11-24 | Q01 à Q04 tranchées par l'utilisateur, Q05 à Q11 hypothèses techniques                               |
-| Brief                   | fait     | 2026-11-24 | livrée avec la partie 4 de FEAT-022 (branche `feat/inscription-ecrans`)                              |
-| Tests dérivés des specs | fait     | 2026-11-24 | domaine, schémas, services, logique cliente, intégration réelle ; chaque scénario cité par un test   |
-| Implémentation          | fait     | 2026-11-24 | API et cinq applications ; voir ci-dessous                                                           |
-| Revue qualité           | en cours | 2026-11-24 | tour 1 : corrections requises (2 majeurs), corrigées dans `b9e7ef2` ; tour 2 en cours                |
-| PR                      | à faire  |            | même PR que la partie 4 de FEAT-022 ; ne pas fusionner sans la tranche 3 (FEAT-022-Q14)              |
+| Étape                   | Statut | Date       | Notes                                                                                                |
+| ----------------------- | ------ | ---------- | ---------------------------------------------------------------------------------------------------- |
+| Intake                  | fait   | 2026-11-24 | audit des connexions et inscriptions des cinq applications ; chaque critère relié au code ci-dessous |
+| Specs                   | fait   | 2026-11-24 | SPEC-024-01 à 04 (clarifiées ; 03 et 04 en v2 après la revue)                                        |
+| Grill-me                | fait   | 2026-11-24 | Q01 à Q04 tranchées par l'utilisateur, Q05 à Q11 hypothèses techniques                               |
+| Brief                   | fait   | 2026-11-24 | livrée avec la partie 4 de FEAT-022 (branche `feat/inscription-ecrans`)                              |
+| Tests dérivés des specs | fait   | 2026-11-24 | domaine, schémas, services, logique cliente, intégration réelle ; chaque scénario cité par un test   |
+| Implémentation          | fait   | 2026-11-24 | API et cinq applications ; voir ci-dessous                                                           |
+| Revue qualité           | fait   | 2026-11-24 | trois tours ; « Prêt pour PR » sur `83c65db` (`review.md`)                                           |
+| PR                      | fait   | 2026-11-24 | `pr.md` ; même PR que la partie 4 de FEAT-022 ; à fusionner avec la tranche 3 (FEAT-022-Q14)         |
 
 ## Intake (2026-11-24)
 
@@ -74,6 +74,10 @@ envoyée par SMS.
 
 ## Dernière vérification
 
-À refaire sur le commit final (après le tour 2 de la revue) : `verify --full` au propre, sans serveur
-de développement qui partage `.next`. Déjà obtenu sur le contenu de `b9e7ef2` : `verify:fast` sans
-échec, intégration `account-onboarding.int.spec.ts` 25/25 sur une base neuve, navigateur 30/30.
+`verify --full` sur `83c65db` (2026-11-24), base neuve, sans serveur de développement en parallèle :
+format, specs, hygiène, architecture, outillage, Prisma, typecheck 24/24, lint 24/24, tests 24/24,
+build 16/16, audit, intégration — sans échec ; E2E indisponible (aucune suite versionnée). Donc « aucun
+nouvel échec », pas « tout vert ». Le premier passage à `52b6cc1` avait deux nouveaux échecs : la
+couverture du domaine (un cas de la suggestion sans test, ajouté) et le `next build` de la console admin
+(un `next dev` lancé pour les captures partageait `.next` ; non reproduit seul, propre ici).
+Navigateur : 30/30 contrôles ; intégration de la feature : 25/25 sur une base neuve.

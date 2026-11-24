@@ -166,3 +166,10 @@ Aucun (`scripts/pipeline/baselines/known-failures.json` inchangé). E2E : pas de
 - **Reporté** : page « Quartiers », quatre étapes et décisions des restaurants, nouveau numéro Mobile
   Money après validation et versements vers le numéro validé (tranche 3) ; écrans d'inscription
   (tranche 4) ; effacement du dossier quand la suppression de compte sera branchée.
+
+## Tranche 4 — PR suivante (avec FEAT-024)
+
+La tranche 4 part dans une PR à part, avec FEAT-024 (branche `feat/inscription-ecrans`, version
+0.27.0, au-dessus de cette PR) : voir
+[`../FEAT-024-saisies-verifiees/pr.md`](../FEAT-024-saisies-verifiees/pr.md). **Elle ne se fusionne
+qu'avec la tranche 3** (FEAT-022-Q14).

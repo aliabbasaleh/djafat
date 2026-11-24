@@ -62,6 +62,9 @@ Constats :
 
 ## Dernière vérification
 
+Partie 4 (avec FEAT-024), `83c65db` (2026-11-24) : `verify --full` sans nouvel échec, E2E indisponible
+(rapport dans `../FEAT-024-saisies-verifiees/verification.md`) ; intégration 25/25 ; navigateur 30/30.
+
 Parties 1 et 2, `230d5eb` (2026-11-24) : `verify --full` sans nouvel échec — format, specs, hygiène,
 architecture, outillage, Prisma, typecheck 24/24, lint 24/24, tests 24/24, build 16/16, audit,
 intégration (base neuve) ; E2E indisponible (pas de suite versionnée). Le premier passage au même

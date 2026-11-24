@@ -93,3 +93,14 @@ superflues · critères visuels et accessibilité.
 ## 3. Verdict
 
 **Prêt pour PR.** Aucun constat bloquant ni majeur ouvert après deux tours ; `verify --full` sans nouvel échec à `230d5eb` (E2E indisponible : pas de suite versionnée). Limites connues : pas essayé sur un vrai téléphone (appareil photo, galerie) ; `restore-check.sh` non exécuté sur le serveur ; tranches 3 et 4 à venir (page « Quartiers », restaurants, changements après validation, écrans d'inscription).
+
+## Tranche 4 (avec FEAT-024, 2026-11-24)
+
+La tranche 4 (écrans d'inscription par type, « Mon profil », e-mail de bienvenue) a été revue avec
+FEAT-024, dans la même PR : trois tours de revue indépendante, verdict « Prêt pour PR » sur `83c65db`,
+`verify --full` sans nouvel échec (E2E indisponible). Rapport complet :
+[`../FEAT-024-saisies-verifiees/review.md`](../FEAT-024-saisies-verifiees/review.md). Constats propres
+à FEAT-022, corrigés : focus des formulaires, rôles lus en base dans « Mon profil », restes d'un rôle
+retiré (409), un administrateur ne décide pas de son propre dossier (SPEC-022-07 v4, R8, SC08),
+session gardée dès le bon code dans l'application client. Limite : écrans de l'application client à
+vérifier sur un téléphone. **À fusionner avec la tranche 3.**
