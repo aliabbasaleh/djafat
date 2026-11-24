@@ -95,3 +95,15 @@ describe('SPEC-022-03 — the restaurant created at sign-up', () => {
     expect(firstFreeSlug('pizza', ['pizza', 'pizza-2', 'pizza-ndjam'])).toBe('pizza-3');
   });
 });
+
+describe('SPEC-022-08 R5 — one restaurant per owner, role revoked or not', () => {
+  it('ownsRestaurant reads the restaurants the account owns, inside the transaction', async () => {
+    const count = vi.fn(async ({ where }: { where: { ownerUserId: string } }) =>
+      where.ownerUserId === 'u-fatime' ? 1 : 0,
+    );
+    const tx = { restaurant: { count } } as unknown as Prisma.TransactionClient;
+    const service = new RestaurantOnboardingService();
+    expect(await service.ownsRestaurant(tx, 'u-fatime')).toBe(true);
+    expect(await service.ownsRestaurant(tx, 'u-awa')).toBe(false);
+  });
+});

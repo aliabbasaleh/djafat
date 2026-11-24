@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import { AccessibilityInfo, Linking, Pressable, Text, View, type TextInput } from 'react-native';
 import { ndjamenaDate } from '@djafat/core';
-import { ApiClientError, type SignedIn } from '@djafat/sdk';
+import type { SignedIn } from '@djafat/sdk';
 import { Button } from '../Button';
 import { api, appUrl } from '../../lib/api';
 import {
@@ -13,13 +13,14 @@ import {
   backToAccountTypes,
   birthDateFromInput,
   chooseAccountType,
+  emailSuggestionFor,
   emailSuggestionText,
   emailTypoCheck,
-  fieldErrorsFromApi,
   maskEmail,
   phoneFieldShowsDialCode,
   registrationRequest,
   signupDoneText,
+  signupFieldErrors,
   startSignup,
   validateCourierFields,
   validateRegisterForm,
@@ -45,18 +46,20 @@ type FormField =
   | 'acceptTerms'
   | 'restaurantName';
 
-const API_FIELDS = [
+/** The form's order: after a refusal, the first field in error takes the focus (WCAG 2.4.3). */
+const FOCUS_ORDER: readonly FormField[] = [
   'fullName',
   'phone',
   'email',
   'password',
+  'confirm',
   'vehicle',
-  'neighbourhoodId',
+  'restaurantName',
+  'neighbourhood',
   'neighbourhoodOther',
   'birthDate',
   'acceptTerms',
-  'restaurantName',
-] as const;
+];
 
 const EMPTY: RegisterFormValues = { fullName: '', phone: '', email: '', password: '', confirm: '' };
 const EMPTY_COURIER: CourierFieldValues = {
@@ -85,9 +88,16 @@ const TITLES: Record<AccountType, string> = {
  */
 export function RegisterForm({
   onSignedIn,
+  onSignedUp,
+  onContinue,
   onGoToLogin,
 }: {
+  /** A customer: the session is kept and the app goes on (FEAT-020, unchanged). */
   readonly onSignedIn: (result: SignedIn) => Promise<void>;
+  /** A courier or a restaurant: the session is kept at once, « what next » stays (SPEC-022-02 R4). */
+  readonly onSignedUp: (result: SignedIn) => Promise<void>;
+  /** « Continuer dans DJAFAT » after « what next ». */
+  readonly onContinue: () => void;
   readonly onGoToLogin: () => void;
 }) {
   const [flow, setFlow] = useState<SignupFlow<RegisterFormValues>>(() => startSignup(null, EMPTY));
@@ -104,9 +114,19 @@ export function RegisterForm({
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [registration, setRegistration] = useState<{ id: string; email: string } | null>(null);
-  const [done, setDone] = useState<{ result: SignedIn; type: 'courier' | 'restaurant' } | null>(
-    null,
-  );
+  const [done, setDone] = useState<{ type: 'courier' | 'restaurant' } | null>(null);
+  /** Focus targets (review of FEAT-024, notes 1 and 16). */
+  const title = useRef<Text>(null);
+  const fields = {
+    fullName: useRef<TextInput>(null),
+    phone: useRef<TextInput>(null),
+    email: useRef<TextInput>(null),
+    password: useRef<TextInput>(null),
+    confirm: useRef<TextInput>(null),
+    restaurantName: useRef<TextInput>(null),
+    neighbourhoodOther: useRef<TextInput>(null),
+    birthDate: useRef<TextInput>(null),
+  } satisfies Partial<Record<FormField, RefObject<TextInput | null>>>;
   /** FEAT-024 (SPEC-024-04): the address already stopped once, and the suggestion shown. */
   const [emailWarned, setEmailWarned] = useState<string | null>(null);
   const [emailHint, setEmailHint] = useState<string | null>(null);
@@ -125,6 +145,20 @@ export function RegisterForm({
       cancelled = true;
     };
   }, [type, neighbourhoods]);
+
+  // SPEC-022-01 « UI »: the form's title takes the screen reader's focus when it opens.
+  useEffect(() => {
+    if (type && title.current) AccessibilityInfo.sendAccessibilityEvent(title.current, 'focus');
+  }, [type]);
+
+  /** After a refusal: the first field in error takes the focus, or its message is read out. */
+  function focusFirstError(found: FieldErrors<FormField>) {
+    const first = FOCUS_ORDER.find((field) => found[field]);
+    if (!first) return;
+    const ref = (fields as Partial<Record<FormField, RefObject<TextInput | null>>>)[first];
+    if (ref?.current) ref.current.focus();
+    else AccessibilityInfo.announceForAccessibility(found[first] ?? '');
+  }
 
   function clear(field: FormField) {
     setErrors((prev) => {
@@ -152,7 +186,12 @@ export function RegisterForm({
     };
     setErrors(found);
     setGeneral(null);
-    if (Object.keys(found).length > 0) return;
+    if (Object.keys(found).length > 0) {
+      // SPEC-024-04 R2: a malformed address may still be a known provider mistyped.
+      if (found.email) setEmailHint(emailSuggestionFor(values.email));
+      focusFirstError(found);
+      return;
+    }
     // SPEC-024-04 R3, R4: a mistyped address stops the sending once.
     const typo = emailTypoCheck(values.email, emailWarned);
     setEmailWarned(typo.warned);
@@ -166,20 +205,11 @@ export function RegisterForm({
       );
       setRegistration({ id: registrationId, email: values.email.trim().toLowerCase() });
     } catch (err) {
-      const mapped = fieldErrorsFromApi(err, API_FIELDS, "L'inscription n'a pas pu être envoyée.");
-      const { neighbourhoodId, ...rest } = mapped.fields;
-      const onFields: FieldErrors<FormField> = {
-        ...rest,
-        ...(neighbourhoodId ? { neighbourhood: neighbourhoodId } : {}),
-      };
-      if (err instanceof ApiClientError && err.code === 'UNDERAGE')
-        onFields.birthDate = err.message;
-      if (err instanceof ApiClientError && err.code === 'NEIGHBOURHOOD_UNKNOWN') {
-        onFields.neighbourhood = err.message;
-      }
-      setErrors(onFields);
-      setGeneral(Object.keys(onFields).length > 0 ? null : mapped.general);
+      const mapped = signupFieldErrors(err, "L'inscription n'a pas pu être envoyée.");
+      setErrors(mapped.fields);
+      setGeneral(mapped.general);
       setErrorCode(mapped.code);
+      focusFirstError(mapped.fields);
     } finally {
       setBusy(false);
     }
@@ -198,12 +228,7 @@ export function RegisterForm({
         {target ? (
           <Button label={text.action} fullWidth onPress={() => void Linking.openURL(target)} />
         ) : null}
-        <Button
-          label="Continuer dans DJAFAT"
-          variant="ghost"
-          fullWidth
-          onPress={() => void onSignedIn(done.result)}
-        />
+        <Button label="Continuer dans DJAFAT" variant="ghost" fullWidth onPress={onContinue} />
       </View>
     );
   }
@@ -222,9 +247,13 @@ export function RegisterForm({
             setBusy(true);
             try {
               const result = await api.auth.verifyRegistration(registration.id, code);
-              // A courier or a restaurant first reads what to complete, and where (SPEC-022-02 R6).
-              if (type === 'courier' || type === 'restaurant') setDone({ result, type });
-              else await onSignedIn(result);
+              // A courier or a restaurant: the session at once, then what to complete (SPEC-022-02 R4, R6).
+              if (type === 'courier' || type === 'restaurant') {
+                await onSignedUp(result);
+                setDone({ type });
+              } else {
+                await onSignedIn(result);
+              }
             } catch (err) {
               setGeneral(accountErrorMessage(err, 'Code invalide ou expiré.'));
             } finally {
@@ -334,6 +363,7 @@ export function RegisterForm({
       />
       {current.neighbourhood === OTHER_NEIGHBOURHOOD ? (
         <Field
+          inputRef={fields.neighbourhoodOther}
           label="Nom du quartier"
           value={current.neighbourhoodOther}
           maxLength={60}
@@ -359,7 +389,7 @@ export function RegisterForm({
       >
         <Text style={s.link}>← Changer de type</Text>
       </Pressable>
-      <Text style={s.heading} accessibilityRole="header">
+      <Text ref={title} style={s.heading} accessibilityRole="header">
         {TITLES[type]}
       </Text>
       {general ? (
@@ -369,6 +399,7 @@ export function RegisterForm({
       ) : null}
       {type === 'restaurant' ? <Text style={s.groupTitle}>Vous (responsable)</Text> : null}
       <Field
+        inputRef={fields.fullName}
         label="Nom complet"
         value={values.fullName}
         onChangeText={set('fullName')}
@@ -378,6 +409,7 @@ export function RegisterForm({
         error={errors.fullName}
       />
       <Field
+        inputRef={fields.phone}
         label="Numéro de téléphone"
         value={values.phone}
         onChangeText={set('phone')}
@@ -393,6 +425,7 @@ export function RegisterForm({
         </Pressable>
       ) : null}
       <Field
+        inputRef={fields.email}
         label={type === 'customer' ? 'E-mail' : 'E-mail (votre identifiant)'}
         value={values.email}
         onChangeText={set('email')}
@@ -408,12 +441,14 @@ export function RegisterForm({
                 onAccept: () => {
                   setFlow((f) => ({ ...f, account: { ...f.account, email: emailHint } }));
                   setEmailHint(null);
+                  fields.email.current?.focus();
                 },
               }
             : null
         }
       />
       <Field
+        inputRef={fields.password}
         label="Mot de passe (8 caractères minimum)"
         secret
         textContentType="newPassword"
@@ -422,6 +457,7 @@ export function RegisterForm({
         error={errors.password}
       />
       <Field
+        inputRef={fields.confirm}
         label="Confirmer le mot de passe"
         secret
         textContentType="newPassword"
@@ -448,6 +484,7 @@ export function RegisterForm({
             'Quartier où vous travaillez',
           )}
           <Field
+            inputRef={fields.birthDate}
             label="Date de naissance (JJ/MM/AAAA)"
             value={birthDateTyped}
             onChangeText={(text) => {
@@ -467,6 +504,7 @@ export function RegisterForm({
         <>
           <Text style={s.groupTitle}>Votre restaurant</Text>
           <Field
+            inputRef={fields.restaurantName}
             label="Nom du restaurant"
             value={restaurant.restaurantName}
             maxLength={80}

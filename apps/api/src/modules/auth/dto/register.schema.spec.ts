@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { RegisterSchema } from './register.schema';
+import {
+  CourierRoleSignupSchema,
+  RegisterSchema,
+  RestaurantRoleSignupSchema,
+} from './register.schema';
 import { ChangePasswordSchema, PasswordLoginSchema, ResetPasswordSchema } from './password.schema';
 
 // FEAT-020 — docs/features/FEAT-020-compte-email-mot-de-passe (SPEC-020-02, SPEC-020-03).
@@ -236,5 +240,72 @@ describe('SPEC-020-03 R4 — a wrong field never breaks the password check', () 
     const result = RegisterSchema.safeParse({ ...VALID, phone: '12' });
     expect(result.success).toBe(false);
     expect(messagesAt(result, 'phone').length).toBe(1);
+  });
+});
+
+describe('SPEC-024-03-SC03 — a restaurant’s name is not a person’s name', () => {
+  it('« Chez Ali 2 » is accepted by the API', () => {
+    const result = RegisterSchema.safeParse({
+      ...VALID,
+      accountType: 'restaurant',
+      restaurantName: 'Chez Ali 2',
+      neighbourhoodOther: 'Klémat Nord',
+      acceptTerms: true,
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('SPEC-022-08 R1, R2 — « Devenir livreur » and « Inscrire mon restaurant » take the type’s fields only', () => {
+  const COURIER = {
+    vehicle: 'velo',
+    neighbourhoodOther: 'Gassi Est',
+    birthDate: '1996-03-01',
+    acceptTerms: true,
+  };
+  const pathsOf = (result: { success: boolean; error?: { issues: Array<{ path: unknown[] }> } }) =>
+    result.success ? [] : (result.error?.issues ?? []).map((i) => i.path.join('.'));
+
+  it('a complete courier form passes; the account’s fields are refused (strict)', () => {
+    expect(CourierRoleSignupSchema.safeParse(COURIER).success).toBe(true);
+    expect(CourierRoleSignupSchema.safeParse({ ...COURIER, email: 'x@example.td' }).success).toBe(
+      false,
+    );
+  });
+
+  it('terms not ticked, no neighbourhood or both, a bad date: each on its field', () => {
+    expect(pathsOf(CourierRoleSignupSchema.safeParse({ ...COURIER, acceptTerms: false }))).toEqual([
+      'acceptTerms',
+    ]);
+    const { neighbourhoodOther: _none, ...withoutNeighbourhood } = COURIER;
+    expect(pathsOf(CourierRoleSignupSchema.safeParse(withoutNeighbourhood))).toEqual([
+      'neighbourhoodId',
+    ]);
+    expect(
+      pathsOf(
+        CourierRoleSignupSchema.safeParse({
+          ...COURIER,
+          neighbourhoodId: '11111111-1111-4111-8111-111111111111',
+        }),
+      ),
+    ).toEqual(['neighbourhoodId']);
+    expect(
+      pathsOf(CourierRoleSignupSchema.safeParse({ ...COURIER, birthDate: '2001-02-30' })),
+    ).toEqual(['birthDate']);
+  });
+
+  it('the restaurant form: its name and neighbourhood, terms ticked', () => {
+    const RESTAURANT = {
+      restaurantName: 'Chez Awa',
+      neighbourhoodOther: 'Klémat Nord',
+      acceptTerms: true,
+    };
+    expect(RestaurantRoleSignupSchema.safeParse(RESTAURANT).success).toBe(true);
+    expect(
+      pathsOf(RestaurantRoleSignupSchema.safeParse({ ...RESTAURANT, restaurantName: ' ' })),
+    ).toEqual(['restaurantName']);
+    expect(RestaurantRoleSignupSchema.safeParse({ ...RESTAURANT, vehicle: 'moto' }).success).toBe(
+      false,
+    );
   });
 });

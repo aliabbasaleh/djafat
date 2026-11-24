@@ -25,9 +25,17 @@ export const KNOWN_EMAIL_DOMAINS = [
   'mail.com',
   'proton.me',
   'protonmail.com',
+  'protonmail.ch',
   'orange.fr',
   'laposte.net',
 ] as const;
+
+/**
+ * Providers with a domain in many countries (hotmail.be, outlook.de, yahoo.ca,
+ * live.co.uk…): their exact name with another ending is a real address, never
+ * corrected (review of FEAT-024, note 18).
+ */
+const NATIONAL_PROVIDERS: ReadonlySet<string> = new Set(['hotmail', 'outlook', 'live', 'yahoo']);
 
 /** Providers that exist under one domain only: « gmail.fr » can only be « gmail.com ». */
 const SINGLE_DOMAIN_PROVIDERS: Readonly<Record<string, string>> = {
@@ -73,12 +81,14 @@ function closestDomain(domain: string): string | null {
   return best?.domain ?? null;
 }
 
+/** « abakar@ymail »: the provider whose name is the closest — the exact one first (R2). */
 function providerLabel(domain: string): string | null {
+  let best: { domain: string; d: number } | null = null;
   for (const known of KNOWN_EMAIL_DOMAINS) {
-    const label = known.slice(0, known.indexOf('.'));
-    if (distance(domain, label) <= 1) return known;
+    const d = distance(domain, known.slice(0, known.indexOf('.')));
+    if (d <= 1 && (!best || d < best.d)) best = { domain: known, d };
   }
-  return null;
+  return best?.domain ?? null;
 }
 
 /**
@@ -92,6 +102,7 @@ export function suggestEmailFix(raw: string): string | null {
   const local = email.slice(0, at);
   const domain = email.slice(at + 1);
   if (KNOWN.has(domain)) return null;
+  if (NATIONAL_PROVIDERS.has(domain.split('.')[0] ?? '') && domain.includes('.')) return null;
 
   const dot = domain.lastIndexOf('.');
   // « abakar@gmail » : the provider's name alone.

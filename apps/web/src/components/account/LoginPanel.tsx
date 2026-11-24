@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { CodeChannel, CodeChannelId, SignedIn } from '@djafat/sdk';
 import { Heading, Stack, Text } from '@djafat/ui';
 import { Alert, Button, FieldSuggestion, Input } from '@/components/ui-client';
@@ -21,6 +21,7 @@ import {
   type FieldErrors,
 } from '@/lib/account';
 import { ChannelRow } from './ChannelRow';
+import { focusField } from './focus';
 import { CodeStep } from './CodeStep';
 import { PasswordField } from './PasswordField';
 import styles from './account.module.css';
@@ -72,6 +73,8 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
   const [emailHint, setEmailHint] = useState<string | null>(null);
   /** FEAT-024 (SPEC-024-01 R8): why the number typed for an SMS cannot get one. */
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  /** The form on screen: the focus goes back to its field after a check (review FEAT-024 #1). */
+  const form = useRef<HTMLFormElement>(null);
 
   const whatsappLink = methods?.find((m) => m.id === 'whatsapp')?.link;
   const whatsappAvailable = Boolean(methods?.find((m) => m.id === 'whatsapp')?.available);
@@ -96,6 +99,7 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
       onAction={() => {
         if (emailHint) setEmail(emailHint);
         setEmailHint(null);
+        focusField(form.current, 'input[type="email"]');
       }}
     />
   );
@@ -332,6 +336,7 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
     const forgot = view.kind === 'forgot';
     return (
       <form
+        ref={form}
         className={styles['panel']}
         onSubmit={(e) => {
           e.preventDefault();
@@ -379,13 +384,17 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
     const byWhatsapp = view.channel === 'whatsapp';
     return (
       <form
+        ref={form}
         className={styles['panel']}
         onSubmit={(e) => {
           e.preventDefault();
           // SPEC-024-01 R8: no SMS to a foreign number or a fixed line — nothing is sent.
           const why = byWhatsapp ? null : smsPhoneError(phone, whatsappAvailable);
           setPhoneError(why);
-          if (why) return;
+          if (why) {
+            focusField(form.current, 'input[type="tel"]');
+            return;
+          }
           void run(
             "Impossible d'envoyer le code. Vérifiez le numéro (ex. 66 12 34 56).",
             async () => {
@@ -437,6 +446,7 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
   // ── e-mail and password (FEAT-020-VIS01) ──────────────────────────────
   return (
     <form
+      ref={form}
       className={styles['panel']}
       onSubmit={(e) => {
         e.preventDefault();

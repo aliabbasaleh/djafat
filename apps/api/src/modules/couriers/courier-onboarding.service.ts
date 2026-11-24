@@ -12,6 +12,10 @@ import type {
  */
 @Injectable()
 export class CourierOnboardingService implements CourierOnboardingPort {
+  async hasCourier(tx: Prisma.TransactionClient, userId: string): Promise<boolean> {
+    return (await tx.courier.count({ where: { userId } })) > 0;
+  }
+
   async provisionCourier(
     tx: Prisma.TransactionClient,
     userId: string,

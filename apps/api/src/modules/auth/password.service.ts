@@ -21,7 +21,7 @@ import { RateLimiterService } from '../../common/rate-limit/rate-limiter.service
 import { PlatformService } from '../platform/platform.service';
 import { UsersService, type UserRecord } from '../users/users.service';
 import { ACCOUNT_NOTICE_PORT, type AccountNoticePort } from './account-notice.port';
-import { listAuthMethods } from './auth-methods';
+import { authMethodsFrom } from './auth-methods';
 import { AuthService, type LoginResultDto, type RequestMeta } from './auth.service';
 import { maskEmail, maskPhone } from './masking';
 import { OtpService } from './otp.service';
@@ -381,13 +381,7 @@ export class PasswordService {
    * deployment has them — SMS only to a Chad mobile (FEAT-024).
    */
   private channelsFor(user: UserRecord, email: string): CodeChannelDto[] {
-    const methods = listAuthMethods({
-      NODE_ENV: this.config.get('NODE_ENV'),
-      SMS_PROVIDER: this.config.get('SMS_PROVIDER'),
-      EMAIL_PROVIDER: this.config.get('EMAIL_PROVIDER'),
-      WHATSAPP_PROVIDER: this.config.get('WHATSAPP_PROVIDER'),
-      WHATSAPP_BUSINESS_NUMBER: this.config.get('WHATSAPP_BUSINESS_NUMBER'),
-    });
+    const methods = authMethodsFrom((key) => this.config.get(key));
     const phoneConfirmed = Boolean(user.phoneVerifiedAt);
     const phone = phoneConfirmed ? { destination: maskPhone(user.phone) } : {};
     const sms = methods.find((m) => m.id === 'sms');

@@ -55,7 +55,8 @@ export class MeController {
   @RequireAuth()
   async getMe(@CurrentActor() actor: AuthenticatedActor) {
     const user = await this.users.getByIdOrThrow(actor.userId);
-    return this.users.toMeDto(user, actor.roles);
+    // The database's roles, not the token's (15 min): a role just added shows at once (SPEC-022-08 R3).
+    return this.users.toMeDto(user, await this.users.getRoles(actor.userId));
   }
 
   /** "Mon profil": set the name shown to the courier and the restaurant. */
@@ -66,7 +67,7 @@ export class MeController {
     @Body(new ZodValidationPipe(UpdateMeSchema)) body: UpdateMeInput,
   ) {
     const user = await this.users.updateFullName(actor.userId, body.fullName);
-    return this.users.toMeDto(user, actor.roles);
+    return this.users.toMeDto(user, await this.users.getRoles(actor.userId));
   }
 
   /** Add (or change) the account's email: sends a verification code to it (FEAT-007). */
@@ -137,7 +138,7 @@ export class MeController {
     @ReqMeta() meta: RequestMeta,
   ) {
     const user = await this.phones.verify(actor.userId, body.channel, body.code, meta);
-    return this.users.toMeDto(user, actor.roles);
+    return this.users.toMeDto(user, await this.users.getRoles(actor.userId));
   }
 
   /** FEAT-022 (SPEC-022-08): « Devenir livreur » — the same account becomes a courier. */

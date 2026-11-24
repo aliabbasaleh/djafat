@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   DIAL_CODE,
@@ -58,6 +58,10 @@ export default function LoginPage() {
     confirm?: string | undefined;
   }>({});
   const [phone, setPhone] = useState('');
+  /** FEAT-024 (SPEC-024-01 R8): why the number typed for an SMS cannot get one — under the field. */
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  /** The form on screen: the focus goes back to its field after a check (review FEAT-024 #1, #8). */
+  const form = useRef<HTMLFormElement>(null);
   const [phoneButtons, setPhoneButtons] = useState<ChannelButton[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -136,6 +140,10 @@ export default function LoginPage() {
       onAction={() => {
         if (emailHint) setEmail(emailHint);
         setEmailHint(null);
+        setTimeout(
+          () => form.current?.querySelector<HTMLElement>('input[type="email"]')?.focus(),
+          0,
+        );
       }}
     />
   );
@@ -224,8 +232,9 @@ export default function LoginPage() {
     // FEAT-024 (SPEC-024-01 R8): no SMS to a foreign number or a fixed line — nothing is sent.
     const whatsapp = phoneButtons.some((b) => b.id === 'whatsapp' && b.enabled);
     const why = smsPhoneError(phone, whatsapp);
+    setPhoneError(why);
     if (why) {
-      setError(why);
+      setTimeout(() => form.current?.querySelector<HTMLElement>('input[type="tel"]')?.focus(), 0);
       return;
     }
     void run(async () => {
@@ -269,6 +278,7 @@ export default function LoginPage() {
         {view.kind === 'password' && (
           <Stack gap="md">
             <form
+              ref={form}
               onSubmit={(e) => {
                 e.preventDefault();
                 login();
@@ -338,6 +348,7 @@ export default function LoginPage() {
 
         {view.kind === 'code' && (
           <form
+            ref={form}
             onSubmit={(e) => {
               e.preventDefault();
               verify(view.challengeId);
@@ -387,6 +398,7 @@ export default function LoginPage() {
 
         {view.kind === 'forgot' && (
           <form
+            ref={form}
             onSubmit={(e) => {
               e.preventDefault();
               askResetCode();
@@ -421,6 +433,7 @@ export default function LoginPage() {
 
         {view.kind === 'reset' && (
           <form
+            ref={form}
             onSubmit={(e) => {
               e.preventDefault();
               reset();
@@ -490,6 +503,7 @@ export default function LoginPage() {
 
         {view.kind === 'phone' && (
           <form
+            ref={form}
             onSubmit={(e) => {
               e.preventDefault();
               requestSmsCode();
@@ -501,8 +515,12 @@ export default function LoginPage() {
                 type="tel"
                 placeholder="66 12 34 56"
                 {...(phoneFieldShowsDialCode(phone) ? { leadingText: DIAL_CODE } : {})}
+                {...(phoneError ? { error: phoneError } : {})}
                 value={phone}
-                onChange={(e) => typed(setPhone)(e.target.value)}
+                onChange={(e) => {
+                  typed(setPhone)(e.target.value);
+                  setPhoneError(null);
+                }}
                 required
                 autoFocus
               />
@@ -523,6 +541,7 @@ export default function LoginPage() {
 
         {view.kind === 'phone-code' && (
           <form
+            ref={form}
             onSubmit={(e) => {
               e.preventDefault();
               verifyPhoneCode(view.channel);

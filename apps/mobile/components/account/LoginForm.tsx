@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Linking, Pressable, Text, View, type TextInput } from 'react-native';
 import type { CodeChannel, CodeChannelId, SignedIn } from '@djafat/sdk';
 import { Button } from '../Button';
 import { api } from '../../lib/api';
@@ -78,6 +78,8 @@ export function LoginForm({
   const [emailHint, setEmailHint] = useState<string | null>(null);
   /** FEAT-024 (SPEC-024-01 R8): why the number typed for an SMS cannot get one. */
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
 
   /** SPEC-024-04 R3, R4: true when the sending stops once to suggest a fixed address. */
   function stopForTypo(): boolean {
@@ -98,6 +100,7 @@ export function LoginForm({
         onAccept: () => {
           setEmail(emailHint);
           setEmailHint(null);
+          emailRef.current?.focus();
         },
       }
     : null;
@@ -318,6 +321,7 @@ export function LoginForm({
           </View>
         ) : null}
         <Field
+          inputRef={emailRef}
           label="E-mail"
           value={email}
           onChangeText={typeEmail}
@@ -363,6 +367,7 @@ export function LoginForm({
           </View>
         ) : null}
         <Field
+          inputRef={phoneRef}
           label="Numéro de téléphone"
           value={phone}
           onChangeText={(text) => {
@@ -383,7 +388,10 @@ export function LoginForm({
             // SPEC-024-01 R8: no SMS to a foreign number or a fixed line — nothing is sent.
             const why = byWhatsapp ? null : smsPhoneError(phone, whatsappAvailable);
             setPhoneError(why);
-            if (why) return;
+            if (why) {
+              phoneRef.current?.focus();
+              return;
+            }
             void run(
               "Impossible d'envoyer le code. Vérifiez le numéro (ex. 66 12 34 56).",
               async () => {
@@ -408,6 +416,7 @@ export function LoginForm({
         </View>
       ) : null}
       <Field
+        inputRef={emailRef}
         label="E-mail"
         value={email}
         onChangeText={typeEmail}

@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  Logger,
   Inject,
   Injectable,
   UnauthorizedException,
@@ -118,6 +119,8 @@ function isDecoy(payload: unknown): boolean {
  */
 @Injectable()
 export class RegistrationService {
+  private readonly logger = new Logger(RegistrationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly otp: OtpService,
@@ -269,7 +272,12 @@ export class RegistrationService {
       signup.type === 'courier'
         ? { type: 'courier' }
         : { type: 'restaurant', restaurantName: signup.restaurantName ?? '' };
-    void this.notices.send({ kind: 'welcome', to, applicant }).catch(() => undefined);
+    void this.notices.send({ kind: 'welcome', to, applicant }).catch((err: unknown) => {
+      // The address stays out of the logs (README: no personal data).
+      this.logger.warn(
+        `welcome e-mail (${signup.type}) not sent: ${err instanceof Error ? err.name : 'error'}`,
+      );
+    });
   }
 
   /**
@@ -295,6 +303,21 @@ export class RegistrationService {
         message: 'Ce quartier ne fait pas partie de la liste.',
       });
     }
+  }
+
+  /**
+   * SPEC-022-08 R3, R5: the account already has a courier row or owns a
+   * restaurant — even with its role revoked by the team since — so adding the
+   * role again answers 409, never a duplicate key (500) nor a second restaurant.
+   */
+  async alreadyProvisioned(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    type: SignupDetails['type'],
+  ): Promise<boolean> {
+    return type === 'courier'
+      ? this.courierOnboarding.hasCourier(tx, userId)
+      : this.restaurantOnboarding.ownsRestaurant(tx, userId);
   }
 
   /**

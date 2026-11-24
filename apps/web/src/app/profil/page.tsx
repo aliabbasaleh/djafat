@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import {
@@ -28,6 +28,7 @@ import type { AuthMethods } from '@/components/account/LoginPanel';
 import { PasswordSection } from '@/components/account/PasswordSection';
 import { PhoneSection } from '@/components/account/PhoneSection';
 import { WorkSection } from '@/components/account/WorkSection';
+import { focusField } from '@/components/account/focus';
 import styles from './page.module.css';
 
 /**
@@ -46,6 +47,8 @@ export default function ProfilePage() {
   /** FEAT-024 (SPEC-024-04): the address already stopped once, and the suggestion shown. */
   const [emailWarned, setEmailWarned] = useState<string | null>(null);
   const [emailHint, setEmailHint] = useState<string | null>(null);
+  const nameForm = useRef<HTMLFormElement>(null);
+  const emailForm = useRef<HTMLFormElement>(null);
   /** FEAT-020 SPEC-020-12 R1: an account with a password gives it to change its e-mail. */
   const [emailPassword, setEmailPassword] = useState('');
   const [code, setCode] = useState('');
@@ -107,7 +110,10 @@ export default function ProfilePage() {
     // SPEC-024-03: a person's name, letters only — checked before sending.
     const why = personNameError(name);
     setNameError(why);
-    if (why) return;
+    if (why) {
+      focusField(nameForm.current, 'input');
+      return;
+    }
     setBusy(true);
     try {
       const profile = await api.auth.updateName(name);
@@ -209,6 +215,7 @@ export default function ProfilePage() {
 
         <section className={cx(styles['card'])}>
           <form
+            ref={nameForm}
             onSubmit={(e) => {
               e.preventDefault();
               void saveName();
@@ -245,6 +252,7 @@ export default function ProfilePage() {
             </p>
           )}
           <form
+            ref={emailForm}
             onSubmit={(e) => {
               e.preventDefault();
               void (codeSent ? confirmEmail() : sendEmailCode());
@@ -269,6 +277,7 @@ export default function ProfilePage() {
                 onAction={() => {
                   if (emailHint) setEmail(emailHint);
                   setEmailHint(null);
+                  focusField(emailForm.current, 'input[type="email"]');
                 }}
               />
               {me.hasPassword && !codeSent && (

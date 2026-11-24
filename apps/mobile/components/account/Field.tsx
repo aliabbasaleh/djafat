@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type Ref } from 'react';
 import { Pressable, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { tokens } from '@djafat/tokens';
 import { accountStyles as s } from './styles';
@@ -12,6 +12,8 @@ interface FieldProps extends TextInputProps {
   readonly leadingText?: string | undefined;
   /** FEAT-024 (SPEC-024-04): « Vouliez-vous dire … ? » and « Oui, corriger » under the field. */
   readonly suggestion?: { readonly text: string; readonly onAccept: () => void } | null;
+  /** To move the focus here after a refusal (review of FEAT-024, note 1). */
+  readonly inputRef?: Ref<TextInput> | undefined;
 }
 
 /** A labelled input, its error under it (FEAT-020, SPEC-020-08). */
@@ -21,11 +23,14 @@ export function Field({
   secret = false,
   leadingText,
   suggestion,
+  inputRef,
   ...input
 }: FieldProps) {
   const [visible, setVisible] = useState(false);
   const box = (
     <TextInput
+      ref={inputRef}
+      aria-invalid={error ? true : undefined}
       style={[s.input, leadingText ? s.inputAffixed : null, error ? s.inputError : null]}
       accessibilityLabel={leadingText ? `${label}, indicatif ${leadingText}` : label}
       placeholderTextColor={tokens.color.text.muted}
@@ -60,7 +65,13 @@ export function Field({
         box
       )}
       {error ? (
-        <Text style={s.fieldError} accessibilityLiveRegion="polite">
+        // Announced on both platforms (review of FEAT-024, note 1): role alert, live region.
+        <Text
+          style={s.fieldError}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          aria-live="polite"
+        >
           {error}
         </Text>
       ) : null}

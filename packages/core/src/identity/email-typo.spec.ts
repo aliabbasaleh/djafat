@@ -13,6 +13,10 @@ describe('SPEC-024-04 — « Vouliez-vous dire … ? »', () => {
     expect(suggestEmailFix('abakar@yahou.fr')).toBe('abakar@yahoo.fr');
     expect(suggestEmailFix('abakar@gmail')).toBe('abakar@gmail.com');
     expect(suggestEmailFix('abakar@gmail.fr')).toBe('abakar@gmail.com');
+    // the provider's name alone: the closest one, the exact one first
+    expect(suggestEmailFix('abakar@ymail')).toBe('abakar@ymail.com');
+    expect(suggestEmailFix('abakar@mail')).toBe('abakar@mail.com');
+    expect(suggestEmailFix('abakar@hotmial')).toBe('abakar@hotmail.fr');
   });
 
   it('SPEC-024-04-SC02 — no suggestion for a right or a faraway address', () => {
@@ -21,6 +25,13 @@ describe('SPEC-024-04 — « Vouliez-vous dire … ? »', () => {
       'abakar@yahoo.fr',
       'contact@djafat.td',
       'awa@entreprise.com',
+      // real national variants of providers present in many countries (R2)
+      'abakar@hotmail.be',
+      'abakar@hotmail.ca',
+      'abakar@outlook.de',
+      'abakar@yahoo.ca',
+      'abakar@yahoo.co.uk',
+      'abakar@protonmail.ch',
     ]) {
       expect(suggestEmailFix(raw), raw).toBeNull();
     }
@@ -32,5 +43,7 @@ describe('SPEC-024-04 — « Vouliez-vous dire … ? »', () => {
     expect(suggestEmailFix('pas-une-adresse')).toBeNull();
     expect(suggestEmailFix('@gmial.com')).toBeNull();
     expect(suggestEmailFix('abakar@')).toBeNull();
+    // no dot and no provider's name: an address to fix by hand, not a typo to suggest
+    expect(suggestEmailFix('abakar@entreprise')).toBeNull();
   });
 });

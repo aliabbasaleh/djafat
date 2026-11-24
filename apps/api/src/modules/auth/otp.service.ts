@@ -20,7 +20,7 @@ import { AppConfigService } from '../../common/config/config.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { RateLimiterService } from '../../common/rate-limit/rate-limiter.service';
 import { PlatformService } from '../platform/platform.service';
-import { listAuthMethods } from './auth-methods';
+import { authMethodsFrom } from './auth-methods';
 import { generateOtpCode, hashOtpCode, timingSafeEqualHex } from './crypto.util';
 import { smsUnavailable } from './providers/disabled-sms-otp-delivery.provider';
 import {
@@ -197,13 +197,9 @@ export class OtpService {
   }
 
   private whatsappAvailable(): boolean {
-    return listAuthMethods({
-      NODE_ENV: this.config.get('NODE_ENV'),
-      SMS_PROVIDER: this.config.get('SMS_PROVIDER'),
-      EMAIL_PROVIDER: this.config.get('EMAIL_PROVIDER'),
-      WHATSAPP_PROVIDER: this.config.get('WHATSAPP_PROVIDER'),
-      WHATSAPP_BUSINESS_NUMBER: this.config.get('WHATSAPP_BUSINESS_NUMBER'),
-    }).some((method) => method.id === 'whatsapp' && method.available);
+    return authMethodsFrom((key) => this.config.get(key)).some(
+      (method) => method.id === 'whatsapp' && method.available,
+    );
   }
 
   /** Codes requested from this network (`otp_rate_limit_per_ip`): 429 `RATE_LIMITED` once spent. */

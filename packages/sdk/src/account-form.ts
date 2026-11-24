@@ -129,6 +129,27 @@ export function emailSuggestionText(suggestion: string): string {
   return `Vouliez-vous dire ${suggestion} ?`;
 }
 
+/**
+ * SPEC-024-04 R2: the suggestion for an address the form refuses as malformed
+ * (« abakar@gmail » has no dot): shown with « Adresse e-mail invalide. ».
+ */
+export function emailSuggestionFor(email: string): string | null {
+  return suggestEmailFix(email);
+}
+
+/**
+ * SPEC-024-02 R1, R4: a stored number put back in a field that shows « +235 »:
+ * a Chad number as its 8 digits (« 66 12 34 56 »), another as stored.
+ */
+export function phoneForField(e164: string | null | undefined): string {
+  if (!e164) return '';
+  if (!e164.startsWith(DIAL_CODE)) return e164;
+  const national = e164.slice(DIAL_CODE.length);
+  return national.length === LAUNCH_PHONE_MARKET.nationalNumberLength
+    ? national.replace(/(\d{2})(?=\d)/g, '$1 ')
+    : e164;
+}
+
 /** SPEC-020-07 R4: what the screen checks before sending the registration. */
 export function validateRegisterForm(values: RegisterFormValues): FieldErrors<RegisterField> {
   const errors: FieldErrors<RegisterField> = {};
@@ -200,6 +221,15 @@ export function accountErrorMessage(err: unknown, fallback: string): string {
       return err.message || smsForeignMessage(false);
     case 'PHONE_FIXED_LINE':
       return PHONE_INPUT_MESSAGES.fixed;
+    // FEAT-022 (SPEC-022-02, 08, 09): each refusal says its real cause.
+    case 'UNDERAGE':
+      return COURIER_SIGNUP_MESSAGES.underage;
+    case 'NEIGHBOURHOOD_UNKNOWN':
+      return 'Ce quartier ne fait pas partie de la liste.';
+    case 'EMAIL_NOT_VERIFIED':
+      return "Confirmez d'abord votre adresse e-mail.";
+    case 'ROLE_ALREADY_HELD':
+      return err.message || 'Ce compte a déjà ce rôle.';
     case 'VALIDATION_ERROR':
       return firstDetail(err) ?? fallback;
     default:
@@ -512,8 +542,9 @@ function neighbourhoodPick(values: NeighbourhoodValues): NeighbourhoodPick {
 
 /** The courier's fields as `POST /auth/register` and `POST /me/roles/courier` take them (checked first). */
 export function courierSignupFields(values: CourierFieldValues): CourierSignupFields {
+  if (!values.vehicle) throw new Error('courierSignupFields: validateCourierFields first');
   return {
-    vehicle: values.vehicle ?? 'moto',
+    vehicle: values.vehicle,
     birthDate: values.birthDate,
     acceptTerms: true,
     ...neighbourhoodPick(values),
@@ -552,6 +583,51 @@ export function registrationRequest(
     return { ...fields, accountType: 'restaurant', ...restaurantSignupFields(restaurant) };
   }
   return fields;
+}
+
+export type SignupField = RegisterField | CourierField | RestaurantField;
+
+const SIGNUP_API_FIELDS = [
+  'fullName',
+  'phone',
+  'email',
+  'password',
+  'vehicle',
+  'neighbourhoodId',
+  'neighbourhoodOther',
+  'birthDate',
+  'acceptTerms',
+  'restaurantName',
+] as const;
+
+/**
+ * Where a refusal of `POST /auth/register` or `/me/roles/*` goes on a sign-up
+ * form (SPEC-022-02 SC02, SC03; SPEC-022-08; SPEC-022-09): `neighbourhoodId` is
+ * the « Quartier » field, 422 `UNDERAGE` the birth date, `NEIGHBOURHOOD_UNKNOWN`
+ * the neighbourhood; anything else is the general message, in its real cause.
+ * One place for the site, « Mon profil » and the app (review of FEAT-024, note 10).
+ */
+export function signupFieldErrors(
+  err: unknown,
+  fallback: string,
+): {
+  readonly fields: FieldErrors<SignupField>;
+  readonly general: string | null;
+  readonly code: string | null;
+} {
+  const mapped = fieldErrorsFromApi(err, SIGNUP_API_FIELDS, fallback);
+  const { neighbourhoodId, ...rest } = mapped.fields;
+  const fields: FieldErrors<SignupField> = {
+    ...rest,
+    ...(neighbourhoodId ? { neighbourhood: neighbourhoodId } : {}),
+  };
+  if (mapped.code === 'UNDERAGE') fields.birthDate = COURIER_SIGNUP_MESSAGES.underage;
+  if (mapped.code === 'NEIGHBOURHOOD_UNKNOWN') {
+    fields.neighbourhood = 'Ce quartier ne fait pas partie de la liste.';
+  }
+  return Object.keys(fields).length > 0
+    ? { fields, general: null, code: mapped.code }
+    : { fields, general: mapped.general, code: mapped.code };
 }
 
 /** SPEC-022-02 R6, SPEC-022-03 R4: the « what next » screen after the right code (FEAT-022-VIS02, VIS03). */

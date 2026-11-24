@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import {
   StyleSheet,
   Text,
@@ -19,37 +20,62 @@ interface PhoneInputProps extends Omit<TextInputProps, 'style' | 'keyboardType' 
   readonly use?: PhoneUse;
   /** The screen's own input style. */
   readonly inputStyle: StyleProp<TextStyle>;
+  /** A refusal said right under the field (SPEC-024-01 R8, SPEC-024-02). */
+  readonly error?: string | null | undefined;
+  /** To move the focus here after a refusal (review of FEAT-024, note 1). */
+  readonly inputRef?: Ref<TextInput> | undefined;
 }
 
 /**
  * A phone field with « +235 » in front of the box (FEAT-024, SPEC-024-02 R1):
  * the 8 digits are enough; a number typed with another country code replaces
- * the prefix, except for Mobile Money.
+ * the prefix, except for Mobile Money. A refusal shows under the box.
  */
 export function PhoneInput({
   label,
   value,
   use = 'account',
   inputStyle,
+  error,
+  inputRef,
   ...rest
 }: PhoneInputProps) {
   const dial = phoneFieldShowsDialCode(value, use);
   return (
-    <View style={styles.row}>
-      {dial ? (
-        <Text style={styles.leading} importantForAccessibility="no" accessibilityElementsHidden>
-          {DIAL_CODE}
+    <View>
+      <View style={styles.row}>
+        {dial ? (
+          <Text style={styles.leading} importantForAccessibility="no" accessibilityElementsHidden>
+            {DIAL_CODE}
+          </Text>
+        ) : null}
+        <TextInput
+          ref={inputRef}
+          style={[
+            inputStyle,
+            styles.box,
+            dial ? styles.affixed : null,
+            error ? styles.invalid : null,
+          ]}
+          value={value}
+          keyboardType="phone-pad"
+          textContentType="telephoneNumber"
+          placeholderTextColor={tokens.color.text.muted}
+          accessibilityLabel={dial ? `${label}, indicatif ${DIAL_CODE}` : label}
+          aria-invalid={error ? true : undefined}
+          {...rest}
+        />
+      </View>
+      {error ? (
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          aria-live="polite"
+          style={styles.error}
+        >
+          {error}
         </Text>
       ) : null}
-      <TextInput
-        style={[inputStyle, styles.box, dial ? styles.affixed : null]}
-        value={value}
-        keyboardType="phone-pad"
-        textContentType="telephoneNumber"
-        placeholderTextColor={tokens.color.text.muted}
-        accessibilityLabel={dial ? `${label}, indicatif ${DIAL_CODE}` : label}
-        {...rest}
-      />
     </View>
   );
 }
@@ -73,4 +99,10 @@ const styles = StyleSheet.create({
   },
   box: { flex: 1 },
   affixed: { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 },
+  invalid: { borderColor: tokens.color.state.danger },
+  error: {
+    marginTop: tokens.space['1'],
+    color: tokens.color.state.danger,
+    fontSize: tokens.type.size.label,
+  },
 });

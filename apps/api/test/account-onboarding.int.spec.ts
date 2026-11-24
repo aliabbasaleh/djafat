@@ -716,7 +716,18 @@ describe('FEAT-022 — welcome e-mail and « Mon profil » roles', () => {
     expect(application.status).toBe('to_complete');
     expect(application.termsAcceptedAt).toBeInstanceOf(Date);
     expect(await prisma.user.count({ where: { email: input.email } })).toBe(1);
+    expect(
+      await prisma.user.count({ where: { phone: `+235${input.phone.replace(/\s/g, '')}` } }),
+    ).toBe(1);
     expect(await lastNotice(input.email, 'welcome')).toMatchObject({ kind: 'welcome' });
+    // R3: « Mon profil » shows the new role at once, with the same session (database roles).
+    const me = await request(server)
+      .get('/v1/me')
+      .set('Authorization', `Bearer ${customer.access}`)
+      .expect(200);
+    expect((me.body as { roles: string[] }).roles).toEqual(
+      expect.arrayContaining(['customer', 'courier']),
+    );
 
     const again = await request(server)
       .post('/v1/me/roles/courier')
@@ -779,5 +790,55 @@ describe('FEAT-024 — numbers checked by the server', () => {
     const signedIn = await signUp(input);
     const user = await prisma.user.findUniqueOrThrow({ where: { id: signedIn.user.id } });
     expect(user.phone).toBe(input.phone.replace(/\s/g, ''));
+  });
+});
+
+describe('FEAT-024 / FEAT-022 — more over HTTP', () => {
+  it('SPEC-024-01-SC05 — a confirmed foreign number: no SMS on a new device (offered: e-mail), and asking anyway: 422', async () => {
+    const input = { ...fresh(), phone: `+33 6 ${String(randomInt(10_000_000, 100_000_000))}` };
+    const signedIn = await signUp(input);
+    await prisma.user.update({
+      where: { id: signedIn.user.id },
+      data: { phoneVerifiedAt: new Date() },
+    });
+    const login = await request(server)
+      .post('/v1/auth/password/login')
+      .send({ email: input.email, password: input.password })
+      .expect(200);
+    const challenge = login.body as {
+      status: string;
+      challengeId: string;
+      channels: Array<{ id: string; available: boolean }>;
+    };
+    expect(challenge.status).toBe('code_required');
+    expect(challenge.channels.find((c) => c.id === 'sms')?.available).toBe(false);
+    expect(challenge.channels.find((c) => c.id === 'email')?.available).toBe(true);
+    const sms = await request(server)
+      .post('/v1/auth/password/challenge/send')
+      .send({ challengeId: challenge.challengeId, channel: 'sms' })
+      .expect(422);
+    expect(sms.body).toMatchObject({ error: { code: 'SMS_FOREIGN_NUMBER' } });
+  });
+
+  it('SPEC-022-08-SC04 — a courier sign-up with a used e-mail: FEAT-020’s answer, no second account; a used number: 409', async () => {
+    const existing = fresh();
+    await signUp(existing);
+    const courierFields = {
+      accountType: 'courier',
+      vehicle: 'moto',
+      neighbourhoodId: await neighbourhood('Moursal'),
+      birthDate: bornYearsAgo(25),
+      acceptTerms: true,
+    };
+    const sameEmail = { ...fresh(), email: existing.email, ...courierFields };
+    await request(server).post('/v1/auth/register').send(sameEmail).expect(202);
+    expect(await lastNotice(existing.email, 'already_registered')).toMatchObject({
+      kind: 'already_registered',
+    });
+    expect(await prisma.user.count({ where: { email: existing.email } })).toBe(1);
+
+    const samePhone = { ...fresh(), phone: existing.phone, ...courierFields };
+    const refused = await request(server).post('/v1/auth/register').send(samePhone).expect(409);
+    expect(refused.body).toMatchObject({ error: { code: 'PHONE_ALREADY_USED' } });
   });
 });

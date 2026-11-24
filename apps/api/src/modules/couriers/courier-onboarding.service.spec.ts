@@ -38,3 +38,15 @@ describe('SPEC-022-02 — the courier created at sign-up', () => {
     expect(applications).toEqual([{ courierUserId: 'u-abakar', termsAcceptedAt }]);
   });
 });
+
+describe('SPEC-022-08 R3 — a courier row left behind counts', () => {
+  it('hasCourier reads the couriers table inside the transaction', async () => {
+    const count = vi.fn(async ({ where }: { where: { userId: string } }) =>
+      where.userId === 'u-abakar' ? 1 : 0,
+    );
+    const tx = { courier: { count } } as unknown as Prisma.TransactionClient;
+    const service = new CourierOnboardingService();
+    expect(await service.hasCourier(tx, 'u-abakar')).toBe(true);
+    expect(await service.hasCourier(tx, 'u-awa')).toBe(false);
+  });
+});

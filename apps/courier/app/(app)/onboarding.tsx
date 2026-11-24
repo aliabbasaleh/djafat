@@ -15,6 +15,7 @@ import {
   ApiClientError,
   personNameError,
   phoneFieldError,
+  phoneForField,
   type CourierApplication,
 } from '@djafat/sdk';
 import { Screen } from '../../components/Screen';
@@ -382,22 +383,18 @@ function ItemEditor({
   const [provider, setProvider] = useState<MobileMoneyProvider>(
     application.mobileMoney?.provider ?? 'airtel',
   );
-  const [number, setNumber] = useState(application.mobileMoney?.number ?? '');
+  // SPEC-024-02 R1, R4: a stored Chad number comes back as its 8 digits, behind « +235 ».
+  const [number, setNumber] = useState(phoneForField(application.mobileMoney?.number));
   const [name, setName] = useState(application.emergencyContact?.name ?? '');
-  const [phone, setPhone] = useState(application.emergencyContact?.phone ?? '');
-  /** FEAT-024: a field refused before sending — said right under it, in the server's words. */
-  const [invalid, setInvalid] = useState<string | null>(null);
-  const onInvalid = setInvalid;
-  const invalidText = invalid ? (
-    <Text
-      accessibilityRole="alert"
-      accessibilityLiveRegion="polite"
-      aria-live="polite"
-      style={styles.error}
-    >
-      {invalid}
-    </Text>
-  ) : null;
+  const [phone, setPhone] = useState(phoneForField(application.emergencyContact?.phone));
+  /** FEAT-024: a field refused before sending — said right under that field, in the server's words. */
+  const [invalid, setInvalid] = useState<{
+    field: 'number' | 'name' | 'phone';
+    message: string;
+  } | null>(null);
+  const messageFor = (field: 'number' | 'name' | 'phone') =>
+    invalid?.field === field ? invalid.message : null;
+  const nameMessage = messageFor('name');
 
   if (item === 'mobile_money') {
     return (
@@ -422,6 +419,7 @@ function ItemEditor({
           label="Numéro Mobile Money"
           use="mobile_money"
           inputStyle={styles.input}
+          error={messageFor('number')}
           value={number}
           onChangeText={(text) => {
             setNumber(text);
@@ -429,14 +427,13 @@ function ItemEditor({
           }}
           placeholder="66 12 34 56"
         />
-        {invalidText}
         <BigButton
           label="Enregistrer"
           loading={busy}
           onPress={() => {
             const why = phoneFieldError(number, 'mobile_money', 'Indiquez le numéro Mobile Money.');
             if (why) {
-              onInvalid(why);
+              setInvalid({ field: 'number', message: why });
               return;
             }
             onSave({ mobileMoney: { provider, number } });
@@ -458,13 +455,25 @@ function ItemEditor({
             setInvalid(null);
           }}
           autoCapitalize="words"
+          aria-invalid={nameMessage ? true : undefined}
         />
+        {nameMessage ? (
+          <Text
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            aria-live="polite"
+            style={styles.error}
+          >
+            {nameMessage}
+          </Text>
+        ) : null}
         <Text style={styles.label}>Son téléphone</Text>
         {/* FEAT-024 (SPEC-024-02 R3): a number to call — foreign or fixed allowed. */}
         <PhoneInput
           label="Téléphone de la personne à prévenir"
           use="contact"
           inputStyle={styles.input}
+          error={messageFor('phone')}
           value={phone}
           onChangeText={(text) => {
             setPhone(text);
@@ -472,17 +481,19 @@ function ItemEditor({
           }}
           placeholder="99 12 34 56"
         />
-        {invalidText}
         <BigButton
           label="Enregistrer"
           loading={busy}
           onPress={() => {
-            // SPEC-024-03 R3: a person's name, letters only.
-            const why =
-              personNameError(name, 'Écrivez le nom de la personne à prévenir.') ??
-              phoneFieldError(phone, 'contact', 'Indiquez son téléphone.');
-            if (why) {
-              onInvalid(why);
+            // SPEC-024-03 R3: a person's name, letters only — each message under its own field.
+            const nameWhy = personNameError(name, 'Écrivez le nom de la personne à prévenir.');
+            if (nameWhy) {
+              setInvalid({ field: 'name', message: nameWhy });
+              return;
+            }
+            const phoneWhy = phoneFieldError(phone, 'contact', 'Indiquez son téléphone.');
+            if (phoneWhy) {
+              setInvalid({ field: 'phone', message: phoneWhy });
               return;
             }
             onSave({ emergencyContact: { name, phone } });

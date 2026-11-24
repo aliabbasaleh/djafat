@@ -32,6 +32,7 @@ export function Input({
   ...rest
 }: InputProps) {
   const id = useId();
+  const labelId = `${id}-label`;
   const leadingId = leadingText ? `${id}-leading` : undefined;
   const helpId = helpText ? `${id}-help` : undefined;
   const errorId = error ? `${id}-error` : undefined;
@@ -40,21 +41,23 @@ export function Input({
       id={id}
       className={cx(styles['control'], error && styles['invalid'], className)}
       aria-invalid={error ? true : undefined}
-      aria-describedby={cx(leadingId, describedBy, helpId, errorId) || undefined}
+      // FEAT-024 (SPEC-024-02 « UI »): « +235 » is part of the field's name.
+      aria-labelledby={leadingId ? `${labelId} ${leadingId}` : undefined}
+      aria-describedby={cx(describedBy, helpId, errorId) || undefined}
       {...rest}
     />
   );
 
   return (
     <div className={styles['field']}>
-      <Label htmlFor={id} style={hideLabel ? visuallyHiddenStyle : undefined}>
+      <Label id={labelId} htmlFor={id} style={hideLabel ? visuallyHiddenStyle : undefined}>
         {label}
       </Label>
       {leadingText ? (
         <div className={styles['affixed']}>
           <span id={leadingId} className={styles['leading']}>
-            <span style={visuallyHiddenStyle}>indicatif </span>
-            {leadingText}
+            <span style={visuallyHiddenStyle}>{`, indicatif ${leadingText}`}</span>
+            <span aria-hidden="true">{leadingText}</span>
           </span>
           {control}
         </div>

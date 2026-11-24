@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ndjamenaDate } from '@djafat/core';
-import { ApiClientError, type SignedIn } from '@djafat/sdk';
+import type { SignedIn } from '@djafat/sdk';
 import { Alert, Button, Checkbox, FieldSuggestion, Input, Radio } from '@/components/ui-client';
 import { api } from '@/lib/api';
 import {
@@ -12,12 +12,13 @@ import {
   accountErrorMessage,
   backToAccountTypes,
   chooseAccountType,
+  emailSuggestionFor,
   emailSuggestionText,
   emailTypoCheck,
-  fieldErrorsFromApi,
   maskEmail,
   phoneFieldShowsDialCode,
   registrationRequest,
+  signupFieldErrors,
   startSignup,
   validateCourierFields,
   validateRegisterForm,
@@ -30,6 +31,7 @@ import {
   type SignupFlow,
 } from '@/lib/account';
 import { AccountTypeChoice } from './AccountTypeChoice';
+import { focusField, focusFirstInvalid } from './focus';
 import { CodeStep } from './CodeStep';
 import { NeighbourhoodField, type NeighbourhoodOption } from './NeighbourhoodField';
 import { PasswordField } from './PasswordField';
@@ -55,20 +57,6 @@ type Field =
   | 'birthDate'
   | 'acceptTerms'
   | 'restaurantName';
-
-/** Where the API puts an error, mapped to the screen's fields (`neighbourhoodId` is « Quartier »). */
-const API_FIELDS = [
-  'fullName',
-  'phone',
-  'email',
-  'password',
-  'vehicle',
-  'neighbourhoodId',
-  'neighbourhoodOther',
-  'birthDate',
-  'acceptTerms',
-  'restaurantName',
-] as const;
 
 const EMPTY: RegisterFormValues = { fullName: '', phone: '', email: '', password: '', confirm: '' };
 const EMPTY_COURIER: CourierFieldValues = {
@@ -125,6 +113,7 @@ export function RegisterPanel({
   const [emailWarned, setEmailWarned] = useState<string | null>(null);
   const [emailHint, setEmailHint] = useState<string | null>(null);
   const formTitle = useRef<HTMLHeadingElement>(null);
+  const form = useRef<HTMLFormElement>(null);
 
   const values = flow.account;
   const type = flow.step === 'choice' ? null : flow.step;
@@ -188,7 +177,12 @@ export function RegisterPanel({
     };
     setErrors(found);
     setGeneral(null);
-    if (Object.keys(found).length > 0) return;
+    if (Object.keys(found).length > 0) {
+      // SPEC-024-04 R2: a malformed address may still be a known provider mistyped.
+      if (found.email) setEmailHint(emailSuggestionFor(values.email));
+      focusFirstInvalid(form.current);
+      return;
+    }
     // SPEC-024-04 R3, R4: a mistyped address stops the sending once.
     const typo = emailTypoCheck(values.email, emailWarned);
     setEmailWarned(typo.warned);
@@ -202,11 +196,11 @@ export function RegisterPanel({
       );
       setRegistration({ id: registrationId, email: values.email.trim().toLowerCase() });
     } catch (err) {
-      const onFields = apiFieldErrors(err);
-      const mapped = fieldErrorsFromApi(err, API_FIELDS, "L'inscription n'a pas pu être envoyée.");
-      setErrors(onFields);
-      setGeneral(Object.keys(onFields).length > 0 ? null : mapped.general);
+      const mapped = signupFieldErrors(err, "L'inscription n'a pas pu être envoyée.");
+      setErrors(mapped.fields);
+      setGeneral(mapped.general);
       setErrorCode(mapped.code);
+      focusFirstInvalid(form.current);
     } finally {
       setBusy(false);
     }
@@ -325,6 +319,7 @@ export function RegisterPanel({
         onAction={() => {
           if (emailHint) setFlow((f) => ({ ...f, account: { ...f.account, email: emailHint } }));
           setEmailHint(null);
+          focusField(form.current, 'input[type="email"]');
         }}
       />
       <PasswordField
@@ -370,6 +365,7 @@ export function RegisterPanel({
 
   return (
     <form
+      ref={form}
       className={styles['panel']}
       noValidate
       onSubmit={(e) => {
@@ -399,6 +395,7 @@ export function RegisterPanel({
                 name="vehicle"
                 label={choice.label}
                 checked={courier.vehicle === choice.id}
+                {...(errors.vehicle ? { 'aria-invalid': true } : {})}
                 onChange={() => {
                   setCourier((c) => ({ ...c, vehicle: choice.id }));
                   clear('vehicle');
@@ -470,23 +467,4 @@ export function RegisterPanel({
       <p className={styles['hint']}>Un code de confirmation sera envoyé à votre adresse e-mail.</p>
     </form>
   );
-}
-
-/**
- * The API's refusals on their field (SPEC-022-02 SC02, SC03, SPEC-022-09):
- * `neighbourhoodId` is « Quartier », 422 `UNDERAGE` the birth date,
- * `NEIGHBOURHOOD_UNKNOWN` the neighbourhood.
- */
-function apiFieldErrors(err: unknown): FieldErrors<Field> {
-  const mapped = fieldErrorsFromApi(err, API_FIELDS, '');
-  const { neighbourhoodId, ...rest } = mapped.fields;
-  const out: FieldErrors<Field> = {
-    ...rest,
-    ...(neighbourhoodId ? { neighbourhood: neighbourhoodId } : {}),
-  };
-  if (err instanceof ApiClientError && err.code === 'UNDERAGE') out.birthDate = err.message;
-  if (err instanceof ApiClientError && err.code === 'NEIGHBOURHOOD_UNKNOWN') {
-    out.neighbourhood = err.message;
-  }
-  return out;
 }

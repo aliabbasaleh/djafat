@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import type { CourierApplication, Prisma } from '@prisma/client';
 import { LAUNCH_MARKET } from '@djafat/config';
 import {
@@ -356,6 +362,14 @@ export class CourierApplicationService {
   ): Promise<CourierDecision> {
     const user = await this.users.getById(userId);
     if (!user || user.status === 'deleted') throw notFound();
+    // FEAT-022-Q17: never one's own application — like a role, which an admin
+    // never changes on their own account (`UsersService.assertCanMutateRole`).
+    if (userId === adminUserId) {
+      throw new ForbiddenException({
+        code: 'FORBIDDEN',
+        message: 'Votre propre dossier doit être décidé par un autre administrateur.',
+      });
+    }
     await this.prisma.$transaction(async (tx) => {
       const application = await this.lockedRow(tx, userId);
       const status = this.statusOf(application);

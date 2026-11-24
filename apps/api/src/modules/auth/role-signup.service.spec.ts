@@ -19,7 +19,7 @@ const USER = {
   fullName: 'Awa Hassan',
 };
 
-function build(options: { roles?: Role[]; emailVerified?: boolean } = {}) {
+function build(options: { roles?: Role[]; emailVerified?: boolean; provisioned?: boolean } = {}) {
   const roles = new Set<Role>(options.roles ?? ['customer']);
   const user = {
     ...USER,
@@ -56,6 +56,7 @@ function build(options: { roles?: Role[]; emailVerified?: boolean } = {}) {
   };
   const registration = {
     checkSignup: vi.fn(() => Promise.resolve()),
+    alreadyProvisioned: vi.fn(() => Promise.resolve(options.provisioned ?? false)),
     provisionSignup: vi.fn((_tx: unknown, userId: string, signup: SignupPayload) => {
       provisioned.push({ userId, signup });
       roles.add(signup.type === 'courier' ? 'courier' : 'restaurant_owner');
@@ -164,6 +165,22 @@ describe('SPEC-022-08 — add a role to one’s own account', () => {
     );
     expect(owner.provisioned).toHaveLength(0);
     expect(owner.welcomes).toHaveLength(0);
+  });
+
+  it('SPEC-022-08 R3, R5 — role revoked but its courier row or restaurant left: 409, never a duplicate', async () => {
+    const formerCourier = build({ roles: ['customer'], provisioned: true });
+    await expect(formerCourier.service.becomeCourier(USER.id, COURIER, META)).rejects.toMatchObject(
+      {
+        status: 409,
+        response: { code: 'ROLE_ALREADY_HELD' },
+      },
+    );
+    expect(formerCourier.provisioned).toHaveLength(0);
+    const formerOwner = build({ roles: ['customer'], provisioned: true });
+    await expect(
+      formerOwner.service.registerRestaurant(USER.id, RESTAURANT, META),
+    ).rejects.toMatchObject({ status: 409, response: { code: 'ROLE_ALREADY_HELD' } });
+    expect(formerOwner.provisioned).toHaveLength(0);
   });
 
   it('SPEC-022-08 R2 — the sign-up rules refuse first (under 18): nothing created', async () => {

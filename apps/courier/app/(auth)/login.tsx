@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Linking, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import {
@@ -67,6 +67,10 @@ export default function LoginScreen() {
   /** FEAT-024 (SPEC-024-04): the address already stopped once, and the suggestion shown. */
   const [emailWarned, setEmailWarned] = useState<string | null>(null);
   const [emailHint, setEmailHint] = useState<string | null>(null);
+  /** FEAT-024 (SPEC-024-01 R8): why the number typed for an SMS cannot get one — under the field. */
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -207,8 +211,9 @@ export default function LoginScreen() {
     // FEAT-024 (SPEC-024-01 R8): no SMS to a foreign number or a fixed line — nothing is sent.
     const whatsapp = phoneButtons.some((b) => b.id === 'whatsapp' && b.enabled);
     const why = smsPhoneError(phone, whatsapp);
+    setPhoneError(why);
     if (why) {
-      setError(why);
+      phoneRef.current?.focus();
       return;
     }
     void run(async () => {
@@ -261,6 +266,7 @@ export default function LoginScreen() {
     <>
       <Text style={styles.label}>E-mail</Text>
       <TextInput
+        ref={emailRef}
         style={styles.input}
         value={email}
         onChangeText={(value) => {
@@ -282,6 +288,7 @@ export default function LoginScreen() {
         onAccept={(address) => {
           setEmail(address);
           setEmailHint(null);
+          emailRef.current?.focus();
         }}
       />
     </>
@@ -292,8 +299,13 @@ export default function LoginScreen() {
       <PhoneInput
         label="Numéro de téléphone"
         inputStyle={styles.input}
+        inputRef={phoneRef}
+        error={phoneError}
         value={phone}
-        onChangeText={typed(setPhone)}
+        onChangeText={(value) => {
+          typed(setPhone)(value);
+          setPhoneError(null);
+        }}
         placeholder="66 12 34 56"
         autoFocus={autoFocus}
       />

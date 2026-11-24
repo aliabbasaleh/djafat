@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACCOUNT_TYPES,
+  emailSuggestionFor,
+  phoneForField,
+  signupFieldErrors,
   OTHER_NEIGHBOURHOOD,
   SMS_CHAD_ONLY,
   accountTypeFromQuery,
@@ -286,5 +289,61 @@ describe('SPEC-022-03 — the restaurant form on the screen', () => {
     expect(done.title).toBe('✅ Compte restaurant créé');
     expect(done.text).toContain("« Chez Fatimé » n'est pas encore visible des clients.");
     expect(done.action).toBe('Ouvrir la console restaurant');
+  });
+});
+
+describe('review of FEAT-024 — one mapping of refusals, numbers put back in their field', () => {
+  it('SPEC-022-02-SC02, SPEC-022-09 — 422 UNDERAGE, NEIGHBOURHOOD_UNKNOWN and `neighbourhoodId` go to their field', () => {
+    expect(
+      signupFieldErrors(new ApiClientError({ status: 422, code: 'UNDERAGE', message: 'x' }), 'f')
+        .fields,
+    ).toEqual({ birthDate: 'Il faut avoir au moins 18 ans pour livrer avec DJAFAT.' });
+    expect(
+      signupFieldErrors(
+        new ApiClientError({ status: 422, code: 'NEIGHBOURHOOD_UNKNOWN', message: 'x' }),
+        'f',
+      ).fields,
+    ).toEqual({ neighbourhood: 'Ce quartier ne fait pas partie de la liste.' });
+    expect(
+      signupFieldErrors(
+        new ApiClientError({
+          status: 422,
+          code: 'VALIDATION_ERROR',
+          message: 'x',
+          details: [{ path: 'neighbourhoodId', message: 'Choisissez votre quartier.' }],
+        }),
+        'f',
+      ).fields,
+    ).toEqual({ neighbourhood: 'Choisissez votre quartier.' });
+  });
+
+  it('SPEC-022-08 R2, R3 — EMAIL_NOT_VERIFIED and ROLE_ALREADY_HELD are general messages with their cause', () => {
+    expect(
+      signupFieldErrors(
+        new ApiClientError({ status: 409, code: 'EMAIL_NOT_VERIFIED', message: 'x' }),
+        'f',
+      ),
+    ).toMatchObject({ fields: {}, general: "Confirmez d'abord votre adresse e-mail." });
+    expect(
+      signupFieldErrors(
+        new ApiClientError({
+          status: 409,
+          code: 'ROLE_ALREADY_HELD',
+          message: 'Ce compte est déjà livreur.',
+        }),
+        'f',
+      ).general,
+    ).toBe('Ce compte est déjà livreur.');
+  });
+
+  it('SPEC-024-04 R2 — a malformed address still gets its suggestion', () => {
+    expect(emailSuggestionFor('abakar@gmail')).toBe('abakar@gmail.com');
+    expect(emailSuggestionFor('abakar@gmail.com')).toBeNull();
+  });
+
+  it('SPEC-024-02 R1, R4 — a stored Chad number comes back as its 8 digits; another as stored', () => {
+    expect(phoneForField('+23566123456')).toBe('66 12 34 56');
+    expect(phoneForField('+33612345678')).toBe('+33612345678');
+    expect(phoneForField(null)).toBe('');
   });
 });

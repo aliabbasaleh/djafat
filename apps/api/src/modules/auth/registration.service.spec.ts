@@ -45,11 +45,17 @@ function fakeOnboarding(options: { failRestaurant?: boolean } = {}) {
     couriers,
     restaurants,
     courierPort: {
+      hasCourier: vi.fn(async (_tx: unknown, userId: string) =>
+        couriers.some((c) => c.userId === userId),
+      ),
       provisionCourier: vi.fn(async (_tx: unknown, userId: string, signup: CourierSignupRecord) => {
         couriers.push({ userId, signup });
       }),
     },
     restaurantPort: {
+      ownsRestaurant: vi.fn(async (_tx: unknown, userId: string) =>
+        restaurants.some((r) => r.userId === userId),
+      ),
       provisionRestaurant: vi.fn(
         async (_tx: unknown, userId: string, signup: RestaurantSignupRecord) => {
           if (options.failRestaurant) throw new Error('restaurant could not be created');

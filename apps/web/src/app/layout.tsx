@@ -62,7 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {
               title: 'Légal',
               items: [
-                { label: 'Conditions générales', href: '/conditions' },
+                { label: "Conditions d'utilisation", href: '/conditions' },
                 { label: 'Confidentialité', soon: true },
                 { label: 'Contact', soon: true },
               ],

@@ -78,7 +78,13 @@ export class RoleSignupService {
     await this.prisma.$transaction(async (tx) => {
       // Two clicks, two tabs: one at a time per account, then the role is read again.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`role-signup:${userId}`}))`;
-      if (await this.users.hasRoleWithin(tx, userId, role)) throw roleAlreadyHeld(signup.type); // R3, R5
+      // R3, R5: the role — or what it left behind (a courier row, an owned restaurant).
+      if (
+        (await this.users.hasRoleWithin(tx, userId, role)) ||
+        (await this.registration.alreadyProvisioned(tx, userId, signup.type))
+      ) {
+        throw roleAlreadyHeld(signup.type);
+      }
       await this.registration.provisionSignup(tx, userId, {
         ...signup,
         termsAcceptedAt: new Date().toISOString(),

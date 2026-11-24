@@ -15,6 +15,10 @@ import { firstFreeSlug, slugifyRestaurantName } from './restaurant-slug';
  */
 @Injectable()
 export class RestaurantOnboardingService implements RestaurantOnboardingPort {
+  async ownsRestaurant(tx: Prisma.TransactionClient, userId: string): Promise<boolean> {
+    return (await tx.restaurant.count({ where: { ownerUserId: userId } })) > 0;
+  }
+
   async provisionRestaurant(
     tx: Prisma.TransactionClient,
     userId: string,

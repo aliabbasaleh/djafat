@@ -3,17 +3,16 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ndjamenaDate } from '@djafat/core';
-import { ApiClientError, type MeProfile } from '@djafat/sdk';
+import type { MeProfile } from '@djafat/sdk';
 import { Stack, Text, cx } from '@djafat/ui';
 import { Alert, Button, Checkbox, Input, Radio } from '@/components/ui-client';
 import { api, appUrl } from '@/lib/api';
 import {
   VEHICLE_CHOICES,
-  accountErrorMessage,
   courierSignupFields,
-  fieldErrorsFromApi,
   restaurantSignupFields,
   signupDoneText,
+  signupFieldErrors,
   validateCourierFields,
   validateRestaurantFields,
   type CourierFieldValues,
@@ -21,6 +20,7 @@ import {
   type RestaurantFieldValues,
 } from '@/lib/account';
 import { NeighbourhoodField, type NeighbourhoodOption } from './NeighbourhoodField';
+import { focusFirstInvalid } from './focus';
 import styles from './account.module.css';
 
 type Kind = 'courier' | 'restaurant';
@@ -77,6 +77,7 @@ export function WorkSection({
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ kind: Kind; name: string } | null>(null);
   const title = useRef<HTMLHeadingElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const isCourier = me.roles.includes('courier');
   const isOwner = me.roles.includes('restaurant_owner');
 
@@ -107,7 +108,10 @@ export function WorkSection({
         ? validateCourierFields(courier, ndjamenaDate(new Date()))
         : validateRestaurantFields(restaurant);
     setErrors(found);
-    if (Object.keys(found).length > 0) return;
+    if (Object.keys(found).length > 0) {
+      focusFirstInvalid(formRef.current);
+      return;
+    }
     setBusy(true);
     try {
       const profile =
@@ -118,34 +122,10 @@ export function WorkSection({
       setDone({ kind, name: restaurant.restaurantName.trim() });
       setOpen(null);
     } catch (err) {
-      const mapped = fieldErrorsFromApi(
-        err,
-        [
-          'vehicle',
-          'neighbourhoodId',
-          'neighbourhoodOther',
-          'birthDate',
-          'acceptTerms',
-          'restaurantName',
-        ] as const,
-        "L'envoi n'a pas abouti. Réessayez.",
-      );
-      const { neighbourhoodId, ...rest } = mapped.fields;
-      const onFields: FieldErrors<Field> = {
-        ...rest,
-        ...(neighbourhoodId ? { neighbourhood: neighbourhoodId } : {}),
-      };
-      if (err instanceof ApiClientError && err.code === 'UNDERAGE')
-        onFields.birthDate = err.message;
-      setErrors(onFields);
-      if (Object.keys(onFields).length === 0) {
-        setError(
-          err instanceof ApiClientError &&
-            (err.code === 'EMAIL_NOT_VERIFIED' || err.code === 'ROLE_ALREADY_HELD')
-            ? err.message
-            : accountErrorMessage(err, mapped.general ?? "L'envoi n'a pas abouti."),
-        );
-      }
+      const mapped = signupFieldErrors(err, "L'envoi n'a pas abouti. Réessayez.");
+      setErrors(mapped.fields);
+      setError(mapped.general);
+      focusFirstInvalid(formRef.current);
     } finally {
       setBusy(false);
     }
@@ -229,6 +209,7 @@ export function WorkSection({
           )
         ) : open === 'courier' ? (
           <form
+            ref={formRef}
             className={styles['panel']}
             noValidate
             onSubmit={(e) => {
@@ -247,6 +228,7 @@ export function WorkSection({
                   name="profile-vehicle"
                   label={choice.label}
                   checked={courier.vehicle === choice.id}
+                  {...(errors.vehicle ? { 'aria-invalid': true } : {})}
                   onChange={() => {
                     setCourier((c) => ({ ...c, vehicle: choice.id }));
                     clear('vehicle');
@@ -305,6 +287,7 @@ export function WorkSection({
           )
         ) : open === 'restaurant' ? (
           <form
+            ref={formRef}
             className={styles['panel']}
             noValidate
             onSubmit={(e) => {

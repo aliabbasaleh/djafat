@@ -308,6 +308,21 @@ describe('SPEC-022-07 — DJAFAT decides on a courier', () => {
     expect(world.applications.get('u-abakar')?.status).toBe('to_complete');
   });
 
+  it('FEAT-022-Q17 — an admin never decides their own application (403), nothing changes', async () => {
+    const world = courierWorld();
+    world.signedUp('u-admin', {
+      application: { status: 'pending_review', submittedAt: new Date() },
+    });
+    for (const decision of [
+      world.service.approve('u-admin', 'u-admin'),
+      world.service.reject('u-admin', 'u-admin', 'La photo du permis est floue.'),
+    ]) {
+      expect(await rejection(decision)).toMatchObject({ status: 403, body: { code: 'FORBIDDEN' } });
+    }
+    expect(world.applications.get('u-admin')?.status).toBe('pending_review');
+    expect(world.audits).toHaveLength(0);
+  });
+
   it('SPEC-022-07 — an application of a deleted account is not decided (404)', async () => {
     const world = courierWorld();
     world.signedUp('u-gone', {
