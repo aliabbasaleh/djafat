@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { withoutFileSignature } from './file-link-redaction';
+import { withoutFileSignature } from './file-link-redaction.mapper';
 
 describe('withoutFileSignature (FEAT-022, SPEC-022-04 R3)', () => {
   it('a private photo link is logged without its signature', () => {

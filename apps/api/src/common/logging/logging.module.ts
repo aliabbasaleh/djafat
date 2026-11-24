@@ -4,7 +4,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { CORRELATION_ID_HEADER } from '@djafat/config';
 import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/config.service';
-import { withoutFileSignature } from './file-link-redaction';
+import { withoutFileSignature } from './file-link-redaction.mapper';
 
 /**
  * Structured logging (pino) + per-request correlation id. Every log line and
