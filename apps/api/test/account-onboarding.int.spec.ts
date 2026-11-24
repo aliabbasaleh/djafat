@@ -671,3 +671,113 @@ describe('FEAT-022 part 2 — the courier’s application and DJAFAT’s decisio
     }
   });
 });
+
+/** The last notice the mock e-mail kept for an address (`{ kind, subject }`), waited for briefly. */
+async function lastNotice(email: string, kind: string): Promise<{ kind: string; subject: string }> {
+  for (let i = 0; i < 50; i += 1) {
+    const raw = await redis.client.get(mockAccountNoticeKey(email));
+    const notice = raw ? (JSON.parse(raw) as { kind: string; subject: string }) : null;
+    if (notice?.kind === kind) return notice;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`no "${kind}" notice for ${email}`);
+}
+
+// FEAT-022 — SPEC-022-02 R8, SPEC-022-03 R6, SPEC-022-08, on a real database.
+describe('FEAT-022 — welcome e-mail and « Mon profil » roles', () => {
+  it('SPEC-022-02-SC07 — a courier who signs up gets « Bienvenue sur DJAFAT »', async () => {
+    const courier = await motoCourier();
+    expect(await lastNotice(courier.email, 'welcome')).toEqual({
+      kind: 'welcome',
+      subject: 'Bienvenue sur DJAFAT : votre compte livreur est créé',
+    });
+  });
+
+  it('SPEC-022-08-SC01 — a customer becomes a courier on the same account; asking again: 409', async () => {
+    const input = fresh();
+    const customer = await signUp(input);
+    const res = await request(server)
+      .post('/v1/me/roles/courier')
+      .set('Authorization', `Bearer ${customer.access}`)
+      .send({
+        vehicle: 'velo',
+        neighbourhoodId: await neighbourhood('Chagoua'),
+        birthDate: bornYearsAgo(30),
+        acceptTerms: true,
+      })
+      .expect(201);
+    expect((res.body as { id: string; roles: string[] }).id).toBe(customer.user.id);
+    expect((res.body as { roles: string[] }).roles).toEqual(
+      expect.arrayContaining(['customer', 'courier']),
+    );
+    const application = await prisma.courierApplication.findUniqueOrThrow({
+      where: { courierUserId: customer.user.id },
+    });
+    expect(application.status).toBe('to_complete');
+    expect(application.termsAcceptedAt).toBeInstanceOf(Date);
+    expect(await prisma.user.count({ where: { email: input.email } })).toBe(1);
+    expect(await lastNotice(input.email, 'welcome')).toMatchObject({ kind: 'welcome' });
+
+    const again = await request(server)
+      .post('/v1/me/roles/courier')
+      .set('Authorization', `Bearer ${customer.access}`)
+      .send({
+        vehicle: 'moto',
+        neighbourhoodOther: 'Gassi Est',
+        birthDate: bornYearsAgo(30),
+        acceptTerms: true,
+      })
+      .expect(409);
+    expect(again.body).toMatchObject({ error: { code: 'ROLE_ALREADY_HELD' } });
+  });
+
+  it('SPEC-022-08 R2 — two « Inscrire mon restaurant » at once: one restaurant, one 409', async () => {
+    const customer = await signUp(fresh());
+    const send = () =>
+      request(server)
+        .post('/v1/me/roles/restaurant')
+        .set('Authorization', `Bearer ${customer.access}`)
+        .send({ restaurantName: 'Chez Awa', neighbourhoodOther: 'Klémat Nord', acceptTerms: true });
+    const statuses = (await Promise.all([send(), send()])).map((r) => r.status).sort();
+    expect(statuses).toEqual([201, 409]);
+    expect(await prisma.restaurant.count({ where: { ownerUserId: customer.user.id } })).toBe(1);
+  });
+});
+
+// FEAT-024 — docs/features/FEAT-024-saisies-verifiees (SPEC-024-01, SPEC-024-02), on a real database.
+describe('FEAT-024 — numbers checked by the server', () => {
+  it('SPEC-024-01-SC01 — a foreign number asking for an SMS: 422 SMS_FOREIGN_NUMBER, no code stored', async () => {
+    const phone = `+336${String(randomInt(10_000_000, 100_000_000))}`;
+    const res = await request(server)
+      .post('/v1/auth/otp/request')
+      .send({ phone, purpose: 'login' })
+      .expect(422);
+    expect(res.body).toMatchObject({ error: { code: 'SMS_FOREIGN_NUMBER' } });
+    expect(await prisma.otpCode.count({ where: { target: phone } })).toBe(0);
+    expect(await redis.client.get(mockOtpKey(phone))).toBeNull();
+  });
+
+  it('SPEC-024-01-SC03 — a Chad fixed line asking for an SMS: 422 PHONE_FIXED_LINE', async () => {
+    const res = await request(server)
+      .post('/v1/auth/otp/request')
+      .send({ phone: '22 51 23 45', purpose: 'login' })
+      .expect(422);
+    expect(res.body).toMatchObject({ error: { code: 'PHONE_FIXED_LINE' } });
+    expect(await prisma.otpCode.count({ where: { target: '+23522512345' } })).toBe(0);
+  });
+
+  it('SPEC-024-02-SC02 — a fixed line at sign-up: 422 on the phone, nothing pending, no e-mail', async () => {
+    const input = { ...fresh(), phone: '22 51 23 45' };
+    const res = await request(server).post('/v1/auth/register').send(input).expect(422);
+    expect(JSON.stringify(res.body)).toContain('Ce numéro est un fixe');
+    expect(await prisma.authChallenge.count({ where: { email: input.email } })).toBe(0);
+    expect(await redis.client.get(mockEmailOtpKey(input.email))).toBeNull();
+  });
+
+  it('SPEC-024-02-SC01 — a foreign number signs up; the account keeps it in international format', async () => {
+    const input = { ...fresh(), phone: `+33 6 ${String(randomInt(10_000_000, 100_000_000))}` };
+    const signedIn = await signUp(input);
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: signedIn.user.id } });
+    expect(user.phone).toBe(input.phone.replace(/\s/g, ''));
+  });
+});

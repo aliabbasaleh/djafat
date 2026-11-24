@@ -233,7 +233,6 @@ export default function OnboardingScreen() {
                   item={item}
                   application={application}
                   busy={busy}
-                  onInvalid={setError}
                   onPhoto={(kind) => setSheetFor(kind)}
                   onSave={(change) =>
                     void run(() => api.courier.application.update(change)).then(
@@ -371,15 +370,12 @@ function ItemEditor({
   item,
   application,
   busy,
-  onInvalid,
   onPhoto,
   onSave,
 }: {
   item: CourierItem;
   application: CourierApplication;
   busy: boolean;
-  /** FEAT-024: a field refused before sending (the server's own words). */
-  onInvalid: (message: string) => void;
   onPhoto: (kind: CourierDocumentKind) => void;
   onSave: (change: Parameters<typeof api.courier.application.update>[0]) => void;
 }) {
@@ -389,6 +385,19 @@ function ItemEditor({
   const [number, setNumber] = useState(application.mobileMoney?.number ?? '');
   const [name, setName] = useState(application.emergencyContact?.name ?? '');
   const [phone, setPhone] = useState(application.emergencyContact?.phone ?? '');
+  /** FEAT-024: a field refused before sending — said right under it, in the server's words. */
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const onInvalid = setInvalid;
+  const invalidText = invalid ? (
+    <Text
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+      aria-live="polite"
+      style={styles.error}
+    >
+      {invalid}
+    </Text>
+  ) : null;
 
   if (item === 'mobile_money') {
     return (
@@ -414,9 +423,13 @@ function ItemEditor({
           use="mobile_money"
           inputStyle={styles.input}
           value={number}
-          onChangeText={setNumber}
+          onChangeText={(text) => {
+            setNumber(text);
+            setInvalid(null);
+          }}
           placeholder="66 12 34 56"
         />
+        {invalidText}
         <BigButton
           label="Enregistrer"
           loading={busy}
@@ -440,7 +453,10 @@ function ItemEditor({
           accessibilityLabel="Nom de la personne à prévenir"
           style={styles.input}
           value={name}
-          onChangeText={setName}
+          onChangeText={(text) => {
+            setName(text);
+            setInvalid(null);
+          }}
           autoCapitalize="words"
         />
         <Text style={styles.label}>Son téléphone</Text>
@@ -450,9 +466,13 @@ function ItemEditor({
           use="contact"
           inputStyle={styles.input}
           value={phone}
-          onChangeText={setPhone}
+          onChangeText={(text) => {
+            setPhone(text);
+            setInvalid(null);
+          }}
           placeholder="99 12 34 56"
         />
+        {invalidText}
         <BigButton
           label="Enregistrer"
           loading={busy}

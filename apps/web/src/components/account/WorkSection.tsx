@@ -205,8 +205,9 @@ export function WorkSection({
           Travailler avec DJAFAT
         </p>
         {done && (
+          // The success box draws its own ✅: the title goes without it.
           <Alert tone="success">
-            {signupDoneText(done.kind, done.name).title} —{' '}
+            {signupDoneText(done.kind, done.name).title.replace(/^✅\s*/, '')} —{' '}
             {signupDoneText(done.kind, done.name).text}
           </Alert>
         )}
