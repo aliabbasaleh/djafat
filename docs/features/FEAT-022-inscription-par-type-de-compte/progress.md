@@ -111,3 +111,20 @@ de `verify --full` ni de revue indépendante (à la fin de la partie 2, avant la
 - Vérification visuelle (navigateur sans interface, données créées par l'API, base jetable
   `djafat_wip`) : 18 contrôles réussis, 14 captures `assets/exec-SPEC-022-06-*` et
   `exec-SPEC-022-07-*` (390×844 pour l'application livreur, 1280×800 pour la console).
+
+## Revue indépendante des parties 1 et 2 (2026-11-23)
+
+Tour 1 (`08c1ae3`, sous-agent spec-reviewer) : corrections requises — 1 bloquant, 4 majeurs, 9 mineurs,
+9 notes (`review.md`). Bloquant : le responsable d'un restaurant inscrit pouvait le rendre visible
+lui-même (`active` ou `paused`) sans décision de DJAFAT — refusé désormais (409
+`RESTAURANT_NOT_APPROVED`, SPEC-022-03 v2). Majeurs corrigés : l'analyseur des photos ne lit plus que
+sur ses routes et pour une session ; disque plein : 507 `STORAGE_FULL` sans fichier laissé ; les JPEG
+perdent ce que le téléphone ajoute après la fin de l'image ; la page « Quartiers » est reportée
+explicitement en partie 3. Corrections dans `ad01d05` (SPEC-022-03 v2, 04 v4, 06 v4, 07 v3) ; captures
+reprises sur le code corrigé (21 contrôles du navigateur réussis, dont : le lien d'une photo
+n'apparaît plus dans les journaux de l'API).
+
+Tour 2 (`ad01d05`) : bloquant résolu, autres constats résolus ou reportés explicitement ; deux nouveaux
+constats mineurs corrigés dans `b8d1c9c` — le jeton d'accès est vérifié avant de lire une photo, et
+passer à vélo ou à pied demande confirmation avant de supprimer les photos déjà envoyées. Captures
+reprises sur `b8d1c9c` : 23 contrôles du navigateur réussis, 15 captures.
