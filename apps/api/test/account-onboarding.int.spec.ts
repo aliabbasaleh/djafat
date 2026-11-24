@@ -306,8 +306,8 @@ describe('FEAT-022 — sign-up by account type on PostgreSQL and Redis', () => {
     expect(await prisma.restaurant.count({ where: { name } })).toBe(0);
   });
 
-  // SPEC-022-09 R2 (SC02's console half — the names to add — comes with the « Quartiers » page, part 3)
-  it('SPEC-022-09 R2 — « Autre » keeps the typed name, without a neighbourhood from the list', async () => {
+  // SPEC-022-09 R3, first half (SC02's console half — the names to add — comes with the « Quartiers » page, part 3)
+  it('SPEC-022-09 R3 — « Autre » keeps the typed name, without a neighbourhood from the list', async () => {
     const input = fresh();
     const signedIn = await signUp({
       ...input,

@@ -2,6 +2,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { VersioningType } from '@nestjs/common';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { registerPhotoUploads } from './infra/storage/photo-upload';
+import { TokenService } from './modules/auth/token.service';
 
 /**
  * The request-handling wiring shared by the real process (`main.ts`) and the
@@ -26,6 +27,10 @@ export function configureApp(app: NestFastifyApplication): void {
 
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  // FEAT-022: a photo sent as the request's body (5 MB) on the applications' upload routes.
-  registerPhotoUploads(app);
+  // FEAT-022: a photo sent as the request's body (5 MB) on the applications' upload routes,
+  // read only for a valid access token (checked before the first byte).
+  const tokens = app.get(TokenService, { strict: false });
+  registerPhotoUploads(app, (token) => {
+    tokens.verifyAccessToken(token);
+  });
 }

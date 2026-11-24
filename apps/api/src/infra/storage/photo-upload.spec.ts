@@ -33,14 +33,23 @@ function body(bytes: number) {
   return stream;
 }
 
+/** A token check like `TokenService.verifyAccessToken`: only « token » is valid. */
+const checkToken = (token: string) => {
+  if (token !== 'token') throw new Error('invalid signature');
+};
+
 function run(req: Parameters<typeof readPhotoBody>[0], payload: Readable) {
   return new Promise<{ status: number | null; code: unknown; length: number | null }>((resolve) =>
-    readPhotoBody(req, payload, (err, out) =>
-      resolve({
-        status: err ? (err as HttpException).getStatus() : null,
-        code: err ? ((err as HttpException).getResponse() as { code?: unknown }).code : null,
-        length: out ? out.length : null,
-      }),
+    readPhotoBody(
+      req,
+      payload,
+      (err, out) =>
+        resolve({
+          status: err ? (err as HttpException).getStatus() : null,
+          code: err ? ((err as HttpException).getResponse() as { code?: unknown }).code : null,
+          length: out ? out.length : null,
+        }),
+      checkToken,
     ),
   );
 }
@@ -62,6 +71,13 @@ describe('the photo body parser', () => {
   it('an upload without a session is refused before its first byte (401)', async () => {
     const payload = body(5 * MB);
     const res = await run(request(UPLOAD, { authorization: '' }), payload);
+    expect(res).toMatchObject({ status: 401, code: 'UNAUTHENTICATED' });
+    expect(payload.readableFlowing).toBeNull();
+  });
+
+  it('a forged or expired token is refused before the first byte too (401)', async () => {
+    const payload = body(5 * MB);
+    const res = await run(request(UPLOAD, { authorization: 'Bearer forged' }), payload);
     expect(res).toMatchObject({ status: 401, code: 'UNAUTHENTICATED' });
     expect(payload.readableFlowing).toBeNull();
   });

@@ -1,6 +1,7 @@
 import {
   applicationIsEditable,
   courierItemOfDocument,
+  vehicleNeedsPapers,
   type CourierDocumentKind,
   type CourierItem,
   type CourierVehicle,
@@ -89,6 +90,18 @@ export function canSubmit(application: CourierApplication): boolean {
     application.items.length > 0 &&
     application.items.every((i) => i.done)
   );
+}
+
+/**
+ * SPEC-022-06 R3: on a bicycle or on foot, the licence and the vehicle papers are not kept —
+ * switching deletes the ones already sent, so the screen asks first (review of FEAT-022, N2).
+ */
+export function vehicleChangeDropsPhotos(
+  application: CourierApplication,
+  next: CourierVehicle,
+): boolean {
+  if (vehicleNeedsPapers(next)) return false;
+  return application.photos.some((p) => p.uploaded && p.kind !== 'face' && p.kind !== 'id_card');
 }
 
 /** The photos behind one item of the list (the vehicle papers are three). */

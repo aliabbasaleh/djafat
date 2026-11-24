@@ -49,6 +49,7 @@ echo "migrations: $migrations (live: $live_migrations) · users: $users · unbal
 
 # FEAT-022 (SPEC-022-04 R5, SC05): every photo the restored database refers to is in the
 # photos archive of the same night (backup.sh writes djafat-<stamp>.dump, uploads-<stamp>.tar.gz).
+# A photo replaced in the minutes between the two can fail one night's check; the next night clears it.
 STAMP="$(basename "$DUMP" .dump)"
 STAMP="${STAMP#djafat-}"
 FILES="backups/uploads-$STAMP.tar.gz"
@@ -66,7 +67,7 @@ if [ -n "$KEYS" ]; then
   LISTING="$(tar -tzf "$FILES" 2>/dev/null)" || fail "the photos archive $FILES is unreadable"
   missing=0
   for key in $KEYS; do
-    printf '%s\n' "$LISTING" | grep -qx "uploads/$key" || missing=$((missing + 1))
+    printf '%s\n' "$LISTING" | grep -Fqx "uploads/$key" || missing=$((missing + 1))
   done
   echo "photos archive: $(basename "$FILES") · $(printf '%s\n' "$KEYS" | wc -l | tr -d ' ') photo(s) referenced, $missing missing"
   [ "$missing" -eq 0 ] || fail "$missing photo(s) referenced by the database are missing from $FILES"

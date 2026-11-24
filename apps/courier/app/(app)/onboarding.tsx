@@ -8,6 +8,7 @@ import {
   MOBILE_MONEY_PROVIDERS,
   type CourierDocumentKind,
   type CourierItem,
+  type CourierVehicle,
   type MobileMoneyProvider,
 } from '@djafat/core';
 import { ApiClientError, type CourierApplication } from '@djafat/sdk';
@@ -29,6 +30,7 @@ import {
   itemState,
   photosOfItem,
   pickedPhoto,
+  vehicleChangeDropsPhotos,
 } from '../../lib/application';
 
 const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
@@ -54,6 +56,8 @@ export default function OnboardingScreen() {
   const [application, setApplication] = useState<CourierApplication | null>(null);
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<CourierItem | 'vehicle' | null>(null);
+  /** R3: a switch to a bicycle or on foot that would delete photos already sent waits for « Oui ». */
+  const [confirmVehicle, setConfirmVehicle] = useState<CourierVehicle | null>(null);
   const [sheetFor, setSheetFor] = useState<CourierDocumentKind | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +101,11 @@ export default function OnboardingScreen() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function changeVehicle(vehicle: CourierVehicle) {
+    setConfirmVehicle(null);
+    void run(() => api.courier.application.update({ vehicle })).then((ok) => ok && setOpen(null));
   }
 
   async function pick(kind: CourierDocumentKind, source: 'camera' | 'library') {
@@ -167,14 +176,36 @@ export default function OnboardingScreen() {
                 label={VEHICLE_LABELS[vehicle]}
                 selected={application.vehicle === vehicle}
                 onPress={() =>
-                  void run(() => api.courier.application.update({ vehicle })).then(
-                    (ok) => ok && setOpen(null),
-                  )
+                  vehicleChangeDropsPhotos(application, vehicle)
+                    ? setConfirmVehicle(vehicle)
+                    : changeVehicle(vehicle)
                 }
               />
             ))}
           </View>
-          <Text style={styles.note}>À vélo ou à pied : ni permis ni papiers du véhicule.</Text>
+          {confirmVehicle ? (
+            <View style={styles.confirm} accessibilityRole="alert" aria-live="polite">
+              <Text style={styles.rowTitle}>Passer à {VEHICLE_LABELS[confirmVehicle]} ?</Text>
+              <Text style={styles.note}>
+                Les photos du permis et des papiers du véhicule déjà envoyées seront supprimées.
+              </Text>
+              <BigButton
+                label={`Oui, passer à ${VEHICLE_LABELS[confirmVehicle]}`}
+                variant="danger"
+                loading={busy}
+                onPress={() => changeVehicle(confirmVehicle)}
+              />
+              <BigButton
+                label={`Non, garder ${application.vehicle ? VEHICLE_LABELS[application.vehicle] : 'mon véhicule'}`}
+                variant="ghost"
+                onPress={() => setConfirmVehicle(null)}
+              />
+            </View>
+          ) : null}
+          <Text style={styles.note}>
+            À vélo ou à pied : ni permis ni papiers du véhicule (leurs photos sont alors
+            supprimées).
+          </Text>
         </View>
       ) : null}
 
@@ -469,6 +500,12 @@ const styles = StyleSheet.create({
     borderColor: tokens.color.border.default,
   },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space['2'] },
+  confirm: {
+    gap: tokens.space['2'],
+    padding: tokens.space['3'],
+    borderRadius: tokens.radius.md,
+    backgroundColor: tokens.color.state.dangerBg,
+  },
   choice: {
     minHeight: 48,
     paddingHorizontal: tokens.space['4'],

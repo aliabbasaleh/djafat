@@ -7,7 +7,9 @@ while true; do
   pg_dump -h postgres -U djafat -d djafat -Fc -f "/backups/djafat-$now.dump" \
     && echo "backup ok: djafat-$now.dump" || echo "backup FAILED at $now"
   if [ -d /data/uploads ]; then
-    tar -czf "/backups/uploads-$now.tar.gz" -C /data uploads \
+    # Written under a temporary name: a restore check running meanwhile never reads half an archive.
+    tar -czf "/backups/uploads-$now.tar.gz.part" -C /data uploads \
+      && mv "/backups/uploads-$now.tar.gz.part" "/backups/uploads-$now.tar.gz" \
       && echo "files ok: uploads-$now.tar.gz" || echo "files backup FAILED at $now"
   else
     # Never silent: without the volume, the photos are not backed up at all.
@@ -15,5 +17,6 @@ while true; do
   fi
   find /backups -name 'djafat-*.dump' -mtime +14 -delete
   find /backups -name 'uploads-*.tar.gz' -mtime +14 -delete
+  find /backups -name 'uploads-*.tar.gz.part' -mtime +1 -delete
   sleep 86400
 done

@@ -14,8 +14,7 @@ describe('SPEC-022-09 — neighbourhood names', () => {
     expect(placeNameKey('Moursal')).not.toBe(placeNameKey('Moursal Centre'));
   });
 
-  // SPEC-022-09-SC02
-  it('SPEC-022-09-SC02 — a name typed under « Autre » is kept as typed, only trimmed', () => {
+  it('SPEC-022-09 R3 — a name typed under « Autre » is kept as typed, only trimmed', () => {
     expect(tidyPlaceName('  Gassi   Est ')).toBe('Gassi Est');
     expect(tidyPlaceName('Klémat')).toBe('Klémat');
   });

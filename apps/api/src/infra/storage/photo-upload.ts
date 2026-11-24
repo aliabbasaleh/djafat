@@ -42,16 +42,22 @@ export function isPhotoUploadRoute(url: string | undefined): boolean {
 
 type ParserDone = (err: Error | null, body?: Buffer) => void;
 
+/** Throws when the access token is forged or expired (`TokenService.verifyAccessToken`: no I/O). */
+export type AccessTokenCheck = (token: string) => void;
+
 /**
- * Reads one photo body. Only an upload route reads anything, and only for a
- * caller with a session: every other route answers 415 as before, and an
- * upload without a token is refused before its first byte — the guard would
- * refuse it anyway, but only after 5 MB (review of FEAT-022 parts 1-2, finding 2).
+ * Reads one photo body. Only an upload route reads anything, and only with a
+ * valid access token (signature and expiry checked here): every other route
+ * answers 415 as before, and an upload without a valid token is refused
+ * before its first byte — the guard would refuse it anyway, but only after
+ * 5 MB (review of FEAT-022 parts 1-2, finding 2 and N1). A token of a session
+ * revoked meanwhile still reaches the guard, which refuses it.
  */
 export function readPhotoBody(
   req: Pick<FastifyRequest, 'headers' | 'routeOptions'>,
   payload: Readable,
   done: ParserDone,
+  checkToken: AccessTokenCheck,
 ): void {
   let settled = false;
   const finish = (err: Error | null, body?: Buffer) => {
@@ -68,9 +74,18 @@ export function readPhotoBody(
     );
     return;
   }
-  if (!/^Bearer\s+\S/i.test(String(req.headers.authorization ?? ''))) {
+  const token = /^Bearer\s+(\S+)$/i.exec(String(req.headers.authorization ?? ''))?.[1];
+  if (!token) {
     finish(
       new UnauthorizedException({ code: 'UNAUTHENTICATED', message: 'Missing bearer token.' }),
+    );
+    return;
+  }
+  try {
+    checkToken(token);
+  } catch {
+    finish(
+      new UnauthorizedException({ code: 'UNAUTHENTICATED', message: 'Invalid or expired token.' }),
     );
     return;
   }
@@ -97,10 +112,13 @@ export function readPhotoBody(
 }
 
 /** Registered by `configureApp`, so the real process and the integration tests read uploads the same way. */
-export function registerPhotoUploads(app: NestFastifyApplication): void {
+export function registerPhotoUploads(
+  app: NestFastifyApplication,
+  checkToken: AccessTokenCheck,
+): void {
   const fastify: FastifyInstance = app.getHttpAdapter().getInstance();
   fastify.addContentTypeParser([...PHOTO_UPLOAD_CONTENT_TYPES], (req, payload, done) =>
-    readPhotoBody(req, payload, done),
+    readPhotoBody(req, payload, done, checkToken),
   );
 }
 

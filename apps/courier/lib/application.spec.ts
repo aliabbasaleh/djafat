@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ApiClientError, type CourierApplication } from '@djafat/sdk';
 import {
   ITEM_LABELS,
+  vehicleChangeDropsPhotos,
   applicationBanner,
   applicationErrorMessage,
   canSubmit,
@@ -109,5 +110,20 @@ describe('SPEC-022-06 — « Avant votre première course »', () => {
         }),
       ),
     ).toBe('Le contact d’urgence doit avoir un autre numéro que le vôtre.');
+  });
+});
+
+describe('SPEC-022-06 R3 — switching to a bicycle or on foot', () => {
+  it('asks first when the licence or a vehicle paper was already sent; not otherwise', () => {
+    const withLicence = application({
+      photos: application().photos.map((p) =>
+        p.kind === 'driving_licence' ? { ...p, uploaded: true } : p,
+      ),
+    });
+    expect(vehicleChangeDropsPhotos(withLicence, 'velo')).toBe(true);
+    expect(vehicleChangeDropsPhotos(withLicence, 'a_pied')).toBe(true);
+    expect(vehicleChangeDropsPhotos(withLicence, 'voiture')).toBe(false);
+    // only the face and the ID sent: nothing to lose
+    expect(vehicleChangeDropsPhotos(application(), 'velo')).toBe(false);
   });
 });

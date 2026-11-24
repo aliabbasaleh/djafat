@@ -43,9 +43,9 @@ export class FilesystemObjectStorage implements ObjectStoragePort {
    */
   async putObject(key: string, body: Uint8Array, _contentType: string): Promise<{ key: string }> {
     this.keyOrThrow(key);
-    await mkdir(this.dir, { recursive: true });
     const temporary = join(this.dir, `.upload-${randomUUID()}`);
     try {
+      await mkdir(this.dir, { recursive: true });
       await this.writeTemporary(temporary, body);
       await rename(temporary, join(this.dir, key));
     } catch (err) {
