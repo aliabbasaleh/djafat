@@ -5,11 +5,17 @@
  */
 export {
   COMING_SOON,
+  DIAL_CODE,
   RESEND_COOLDOWN_SECONDS,
   accountErrorMessage,
   channelButtons,
+  emailSuggestionText,
+  emailTypoCheck,
   fieldErrorsFromApi,
   maskEmail,
+  phoneFieldShowsDialCode,
+  phoneForSending,
+  smsPhoneError,
   validateNewPassword,
   validateRegisterForm,
   type ChannelButton,

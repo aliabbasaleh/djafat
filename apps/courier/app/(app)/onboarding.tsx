@@ -11,10 +11,16 @@ import {
   type CourierVehicle,
   type MobileMoneyProvider,
 } from '@djafat/core';
-import { ApiClientError, type CourierApplication } from '@djafat/sdk';
+import {
+  ApiClientError,
+  personNameError,
+  phoneFieldError,
+  type CourierApplication,
+} from '@djafat/sdk';
 import { Screen } from '../../components/Screen';
 import { BigButton } from '../../components/BigButton';
 import { Badge } from '../../components/Badge';
+import { PhoneInput } from '../../components/PhoneInput';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 import {
@@ -227,6 +233,7 @@ export default function OnboardingScreen() {
                   item={item}
                   application={application}
                   busy={busy}
+                  onInvalid={setError}
                   onPhoto={(kind) => setSheetFor(kind)}
                   onSave={(change) =>
                     void run(() => api.courier.application.update(change)).then(
@@ -364,12 +371,15 @@ function ItemEditor({
   item,
   application,
   busy,
+  onInvalid,
   onPhoto,
   onSave,
 }: {
   item: CourierItem;
   application: CourierApplication;
   busy: boolean;
+  /** FEAT-024: a field refused before sending (the server's own words). */
+  onInvalid: (message: string) => void;
   onPhoto: (kind: CourierDocumentKind) => void;
   onSave: (change: Parameters<typeof api.courier.application.update>[0]) => void;
 }) {
@@ -398,19 +408,26 @@ function ItemEditor({
           ))}
         </View>
         <Text style={styles.label}>Numéro</Text>
-        <TextInput
-          accessibilityLabel="Numéro Mobile Money"
-          style={styles.input}
+        {/* FEAT-024 (SPEC-024-02 R4): a Chad mobile only — « +235 » always shows. */}
+        <PhoneInput
+          label="Numéro Mobile Money"
+          use="mobile_money"
+          inputStyle={styles.input}
           value={number}
           onChangeText={setNumber}
-          keyboardType="phone-pad"
           placeholder="66 12 34 56"
-          placeholderTextColor={tokens.color.text.muted}
         />
         <BigButton
           label="Enregistrer"
           loading={busy}
-          onPress={() => onSave({ mobileMoney: { provider, number } })}
+          onPress={() => {
+            const why = phoneFieldError(number, 'mobile_money', 'Indiquez le numéro Mobile Money.');
+            if (why) {
+              onInvalid(why);
+              return;
+            }
+            onSave({ mobileMoney: { provider, number } });
+          }}
         />
       </View>
     );
@@ -427,19 +444,29 @@ function ItemEditor({
           autoCapitalize="words"
         />
         <Text style={styles.label}>Son téléphone</Text>
-        <TextInput
-          accessibilityLabel="Téléphone de la personne à prévenir"
-          style={styles.input}
+        {/* FEAT-024 (SPEC-024-02 R3): a number to call — foreign or fixed allowed. */}
+        <PhoneInput
+          label="Téléphone de la personne à prévenir"
+          use="contact"
+          inputStyle={styles.input}
           value={phone}
           onChangeText={setPhone}
-          keyboardType="phone-pad"
           placeholder="99 12 34 56"
-          placeholderTextColor={tokens.color.text.muted}
         />
         <BigButton
           label="Enregistrer"
           loading={busy}
-          onPress={() => onSave({ emergencyContact: { name, phone } })}
+          onPress={() => {
+            // SPEC-024-03 R3: a person's name, letters only.
+            const why =
+              personNameError(name, 'Écrivez le nom de la personne à prévenir.') ??
+              phoneFieldError(phone, 'contact', 'Indiquez son téléphone.');
+            if (why) {
+              onInvalid(why);
+              return;
+            }
+            onSave({ emergencyContact: { name, phone } });
+          }}
         />
       </View>
     );

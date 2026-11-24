@@ -6,7 +6,11 @@ import {
   checkCourierBirthDate,
   ndjamenaDate,
 } from '@djafat/core';
-import { makePhoneInputSchema, NeighbourhoodNameSchema } from '@djafat/validation';
+import {
+  makePersonNameSchema,
+  makePhoneInputSchema,
+  NeighbourhoodNameSchema,
+} from '@djafat/validation';
 import { EmailInputSchema } from './email.schema';
 import { NewPasswordSchema, refusePersonalPassword } from './password.schema';
 
@@ -15,14 +19,18 @@ import { NewPasswordSchema, refusePersonalPassword } from './password.schema';
  * screen's job: the API receives one password.
  */
 
-/** Numbers as typed in Chad, normalised to E.164 (FEAT-005). */
-const PhoneInput = makePhoneInputSchema(LAUNCH_MARKET);
+/**
+ * Numbers as typed in Chad, normalised to E.164 (FEAT-005). The number of an
+ * account: a Chad mobile or a foreign number, never a fixed line (FEAT-024,
+ * SPEC-024-02 R2).
+ */
+const PhoneInput = makePhoneInputSchema(LAUNCH_MARKET, 'account');
 
-/** « Nom complet » : 2 to 80 characters once trimmed, spaces collapsed. */
-export const FullNameSchema = z
-  .string()
-  .transform((v) => v.trim().replace(/\s+/g, ' '))
-  .pipe(z.string().min(2, 'Indiquez votre nom complet.').max(80, 'Au plus 80 caractères.'));
+/**
+ * « Nom complet » : letters only, at least two, 80 characters at most once
+ * trimmed and spaces collapsed (FEAT-024, SPEC-024-03).
+ */
+export const FullNameSchema = makePersonNameSchema();
 
 /** The account itself — the same four fields for every type (FEAT-020, SPEC-022-01 R2). */
 const AccountFields = {
@@ -96,9 +104,13 @@ export const RegisterSchema = z
     ]),
   )
   .superRefine((v, ctx) => {
+    // A field that failed its own check holds no string here (zod's NEVER): the
+    // personal-password rule sees only the fields that passed — otherwise a
+    // malformed phone with a valid password threw instead of answering 422.
+    const text = (value: unknown) => (typeof value === 'string' ? value : null);
     refusePersonalPassword(
       v.password,
-      { email: v.email, phone: v.phone, fullName: v.fullName },
+      { email: text(v.email), phone: text(v.phone), fullName: text(v.fullName) },
       ctx,
       'password',
     );

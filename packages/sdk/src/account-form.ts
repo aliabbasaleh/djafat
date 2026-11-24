@@ -1,4 +1,17 @@
-import { PASSWORD_REJECTION_MESSAGES, evaluatePassword } from '@djafat/core';
+import {
+  LAUNCH_PHONE_MARKET,
+  PASSWORD_REJECTION_MESSAGES,
+  PERSON_NAME_MESSAGES,
+  PHONE_INPUT_MESSAGES,
+  checkPersonName,
+  evaluatePassword,
+  phoneInputMessage,
+  phoneKind,
+  readPhoneInput,
+  smsForeignMessage,
+  suggestEmailFix,
+  type PhoneUse,
+} from '@djafat/core';
 import { ApiClientError } from './http.js';
 import type { CodeChannelId, MeProfile } from './auth.js';
 
@@ -24,20 +37,96 @@ export interface RegisterFormValues {
 export type RegisterField = keyof RegisterFormValues;
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/** Chad numbers have 8 national digits (FEAT-005); the API normalises the rest. */
-const MIN_PHONE_DIGITS = 8;
+
+/** FEAT-024 (SPEC-024-02 R1): the dial code shown in front of every phone field. */
+export const DIAL_CODE = LAUNCH_PHONE_MARKET.dialCode;
+
+/**
+ * SPEC-024-02 R1: « +235 » stays in front of the box until the number carries
+ * its own code (« + » or « 00 », Arabic digits included); always for a Mobile
+ * Money number, which is Chadian.
+ */
+export function phoneFieldShowsDialCode(value: string, use: PhoneUse = 'account'): boolean {
+  if (use === 'mobile_money') return true;
+  return !/^\s*(\+|00|٠٠|۰۰)/.test(value);
+}
+
+/** SPEC-024-02: the message under a phone field for `use`, or null — the server's own words. */
+export function phoneFieldError(
+  value: string,
+  use: PhoneUse,
+  emptyMessage = 'Indiquez votre numéro de téléphone.',
+): string | null {
+  const read = readPhoneInput(value, LAUNCH_PHONE_MARKET, use);
+  if (read.ok) return null;
+  return read.reason === 'empty' ? emptyMessage : phoneInputMessage(read.reason, use);
+}
+
+/**
+ * SPEC-024-02 R1, R6: a number as typed in a field that shows « +235 », sent in
+ * international format when it is a valid number; otherwise as typed, for the
+ * server to judge.
+ */
+export function phoneForSending(value: string): string {
+  const read = readPhoneInput(value, LAUNCH_PHONE_MARKET, 'contact');
+  return read.ok ? read.e164 : value.trim();
+}
+
+/**
+ * SPEC-024-01 R8: why a number typed for an SMS code cannot get one, or null.
+ * A foreign number is offered WhatsApp when the deployment has it, else the e-mail.
+ */
+export function smsPhoneError(value: string, whatsappAvailable: boolean): string | null {
+  const read = readPhoneInput(value, LAUNCH_PHONE_MARKET, 'contact');
+  if (!read.ok) {
+    return read.reason === 'empty'
+      ? 'Indiquez votre numéro de téléphone.'
+      : PHONE_INPUT_MESSAGES.invalid;
+  }
+  const kind = phoneKind(read.e164, LAUNCH_PHONE_MARKET);
+  if (kind === 'fixed') return PHONE_INPUT_MESSAGES.fixed;
+  return kind === 'foreign' ? smsForeignMessage(whatsappAvailable) : null;
+}
+
+/** SPEC-024-03: the message under a person's name, or null; a form may word « missing » its own way. */
+export function personNameError(
+  value: string,
+  missing: string = PERSON_NAME_MESSAGES.missing,
+): string | null {
+  const name = checkPersonName(value);
+  if (name.ok) return null;
+  return name.reason === 'missing' ? missing : PERSON_NAME_MESSAGES[name.reason];
+}
+
+/**
+ * SPEC-024-04 R3, R4: on sending, the address to suggest — sending stops and
+ * the screen shows « Vouliez-vous dire … ? » — or null to send. `warned` is the
+ * address already stopped once (kept by the screen): the same address is never
+ * stopped twice, so sending again keeps what was typed.
+ */
+export function emailTypoCheck(
+  email: string,
+  warned: string | null,
+): { readonly suggestion: string | null; readonly warned: string | null } {
+  const typed = email.trim().toLowerCase();
+  const suggestion = suggestEmailFix(typed);
+  if (!suggestion || typed === warned) return { suggestion: null, warned };
+  return { suggestion, warned: typed };
+}
+
+/** The words of the suggestion (FEAT-024-VIS02, point 4). */
+export function emailSuggestionText(suggestion: string): string {
+  return `Vouliez-vous dire ${suggestion} ?`;
+}
 
 /** SPEC-020-07 R4: what the screen checks before sending the registration. */
 export function validateRegisterForm(values: RegisterFormValues): FieldErrors<RegisterField> {
   const errors: FieldErrors<RegisterField> = {};
-  if (values.fullName.trim().replace(/\s+/g, ' ').length < 2) {
-    errors.fullName = 'Indiquez votre nom complet.';
-  }
-  if (values.phone.replace(/\D/g, '').length < MIN_PHONE_DIGITS) {
-    errors.phone = values.phone.trim()
-      ? 'Numéro invalide (ex. 66 12 34 56).'
-      : 'Indiquez votre numéro de téléphone.';
-  }
+  // FEAT-024: a person's name (SPEC-024-03); the number of an account, never a fixed line (SPEC-024-02).
+  const nameError = personNameError(values.fullName);
+  if (nameError) errors.fullName = nameError;
+  const phoneError = phoneFieldError(values.phone, 'account');
+  if (phoneError) errors.phone = phoneError;
   if (!EMAIL_SHAPE.test(values.email.trim())) errors.email = 'Adresse e-mail invalide.';
   Object.assign(
     errors,
@@ -96,6 +185,11 @@ export function accountErrorMessage(err: unknown, fallback: string): string {
       return 'Mot de passe actuel incorrect.';
     case 'EMAIL_REQUIRED':
       return "Ajoutez d'abord votre adresse e-mail.";
+    case 'SMS_FOREIGN_NUMBER':
+      // The server words it: it knows whether WhatsApp is in service (SPEC-024-01 R2).
+      return err.message || smsForeignMessage(false);
+    case 'PHONE_FIXED_LINE':
+      return PHONE_INPUT_MESSAGES.fixed;
     case 'VALIDATION_ERROR':
       return firstDetail(err) ?? fallback;
     default:
@@ -127,6 +221,8 @@ export function fieldErrorsFromApi<F extends string>(
     }
     const byCode: Partial<Record<string, string>> = {
       PHONE_ALREADY_USED: 'phone',
+      SMS_FOREIGN_NUMBER: 'phone',
+      PHONE_FIXED_LINE: 'phone',
       EMAIL_ALREADY_USED: 'email',
       CURRENT_PASSWORD_INCORRECT: 'currentPassword',
     };
@@ -197,9 +293,15 @@ export interface PhoneSectionState {
   readonly sms: ChannelButton;
 }
 
-/** « Mon profil » — SPEC-020-09 R3: the number's state and the ways to confirm it. */
+/** SPEC-024-01 R8: the note of the SMS button for a number that is not a Chad mobile. */
+export const SMS_CHAD_ONLY = 'SMS : numéros du Tchad seulement';
+
+/**
+ * « Mon profil » — SPEC-020-09 R3: the number's state and the ways to confirm
+ * it. FEAT-024 (SPEC-024-01 R8): no SMS for a number that is not a Chad mobile.
+ */
 export function phoneSectionState(
-  me: Pick<MeProfile, 'phoneVerified'>,
+  me: Pick<MeProfile, 'phoneVerified'> & { readonly phone?: string | null },
   methods: ReadonlyArray<{ id: string; available: boolean; link?: string }> | null,
 ): PhoneSectionState {
   const buttons = channelButtons(methods ?? []);
@@ -210,7 +312,13 @@ export function phoneSectionState(
       enabled: false,
       note: COMING_SOON,
     };
-  return { confirmed: me.phoneVerified, whatsapp: pick('whatsapp'), sms: pick('sms') };
+  const sms = pick('sms');
+  const chadMobile = !me.phone || phoneKind(me.phone, LAUNCH_PHONE_MARKET) === 'mobile';
+  return {
+    confirmed: me.phoneVerified,
+    whatsapp: pick('whatsapp'),
+    sms: chadMobile ? sms : { id: 'sms', ...CHANNEL_FACE.sms, enabled: false, note: SMS_CHAD_ONLY },
+  };
 }
 
 /** `awa@example.td` -> `a***@example.td`, as the API masks it. */

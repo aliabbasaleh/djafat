@@ -48,6 +48,10 @@ export const API_ERROR_CODES = [
   'EMAIL_REQUIRED',
   /** A phone code on an email account whose number was never confirmed (409) — FEAT-020. */
   'PHONE_NOT_CONFIRMED',
+  /** FEAT-024 — DJAFAT sends no SMS to a foreign number: WhatsApp or e-mail instead (422, SPEC-024-01 R2). */
+  'SMS_FOREIGN_NUMBER',
+  /** FEAT-024 — a fixed line receives neither SMS nor WhatsApp (422, SPEC-024-01 R3). */
+  'PHONE_FIXED_LINE',
   /** FEAT-022 — a courier who signs up is 18 or older (422, SPEC-022-02 R2). */
   'UNDERAGE',
   /** FEAT-022 — a courier whose application is not approved cannot go online (409, SPEC-022-06 R5). */

@@ -5,10 +5,15 @@ import { Button } from '../Button';
 import { api } from '../../lib/api';
 import { loadDeviceToken } from '../../lib/auth-storage';
 import {
+  DIAL_CODE,
   accountErrorMessage,
   channelButtons,
+  emailSuggestionText,
+  emailTypoCheck,
   fieldErrorsFromApi,
   maskEmail,
+  phoneFieldShowsDialCode,
+  smsPhoneError,
   validateNewPassword,
   type ChannelButton,
   type FieldErrors,
@@ -63,9 +68,39 @@ export function LoginForm({
   }, []);
 
   const whatsappLink = methods?.find((m) => m.id === 'whatsapp')?.link;
+  const whatsappAvailable = Boolean(methods?.find((m) => m.id === 'whatsapp')?.available);
   const openLink = (link: string | undefined) => {
     if (link) void Linking.openURL(link);
   };
+
+  /** FEAT-024 (SPEC-024-04): the address already stopped once, and the suggestion shown. */
+  const [emailWarned, setEmailWarned] = useState<string | null>(null);
+  const [emailHint, setEmailHint] = useState<string | null>(null);
+  /** FEAT-024 (SPEC-024-01 R8): why the number typed for an SMS cannot get one. */
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  /** SPEC-024-04 R3, R4: true when the sending stops once to suggest a fixed address. */
+  function stopForTypo(): boolean {
+    const typo = emailTypoCheck(email, emailWarned);
+    setEmailWarned(typo.warned);
+    setEmailHint(typo.suggestion);
+    return typo.suggestion !== null;
+  }
+
+  const typeEmail = (text: string) => {
+    setEmail(text);
+    setEmailHint(null);
+  };
+
+  const emailSuggestion = emailHint
+    ? {
+        text: emailSuggestionText(emailHint),
+        onAccept: () => {
+          setEmail(emailHint);
+          setEmailHint(null);
+        },
+      }
+    : null;
 
   function go(next: View_) {
     setError(null);
@@ -285,17 +320,19 @@ export function LoginForm({
         <Field
           label="E-mail"
           value={email}
-          onChangeText={setEmail}
+          onChangeText={typeEmail}
           placeholder="vous@gmail.com"
           keyboardType="email-address"
           textContentType="emailAddress"
           autoCapitalize="none"
+          suggestion={emailSuggestion}
         />
         <Button
           label="Recevoir un code"
           loading={busy}
           fullWidth
           onPress={() =>
+            !stopForTypo() &&
             void run("Impossible d'envoyer le code. Vérifiez l'adresse e-mail.", async () => {
               if (forgot) await api.auth.forgotPassword(email);
               else await api.auth.requestEmailCode(email);
@@ -328,16 +365,25 @@ export function LoginForm({
         <Field
           label="Numéro de téléphone"
           value={phone}
-          onChangeText={setPhone}
+          onChangeText={(text) => {
+            setPhone(text);
+            setPhoneError(null);
+          }}
           placeholder="66 12 34 56"
           keyboardType="phone-pad"
           textContentType="telephoneNumber"
+          leadingText={phoneFieldShowsDialCode(phone) ? DIAL_CODE : undefined}
+          error={phoneError ?? undefined}
         />
         <Button
           label={byWhatsapp ? 'Recevoir mon code sur WhatsApp' : 'Envoyer le code'}
           loading={busy}
           fullWidth
-          onPress={() =>
+          onPress={() => {
+            // SPEC-024-01 R8: no SMS to a foreign number or a fixed line — nothing is sent.
+            const why = byWhatsapp ? null : smsPhoneError(phone, whatsappAvailable);
+            setPhoneError(why);
+            if (why) return;
             void run(
               "Impossible d'envoyer le code. Vérifiez le numéro (ex. 66 12 34 56).",
               async () => {
@@ -346,8 +392,8 @@ export function LoginForm({
                   await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
                 setView({ ...view, sent: true });
               },
-            )
-          }
+            );
+          }}
         />
         <Button label="Retour" variant="ghost" fullWidth onPress={() => go({ kind: 'password' })} />
       </View>
@@ -364,11 +410,12 @@ export function LoginForm({
       <Field
         label="E-mail"
         value={email}
-        onChangeText={setEmail}
+        onChangeText={typeEmail}
         placeholder="vous@gmail.com"
         keyboardType="email-address"
         textContentType="emailAddress"
         autoCapitalize="none"
+        suggestion={emailSuggestion}
       />
       <Field
         label="Mot de passe"
@@ -382,6 +429,7 @@ export function LoginForm({
         loading={busy}
         fullWidth
         onPress={() =>
+          !stopForTypo() &&
           void run('Connexion impossible pour le moment.', async () => {
             const result = await api.auth.passwordLogin({ email, password, deviceToken });
             if (result.status === 'signed_in') {

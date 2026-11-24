@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ApiClientError, type RestaurantProfile } from '@djafat/sdk';
+import {
+  ApiClientError,
+  DIAL_CODE,
+  phoneFieldShowsDialCode,
+  phoneForSending,
+  type RestaurantProfile,
+} from '@djafat/sdk';
 import { Heading, Text, Stack, Inline, Badge, ErrorState, Skeleton, cx } from '@djafat/ui';
 import { Button, Input, Textarea, Alert } from '@/components/ui-client';
 import { api } from '@/lib/api';
@@ -101,7 +107,8 @@ export default function ProfilePage() {
       await api.restaurant.update(profile.id, {
         name: form.name,
         description: form.description,
-        phone: form.phone,
+        // FEAT-024: the field shows « +235 »; 8 digits typed leave in international format.
+        phone: form.phone.trim() ? phoneForSending(form.phone) : form.phone,
         addressText: form.addressText,
         logoUrl: form.logoUrl,
         coverUrl: form.coverUrl,
@@ -201,6 +208,9 @@ export default function ProfilePage() {
         />
         <Input
           label="Téléphone"
+          type="tel"
+          placeholder="66 12 34 56"
+          {...(phoneFieldShowsDialCode(form.phone) ? { leadingText: DIAL_CODE } : {})}
           value={form.phone}
           onChange={(e) => setForm({ ...form, phone: e.target.value })}
           disabled={!canWrite}

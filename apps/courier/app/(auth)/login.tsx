@@ -4,7 +4,9 @@ import { Linking, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'r
 import {
   RESEND_COOLDOWN_SECONDS,
   accountErrorMessage,
+  emailTypoCheck,
   phoneCodeButtons,
+  smsPhoneError,
   teamPasswordLogin,
   teamResetPassword,
   teamVerifyCode,
@@ -14,6 +16,8 @@ import {
 import { tokens } from '@djafat/tokens';
 import { Screen } from '../../components/Screen';
 import { BigButton } from '../../components/BigButton';
+import { EmailSuggestion } from '../../components/EmailSuggestion';
+import { PhoneInput } from '../../components/PhoneInput';
 import { api } from '../../lib/api';
 import { courierSessionKeeper, loadDeviceToken } from '../../lib/auth-storage';
 import { useAuth } from '../../lib/auth-context';
@@ -60,6 +64,9 @@ export default function LoginScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  /** FEAT-024 (SPEC-024-04): the address already stopped once, and the suggestion shown. */
+  const [emailWarned, setEmailWarned] = useState<string | null>(null);
+  const [emailHint, setEmailHint] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +107,14 @@ export default function LoginScreen() {
 
   const digits = (value: string) => value.replace(/\D/g, '').slice(0, 6);
 
+  /** SPEC-024-04 R3, R4: true when the sending stops once to suggest a fixed address. */
+  function stopForTypo(): boolean {
+    const typo = emailTypoCheck(email, emailWarned);
+    setEmailWarned(typo.warned);
+    setEmailHint(typo.suggestion);
+    return typo.suggestion !== null;
+  }
+
   async function run(action: () => Promise<void>) {
     setError(null);
     setLoading(true);
@@ -118,6 +133,7 @@ export default function LoginScreen() {
   }
 
   function login() {
+    if (stopForTypo()) return;
     void run(async () => {
       const next = await teamPasswordLogin(
         api.auth,
@@ -150,6 +166,7 @@ export default function LoginScreen() {
   }
 
   function askResetCode() {
+    if (stopForTypo()) return;
     void run(async () => {
       await api.auth.forgotPassword(email);
       setCooldown(RESEND_COOLDOWN_SECONDS);
@@ -187,6 +204,13 @@ export default function LoginScreen() {
   }
 
   function requestSmsCode() {
+    // FEAT-024 (SPEC-024-01 R8): no SMS to a foreign number or a fixed line — nothing is sent.
+    const whatsapp = phoneButtons.some((b) => b.id === 'whatsapp' && b.enabled);
+    const why = smsPhoneError(phone, whatsapp);
+    if (why) {
+      setError(why);
+      return;
+    }
     void run(async () => {
       await api.auth.requestPhoneLoginCode(phone);
       go({ kind: 'phone-code', channel: 'sms' });
@@ -239,7 +263,10 @@ export default function LoginScreen() {
       <TextInput
         style={styles.input}
         value={email}
-        onChangeText={typed(setEmail)}
+        onChangeText={(value) => {
+          typed(setEmail)(value);
+          setEmailHint(null);
+        }}
         placeholder="vous@gmail.com"
         placeholderTextColor={tokens.color.text.muted}
         keyboardType="email-address"
@@ -250,20 +277,24 @@ export default function LoginScreen() {
         accessibilityLabel="E-mail"
         autoFocus
       />
+      <EmailSuggestion
+        suggestion={emailHint}
+        onAccept={(address) => {
+          setEmail(address);
+          setEmailHint(null);
+        }}
+      />
     </>
   );
   const phoneInput = (autoFocus = false) => (
     <>
       <Text style={styles.label}>Numéro de téléphone</Text>
-      <TextInput
-        style={styles.input}
+      <PhoneInput
+        label="Numéro de téléphone"
+        inputStyle={styles.input}
         value={phone}
         onChangeText={typed(setPhone)}
-        placeholder="+23566000000"
-        placeholderTextColor={tokens.color.text.muted}
-        keyboardType="phone-pad"
-        textContentType="telephoneNumber"
-        accessibilityLabel="Numéro de téléphone"
+        placeholder="66 12 34 56"
         autoFocus={autoFocus}
       />
     </>

@@ -5,14 +5,22 @@ import {
   Injectable,
   Logger,
   UnauthorizedException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import type { OtpDeliveryPort, OtpDeliveryPurpose } from '@djafat/types';
-import { evaluateOtpAttempt } from '@djafat/core';
+import { LAUNCH_MARKET } from '@djafat/config';
+import {
+  PHONE_INPUT_MESSAGES,
+  evaluateOtpAttempt,
+  phoneKind,
+  smsForeignMessage,
+} from '@djafat/core';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AppConfigService } from '../../common/config/config.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { RateLimiterService } from '../../common/rate-limit/rate-limiter.service';
 import { PlatformService } from '../platform/platform.service';
+import { listAuthMethods } from './auth-methods';
 import { generateOtpCode, hashOtpCode, timingSafeEqualHex } from './crypto.util';
 import { smsUnavailable } from './providers/disabled-sms-otp-delivery.provider';
 import {
@@ -125,6 +133,10 @@ export class OtpService {
     ip: string | null,
     options: OtpRequestOptions = {},
   ): Promise<void> {
+    // FEAT-024 (SPEC-024-01 R1-R4): an SMS code goes to a Chad mobile only. A
+    // foreign number or a fixed line is refused first — before the switched-off
+    // check, any budget or write: nothing leaves, nothing is counted.
+    if (to.channel === 'sms') this.assertSmsReachable(to.target);
     // FEAT-008 (SPEC-008-01-SC05): a switched-off SMS channel is refused BEFORE any
     // budget or write — otherwise SMS requests for someone's number would burn the
     // per-number budget their WhatsApp codes share.
@@ -164,6 +176,34 @@ export class OtpService {
       ip,
       metadata: { purpose }, // phone is the actor here but has no user id yet — kept out of metadata too (not a secret, but unnecessary to duplicate; entityId is reserved for uuids)
     });
+  }
+
+  /**
+   * SPEC-024-01 R2, R3: no SMS to a foreign number (WhatsApp, when the
+   * deployment has it, or the e-mail instead) nor to a fixed line.
+   */
+  private assertSmsReachable(phone: string): void {
+    const kind = phoneKind(phone, LAUNCH_MARKET);
+    if (kind === 'mobile') return;
+    const [code, message] =
+      kind === 'fixed'
+        ? (['PHONE_FIXED_LINE', PHONE_INPUT_MESSAGES.fixed] as const)
+        : (['SMS_FOREIGN_NUMBER', smsForeignMessage(this.whatsappAvailable())] as const);
+    throw new UnprocessableEntityException({
+      code,
+      message,
+      details: [{ path: 'phone', message }],
+    });
+  }
+
+  private whatsappAvailable(): boolean {
+    return listAuthMethods({
+      NODE_ENV: this.config.get('NODE_ENV'),
+      SMS_PROVIDER: this.config.get('SMS_PROVIDER'),
+      EMAIL_PROVIDER: this.config.get('EMAIL_PROVIDER'),
+      WHATSAPP_PROVIDER: this.config.get('WHATSAPP_PROVIDER'),
+      WHATSAPP_BUSINESS_NUMBER: this.config.get('WHATSAPP_BUSINESS_NUMBER'),
+    }).some((method) => method.id === 'whatsapp' && method.available);
   }
 
   /** Codes requested from this network (`otp_rate_limit_per_ip`): 429 `RATE_LIMITED` once spent. */

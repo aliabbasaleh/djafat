@@ -81,6 +81,12 @@ applications d'équipe). Le numéro relié à l'API WhatsApp Cloud ne peut en pr
 dans l'application WhatsApp Business (sauf « coexistence », si Meta la propose au Tchad) ;
 FEAT-017 (commandes par WhatsApp) utilise aujourd'hui le numéro WhatsApp de DJAFAT.
 
+Numéros étrangers (demande de l'utilisateur du 2026-11-24, FEAT-024) : WhatsApp doit servir aussi
+un numéro étranger, puisqu'aucun SMS ne part vers l'étranger. Exemple de l'utilisateur : un visiteur
+venu au Tchad, sans numéro local, s'inscrit avec son e-mail puis se connecte et confirme son numéro
+par WhatsApp. Citation : « if it is foreign number, they can continue with the WhatsApp […] At the
+time that we'll be fixing the WhatsApp, so we have to take that consideration. »
+
 ## Questions ouvertes
 
 - Quel numéro relier à Meta : celui des commandes par WhatsApp (FEAT-017) ou un second numéro ?

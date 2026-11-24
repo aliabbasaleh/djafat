@@ -8,11 +8,32 @@ interface FieldProps extends TextInputProps {
   readonly error?: string | undefined;
   /** A password: hidden, with « Afficher / Masquer » (FEAT-020-VIS01). */
   readonly secret?: boolean;
+  /** FEAT-024 (SPEC-024-02 R1): « +235 » in front of the box, not typed. */
+  readonly leadingText?: string | undefined;
+  /** FEAT-024 (SPEC-024-04): « Vouliez-vous dire … ? » and « Oui, corriger » under the field. */
+  readonly suggestion?: { readonly text: string; readonly onAccept: () => void } | null;
 }
 
 /** A labelled input, its error under it (FEAT-020, SPEC-020-08). */
-export function Field({ label, error, secret = false, ...input }: FieldProps) {
+export function Field({
+  label,
+  error,
+  secret = false,
+  leadingText,
+  suggestion,
+  ...input
+}: FieldProps) {
   const [visible, setVisible] = useState(false);
+  const box = (
+    <TextInput
+      style={[s.input, leadingText ? s.inputAffixed : null, error ? s.inputError : null]}
+      accessibilityLabel={leadingText ? `${label}, indicatif ${leadingText}` : label}
+      placeholderTextColor={tokens.color.text.muted}
+      secureTextEntry={secret && !visible}
+      autoCapitalize={secret ? 'none' : input.autoCapitalize}
+      {...input}
+    />
+  );
   return (
     <View style={s.field}>
       <View style={s.labelRow}>
@@ -28,18 +49,36 @@ export function Field({ label, error, secret = false, ...input }: FieldProps) {
           </Pressable>
         )}
       </View>
-      <TextInput
-        style={[s.input, error ? s.inputError : null]}
-        accessibilityLabel={label}
-        placeholderTextColor={tokens.color.text.muted}
-        secureTextEntry={secret && !visible}
-        autoCapitalize={secret ? 'none' : input.autoCapitalize}
-        {...input}
-      />
+      {leadingText ? (
+        <View style={s.affixed}>
+          <Text style={s.leading} importantForAccessibility="no" accessibilityElementsHidden>
+            {leadingText}
+          </Text>
+          {box}
+        </View>
+      ) : (
+        box
+      )}
       {error ? (
         <Text style={s.fieldError} accessibilityLiveRegion="polite">
           {error}
         </Text>
+      ) : null}
+      {suggestion !== undefined ? (
+        <View accessibilityLiveRegion="polite" aria-live="polite">
+          {suggestion ? (
+            <View style={s.suggestion}>
+              <Text style={s.suggestionText}>{suggestion.text}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={suggestion.onAccept}
+                style={s.suggestionAction}
+              >
+                <Text style={s.suggestionActionText}>Oui, corriger</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );

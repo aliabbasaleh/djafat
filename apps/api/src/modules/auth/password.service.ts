@@ -7,7 +7,13 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { FieldValidationError, PASSWORD_REJECTION_MESSAGES, evaluatePassword } from '@djafat/core';
+import { LAUNCH_MARKET } from '@djafat/config';
+import {
+  FieldValidationError,
+  PASSWORD_REJECTION_MESSAGES,
+  evaluatePassword,
+  phoneKind,
+} from '@djafat/core';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AppConfigService } from '../../common/config/config.service';
 import { AuditService } from '../../common/audit/audit.service';
@@ -370,7 +376,10 @@ export class PasswordService {
     }
   }
 
-  /** R6: email always; SMS and WhatsApp to the confirmed number, when the deployment has them. */
+  /**
+   * R6: email always; SMS and WhatsApp to the confirmed number, when the
+   * deployment has them — SMS only to a Chad mobile (FEAT-024).
+   */
   private channelsFor(user: UserRecord, email: string): CodeChannelDto[] {
     const methods = listAuthMethods({
       NODE_ENV: this.config.get('NODE_ENV'),
@@ -383,7 +392,11 @@ export class PasswordService {
     const phone = phoneConfirmed ? { destination: maskPhone(user.phone) } : {};
     const sms = methods.find((m) => m.id === 'sms');
     const whatsapp = methods.find((m) => m.id === 'whatsapp');
-    const smsUsable = phoneConfirmed && Boolean(sms?.available);
+    // FEAT-024 (SPEC-024-01 R6): no SMS to a number that is not a Chad mobile.
+    const smsUsable =
+      phoneConfirmed &&
+      Boolean(sms?.available) &&
+      phoneKind(user.phone, LAUNCH_MARKET) === 'mobile';
     const whatsappUsable = phoneConfirmed && Boolean(whatsapp?.available);
     return [
       { id: 'email', available: true, destination: maskEmail(email) },

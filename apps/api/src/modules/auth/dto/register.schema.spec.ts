@@ -178,3 +178,63 @@ describe('SPEC-022-03 — the restaurant form', () => {
     expect(fieldErrors({ ...RESTAURANT, birthDate: '2001-04-12' })).not.toEqual({}); // strict
   });
 });
+
+// FEAT-024 — docs/features/FEAT-024-saisies-verifiees (SPEC-024-02, SPEC-024-03).
+describe('SPEC-024-02 — the number of an account', () => {
+  it('SPEC-024-02-SC01 — a foreign number is accepted, kept in international format', () => {
+    expect(RegisterSchema.parse({ ...VALID, phone: '+33 6 12 34 56 78' })).toMatchObject({
+      phone: '+33612345678',
+    });
+  });
+
+  it('SPEC-024-02-SC02 — a fixed line is refused on `phone`, for each account type', () => {
+    const courier = {
+      accountType: 'courier',
+      vehicle: 'moto',
+      neighbourhoodOther: 'Moursal',
+      birthDate: '2000-01-01',
+      acceptTerms: true,
+    };
+    const restaurant = {
+      accountType: 'restaurant',
+      restaurantName: 'Chez Fatimé',
+      neighbourhoodOther: 'Moursal',
+      acceptTerms: true,
+    };
+    for (const extra of [{}, courier, restaurant]) {
+      expect(
+        messagesAt(RegisterSchema.safeParse({ ...VALID, ...extra, phone: '22 51 23 45' }), 'phone'),
+      ).toEqual(['Ce numéro est un fixe : indiquez un numéro de portable (ex. 66 12 34 56).']);
+    }
+  });
+});
+
+describe('SPEC-024-03 — the full name is a person’s name', () => {
+  it('SPEC-024-03-SC02 — digits and signs are refused on `fullName`; one letter is missing', () => {
+    for (const fullName of ['12345', 'a1b2', 'Awa_Hassan', '@@']) {
+      expect(messagesAt(RegisterSchema.safeParse({ ...VALID, fullName }), 'fullName')).toEqual([
+        'Le nom ne contient que des lettres (ex. Abakar Mahamat).',
+      ]);
+    }
+    expect(messagesAt(RegisterSchema.safeParse({ ...VALID, fullName: 'A' }), 'fullName')).toEqual([
+      'Indiquez votre nom complet.',
+    ]);
+  });
+
+  it('SPEC-024-03-SC01 — Arabic and hyphenated names pass', () => {
+    for (const fullName of ['محمد علي', 'Al-Hadj Moussa', "N'Djamena Fatimé"]) {
+      expect(RegisterSchema.safeParse({ ...VALID, fullName }).success, fullName).toBe(true);
+    }
+  });
+});
+
+describe('SPEC-020-03 R4 — a wrong field never breaks the password check', () => {
+  // Found while writing FEAT-024's tests: a malformed phone (FEAT-005, before
+  // FEAT-024) or name with a VALID password reached the personal-password rule
+  // with a non-string value and threw a TypeError — a 500 instead of a 422.
+  it('a malformed phone with a valid password fails on `phone`, without throwing', () => {
+    const result = RegisterSchema.safeParse({ ...VALID, phone: '12' });
+    expect(result.success).toBe(false);
+    expect(messagesAt(result, 'phone').length).toBe(1);
+  });
+});

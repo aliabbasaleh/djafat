@@ -3,14 +3,19 @@
 import { useState } from 'react';
 import type { CodeChannel, CodeChannelId, SignedIn } from '@djafat/sdk';
 import { Heading, Stack, Text } from '@djafat/ui';
-import { Alert, Button, Input } from '@/components/ui-client';
+import { Alert, Button, FieldSuggestion, Input } from '@/components/ui-client';
 import { api } from '@/lib/api';
 import { getDeviceToken } from '@/lib/auth-storage';
 import {
+  DIAL_CODE,
   accountErrorMessage,
   channelButtons,
+  emailSuggestionText,
+  emailTypoCheck,
   fieldErrorsFromApi,
   maskEmail,
+  phoneFieldShowsDialCode,
+  smsPhoneError,
   validateNewPassword,
   type ChannelButton,
   type FieldErrors,
@@ -62,7 +67,38 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
   /** Review FEAT-020 #12: after a change of view, its first field takes the focus (not on first load). */
   const [navigated, setNavigated] = useState(false);
 
+  /** FEAT-024 (SPEC-024-04): the address already stopped once, and the suggestion shown. */
+  const [emailWarned, setEmailWarned] = useState<string | null>(null);
+  const [emailHint, setEmailHint] = useState<string | null>(null);
+  /** FEAT-024 (SPEC-024-01 R8): why the number typed for an SMS cannot get one. */
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
   const whatsappLink = methods?.find((m) => m.id === 'whatsapp')?.link;
+  const whatsappAvailable = Boolean(methods?.find((m) => m.id === 'whatsapp')?.available);
+
+  /** SPEC-024-04 R3, R4: true when the sending stops once to suggest a fixed address. */
+  function stopForTypo(): boolean {
+    const typo = emailTypoCheck(email, emailWarned);
+    setEmailWarned(typo.warned);
+    setEmailHint(typo.suggestion);
+    return typo.suggestion !== null;
+  }
+
+  const typeEmail = (value: string) => {
+    setEmail(value);
+    setEmailHint(null);
+  };
+
+  const emailSuggestion = (
+    <FieldSuggestion
+      text={emailHint ? emailSuggestionText(emailHint) : null}
+      actionLabel="Oui, corriger"
+      onAction={() => {
+        if (emailHint) setEmail(emailHint);
+        setEmailHint(null);
+      }}
+    />
+  );
 
   function go(next: View) {
     setError(null);
@@ -299,6 +335,7 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
         className={styles['panel']}
         onSubmit={(e) => {
           e.preventDefault();
+          if (stopForTypo()) return;
           void run("Impossible d'envoyer le code. Vérifiez l'adresse e-mail.", async () => {
             if (forgot) await api.auth.forgotPassword(email);
             else await api.auth.requestEmailCode(email);
@@ -324,9 +361,10 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
           autoComplete="email"
           placeholder="vous@gmail.com"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => typeEmail(e.target.value)}
           required
         />
+        {emailSuggestion}
         <Button type="submit" loading={busy} fullWidth>
           Recevoir un code
         </Button>
@@ -344,6 +382,10 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
         className={styles['panel']}
         onSubmit={(e) => {
           e.preventDefault();
+          // SPEC-024-01 R8: no SMS to a foreign number or a fixed line — nothing is sent.
+          const why = byWhatsapp ? null : smsPhoneError(phone, whatsappAvailable);
+          setPhoneError(why);
+          if (why) return;
           void run(
             "Impossible d'envoyer le code. Vérifiez le numéro (ex. 66 12 34 56).",
             async () => {
@@ -373,8 +415,13 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
           type="tel"
           autoComplete="tel"
           placeholder="66 12 34 56"
+          {...(phoneFieldShowsDialCode(phone) ? { leadingText: DIAL_CODE } : {})}
+          {...(phoneError ? { error: phoneError } : {})}
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => {
+            setPhone(e.target.value);
+            setPhoneError(null);
+          }}
           required
         />
         <Button type="submit" loading={busy} fullWidth>
@@ -393,6 +440,7 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
       className={styles['panel']}
       onSubmit={(e) => {
         e.preventDefault();
+        if (stopForTypo()) return;
         void login();
       }}
     >
@@ -404,9 +452,10 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
         autoComplete="email"
         placeholder="vous@gmail.com"
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        onChange={(e) => typeEmail(e.target.value)}
         required
       />
+      {emailSuggestion}
       <PasswordField
         label="Mot de passe"
         autoComplete="current-password"

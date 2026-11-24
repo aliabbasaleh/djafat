@@ -43,4 +43,24 @@ describe('Input (docs/21 §4 — `label` is mandatory, never a placeholder subst
     render(<Input label="Rechercher un restaurant ou un plat" hideLabel />);
     expect(screen.getByLabelText('Rechercher un restaurant ou un plat')).toBeInTheDocument();
   });
+
+  // FEAT-024 — SPEC-024-02 « UI et accessibilité »: « +235 » in front, announced with the field.
+  it('a leading text sits before the box and is part of its description', () => {
+    render(<Input label="Numéro de téléphone" leadingText="+235" />);
+    const input = screen.getByLabelText('Numéro de téléphone');
+    const ids = (input.getAttribute('aria-describedby') ?? '').split(' ');
+    expect(document.getElementById(ids[0]!)).toHaveTextContent('indicatif +235');
+  });
+
+  it('a description given by the page is kept next to the leading text', () => {
+    render(
+      <>
+        <p id="page-hint">Code envoyé par WhatsApp.</p>
+        <Input label="Numéro" leadingText="+235" aria-describedby="page-hint" />
+      </>,
+    );
+    const ids = (screen.getByLabelText('Numéro').getAttribute('aria-describedby') ?? '').split(' ');
+    expect(ids).toContain('page-hint');
+    expect(document.getElementById(ids[0]!)).toHaveTextContent('indicatif +235');
+  });
 });

@@ -17,6 +17,7 @@ export {
   Checkbox,
   Select,
   Input,
+  FieldSuggestion,
   Alert,
   Radio,
   Textarea,

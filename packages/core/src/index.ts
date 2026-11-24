@@ -35,3 +35,7 @@ export * from './cart/cart-pricing.js';
 
 export * from './phone/normalize-phone.js';
 export * from './phone/mask-phone.js';
+export * from './phone/phone-kind.js';
+
+export * from './identity/person-name.js';
+export * from './identity/email-typo.js';

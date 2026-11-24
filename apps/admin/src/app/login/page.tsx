@@ -3,9 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  DIAL_CODE,
   RESEND_COOLDOWN_SECONDS,
   accountErrorMessage,
+  emailSuggestionText,
+  emailTypoCheck,
   phoneCodeButtons,
+  phoneFieldShowsDialCode,
+  smsPhoneError,
   teamPasswordLogin,
   teamResetPassword,
   teamVerifyCode,
@@ -13,7 +18,7 @@ import {
   type ChannelButton,
 } from '@djafat/sdk';
 import { Container, Heading, Text, Stack, cx } from '@djafat/ui';
-import { Button, Input, Alert, Checkbox } from '@/components/ui-client';
+import { Button, Input, Alert, Checkbox, FieldSuggestion } from '@/components/ui-client';
 import { api } from '@/lib/api';
 import { adminSessionKeeper, getDeviceToken } from '@/lib/auth-storage';
 import styles from './page.module.css';
@@ -58,6 +63,9 @@ export default function LoginPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  /** FEAT-024 (SPEC-024-04): the address already stopped once, and the suggestion shown. */
+  const [emailWarned, setEmailWarned] = useState<string | null>(null);
+  const [emailHint, setEmailHint] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,12 +116,37 @@ export default function LoginPage() {
     }
   }
 
+  /** SPEC-024-04 R3, R4: true when the sending stops once to suggest a fixed address. */
+  function stopForTypo(): boolean {
+    const typo = emailTypoCheck(email, emailWarned);
+    setEmailWarned(typo.warned);
+    setEmailHint(typo.suggestion);
+    return typo.suggestion !== null;
+  }
+
+  function typeEmail(value: string) {
+    typed(setEmail)(value);
+    setEmailHint(null);
+  }
+
+  const emailSuggestion = (
+    <FieldSuggestion
+      text={emailHint ? emailSuggestionText(emailHint) : null}
+      actionLabel="Oui, corriger"
+      onAction={() => {
+        if (emailHint) setEmail(emailHint);
+        setEmailHint(null);
+      }}
+    />
+  );
+
   function finish(outcome: 'signed_in' | 'denied') {
     if (outcome === 'signed_in') router.push(HOME);
     else setError(adminSessionKeeper.deniedMessage);
   }
 
   function login() {
+    if (stopForTypo()) return;
     void run(async () => {
       const step = await teamPasswordLogin(
         api.auth,
@@ -150,6 +183,7 @@ export default function LoginPage() {
   }
 
   function askResetCode() {
+    if (stopForTypo()) return;
     void run(async () => {
       await api.auth.forgotPassword(email);
       setCooldown(RESEND_COOLDOWN_SECONDS);
@@ -187,6 +221,13 @@ export default function LoginPage() {
   }
 
   function requestSmsCode() {
+    // FEAT-024 (SPEC-024-01 R8): no SMS to a foreign number or a fixed line — nothing is sent.
+    const whatsapp = phoneButtons.some((b) => b.id === 'whatsapp' && b.enabled);
+    const why = smsPhoneError(phone, whatsapp);
+    if (why) {
+      setError(why);
+      return;
+    }
     void run(async () => {
       await api.auth.requestPhoneLoginCode(phone);
       go({ kind: 'phone-code', channel: 'sms' });
@@ -240,10 +281,11 @@ export default function LoginPage() {
                   autoComplete="email"
                   placeholder="vous@gmail.com"
                   value={email}
-                  onChange={(e) => typed(setEmail)(e.target.value)}
+                  onChange={(e) => typeEmail(e.target.value)}
                   required
                   autoFocus
                 />
+                {emailSuggestion}
                 <div className={cx(styles['passwordRow'])}>
                   <Input
                     label="Mot de passe"
@@ -357,10 +399,11 @@ export default function LoginPage() {
                 autoComplete="email"
                 placeholder="vous@gmail.com"
                 value={email}
-                onChange={(e) => typed(setEmail)(e.target.value)}
+                onChange={(e) => typeEmail(e.target.value)}
                 required
                 autoFocus
               />
+              {emailSuggestion}
               <Button type="submit" loading={loading} fullWidth>
                 Recevoir un code
               </Button>
@@ -456,7 +499,8 @@ export default function LoginPage() {
               <Input
                 label="Numéro de téléphone"
                 type="tel"
-                placeholder="+23566000000"
+                placeholder="66 12 34 56"
+                {...(phoneFieldShowsDialCode(phone) ? { leadingText: DIAL_CODE } : {})}
                 value={phone}
                 onChange={(e) => typed(setPhone)(e.target.value)}
                 required
@@ -489,7 +533,8 @@ export default function LoginPage() {
                 <Input
                   label="Numéro de téléphone"
                   type="tel"
-                  placeholder="+23566000000"
+                  placeholder="66 12 34 56"
+                  {...(phoneFieldShowsDialCode(phone) ? { leadingText: DIAL_CODE } : {})}
                   value={phone}
                   onChange={(e) => typed(setPhone)(e.target.value)}
                   aria-describedby="login-subtitle"

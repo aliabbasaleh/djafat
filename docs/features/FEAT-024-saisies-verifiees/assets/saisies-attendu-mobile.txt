@@ -1,0 +1,47 @@
+FEAT-024-VIS02 — apps/web /compte, « Créer un compte » (formulaire client), 390x844 (mobile)
+Nature : attendu. Contrôles choisis par l'utilisateur le 2026-11-24
+(noms en lettres, pas de fixe, aide pour l'adresse e-mail, « +235 »
+dans chaque champ ; SMS pour les seuls numéros du Tchad, numéros
+étrangers par WhatsApp ou e-mail). Mêmes messages sur chaque formulaire
+concerné, dans les cinq applications.
+
+ 1. Champ du numéro — « +235 » devant la case :
+
+  Numéro de téléphone
+  [ +235 | 66 12 34 56              ]
+
+    Un numéro tapé avec un autre indicatif remplace « +235 » :
+  [ +33 6 12 34 56 78               ]   (accepté)
+
+ 2. Numéro fixe — « Créer mon compte » touché, rien n'est envoyé :
+
+  Numéro de téléphone
+  [ +235 | 22 51 23 45              ]
+  ⚠ Ce numéro est un fixe : indiquez un numéro de portable
+    (ex. 66 12 34 56).
+
+ 3. Nom sans lettres :
+
+  Nom complet
+  [ 12345                            ]
+  ⚠ Le nom ne contient que des lettres (ex. Abakar Mahamat).
+
+ 4. Adresse e-mail mal tapée — premier envoi arrêté, une seule fois :
+
+  E-mail
+  [ abakar@gmial.com                 ]
+  Vouliez-vous dire abakar@gmail.com ?   [ Oui, corriger ]
+
+  « Oui, corriger » remplace l'adresse ; « Créer mon compte » touché de
+  nouveau sans rien changer garde « abakar@gmial.com » et envoie.
+
+ 5. « Se connecter », « recevoir un code par SMS » avec un numéro
+    étranger — rien n'est envoyé :
+
+  [ +33 6 12 34 56 78               ]
+  ⚠ Le code par SMS n'est envoyé qu'aux numéros du Tchad. Avec un
+    numéro étranger, recevez le code par WhatsApp ou par e-mail.
+    (« par e-mail » seulement tant que WhatsApp n'est pas en service)
+
+ Chaque message est sous son champ, annoncé (rôle alert), et le focus
+ va au premier champ en erreur.

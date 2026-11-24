@@ -13,6 +13,11 @@ export interface PhoneMarket {
   readonly dialCode: string;
   /** Digits of a national number, e.g. 8 for Chad. */
   readonly nationalNumberLength: number;
+  /**
+   * FEAT-024: how the national numbers of fixed lines begin ("22" in Chad).
+   * A fixed line receives neither SMS nor WhatsApp (see `phoneKind`).
+   */
+  readonly fixedLinePrefixes?: readonly string[];
 }
 
 export type NormalizedPhone =

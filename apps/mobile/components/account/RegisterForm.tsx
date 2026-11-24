@@ -4,9 +4,13 @@ import type { SignedIn } from '@djafat/sdk';
 import { Button } from '../Button';
 import { api } from '../../lib/api';
 import {
+  DIAL_CODE,
   accountErrorMessage,
+  emailSuggestionText,
+  emailTypoCheck,
   fieldErrorsFromApi,
   maskEmail,
+  phoneFieldShowsDialCode,
   validateRegisterForm,
   type FieldErrors,
   type RegisterField,
@@ -34,6 +38,9 @@ export function RegisterForm({
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [registration, setRegistration] = useState<{ id: string; email: string } | null>(null);
+  /** FEAT-024 (SPEC-024-04): the address already stopped once, and the suggestion shown. */
+  const [emailWarned, setEmailWarned] = useState<string | null>(null);
+  const [emailHint, setEmailHint] = useState<string | null>(null);
 
   /** Editing a field clears its error; a new password also clears the confirmation's. */
   const set = (field: RegisterField) => (text: string) => {
@@ -45,6 +52,7 @@ export function RegisterForm({
       return next;
     });
     if (field === 'phone') setErrorCode(null);
+    if (field === 'email') setEmailHint(null);
   };
 
   async function submit() {
@@ -52,6 +60,11 @@ export function RegisterForm({
     setErrors(found);
     setGeneral(null);
     if (Object.keys(found).length > 0) return;
+    // SPEC-024-04 R3, R4: a mistyped address stops the sending once.
+    const typo = emailTypoCheck(values.email, emailWarned);
+    setEmailWarned(typo.warned);
+    setEmailHint(typo.suggestion);
+    if (typo.suggestion) return;
     setBusy(true);
     try {
       const { registrationId } = await api.auth.register({
@@ -132,6 +145,7 @@ export function RegisterForm({
         placeholder="66 12 34 56"
         keyboardType="phone-pad"
         textContentType="telephoneNumber"
+        leadingText={phoneFieldShowsDialCode(values.phone) ? DIAL_CODE : undefined}
         error={errors.phone}
       />
       {phoneTaken ? (
@@ -148,6 +162,17 @@ export function RegisterForm({
         textContentType="emailAddress"
         autoCapitalize="none"
         error={errors.email}
+        suggestion={
+          emailHint
+            ? {
+                text: emailSuggestionText(emailHint),
+                onAccept: () => {
+                  setValues((v) => ({ ...v, email: emailHint }));
+                  setEmailHint(null);
+                },
+              }
+            : null
+        }
       />
       <Field
         label="Mot de passe (8 caractères minimum)"

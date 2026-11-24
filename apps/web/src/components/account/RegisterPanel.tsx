@@ -2,12 +2,16 @@
 
 import { useState } from 'react';
 import type { SignedIn } from '@djafat/sdk';
-import { Alert, Button, Input } from '@/components/ui-client';
+import { Alert, Button, FieldSuggestion, Input } from '@/components/ui-client';
 import { api } from '@/lib/api';
 import {
+  DIAL_CODE,
   accountErrorMessage,
+  emailSuggestionText,
+  emailTypoCheck,
   fieldErrorsFromApi,
   maskEmail,
+  phoneFieldShowsDialCode,
   validateRegisterForm,
   type FieldErrors,
   type RegisterField,
@@ -40,6 +44,9 @@ export function RegisterPanel({ onSignedIn, onGoToLogin }: RegisterPanelProps) {
   const [returned, setReturned] = useState(false);
   const [busy, setBusy] = useState(false);
   const [registration, setRegistration] = useState<{ id: string; email: string } | null>(null);
+  /** FEAT-024 (SPEC-024-04): the address already stopped once, and the suggestion shown. */
+  const [emailWarned, setEmailWarned] = useState<string | null>(null);
+  const [emailHint, setEmailHint] = useState<string | null>(null);
 
   /** Editing a field clears its error; a new password also clears the confirmation's. */
   const set = (field: RegisterField) => (e: { target: { value: string } }) => {
@@ -52,6 +59,7 @@ export function RegisterPanel({ onSignedIn, onGoToLogin }: RegisterPanelProps) {
       return next;
     });
     if (field === 'phone') setErrorCode(null);
+    if (field === 'email') setEmailHint(null);
   };
 
   async function submit() {
@@ -59,6 +67,11 @@ export function RegisterPanel({ onSignedIn, onGoToLogin }: RegisterPanelProps) {
     setErrors(found);
     setGeneral(null);
     if (Object.keys(found).length > 0) return;
+    // SPEC-024-04 R3, R4: a mistyped address stops the sending once.
+    const typo = emailTypoCheck(values.email, emailWarned);
+    setEmailWarned(typo.warned);
+    setEmailHint(typo.suggestion);
+    if (typo.suggestion) return;
     setBusy(true);
     try {
       const { registrationId } = await api.auth.register({
@@ -142,6 +155,7 @@ export function RegisterPanel({ onSignedIn, onGoToLogin }: RegisterPanelProps) {
         type="tel"
         autoComplete="tel"
         placeholder="66 12 34 56"
+        {...(phoneFieldShowsDialCode(values.phone) ? { leadingText: DIAL_CODE } : {})}
         value={values.phone}
         onChange={set('phone')}
         {...(errors.phone ? { error: errors.phone } : {})}
@@ -161,6 +175,14 @@ export function RegisterPanel({ onSignedIn, onGoToLogin }: RegisterPanelProps) {
         onChange={set('email')}
         {...(errors.email ? { error: errors.email } : {})}
         required
+      />
+      <FieldSuggestion
+        text={emailHint ? emailSuggestionText(emailHint) : null}
+        actionLabel="Oui, corriger"
+        onAction={() => {
+          if (emailHint) setValues((v) => ({ ...v, email: emailHint }));
+          setEmailHint(null);
+        }}
       />
       <PasswordField
         label="Mot de passe (8 caractères minimum)"
