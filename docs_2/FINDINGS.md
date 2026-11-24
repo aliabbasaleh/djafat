@@ -100,6 +100,7 @@ verified.
 | [FE-07](#fe-07)       | Typed routes are configured but never checked                                               | Broken              | Low      | RUN      |
 | [PAY-09](#pay-09)     | Payment idempotency scope is global; attempt counter never moves                            | Needs Improvement   | Low      | CODE     |
 | [TEST-05](#test-05)   | The mobile typecheck is silenced by a known-failure entry                                   | Needs Improvement   | Low      | CODE     |
+| [TEST-06](#test-06)   | A delivery-code unit test fails about once in a thousand runs                               | Needs Improvement   | Low      | RUN      |
 
 ---
 
@@ -799,6 +800,10 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   Prisma "up to date". Health check tested against a fake ntfy receiver and simulated failures. Not done:
   installing the cron jobs on the server, an off-server backup copy. End of the trial server: see `OPS-06`.
 - **Sync S-034 (2026-11-18), merges:** The scripts are on `main` since #22 (`3e92261`); installing the cron jobs on the server and an off-server backup copy are still to do. The end of the trial server is `OPS-06`.
+- **Sync S-048 note (2026-11-24), CODE, branch only (FEAT-022, PR to come):** the nightly backup also
+  archives the photos volume (under a temporary name, then renamed) and reports a missing volume;
+  `restore-check.sh` fails when a photo referenced by the restored database is missing from the archive of
+  the same night. Syntax-checked only; not run on the server. Status unchanged.
 
 ### SEC-02
 
@@ -1363,6 +1368,21 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 ### TEST-05
 
 **The mobile typecheck is silenced by a known-failure entry** · Needs Improvement · Low · CODE · Status: Resolved on `main` (pull request #17, merged as `0ab2644` on 2026-11-18, sync S-034; `main` @ `afaa7c2` is identical to the verified tip of the stack); fix present on `fix/mobile-typed-routes` (version 0.21.8), verified there (sync S-025) _(added 2026-11-17, sync S-014; on `main` since pull request #8, `57120ed`, sync S-019)_ — `cabf058` on `feat/welcome-greeting` records `@djafat/mobile#typecheck` in `scripts/pipeline/baselines/known-failures.json` as pre-existing ("expo-router's generated route-literal type is stale…"). On `main` it passes (RUN, 2026-11-17: `turbo run typecheck --filter=@djafat/mobile`, and in every `verify:fast` run that day; CI green): it fails only where Expo has generated its typed routes (`.expo/types`, gitignored), against calls such as `router.push(`/orders/${id}`)`. Once the entry is in, any real mobile type error is reported as pre-existing on every machine. Fix: write those calls in typed-route form (or regenerate the types) and drop the entry. Verify: with `.expo/types` generated, `pnpm --filter @djafat/mobile typecheck` passes. _Sync S-025 note (2026-11-18), RUN: reproduced (Expo's dev server generated `.expo/types`; the type check then failed with 9 errors, all calls cast to `` `/${string}` ``). The nine calls now use typed-route objects (`{ pathname, params }`), and login only follows an in-app `redirect` (`/(app)/…`). The type check passes with the generated types (0 errors) and without them, as in CI (0 errors); the `@djafat/mobile#typecheck`entry is removed from`known-failures.json`, together with the stale `@djafat/mobile#build`and`@djafat/courier#build`entries (both apps build:`expo export` succeeded for each). Navigation not run on a device.\_
+
+### TEST-06
+
+**A delivery-code unit test fails about once in a thousand runs** · Needs Improvement · Low · RUN · Status: Open _(added 2026-11-24, sync S-048)_
+
+- **Where:** `apps/api/src/modules/deliveries/delivery-code-retrieval.spec.ts:68`,
+  `expect(stored.valueHash).not.toContain(issued)`.
+- **Observed:** `verify --full` of 2026-11-24 at `230d5eb` (FEAT-022 branch, which does not touch
+  `deliveries`): « Expected: "6731" », the stored hash `9579fed16c7fe6731713…` contained the random 4-digit code
+  by chance. A 64-character hex hash contains a given 4-digit string in roughly 1 run in 1,000; the next run
+  passed.
+- **Why it matters:** a red run without any defect, on a laptop or in CI (Linux and Windows).
+- **Fix:** assert what the test means — the stored value is a hash (64 hex characters) and never the code —
+  instead of searching the hash for the code's digits; keep the check on the encrypted reference.
+- **Verify:** the spec passes repeatedly (e.g. 5,000 runs of that test) without a failure.
 
 ---
 

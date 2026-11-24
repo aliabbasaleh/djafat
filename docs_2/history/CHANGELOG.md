@@ -8,6 +8,16 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-24 — Sync S-048: FEAT-022 parts 1-2 reviewed and corrected (0.26.0); PR #29 is 0.24.6
+
+**Fixed (review):** a restaurant that signed up could be made visible by its owner without DJAFAT — refused
+now; photo uploads are read only on their routes and for a valid session; a full disk answers « plus de
+place » without leaving files; photos lose what phones append after the image; a switch to a bicycle asks
+before deleting photos. **Changed:** the photos backup and its weekly check cover every photo the database
+refers to. PR #29 takes 0.24.6 (`main` merged in).
+
+---
+
 ## 2026-11-23 — Sync S-047: `main` 0.24.5; FEAT-022 part 2 (local branch, not pushed)
 
 **`main` (teammate, PR #30):** customer accounts by e-mail run on djafat.com with DJAFAT's real Gmail; the MinIO

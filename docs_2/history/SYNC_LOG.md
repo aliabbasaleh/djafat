@@ -10,6 +10,28 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-048 — 2026-11-24 — FEAT-022 parts 1-2 reviewed, corrected, version 0.26.0; PR #29 becomes 0.24.6
+
+**Our own commits** `ad01d05` to the reports commit on `wip/feat-022-part1` (pushed as
+`feat/inscription-par-type`), described in `docs/features/FEAT-022-inscription-par-type-de-compte`
+(`review.md`, `progress.md`, `verification.md`). Independent review in two rounds. **Fixed:** a signed-up
+restaurant's owner could publish it without DJAFAT (blocking; now 409 `RESTAURANT_NOT_APPROVED`); photo
+uploads read a body only on their routes and for a valid access token; a full disk answers 507
+`STORAGE_FULL` without a leftover file; JPEGs lose what phones append after the image and keep only their
+orientation; same-name restaurant sign-ups no longer collide (rare residue noted); private photo links stay
+out of the logs; a switch to a bicycle asks before deleting vehicle photos. **Changed:** the nightly backup
+writes the photos archive under a temporary name and reports a missing volume; `restore-check.sh` requires
+every photo the restored database refers to (OPS-02 note). **Verified:** `verify --full` on the final code
+commit (see `verification.md`), 16 integration tests of the feature on a fresh database, a browser run (23
+checks, 15 screenshots). **Not verified:** a real phone (camera, gallery); `restore-check.sh` on the server.
+The first full run at `230d5eb` hit a pre-existing flaky assertion outside the feature (new finding TEST-06);
+the repeated run is the one reported.
+
+**Our merge** `262b8cf` on `ci/cheaper-runs` (PR #29): `main` merged in, version 0.24.6 (0.24.5 was taken
+by PR #30); documentation and version only. GitHub still refuses to start any job (billing).
+
+---
+
 ## S-047 — 2026-11-23 — `main` 0.24.5 (FEAT-020 live, MinIO re-checked); FEAT-022 part 2 (local branch)
 
 **`main`, a teammate's commit** `93252b8` (kcerha), merged as PR #30 (`c6e5ac1`, by the repository owner),
