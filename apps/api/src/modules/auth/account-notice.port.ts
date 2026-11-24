@@ -1,8 +1,9 @@
 /**
  * Account emails that carry no code (FEAT-020, SPEC-020-01 R6): "you already
  * have an account" (sent instead of a registration code, SPEC-020-03 R3),
- * "your password was changed" (SPEC-020-05) and, since FEAT-022, DJAFAT's
- * decision on an application (SPEC-022-07 R5). Chosen by `EMAIL_PROVIDER`, like
+ * "your password was changed" (SPEC-020-05) and, since FEAT-022, the welcome
+ * of a courier or a restaurant and DJAFAT's decision on an application
+ * (SPEC-022-07 R5). Chosen by `EMAIL_PROVIDER`, like
  * the code transport. Best effort: a provider never throws, so a notice that
  * cannot leave never fails the request that sends it.
  */
@@ -16,6 +17,11 @@ export type AccountNotice =
       readonly newAddress: string;
       readonly at: Date;
     }
+  /**
+   * FEAT-022 SPEC-022-02 R8, SPEC-022-03 R6 (FEAT-022-Q13): a courier or a
+   * restaurant just signed up — what to complete, and where.
+   */
+  | { readonly kind: 'welcome'; readonly to: string; readonly applicant: Applicant }
   /** FEAT-022 SPEC-022-07 R5: DJAFAT validated an application. */
   | { readonly kind: 'application_approved'; readonly to: string; readonly applicant: Applicant }
   /** FEAT-022 SPEC-022-07 R4, R5: DJAFAT refused it, and says why. */

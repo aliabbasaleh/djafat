@@ -24,7 +24,7 @@ import {
   type CourierOnboardingPort,
   type RestaurantOnboardingPort,
 } from '../../common/ports/account-onboarding.port';
-import { ACCOUNT_NOTICE_PORT, type AccountNoticePort } from './account-notice.port';
+import { ACCOUNT_NOTICE_PORT, type AccountNoticePort, type Applicant } from './account-notice.port';
 import { AuthService, type LoginResultDto, type RequestMeta } from './auth.service';
 import { emailDeliveryFailed, emailUnavailable } from './email-delivery-errors';
 import { OtpService } from './otp.service';
@@ -96,7 +96,8 @@ const RegistrationPayload = z.object({
     ])
     .optional(),
 });
-type SignupPayload = NonNullable<z.infer<typeof RegistrationPayload>['signup']>;
+/** A courier's or a restaurant's details, with when the terms were accepted (ISO date). */
+export type SignupPayload = NonNullable<z.infer<typeof RegistrationPayload>['signup']>;
 
 const otpInvalid = () =>
   new UnauthorizedException({ code: 'OTP_INVALID', message: 'Invalid or expired code.' });
@@ -210,7 +211,7 @@ export class RegistrationService {
         });
         if (claimed.count !== 1) throw otpInvalid();
       },
-      signup ? (tx, createdId) => this.provision(tx, createdId, signup) : undefined,
+      signup ? (tx, createdId) => this.provisionSignup(tx, createdId, signup) : undefined,
     );
     await this.audit.log({
       actorUserId: userId,
@@ -225,6 +226,9 @@ export class RegistrationService {
     const session = await this.auth.openSession(userId, meta);
     // The code proved the mailbox on this device: it is remembered (FEAT-020-VIS03).
     const device = await this.devices.trust(userId, meta);
+    // FEAT-022-Q13: a courier or a restaurant gets « Bienvenue sur DJAFAT » —
+    // in the background: the account never waits for, nor depends on, the e-mail.
+    if (signup) this.sendWelcome(row.email, signup);
     return {
       ...session,
       deviceToken: device.token,
@@ -256,11 +260,25 @@ export class RegistrationService {
   }
 
   /**
+   * FEAT-022 (SPEC-022-02 R8, SPEC-022-03 R6): what to complete, and where.
+   * Best effort and not awaited — a notice provider never throws, and the
+   * catch only guards against a provider that would.
+   */
+  sendWelcome(to: string, signup: Pick<SignupDetails, 'type'> & { restaurantName?: string }): void {
+    const applicant: Applicant =
+      signup.type === 'courier'
+        ? { type: 'courier' }
+        : { type: 'restaurant', restaurantName: signup.restaurantName ?? '' };
+    void this.notices.send({ kind: 'welcome', to, applicant }).catch(() => undefined);
+  }
+
+  /**
    * FEAT-022: SPEC-022-02 R2 — a courier is 18 or older on N'Djamena's date
    * (422 `UNDERAGE`); SPEC-022-09 — a neighbourhood id names an active one
    * (422 `NEIGHBOURHOOD_UNKNOWN`). Nothing here depends on whether an account exists.
+   * Also used when a signed-in customer adds a role (SPEC-022-08 R2).
    */
-  private async checkSignup(signup: SignupDetails | undefined): Promise<void> {
+  async checkSignup(signup: SignupDetails | undefined): Promise<void> {
     if (!signup) return;
     if (signup.type === 'courier') {
       const verdict = checkCourierBirthDate(signup.birthDate, ndjamenaDate(new Date()));
@@ -279,8 +297,11 @@ export class RegistrationService {
     }
   }
 
-  /** FEAT-022 (SPEC-022-02 R4, SPEC-022-03 R2): in the account's transaction. */
-  private async provision(
+  /**
+   * FEAT-022 (SPEC-022-02 R4, SPEC-022-03 R2): in the account's transaction —
+   * or, for a signed-in customer adding a role, in that one (SPEC-022-08 R2).
+   */
+  async provisionSignup(
     tx: Prisma.TransactionClient,
     userId: string,
     signup: SignupPayload,

@@ -447,6 +447,49 @@ describe('SPEC-022-02 — sign up as a courier', () => {
   });
 });
 
+describe('SPEC-022-02 R8, SPEC-022-03 R6 — « Bienvenue sur DJAFAT » (FEAT-022-Q13)', () => {
+  // SPEC-022-02-SC07
+  it('SPEC-022-02-SC07 — the courier gets the welcome after the right code; an e-mail that fails undoes nothing', async () => {
+    const { service, otp, notices } = build();
+    const { registrationId } = await service.request(COURIER, META.ip);
+    await service.verify(registrationId, otp.lastCode().code, META);
+    await vi.waitFor(() =>
+      expect(notices.sent).toContainEqual({
+        kind: 'welcome',
+        to: 'awa@example.td',
+        applicant: { type: 'courier' },
+      }),
+    );
+
+    const failing = build();
+    vi.mocked(failing.notices.send).mockRejectedValue(new Error('smtp down'));
+    const pending = await failing.service.request(COURIER, META.ip);
+    await expect(
+      failing.service.verify(pending.registrationId, failing.otp.lastCode().code, META),
+    ).resolves.toMatchObject({ access: expect.any(String) });
+    expect(failing.users.accounts).toHaveLength(1);
+  });
+
+  // SPEC-022-03-SC06
+  it('SPEC-022-03-SC06 — the restaurant owner gets the welcome naming the restaurant; a customer gets none', async () => {
+    const { service, otp, notices } = build();
+    const { registrationId } = await service.request(RESTAURANT, META.ip);
+    await service.verify(registrationId, otp.lastCode().code, META);
+    await vi.waitFor(() =>
+      expect(notices.sent).toContainEqual({
+        kind: 'welcome',
+        to: 'awa@example.td',
+        applicant: { type: 'restaurant', restaurantName: 'Chez Fatimé' },
+      }),
+    );
+
+    const customer = build();
+    const res = await customer.service.request(INPUT, META.ip);
+    await customer.service.verify(res.registrationId, customer.otp.lastCode().code, META);
+    expect(customer.notices.sent.filter((n) => n.kind === 'welcome')).toHaveLength(0);
+  });
+});
+
 describe('SPEC-022-03 — sign up a restaurant', () => {
   // SPEC-022-03-SC01
   it('SPEC-022-03-SC01 — the right code creates the account, the draft restaurant and the owner role limited to it', async () => {

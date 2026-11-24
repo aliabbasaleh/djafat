@@ -22,6 +22,7 @@ export function accountNoticeMessage(notice: AccountNotice): { subject: string; 
       ].join('\n'),
     };
   }
+  if (notice.kind === 'welcome') return welcomeMessage(notice.applicant);
   if (notice.kind === 'application_approved') return approvedMessage(notice.applicant);
   if (notice.kind === 'application_rejected') {
     return rejectedMessage(notice.applicant, notice.reason);
@@ -51,6 +52,47 @@ export function accountNoticeMessage(notice: AccountNotice): { subject: string; 
       '',
       "Si c'est vous, il n'y a rien à faire.",
       "Si ce n'est pas vous, utilisez tout de suite « Mot de passe oublié ? » sur la page « Compte », puis contactez DJAFAT.",
+      '',
+      "L'équipe DJAFAT",
+    ].join('\n'),
+  };
+}
+
+/** FEAT-022 SPEC-022-02 R8, SPEC-022-03 R6: what to complete after signing up, and where. */
+function welcomeMessage(applicant: Applicant): { subject: string; text: string } {
+  if (applicant.type === 'courier') {
+    return {
+      subject: 'Bienvenue sur DJAFAT : votre compte livreur est créé',
+      text: [
+        'Bonjour,',
+        '',
+        'Votre compte livreur DJAFAT est créé.',
+        "Pour recevoir des courses, ouvrez l'application DJAFAT Livreur, connectez-vous avec cette adresse e-mail et votre mot de passe, puis complétez :",
+        '- une photo de votre visage ;',
+        "- votre pièce d'identité (CNI ou passeport) ;",
+        '- pour la moto et la voiture : votre permis et les papiers du véhicule (carte grise, assurance, plaque) ;',
+        '- votre numéro Mobile Money (Airtel Money ou Moov Money) pour vos gains ;',
+        "- un contact en cas d'urgence.",
+        '',
+        'Touchez ensuite « Envoyer pour validation » : DJAFAT vérifie votre dossier et vous répond par e-mail.',
+        '',
+        "L'équipe DJAFAT",
+      ].join('\n'),
+    };
+  }
+  return {
+    subject: `Bienvenue sur DJAFAT : « ${applicant.restaurantName} » est inscrit`,
+    text: [
+      'Bonjour,',
+      '',
+      `Votre restaurant « ${applicant.restaurantName} » est inscrit sur DJAFAT. Il n'est pas encore visible des clients.`,
+      'Ouvrez la console restaurant, connectez-vous avec cette adresse e-mail et votre mot de passe, puis complétez les quatre étapes :',
+      '1. Emplacement : le point sur la carte, l’adresse et un repère ;',
+      '2. Horaires et menu, avec au moins un plat et son prix ;',
+      '3. Logo et photo de couverture ;',
+      "4. Papiers (numéro RCCM ou NIF, pièce d'identité du responsable) et numéro Mobile Money pour les paiements.",
+      '',
+      'Touchez ensuite « Envoyer pour validation » : DJAFAT vérifie le dossier et vous répond par e-mail.',
       '',
       "L'équipe DJAFAT",
     ].join('\n'),

@@ -237,6 +237,20 @@ export class UsersService {
       ON CONFLICT DO NOTHING`;
   }
 
+  /**
+   * FEAT-022 (SPEC-022-08 R3, R5): whether the user already holds `role`, read
+   * inside the caller's transaction (after its lock), whatever the scope.
+   */
+  async hasRoleWithin(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    role: 'courier' | 'restaurant_owner',
+  ): Promise<boolean> {
+    const rows = await tx.$queryRaw<Array<{ held: boolean }>>`
+      SELECT true AS held FROM user_roles WHERE user_id = ${userId}::uuid AND role = ${role} LIMIT 1`;
+    return rows.length > 0;
+  }
+
   /** FEAT-020: the stored hash, read only to verify a password — it never travels in a `UserRecord`. */
   async getPasswordHash(userId: string): Promise<string | null> {
     const u = await this.prisma.user.findFirst({

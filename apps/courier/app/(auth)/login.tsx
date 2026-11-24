@@ -18,7 +18,7 @@ import { Screen } from '../../components/Screen';
 import { BigButton } from '../../components/BigButton';
 import { EmailSuggestion } from '../../components/EmailSuggestion';
 import { PhoneInput } from '../../components/PhoneInput';
-import { api } from '../../lib/api';
+import { COURIER_SIGNUP_URL, api } from '../../lib/api';
 import { courierSessionKeeper, loadDeviceToken } from '../../lib/auth-storage';
 import { useAuth } from '../../lib/auth-context';
 
@@ -377,6 +377,21 @@ export default function LoginScreen() {
               </View>
             </View>
           )}
+          {/* FEAT-022 (SPEC-022-01 R6): the same sign-up everywhere — the site's courier form. */}
+          {COURIER_SIGNUP_URL ? (
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="Pas encore de compte ? Devenir livreur"
+              onPress={() => {
+                if (COURIER_SIGNUP_URL) void Linking.openURL(COURIER_SIGNUP_URL);
+              }}
+              style={styles.signup}
+            >
+              <Text style={styles.signupText}>
+                Pas encore de compte ? <Text style={styles.signupLink}>Devenir livreur</Text>
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       )}
 
@@ -573,4 +588,11 @@ const styles = StyleSheet.create({
     marginBottom: tokens.space['4'],
   },
   errorText: { color: tokens.color.state.danger, fontSize: tokens.type.size.body },
+  signup: { minHeight: 44, justifyContent: 'center', marginTop: tokens.space['2'] },
+  signupText: {
+    textAlign: 'center',
+    fontSize: tokens.type.size.body,
+    color: tokens.color.text.secondary,
+  },
+  signupLink: { color: tokens.color.brand.primary, fontWeight: '700' },
 });

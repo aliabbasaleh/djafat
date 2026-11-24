@@ -1,7 +1,10 @@
-import { createApiClient, webLocksMutex } from '@djafat/sdk';
+import { createApiClient, signupUrl, webLocksMutex } from '@djafat/sdk';
 import { clearSession, getAccessToken, getRefreshToken, updateTokens } from './auth-storage';
 
 const baseUrl = process.env['NEXT_PUBLIC_API_BASE_URL'] ?? 'http://localhost:3001/v1';
+
+/** FEAT-022 (SPEC-022-01 R6): the site's restaurant sign-up form, found from the API's address. */
+export const RESTAURANT_SIGNUP_URL = signupUrl(baseUrl, 'restaurant');
 
 /** Same boundary as `apps/admin`/`apps/web`'s `lib/api.ts` — frontend code never imports a backend package directly. */
 export const api = createApiClient({

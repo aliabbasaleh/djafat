@@ -52,6 +52,10 @@ export const API_ERROR_CODES = [
   'SMS_FOREIGN_NUMBER',
   /** FEAT-024 — a fixed line receives neither SMS nor WhatsApp (422, SPEC-024-01 R3). */
   'PHONE_FIXED_LINE',
+  /** FEAT-022 — adding a role from « Mon profil » needs a verified e-mail (409, SPEC-022-08 R2). */
+  'EMAIL_NOT_VERIFIED',
+  /** FEAT-022 — the account is already a courier, or already owns a restaurant (409, SPEC-022-08 R3, R5). */
+  'ROLE_ALREADY_HELD',
   /** FEAT-022 — a courier who signs up is 18 or older (422, SPEC-022-02 R2). */
   'UNDERAGE',
   /** FEAT-022 — a courier whose application is not approved cannot go online (409, SPEC-022-06 R5). */

@@ -151,3 +151,45 @@ describe('SPEC-022-07 — the e-mails of a decision', () => {
     expect(text).toContain('console restaurant');
   });
 });
+
+// FEAT-022 — SPEC-022-02 R8, SPEC-022-03 R6 (FEAT-022-Q13).
+describe('SPEC-022-02 R8, SPEC-022-03 R6 — « Bienvenue sur DJAFAT »', () => {
+  it('SPEC-022-02-SC07 — the courier: the items to complete in the courier app, then « Envoyer pour validation »', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'welcome',
+      to: 'awa@example.td',
+      applicant: { type: 'courier' },
+    });
+    expect(subject).toBe('Bienvenue sur DJAFAT : votre compte livreur est créé');
+    for (const item of [
+      'DJAFAT Livreur',
+      'photo de votre visage',
+      "pièce d'identité",
+      'permis et les papiers du véhicule',
+      'Mobile Money',
+      "contact en cas d'urgence",
+      '« Envoyer pour validation »',
+    ]) {
+      expect(text).toContain(item);
+    }
+  });
+
+  it('SPEC-022-03-SC06 — the restaurant: not visible yet, the four steps of the console', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'welcome',
+      to: 'awa@example.td',
+      applicant: { type: 'restaurant', restaurantName: 'Chez Fatimé' },
+    });
+    expect(subject).toBe('Bienvenue sur DJAFAT : « Chez Fatimé » est inscrit');
+    expect(text).toContain("Il n'est pas encore visible des clients.");
+    for (const step of [
+      '1. Emplacement',
+      '2. Horaires et menu',
+      '3. Logo et photo de couverture',
+      '4. Papiers',
+      '« Envoyer pour validation »',
+    ]) {
+      expect(text).toContain(step);
+    }
+  });
+});

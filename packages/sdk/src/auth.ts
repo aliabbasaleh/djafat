@@ -74,13 +74,42 @@ export type PasswordLoginResult =
       readonly channels: readonly CodeChannel[];
     };
 
-export interface RegistrationRequest {
+/** The four fields of every account (FEAT-020, SPEC-022-01 R2). */
+export interface AccountFields {
   readonly fullName: string;
   /** As typed: the API accepts Chad-style numbers (FEAT-005). */
   readonly phone: string;
   readonly email: string;
   readonly password: string;
 }
+
+/** FEAT-022 (SPEC-022-09): a neighbourhood from the list, or the name typed under « Autre ». */
+export type NeighbourhoodPick =
+  | { readonly neighbourhoodId: string; readonly neighbourhoodOther?: never }
+  | { readonly neighbourhoodOther: string; readonly neighbourhoodId?: never };
+
+/** FEAT-022 (SPEC-022-02 R1): what a courier adds — also `POST /me/roles/courier` (SPEC-022-08). */
+export type CourierSignupFields = {
+  readonly vehicle: 'moto' | 'velo' | 'voiture' | 'a_pied';
+  /** `YYYY-MM-DD`. */
+  readonly birthDate: string;
+  readonly acceptTerms: true;
+} & NeighbourhoodPick;
+
+/** FEAT-022 (SPEC-022-03 R1): what a restaurant adds — also `POST /me/roles/restaurant`. */
+export type RestaurantSignupFields = {
+  readonly restaurantName: string;
+  readonly acceptTerms: true;
+} & NeighbourhoodPick;
+
+/**
+ * `POST /auth/register`: a customer exactly as FEAT-020 (no type, SPEC-022-01-SC03),
+ * a courier or a restaurant with their fields (SPEC-022-02, 03).
+ */
+export type RegistrationRequest =
+  | AccountFields
+  | (AccountFields & { readonly accountType: 'courier' } & CourierSignupFields)
+  | (AccountFields & { readonly accountType: 'restaurant' } & RestaurantSignupFields);
 
 /** ADM-03: the caller's MFA state (`GET /auth/mfa/status`). */
 export interface MfaStatus {
@@ -155,6 +184,15 @@ export function createAuthClient(http: ApiHttp) {
     /** Create an account: a code goes to the email; nothing exists before it. */
     register: (input: RegistrationRequest) =>
       http.post<{ registrationId: string; expiresAt: string }>('/auth/register', { body: input }),
+    /** FEAT-022 (SPEC-022-09 R5): the active neighbourhoods of N'Djamena, read before any account. */
+    neighbourhoods: () =>
+      http.get<{ neighbourhoods: Array<{ id: string; name: string }> }>('/geo/neighbourhoods'),
+    /** FEAT-022 (SPEC-022-08): « Devenir livreur » — the signed-in account becomes a courier. */
+    becomeCourier: (input: CourierSignupFields) =>
+      http.post<MeProfile>('/me/roles/courier', { body: input }),
+    /** FEAT-022 (SPEC-022-08): « Inscrire mon restaurant » — on the signed-in account. */
+    registerRestaurant: (input: RestaurantSignupFields) =>
+      http.post<MeProfile>('/me/roles/restaurant', { body: input }),
     /** The right code creates the account and signs in (the device is remembered). */
     verifyRegistration: (registrationId: string, code: string) =>
       http.post<SignedIn>('/auth/register/verify', { body: { registrationId, code } }),

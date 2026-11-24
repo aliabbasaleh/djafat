@@ -154,3 +154,54 @@ export type RegisterVerifyInput = z.infer<typeof RegisterVerifySchema>;
 
 export const RegisterResendSchema = z.object({ registrationId: RegistrationId }).strict();
 export type RegisterResendInput = z.infer<typeof RegisterResendSchema>;
+
+/**
+ * `POST /me/roles/courier` and `POST /me/roles/restaurant` (FEAT-022, SPEC-022-08
+ * R1, R2): the fields of the type, without the account's — the session is the
+ * account. Same rules as the sign-up: age, neighbourhood, terms.
+ */
+const neighbourhoodChosen = (
+  v: { neighbourhoodId?: string | undefined; neighbourhoodOther?: string | undefined },
+  ctx: z.RefinementCtx,
+) => {
+  if ((v.neighbourhoodId === undefined) === (v.neighbourhoodOther === undefined)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['neighbourhoodId'],
+      message: 'Choisissez votre quartier, ou « Autre » avec son nom.',
+    });
+  }
+};
+
+export const CourierRoleSignupSchema = z
+  .object({
+    vehicle: z.enum(COURIER_VEHICLES, {
+      errorMap: () => ({ message: 'Choisissez votre véhicule.' }),
+    }),
+    ...NeighbourhoodFields,
+    birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, COURIER_SIGNUP_MESSAGES.invalid_birth_date),
+    acceptTerms: AcceptTerms,
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    neighbourhoodChosen(v, ctx);
+    const verdict = checkCourierBirthDate(v.birthDate, ndjamenaDate(new Date()));
+    if (!verdict.ok && verdict.reason === 'invalid_birth_date') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['birthDate'],
+        message: COURIER_SIGNUP_MESSAGES.invalid_birth_date,
+      });
+    }
+  });
+export type CourierRoleSignupInput = z.infer<typeof CourierRoleSignupSchema>;
+
+export const RestaurantRoleSignupSchema = z
+  .object({
+    restaurantName: RestaurantNameSchema,
+    ...NeighbourhoodFields,
+    acceptTerms: AcceptTerms,
+  })
+  .strict()
+  .superRefine(neighbourhoodChosen);
+export type RestaurantRoleSignupInput = z.infer<typeof RestaurantRoleSignupSchema>;

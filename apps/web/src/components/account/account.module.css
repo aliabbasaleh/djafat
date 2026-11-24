@@ -106,3 +106,101 @@
   color: var(--djafat-color-text-secondary);
   font-size: calc(var(--djafat-type-size-caption) * 1px);
 }
+
+/* FEAT-022 — « Quel compte voulez-vous créer ? » and the typed forms. */
+.stepTitle {
+  margin: 0;
+  font-size: calc(var(--djafat-type-size-h2) * 1px);
+  font-weight: 700;
+  color: var(--djafat-color-text-primary);
+}
+.stepTitle:focus-visible {
+  outline: 2px solid var(--djafat-color-focus-ring);
+  outline-offset: 2px;
+}
+.typeList {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-3) * 1px);
+}
+.typeCard {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--djafat-space-3) * 1px);
+  min-height: 64px;
+  padding: calc(var(--djafat-space-3) * 1px) calc(var(--djafat-space-4) * 1px);
+  border: 1px solid var(--djafat-color-border-strong);
+  border-radius: calc(var(--djafat-radius-lg) * 1px);
+  background: var(--djafat-color-bg-surface);
+  color: var(--djafat-color-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.typeCard:hover {
+  border-color: var(--djafat-color-brand-primary);
+}
+.typeCard:focus-visible {
+  outline: 2px solid var(--djafat-color-focus-ring);
+  outline-offset: 2px;
+}
+.typeIcon {
+  font-size: 28px;
+}
+.typeText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.typeTitle {
+  font-weight: 700;
+}
+.typeDescription {
+  color: var(--djafat-color-text-secondary);
+  font-size: calc(var(--djafat-type-size-small) * 1px);
+}
+.formHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--djafat-space-2) * 1px);
+}
+.groupTitle {
+  margin: calc(var(--djafat-space-2) * 1px) 0 0;
+  font-size: calc(var(--djafat-type-size-body) * 1px);
+  font-weight: 700;
+  color: var(--djafat-color-text-primary);
+}
+.choiceGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--djafat-space-2) * 1px) calc(var(--djafat-space-4) * 1px);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.choiceGroup legend {
+  margin-bottom: calc(var(--djafat-space-1) * 1px);
+  font-weight: 600;
+  font-size: calc(var(--djafat-type-size-label) * 1px);
+}
+.fieldError {
+  margin: 0;
+  color: var(--djafat-color-state-danger);
+  font-size: calc(var(--djafat-type-size-caption) * 1px);
+}
+.primaryLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--djafat-touch-target-min) * 1px);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  background: var(--djafat-color-brand-primary);
+  color: var(--djafat-color-brand-on-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+.primaryLink:focus-visible {
+  outline: 2px solid var(--djafat-color-focus-ring);
+  outline-offset: 2px;
+}

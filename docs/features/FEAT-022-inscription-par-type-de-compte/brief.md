@@ -1,7 +1,7 @@
 ---
 feature: FEAT-022
 # prettier-ignore
-specs: [SPEC-022-01@2, SPEC-022-02@3, SPEC-022-03@2, SPEC-022-04@4, SPEC-022-05@1, SPEC-022-06@4, SPEC-022-07@3, SPEC-022-08@2, SPEC-022-09@1]
+specs: [SPEC-022-01@3, SPEC-022-02@4, SPEC-022-03@3, SPEC-022-04@4, SPEC-022-05@1, SPEC-022-06@4, SPEC-022-07@3, SPEC-022-08@3, SPEC-022-09@1]
 ---
 
 # FEAT-022 — Brief d'exécution
@@ -63,11 +63,13 @@ sans dépendance (FEAT-022-Q08 révisée en partie 2). Aucune nouvelle arête en
 | SPEC-022-02-SC03 | domain       | `packages/core/src/onboarding/courier-signup.spec.ts`                | « chaque champ manquant affiche son message et rien n'est envoyé ; l'API refuse aussi (422, champs en erreur) »                                          |
 | SPEC-022-02-SC04 | application  | `apps/api/src/modules/couriers/couriers.service.spec.ts`             | « 409 `COURIER_NOT_APPROVED` et son statut reste `offline` ; la répartition des courses ne le choisit jamais »                                           |
 | SPEC-022-02-SC05 | application  | `apps/api/src/modules/auth/registration.service.spec.ts`             | « aucun compte, aucun rôle, aucune ligne `couriers` ni dossier n'existe »                                                                                |
+| SPEC-022-02-SC07 | application  | `apps/api/src/modules/auth/registration.service.spec.ts`             | « l'e-mail « Bienvenue sur DJAFAT : votre compte livreur est créé » part vers son adresse avec la liste de R8 ; en panne, le compte existe quand même »  |
 | SPEC-022-02-SC06 | manuel       | capture d’exécution (`assets/exec-SPEC-022-02-SC06-*.png`)           | « « ✅ Compte livreur créé », la liste à compléter et « Ouvrir l'application livreur » (FEAT-022-VIS02) »                                                |
 | SPEC-022-03-SC01 | application  | `apps/api/src/modules/catalog/restaurant-onboarding.service.spec.ts` | « le compte existe avec `customer` et `restaurant_owner` limité au restaurant créé ; le restaurant est `draft`, nommé « Chez Fatimé », quartier… »       |
 | SPEC-022-03-SC02 | intégration  | `apps/api/test/account-onboarding.int.spec.ts`                       | « il n'apparaît pas (404 sur sa page), et une commande pour lui est refusée »                                                                            |
 | SPEC-022-03-SC03 | application  | `apps/api/src/modules/auth/registration.service.spec.ts`             | « les champs manquants sont refusés (écran et API, 422) ; sans le bon code, ni compte, ni restaurant, ni rôle »                                          |
 | SPEC-022-03-SC04 | application  | `apps/api/src/modules/catalog/restaurant-onboarding.service.spec.ts` | « son restaurant est créé avec une adresse web distincte (identifiant `slug` suffixé), sans erreur »                                                     |
+| SPEC-022-03-SC06 | application  | `apps/api/src/modules/auth/registration.service.spec.ts`             | « l'e-mail « Bienvenue sur DJAFAT : « Chez Fatimé » est inscrit » part vers l'adresse du responsable, avec les quatre étapes de R6 »                     |
 | SPEC-022-03-SC05 | manuel       | capture d’exécution (`assets/exec-SPEC-022-03-SC05-*.png`)           | « « ✅ Compte restaurant créé », « « Chez Fatimé » n'est pas encore visible des clients », la liste à compléter et « Ouvrir la console restaurant »… »   |
 | SPEC-022-04-SC01 | transport    | test HTTP de `GET /files/:key` ; `account-onboarding.int.spec.ts`    | « pas de lien public (404 ou 403 sans dire si le fichier existe), et refus pour l'autre livreur (404) »                                                  |
 | SPEC-022-04-SC02 | infra        | `apps/api/src/infra/storage/filesystem-object-storage.spec.ts`       | « chacun reçoit un lien qui renvoie l'image ; le même lien, 5 minutes plus tard ou modifié d'un caractère, répond 403 »                                  |
@@ -106,6 +108,9 @@ sans dépendance (FEAT-022-Q08 révisée en partie 2). Aucune nouvelle arête en
 Une PR par tranche, chacune avec sa version, sa revue et son `verify`. Les écrans d'inscription
 sortent en dernier : personne ne peut s'inscrire comme livreur ou restaurant avant que son
 parcours « À compléter » existe.
+
+Ordre revu le 2026-11-24 (FEAT-022-Q14) : la tranche 4 se construit avant la tranche 3, avec
+FEAT-024 (même PR), et les deux tranches partent ensemble sur le serveur.
 
 1. **Fondations** — stockage sur disque et `GET /files/:key` (SPEC-022-04), quartiers (SPEC-022-09),
    migration, règles du domaine, ports d'inscription, `POST /auth/register` typé, « En ligne »

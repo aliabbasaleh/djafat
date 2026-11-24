@@ -1,8 +1,10 @@
 import {
+  COURIER_SIGNUP_MESSAGES,
   LAUNCH_PHONE_MARKET,
   PASSWORD_REJECTION_MESSAGES,
   PERSON_NAME_MESSAGES,
   PHONE_INPUT_MESSAGES,
+  checkCourierBirthDate,
   checkPersonName,
   evaluatePassword,
   phoneInputMessage,
@@ -10,10 +12,18 @@ import {
   readPhoneInput,
   smsForeignMessage,
   suggestEmailFix,
+  type CourierVehicle,
   type PhoneUse,
 } from '@djafat/core';
 import { ApiClientError } from './http.js';
-import type { CodeChannelId, MeProfile } from './auth.js';
+import type {
+  CodeChannelId,
+  CourierSignupFields,
+  MeProfile,
+  NeighbourhoodPick,
+  RegistrationRequest,
+  RestaurantSignupFields,
+} from './auth.js';
 
 /**
  * Client logic of the customer account screens (FEAT-020), shared by the web
@@ -331,4 +341,233 @@ function firstDetail(err: ApiClientError): string | null {
   const details = Array.isArray(err.details) ? (err.details as Array<{ message?: unknown }>) : [];
   const message = details[0]?.message;
   return typeof message === 'string' ? message : null;
+}
+
+/* ── FEAT-022 — « Quel compte voulez-vous créer ? » (SPEC-022-01, 02, 03) ── */
+
+export type AccountType = 'customer' | 'courier' | 'restaurant';
+
+export interface AccountTypeChoice {
+  readonly id: AccountType;
+  readonly icon: string;
+  readonly title: string;
+  readonly description: string;
+}
+
+/** SPEC-022-01 R1: the three choices, in this order (FEAT-022-VIS01). */
+export const ACCOUNT_TYPES: readonly AccountTypeChoice[] = [
+  { id: 'customer', icon: '🍽', title: 'Client', description: 'Commander des repas' },
+  { id: 'courier', icon: '🛵', title: 'Livreur', description: 'Livrer des commandes, gagner' },
+  { id: 'restaurant', icon: '🏪', title: 'Restaurant', description: 'Vendre vos plats sur DJAFAT' },
+];
+
+const FROM_QUERY: Readonly<Record<string, AccountType>> = {
+  client: 'customer',
+  livreur: 'courier',
+  restaurant: 'restaurant',
+};
+
+/** SPEC-022-01 R4: `?inscription=livreur` opens the courier form; anything else shows the choice. */
+export function accountTypeFromQuery(value: unknown): AccountType | null {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(FROM_QUERY, value)
+    ? (FROM_QUERY[value] ?? null)
+    : null;
+}
+
+/**
+ * SPEC-022-01 R1, SC02: where « Créer un compte » stands — the choice or a
+ * type's form — and the account fields typed so far. Changing the type never
+ * touches them (name, phone, e-mail, passwords).
+ */
+export interface SignupFlow<Account> {
+  readonly step: 'choice' | AccountType;
+  readonly account: Account;
+}
+
+/** Opens on the form the link asked for (`?inscription=`), otherwise on the choice. */
+export function startSignup<Account>(query: unknown, account: Account): SignupFlow<Account> {
+  return { step: accountTypeFromQuery(query) ?? 'choice', account };
+}
+
+export function chooseAccountType<Account>(
+  flow: SignupFlow<Account>,
+  type: AccountType,
+): SignupFlow<Account> {
+  return { ...flow, step: type };
+}
+
+/** « ← Changer de type »: back to the choice, nothing typed is lost. */
+export function backToAccountTypes<Account>(flow: SignupFlow<Account>): SignupFlow<Account> {
+  return { ...flow, step: 'choice' };
+}
+
+/** SPEC-022-02 R1: the four vehicles, in this order (FEAT-022-VIS02). */
+export const VEHICLE_CHOICES: ReadonlyArray<{
+  readonly id: CourierVehicle;
+  readonly label: string;
+}> = [
+  { id: 'moto', label: 'Moto' },
+  { id: 'velo', label: 'Vélo' },
+  { id: 'voiture', label: 'Voiture' },
+  { id: 'a_pied', label: 'À pied' },
+];
+
+/**
+ * A birth date typed without a date picker (the app): « 12/04/2001 »,
+ * « 12-04-2001 », « 12.04.2001 » or « 2001-04-12 » → `2001-04-12`. Anything
+ * else is returned trimmed, and `validateCourierFields` says it is invalid.
+ */
+export function birthDateFromInput(raw: string): string {
+  const typed = raw.trim();
+  const dayFirst = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(typed);
+  if (dayFirst) {
+    const [, day, month, year] = dayFirst;
+    return `${year}-${month!.padStart(2, '0')}-${day!.padStart(2, '0')}`;
+  }
+  return typed;
+}
+
+/** The value of a neighbourhood list that opens the « Autre » field (SPEC-022-02 « UI »). */
+export const OTHER_NEIGHBOURHOOD = 'autre';
+
+export interface NeighbourhoodValues {
+  /** A neighbourhood id, `OTHER_NEIGHBOURHOOD`, or empty. */
+  readonly neighbourhood: string;
+  readonly neighbourhoodOther: string;
+}
+
+export interface CourierFieldValues extends NeighbourhoodValues {
+  readonly vehicle: CourierVehicle | null;
+  /** `YYYY-MM-DD`, as a date field gives it. */
+  readonly birthDate: string;
+  readonly acceptTerms: boolean;
+}
+export type CourierField =
+  | 'vehicle'
+  | 'neighbourhood'
+  | 'neighbourhoodOther'
+  | 'birthDate'
+  | 'acceptTerms';
+
+export interface RestaurantFieldValues extends NeighbourhoodValues {
+  readonly restaurantName: string;
+  readonly acceptTerms: boolean;
+}
+export type RestaurantField =
+  | 'restaurantName'
+  | 'neighbourhood'
+  | 'neighbourhoodOther'
+  | 'acceptTerms';
+
+const TERMS_MESSAGE = "Acceptez les conditions d'utilisation.";
+
+function neighbourhoodErrors(
+  values: NeighbourhoodValues,
+): FieldErrors<'neighbourhood' | 'neighbourhoodOther'> {
+  if (!values.neighbourhood) {
+    return { neighbourhood: 'Choisissez votre quartier, ou « Autre » avec son nom.' };
+  }
+  if (values.neighbourhood !== OTHER_NEIGHBOURHOOD) return {};
+  const name = values.neighbourhoodOther.trim().replace(/\s+/g, ' ');
+  if (name.length < 2) return { neighbourhoodOther: 'Écrivez le nom du quartier.' };
+  if (name.length > 60) return { neighbourhoodOther: 'Au plus 60 caractères.' };
+  return {};
+}
+
+/**
+ * SPEC-022-02 R1, R2, SC02, SC03: what the screen checks before sending a
+ * courier's fields; `today` is N'Djamena's date (`ndjamenaDate`).
+ */
+export function validateCourierFields(
+  values: CourierFieldValues,
+  today: string,
+): FieldErrors<CourierField> {
+  const errors: FieldErrors<CourierField> = {};
+  if (!values.vehicle) errors.vehicle = 'Choisissez votre véhicule.';
+  Object.assign(errors, neighbourhoodErrors(values));
+  const verdict = checkCourierBirthDate(values.birthDate, today);
+  if (!verdict.ok) errors.birthDate = COURIER_SIGNUP_MESSAGES[verdict.reason];
+  if (!values.acceptTerms) errors.acceptTerms = TERMS_MESSAGE;
+  return errors;
+}
+
+/** SPEC-022-03 R1, SC03: what the screen checks before sending a restaurant's fields. */
+export function validateRestaurantFields(
+  values: RestaurantFieldValues,
+): FieldErrors<RestaurantField> {
+  const errors: FieldErrors<RestaurantField> = {};
+  const name = values.restaurantName.trim().replace(/\s+/g, ' ');
+  if (name.length < 2) errors.restaurantName = 'Indiquez le nom du restaurant.';
+  else if (name.length > 80) errors.restaurantName = 'Au plus 80 caractères.';
+  Object.assign(errors, neighbourhoodErrors(values));
+  if (!values.acceptTerms) errors.acceptTerms = TERMS_MESSAGE;
+  return errors;
+}
+
+function neighbourhoodPick(values: NeighbourhoodValues): NeighbourhoodPick {
+  return values.neighbourhood === OTHER_NEIGHBOURHOOD
+    ? { neighbourhoodOther: values.neighbourhoodOther.trim().replace(/\s+/g, ' ') }
+    : { neighbourhoodId: values.neighbourhood };
+}
+
+/** The courier's fields as `POST /auth/register` and `POST /me/roles/courier` take them (checked first). */
+export function courierSignupFields(values: CourierFieldValues): CourierSignupFields {
+  return {
+    vehicle: values.vehicle ?? 'moto',
+    birthDate: values.birthDate,
+    acceptTerms: true,
+    ...neighbourhoodPick(values),
+  };
+}
+
+/** The restaurant's fields as `POST /auth/register` and `POST /me/roles/restaurant` take them. */
+export function restaurantSignupFields(values: RestaurantFieldValues): RestaurantSignupFields {
+  return {
+    restaurantName: values.restaurantName.trim().replace(/\s+/g, ' '),
+    acceptTerms: true,
+    ...neighbourhoodPick(values),
+  };
+}
+
+/**
+ * `POST /auth/register` for the type chosen: a customer's is FEAT-020's request,
+ * no type added (SPEC-022-01-SC03); a courier's and a restaurant's add their
+ * fields (checked first with `validateCourierFields` / `validateRestaurantFields`).
+ */
+export function registrationRequest(
+  type: AccountType,
+  account: RegisterFormValues,
+  courier: CourierFieldValues,
+  restaurant: RestaurantFieldValues,
+): RegistrationRequest {
+  const fields = {
+    fullName: account.fullName,
+    phone: account.phone,
+    email: account.email,
+    password: account.password,
+  };
+  if (type === 'courier')
+    return { ...fields, accountType: 'courier', ...courierSignupFields(courier) };
+  if (type === 'restaurant') {
+    return { ...fields, accountType: 'restaurant', ...restaurantSignupFields(restaurant) };
+  }
+  return fields;
+}
+
+/** SPEC-022-02 R6, SPEC-022-03 R4: the « what next » screen after the right code (FEAT-022-VIS02, VIS03). */
+export function signupDoneText(
+  type: 'courier' | 'restaurant',
+  restaurantName = '',
+): { readonly title: string; readonly text: string; readonly action: string } {
+  return type === 'courier'
+    ? {
+        title: '✅ Compte livreur créé',
+        text: "Pour recevoir des courses, complétez votre profil dans l'application livreur : photo, pièce d'identité, permis, papiers du véhicule, Mobile Money. DJAFAT vérifie, puis vous valide.",
+        action: "Ouvrir l'application livreur",
+      }
+    : {
+        title: '✅ Compte restaurant créé',
+        text: `« ${restaurantName} » n'est pas encore visible des clients. Complétez-le sur la console restaurant : emplacement, horaires et menu, photos, papiers et Mobile Money. DJAFAT vérifie, puis le met en ligne.`,
+        action: 'Ouvrir la console restaurant',
+      };
 }

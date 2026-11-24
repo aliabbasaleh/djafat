@@ -19,7 +19,7 @@ import {
 } from '@djafat/sdk';
 import { Container, Heading, Text, Stack, cx } from '@djafat/ui';
 import { Button, Input, Alert, Checkbox, FieldSuggestion } from '@/components/ui-client';
-import { api } from '@/lib/api';
+import { RESTAURANT_SIGNUP_URL, api } from '@/lib/api';
 import { restaurantSessionKeeper, getDeviceToken } from '@/lib/auth-storage';
 import styles from './page.module.css';
 
@@ -334,6 +334,12 @@ export default function LoginPage() {
                   ))}
                 </div>
               </Stack>
+            )}
+            {/* FEAT-022 (SPEC-022-01 R6): the same sign-up everywhere — the site's restaurant form. */}
+            {RESTAURANT_SIGNUP_URL && (
+              <p className={cx(styles['signup'])}>
+                Pas encore de compte ? <a href={RESTAURANT_SIGNUP_URL}>Inscrire mon restaurant</a>
+              </p>
             )}
           </Stack>
         )}

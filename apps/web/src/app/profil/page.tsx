@@ -27,6 +27,7 @@ import { signOut } from '@/lib/session';
 import type { AuthMethods } from '@/components/account/LoginPanel';
 import { PasswordSection } from '@/components/account/PasswordSection';
 import { PhoneSection } from '@/components/account/PhoneSection';
+import { WorkSection } from '@/components/account/WorkSection';
 import styles from './page.module.css';
 
 /**
@@ -51,6 +52,8 @@ export default function ProfilePage() {
   const [codeSent, setCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [methods, setMethods] = useState<AuthMethods | undefined>(undefined);
+  /** FEAT-022 (SPEC-022-08): `/profil?devenir=livreur | restaurant` opens that form. */
+  const [become, setBecome] = useState<'courier' | 'restaurant' | null>(null);
   const [message, setMessage] = useState<{
     tone: 'success' | 'danger' | 'info';
     text: string;
@@ -68,6 +71,11 @@ export default function ProfilePage() {
       }
     }
   }, [router]);
+
+  useEffect(() => {
+    const asked = new URLSearchParams(window.location.search).get('devenir');
+    setBecome(asked === 'livreur' ? 'courier' : asked === 'restaurant' ? 'restaurant' : null);
+  }, []);
 
   useEffect(() => {
     api.auth
@@ -295,6 +303,16 @@ export default function ProfilePage() {
             </Stack>
           </form>
         </section>
+
+        <WorkSection
+          key={become ?? 'none'}
+          me={me}
+          initial={become}
+          onUpdated={setMe}
+          cardClassName={styles['card'] ?? ''}
+          labelClassName={styles['label'] ?? ''}
+          mutedClassName={styles['muted'] ?? ''}
+        />
 
         <PasswordSection
           me={me}
