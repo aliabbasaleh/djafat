@@ -11,6 +11,7 @@ these IDs instead of repeating the detail.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
 - **Counts:** 3 Critical · 11 High · 22 Medium · 13 Low = 49 open findings, plus 21 resolved
   _(updated 2026-11-18, sync S-034: `TEST-05`, `ADM-01`, `ADM-02`, `ORD-01`, `PAY-04`, `ORD-02`, `ADM-03`, `SEC-02` and `OPS-05` resolved on `main`)_
+  _(updated 2026-11-25, sync S-050: new `SEC-09` and `SEC-10`, found by review and fixed on `feat/inscription-restaurants` before any merge — never on `main`, not counted as open)_
   _(updated 2026-11-18, sync S-030: new `OPS-06`; sync S-032: `TEST-04` and `DOC-03` resolved on `main`)_
   _(updated 2026-11-14, sync S-008: new `DOC-03`; 2026-11-17, sync S-011: new `TEST-04`; sync
   S-013: `PAY-01`, `PAY-03`, `SEC-01`, `FE-03` and `PAY-05` resolved on `main`; sync S-014: new `TEST-05`)_
@@ -78,6 +79,8 @@ verified.
 | [ARCH-02](#arch-02)   | Dispatch logic exists twice (API and worker)                                                | Needs Improvement   | Medium   | CODE     |
 | [AUTH-02](#auth-02)   | No profile update, phone change or account deletion                                         | Not Implemented     | Medium   | CODE     |
 | [AUTH-03](#auth-03)   | A malformed phone with a valid password crashed the registration (500)                      | Broken              | Medium   | RUN      |
+| [SEC-09](#sec-09)     | A restaurant owner could get another restaurant's logo or cover deleted                     | Broken              | High     | CODE     |
+| [SEC-10](#sec-10)     | A restaurant's staff member, owner of another, could reach the first one's papers           | Broken              | High     | CODE     |
 | [NOTIF-01](#notif-01) | Notifications are stored but never shown or pushed                                          | Partially Completed | Medium   | LIVE     |
 | [STOR-01](#stor-01)   | No file upload: object storage is a stub                                                    | Not Implemented     | Medium   | CODE     |
 | [OBS-01](#obs-01)     | No error tracking, metrics or tracing; request IDs are not propagated                       | Not Implemented     | Medium   | LIVE     |
@@ -1182,6 +1185,35 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Verify:** the test passes on the branch; after the merge, `POST /auth/register` with `phone: "12"`
   and a valid password answers 422 on `phone`.
 
+### SEC-09
+
+**A restaurant owner could get another restaurant's logo or cover deleted** · Broken · High · CODE · Status: fixed on `feat/inscription-restaurants` (`6163d15`, never pushed before the fix; not on `main`) _(added 2026-11-25, sync S-050)_
+
+- **Where:** `apps/api/src/modules/catalog/restaurant-application.service.ts` (`storePublicPhoto`, FEAT-022
+  part 3 commit `72d155d`): the replaced photo was the `public-<uuid>` key read from the previous
+  `logoUrl`/`coverUrl`, and an owner could still type any address there (`PATCH /restaurants/:id`).
+- **Scenario:** an owner sets its logo address to another restaurant's photo, then uploads a logo: the other
+  restaurant's file was deleted. Found by the independent review (round 1).
+- **Fix (branch):** an owner can no longer send `logoUrl`/`coverUrl` (403, FEAT-022-Q20); a replaced photo is
+  deleted only when no restaurant still shows it; tests in `restaurant-application.service.spec.ts` and
+  `restaurants-management.service.spec.ts`, and in integration.
+- **Verify:** after the merge, an owner's `PATCH /restaurants/:id` with a `logoUrl` answers 403.
+
+### SEC-10
+
+**A restaurant's staff member, owner of another, could reach the first one's papers** · Broken · High · CODE · Status: fixed on `feat/inscription-restaurants` (`6163d15`, `957be96`; not on `main`) _(added 2026-11-25, sync S-050)_
+
+- **Where:** `UsersService.getRestaurantScope` returned the first owner-or-staff grant (`LIMIT 1`, no order);
+  the owner-only routes of FEAT-022 part 3 used it, and « Inscrire mon restaurant » (part 4) let a staff
+  member of A become owner of B.
+- **Scenario:** that account could be resolved to A and read A's Mobile Money number and papers, or change
+  them. Found by the independent review (round 1).
+- **Fix (branch):** the owner routes use the owner grant only (`getOwnedRestaurantScope`);
+  `getRestaurantScope` is ordered, owner first; « Inscrire mon restaurant » is refused to a staff account
+  (409, SPEC-022-08 v5, FEAT-022-Q25), and so are an admin grant of a restaurant role at a second
+  restaurant and an owner's second `POST /restaurants` (`957be96`); unit and integration tests.
+- **Verify:** after the merge, a staff account's `POST /me/roles/restaurant` answers 409.
+
 ### AUTH-02
 
 **No profile update, phone change or account deletion** · Not Implemented · Medium · CODE
@@ -1213,6 +1245,10 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   5-minute HMAC link), and the courier's photo uploads (body = the photo, 5 MB, type from its bytes, metadata
   removed); tested in integration and in a browser. Restaurant logos and covers come with FEAT-022 part 3; product
   photos are not planned. Status unchanged until merged: Not Implemented on `main`.
+- **Sync S-050 note (2026-11-25), CODE + RUN, branch only (`feat/inscription-restaurants`, PR to come):** restaurant
+  logos and covers are uploaded from the restaurant console (`POST /restaurants/me/photos/:kind`, also for a
+  restaurant created by the team), shrunk in the browser above 4 MB; an owner can no longer type their address
+  (`SEC-09`). Product photos still not planned. Status unchanged until merged.
 
 ### OBS-01
 

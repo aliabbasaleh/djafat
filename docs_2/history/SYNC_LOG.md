@@ -10,6 +10,32 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-050 — 2026-11-25 — FEAT-022 part 3 (restaurants: four steps, decisions, changes after approval), version 0.28.0
+
+**Our own commits** `72d155d` to `4bebbc5` on `feat/inscription-restaurants` (above PR #32), described in
+`docs/features/FEAT-022-inscription-par-type-de-compte` (`review.md`, `progress.md`, `verification.md`,
+`pr.md`). **Added:** the restaurant console guides a signed-up restaurant in four steps (map point stored in
+PostGIS, hours and menu, logo and cover uploaded from the device, RCCM or NIF and ID photos, Mobile Money),
+then « Envoyer pour validation »; steps locked during the review except the menu; « Demandes à vérifier »
+opens and decides restaurants (approval re-checks the four steps); after an approval a new Mobile Money
+number or paper waits in `application_changes`, accepted with the step-up code; staff payouts read the
+approved number through a new port (`COURIER_PAYOUT_ACCOUNT_PORT`, no new module edge); « Mes gains » and
+« Mes papiers » in the courier app; admin « Quartiers » page; new dependency `leaflet` 1.9.4 in
+`apps/restaurant` (the customer site's version); no migration. **Fixed before any push (independent review,
+round 1):** two new findings — `SEC-09` (an owner could get another restaurant's public photo deleted) and
+`SEC-10` (a restaurant's staff member who registered a restaurant could reach the first one's papers) — plus
+dishes counted that customers never see, and « Papiers » withdrawing the other field's waiting change;
+round 2 (5 minor): the status frozen during the review, one restaurant per account also through
+`POST /restaurants` and admin role grants (`grantRole` now refuses a restaurant role at a second
+restaurant — a change to Bloc 9 role management); round 3: ready for PR, one note fixed (`70733f3`).
+**Verified:** `verify --full` at `70733f3` (see
+`verification.md`), 33 integration tests of the feature on a fresh database (plus the catalog and admin-role
+suites, 88 in all), a browser run (28 checks). **Not verified:** the map's tiles (no network access in the
+test browser), real e-mail delivery. `STOR-01`: restaurant photos now uploaded on the branch.
+**Merge condition:** after PR #32, together with it.
+
+---
+
 ## S-049 — 2026-11-24 — FEAT-024 (checked inputs) and FEAT-022 part 4 (sign-up screens), version 0.27.0
 
 **Our own commits** `be136f8` to `5a3cf4a` on `feat/inscription-ecrans` (above PR #31), described in

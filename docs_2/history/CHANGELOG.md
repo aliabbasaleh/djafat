@@ -8,6 +8,18 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-25 — Sync S-050: FEAT-022 part 3 (restaurants), 0.28.0
+
+The restaurant's four steps in its console, DJAFAT's decisions on restaurants, changes after approval
+(waiting for an admin, accepted with the step-up code; payouts keep the approved number), « Mes gains » /
+« Mes papiers » in the courier app, the admin « Quartiers » page. Areas: `catalog`, `couriers`, `admin`,
+`payments` (read through a new port), restaurant, admin and courier apps, SDK. Verification: `verify --full`
+at `70733f3`, 33 integration tests on a fresh database, browser run (28 checks). Learned: the independent
+review (three rounds) found two cross-restaurant authorization problems before any push — new findings
+`SEC-09`, `SEC-10`, fixed on the branch; admin role grants now keep « one account, one restaurant ».
+
+---
+
 ## 2026-11-24 — Sync S-049: checked inputs (FEAT-024) and sign-up screens (FEAT-022 part 4), 0.27.0
 
 **Added (branch, PR to come):** no SMS code abroad — a foreign number uses WhatsApp (when in service) or
