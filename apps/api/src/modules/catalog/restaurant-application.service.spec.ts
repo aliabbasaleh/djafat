@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FOUR_STEPS, restaurantWorld } from './restaurant-application-test-support';
+import { FOUR_STEPS, dish, restaurantWorld } from './restaurant-application-test-support';
 
 // FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte (SPEC-022-05, SPEC-022-07).
 
@@ -65,10 +65,17 @@ describe('SPEC-022-05 — the owner completes four steps, then sends', () => {
     expect(await menuStep()).toBe(false); // no hours
     world.restaurants.get('r-1')!.hours = 7;
     expect(await menuStep()).toBe(false); // no dish
-    world.restaurants.get('r-1')!.prices = [0n];
+    world.restaurants.get('r-1')!.dishes = [dish(0n)];
     expect(await menuStep()).toBe(false); // a dish at 0 XAF
-    world.restaurants.get('r-1')!.prices = [0n, 150_000n];
-    expect(await menuStep()).toBe(true); // 1 500 XAF
+    world.restaurants.get('r-1')!.dishes = [
+      dish(0n),
+      dish(150_000n, { isActive: false }), // « removed »
+      dish(150_000n, { categoryActive: false }), // its category hidden
+      dish(150_000n, { categoryActive: null }), // no category: customers never see it
+    ];
+    expect(await menuStep()).toBe(false); // none of them on the customers' menu
+    world.restaurants.get('r-1')!.dishes = [dish(0n), dish(150_000n)];
+    expect(await menuStep()).toBe(true); // 1 500 XAF, active, in an active category
 
     const address = await world.service.updateLocation('u-owner', {
       lat: 12.1067,
@@ -151,6 +158,22 @@ describe('SPEC-022-05 — the owner completes four steps, then sends', () => {
     );
   });
 
+  it('review of part 3, #1 — a logo address pointing to another restaurant’s photo is replaced, and that photo is never deleted', async () => {
+    const world = restaurantWorld();
+    const theirs = 'http://api.test/v1/files/public-00000000-0000-4000-8000-0000000000bb.jpg';
+    world.signedUp('r-victim', 'u-victim', { restaurant: { logoUrl: theirs } });
+    // The address came from somewhere else (the team, or data from before FEAT-022).
+    world.signedUp('r-1', 'u-owner', { restaurant: { logoUrl: theirs } });
+
+    await world.service.storePublicPhoto('u-owner', 'logo', PHOTO);
+
+    expect(world.removed).toEqual([]);
+    expect(world.restaurants.get('r-victim')?.logoUrl).toBe(theirs);
+    expect(world.restaurants.get('r-1')?.logoUrl).toBe(
+      `http://api.test/v1/files/${world.stored[0]}`,
+    );
+  });
+
   it('SPEC-022-05 R6 — a logo address that is not one of DJAFAT’s photos is replaced and never deleted', async () => {
     const world = restaurantWorld();
     world.signedUp('r-1', 'u-owner', {
@@ -204,10 +227,10 @@ describe('SPEC-022-07 — DJAFAT decides a restaurant', () => {
     });
   });
 
-  it('FEAT-022-Q18 — the last dish deleted during the review: « Valider » answers 409 APPLICATION_INCOMPLETE and nothing changes', async () => {
+  it('FEAT-022-Q18 — the last dish removed (deactivated) during the review: « Valider » answers 409 APPLICATION_INCOMPLETE and nothing changes', async () => {
     const world = restaurantWorld();
     ready(world, { status: 'pending_review' });
-    world.restaurants.get('r-1')!.prices = [];
+    world.restaurants.get('r-1')!.dishes = [dish(150_000n, { isActive: false })];
 
     await expect(world.service.approve('r-1', 'u-admin')).rejects.toMatchObject({
       status: 409,
@@ -409,5 +432,34 @@ describe('SPEC-022-07 R6 — after the approval, a new number or paper waits for
       world.service.decideChange('r-2', change!.id, 'u-admin', { status: 'approved' }),
     ).rejects.toMatchObject({ status: 404, response: { code: 'CHANGE_NOT_FOUND' } });
     expect(world.applications.get('r-1')?.registryNumber).toBe('TD-NDJ-2026-B-1234');
+  });
+});
+
+// Review of FEAT-022 part 3, #4 — SPEC-022-05 « Autorisations ».
+describe('SPEC-022-05 « Autorisations » — the owner’s restaurant only', () => {
+  it('an account owning r-2 and on the staff of r-1 reaches r-2’s application, never r-1’s papers', async () => {
+    const world = restaurantWorld();
+    ready(world); // r-1, owned by u-owner
+    world.signedUp('r-2', 'u-both', { restaurant: { name: 'Grill 235' } });
+    world.staffScopes.set('u-both', 'r-1');
+
+    const mine = await world.service.getMine('u-both');
+
+    expect(mine.restaurantId).toBe('r-2');
+    await world.service.updatePapers('u-both', {
+      mobileMoney: { provider: 'moov', number: '+23599000009' },
+    });
+    expect(world.applications.get('r-1')?.mobileMoneyNumber).toBe('+23566000001');
+  });
+
+  it('a staff member without a restaurant of their own has no application (404)', async () => {
+    const world = restaurantWorld();
+    ready(world);
+    world.staffScopes.set('u-staff', 'r-1');
+
+    await expect(world.service.getMine('u-staff')).rejects.toMatchObject({
+      status: 404,
+      response: { code: 'APPLICATION_NOT_FOUND' },
+    });
   });
 });

@@ -10,7 +10,12 @@ import {
   type MobileMoneyProvider,
   type RestaurantStep,
 } from '@djafat/core';
-import { phoneFieldError, phoneForSending, type FieldErrors } from './account-form.js';
+import {
+  phoneFieldError,
+  phoneForField,
+  phoneForSending,
+  type FieldErrors,
+} from './account-form.js';
 import type { ApiHttp } from './http.js';
 
 /**
@@ -272,9 +277,14 @@ export function changeTopicText(topic: string): string {
   return CHANGE_TOPIC_TEXT[topic] ?? 'Changement';
 }
 
-/** « Airtel Money 66 12 34 56 » — the provider's name with the number as given. */
+/**
+ * « Airtel Money 66 12 34 56 » — a Chad number in its national form, as the
+ * fields show it (FEAT-024); a masked one (« 66 •• •• 01 ») as given.
+ */
 export function mobileMoneyText(mobileMoney: MobileMoney): string {
-  return `${mobileMoney.provider === 'airtel' ? 'Airtel Money' : 'Moov Money'} ${mobileMoney.number}`;
+  const national = /^\+235(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(mobileMoney.number);
+  const number = national ? national.slice(1).join(' ') : mobileMoney.number;
+  return `${mobileMoney.provider === 'airtel' ? 'Airtel Money' : 'Moov Money'} ${number}`;
 }
 
 /** The two Mobile Money operators, as the forms offer them. */
@@ -364,6 +374,58 @@ export function restaurantPapersRequest(values: RestaurantPapersValues): Restaur
   return {
     registryNumber: values.registryNumber.trim(),
     mobileMoney: mobileMoneyRequest(values),
+  };
+}
+
+/**
+ * What the « Papiers » form starts from: the value waiting for DJAFAT when
+ * there is one (SPEC-022-07 R6), else the saved one — so the field shows what
+ * will apply, and typing the approved value back withdraws the change.
+ */
+export function restaurantPapersStart(
+  application: Pick<RestaurantApplication, 'papers' | 'mobileMoney' | 'pendingChanges'>,
+): RestaurantPapersValues {
+  const registry = pendingChangeOf(application, 'registry_number')?.registryNumber;
+  const money =
+    pendingChangeOf(application, 'mobile_money')?.mobileMoney ?? application.mobileMoney;
+  return {
+    registryNumber: registry ?? application.papers.registryNumber ?? '',
+    provider: money?.provider ?? '',
+    number: phoneForField(money?.number),
+  };
+}
+
+/**
+ * R6 (review of FEAT-022 part 3, #3): only what the owner changed leaves —
+ * the other field, untouched, never withdraws its own waiting change. Each
+ * changed field is checked; `request` is `null` when nothing changed.
+ */
+export function restaurantPapersChanges(
+  values: RestaurantPapersValues,
+  start: RestaurantPapersValues,
+): {
+  readonly errors: FieldErrors<'registryNumber' | 'provider' | 'number'>;
+  readonly request: RestaurantPapersInput | null;
+} {
+  const registryChanged = values.registryNumber.trim() !== start.registryNumber.trim();
+  const moneyChanged =
+    values.provider !== start.provider ||
+    phoneForSending(values.number) !== phoneForSending(start.number);
+  const all = restaurantPapersErrors(values);
+  const errors: FieldErrors<'registryNumber' | 'provider' | 'number'> = {
+    ...(registryChanged && all.registryNumber ? { registryNumber: all.registryNumber } : {}),
+    ...(moneyChanged && all.provider ? { provider: all.provider } : {}),
+    ...(moneyChanged && all.number ? { number: all.number } : {}),
+  };
+  if (Object.keys(errors).length > 0 || (!registryChanged && !moneyChanged)) {
+    return { errors, request: null };
+  }
+  return {
+    errors,
+    request: {
+      ...(registryChanged ? { registryNumber: values.registryNumber.trim() } : {}),
+      ...(moneyChanged ? { mobileMoney: mobileMoneyRequest(values) } : {}),
+    },
   };
 }
 

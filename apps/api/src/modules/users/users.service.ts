@@ -244,7 +244,7 @@ export class UsersService {
   async hasRoleWithin(
     tx: Prisma.TransactionClient,
     userId: string,
-    role: 'courier' | 'restaurant_owner',
+    role: 'courier' | 'restaurant_owner' | 'restaurant_staff',
   ): Promise<boolean> {
     const rows = await tx.$queryRaw<Array<{ held: boolean }>>`
       SELECT true AS held FROM user_roles WHERE user_id = ${userId}::uuid AND role = ${role} LIMIT 1`;
@@ -355,10 +355,29 @@ export class UsersService {
    * scope for these roles — but a pre-Bloc-9 seed row could still be global).
    */
   async getRestaurantScope(userId: string): Promise<string | null> {
+    // One grant per restaurant role at most (migration 0028); the owner's comes
+    // first, so an answer never depends on the row order (review of FEAT-022 part 3, #4).
     const rows = await this.prisma.$queryRaw<Array<{ scope_restaurant_id: string | null }>>`
       SELECT scope_restaurant_id FROM user_roles
       WHERE user_id = ${userId}::uuid
         AND role IN ('restaurant_owner', 'restaurant_staff')
+        AND scope_restaurant_id IS NOT NULL
+      ORDER BY (role = 'restaurant_owner') DESC
+      LIMIT 1
+    `;
+    return rows[0]?.scope_restaurant_id ?? null;
+  }
+
+  /**
+   * FEAT-022 (SPEC-022-05 « Autorisations »): the restaurant this account
+   * OWNS — never one where it is only on the staff. The owner-only routes
+   * (papers, Mobile Money) resolve their restaurant here.
+   */
+  async getOwnedRestaurantScope(userId: string): Promise<string | null> {
+    const rows = await this.prisma.$queryRaw<Array<{ scope_restaurant_id: string | null }>>`
+      SELECT scope_restaurant_id FROM user_roles
+      WHERE user_id = ${userId}::uuid
+        AND role = 'restaurant_owner'
         AND scope_restaurant_id IS NOT NULL
       LIMIT 1
     `;

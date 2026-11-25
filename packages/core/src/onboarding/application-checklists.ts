@@ -135,16 +135,10 @@ export function missingRestaurantSteps(facts: RestaurantApplicationFacts): Resta
 export const RESTAURANT_DOCUMENT_KINDS = ['logo', 'cover', 'registry', 'owner_id'] as const;
 export type RestaurantDocumentKind = (typeof RESTAURANT_DOCUMENT_KINDS)[number];
 
-export function isRestaurantDocumentKind(value: string): value is RestaurantDocumentKind {
-  return (RESTAURANT_DOCUMENT_KINDS as readonly string[]).includes(value);
-}
-
-/** Who may open the photo: anyone by its address, or its owner and DJAFAT by a signed link. */
+/**
+ * Who may open the photo: anyone by its address (the logo and the cover,
+ * step 3), or its owner and DJAFAT by a signed link (the papers, step 4).
+ */
 export function restaurantDocumentIsPublic(kind: RestaurantDocumentKind): boolean {
   return kind === 'logo' || kind === 'cover';
-}
-
-/** The step a photo fills (SPEC-022-05 R1). */
-export function restaurantStepOfDocument(kind: RestaurantDocumentKind): RestaurantStep {
-  return restaurantDocumentIsPublic(kind) ? 'photos' : 'papers';
 }

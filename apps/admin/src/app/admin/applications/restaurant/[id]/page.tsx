@@ -125,6 +125,8 @@ export default function RestaurantApplicationPage() {
       const message = decisionErrorMessage(err);
       if (decision === 'reject' && rejecting) setReasonError(message);
       else setActionError(message);
+      // What changed meanwhile (a step that no longer holds) shows on the page.
+      if (err instanceof ApiClientError && err.code === 'APPLICATION_INCOMPLETE') await load();
     } finally {
       setBusy(false);
     }

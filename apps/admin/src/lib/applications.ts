@@ -1,5 +1,6 @@
 import {
   ApiClientError,
+  RESTAURANT_STEP_TEXT,
   type ApplicationDecision,
   type ApplicationPhoto,
   type ApplicationType,
@@ -117,7 +118,28 @@ export function decisionErrorMessage(err: unknown): string {
       return 'Ce changement a été remplacé par un plus récent : rechargez la page.';
     }
     if (err.code === 'VALIDATION_ERROR') return 'Vérifiez le motif du refus.';
+    if (err.code === 'APPLICATION_INCOMPLETE') {
+      // SPEC-022-07 R3 v5 (FEAT-022-Q18): which steps no longer hold.
+      const missing = missingSteps(err.details);
+      return missing.length > 0
+        ? `Une étape du dossier ne tient plus : ${missing.join(', ')}. Le restaurant doit la compléter.`
+        : err.message;
+    }
     return err.message;
   }
   return 'Action impossible : réessayez.';
+}
+
+/** The steps an `APPLICATION_INCOMPLETE` refusal lists (`details.missing`), by their console name. */
+function missingSteps(details: unknown): string[] {
+  const missing =
+    details && typeof details === 'object' && 'missing' in details
+      ? (details as { missing: unknown }).missing
+      : null;
+  if (!Array.isArray(missing)) return [];
+  return missing.flatMap((step) =>
+    typeof step === 'string' && step in RESTAURANT_STEP_TEXT
+      ? [RESTAURANT_STEP_TEXT[step as keyof typeof RESTAURANT_STEP_TEXT].title]
+      : [],
+  );
 }

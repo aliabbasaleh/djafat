@@ -196,4 +196,23 @@ describe('SPEC-022-08 — add a role to one’s own account', () => {
     });
     expect(provisioned).toHaveLength(0);
   });
+
+  // Review of FEAT-022 part 3, #4 — SPEC-022-08 R5 (v4).
+  it('SPEC-022-08 R5 — on the staff of a restaurant: « Inscrire mon restaurant » is refused (409), « Devenir livreur » still works', async () => {
+    const { service, roles, provisioned } = build({ roles: ['customer', 'restaurant_staff'] });
+
+    await expect(service.registerRestaurant(USER.id, RESTAURANT, META)).rejects.toMatchObject({
+      status: 409,
+      response: {
+        code: 'ROLE_ALREADY_HELD',
+        message:
+          "Ce compte fait partie de l'équipe d'un restaurant : inscrivez le vôtre avec un autre compte.",
+      },
+    });
+    expect(provisioned).toHaveLength(0);
+    expect(roles.has('restaurant_owner')).toBe(false);
+
+    await service.becomeCourier(USER.id, COURIER, META);
+    expect(roles.has('courier')).toBe(true);
+  });
 });

@@ -190,7 +190,9 @@ function changeDecidedMessage(notice: Extract<AccountNotice, { kind: 'change_dec
           ? courier
             ? 'Vos prochains gains y seront envoyés.'
             : 'Les prochains paiements y seront envoyés.'
-          : "Il remplace l'ancien dans votre dossier.",
+          : notice.topic === 'registry_number'
+            ? "Il remplace l'ancien dans votre dossier."
+            : "Elle remplace l'ancienne dans votre dossier.",
         '',
         "L'équipe DJAFAT",
       ].join('\n'),

@@ -146,7 +146,12 @@ export function PendingChanges({
             </span>
             <span className={cx(styles['actions'])}>
               {change.kind === 'document' && !change.registryNumber && (
-                <Button variant="ghost" size="sm" onClick={() => void showPhoto(change)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void showPhoto(change)}
+                  aria-label={`Voir la nouvelle photo : ${changeTopicText(change.topic)}`}
+                >
                   voir la photo
                 </Button>
               )}

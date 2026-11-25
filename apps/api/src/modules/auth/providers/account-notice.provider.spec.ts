@@ -195,6 +195,7 @@ describe('SPEC-022-07 R6 — the e-mails of a change after the approval', () => 
     });
     expect(accepted.subject).toBe('Votre nouveau papier est accepté');
     expect(accepted.text).toContain('DJAFAT a accepté la nouvelle photo du permis.');
+    expect(accepted.text).toContain("Elle remplace l'ancienne dans votre dossier.");
 
     const refused = accountNoticeMessage({
       kind: 'change_decided',

@@ -867,8 +867,11 @@ async function signedUpRestaurant(): Promise<SignedIn & { email: string; restaur
   return { ...signedIn, email: input.email, restaurantId: restaurant.id };
 }
 
-/** The four steps over HTTP (SPEC-022-05 R1): the point, hours and a priced dish, both photos, the papers. */
-async function fillFourSteps(owner: SignedIn & { restaurantId: string }): Promise<void> {
+/**
+ * The four steps over HTTP (SPEC-022-05 R1): the point, hours and a priced dish in a
+ * category (what customers see), both photos, the papers. Returns the dish.
+ */
+async function fillFourSteps(owner: SignedIn & { restaurantId: string }): Promise<string> {
   await request(server)
     .put('/v1/restaurants/me/application/location')
     .set(bearer(owner.access))
@@ -884,10 +887,19 @@ async function fillFourSteps(owner: SignedIn & { restaurantId: string }): Promis
     .set(bearer(owner.access))
     .send({ hours: [{ weekday: 1, opensMinutes: 480, closesMinutes: 1320 }] })
     .expect(200);
-  await request(server)
+  const category = await request(server)
+    .post(`/v1/restaurants/${owner.restaurantId}/categories`)
+    .set(bearer(owner.access))
+    .send({ name: 'Grillades' })
+    .expect(201);
+  const dish = await request(server)
     .post(`/v1/restaurants/${owner.restaurantId}/products`)
     .set(bearer(owner.access))
-    .send({ name: 'Poulet braisé', priceMinor: '150000' })
+    .send({
+      name: 'Poulet braisé',
+      priceMinor: '150000',
+      categoryId: (category.body as { id: string }).id,
+    })
     .expect(201);
   for (const kind of ['logo', 'cover']) {
     await request(server)
@@ -913,6 +925,7 @@ async function fillFourSteps(owner: SignedIn & { restaurantId: string }): Promis
       .send(JPEG)
       .expect(200);
   }
+  return (dish.body as { id: string }).id;
 }
 
 /** A fresh admin (promoted in the database), signed in; stepped up when asked. */
@@ -996,9 +1009,9 @@ describe('FEAT-022 part 3 — the restaurant’s four steps and DJAFAT’s decis
   });
 
   // SPEC-022-07-SC02, SPEC-022-07 R3 (FEAT-022-Q18)
-  it('FEAT-022-Q18 — a dish set to 0 XAF during the review: « Valider » answers 409; SPEC-022-07-SC02 — then validated: active, its page opens, the owner is e-mailed', async () => {
+  it('FEAT-022-Q18 — the only dish removed during the review: « Valider » answers 409; SPEC-022-07-SC02 — back on the menu, validated: active, its page opens, the owner is e-mailed', async () => {
     const owner = await signedUpRestaurant();
-    await fillFourSteps(owner);
+    const dish = await fillFourSteps(owner);
     await request(server)
       .post('/v1/restaurants/me/application/submit')
       .set(bearer(owner.access))
@@ -1009,10 +1022,12 @@ describe('FEAT-022 part 3 — the restaurant’s four steps and DJAFAT’s decis
     await request(server).get(`/v1/restaurants/${restaurant.slug}`).expect(404);
     const admin = await staffToken(STAFF.admin);
 
-    await prisma.product.updateMany({
-      where: { restaurantId: owner.restaurantId },
-      data: { priceMinor: 0n },
-    });
+    // The menu stays editable during the review: « removing » a dish deactivates it.
+    await request(server)
+      .patch(`/v1/products/${dish}`)
+      .set(bearer(owner.access))
+      .send({ isActive: false })
+      .expect(200);
     const incomplete = await request(server)
       .post(`/v1/admin/applications/restaurant/${owner.restaurantId}/approve`)
       .set(bearer(admin))
@@ -1022,10 +1037,11 @@ describe('FEAT-022 part 3 — the restaurant’s four steps and DJAFAT’s decis
       error: { code: 'APPLICATION_INCOMPLETE', details: { missing: ['hours_menu'] } },
     });
 
-    await prisma.product.updateMany({
-      where: { restaurantId: owner.restaurantId },
-      data: { priceMinor: 150_000n },
-    });
+    await request(server)
+      .patch(`/v1/products/${dish}`)
+      .set(bearer(owner.access))
+      .send({ isActive: true })
+      .expect(200);
     const approved = await request(server)
       .post(`/v1/admin/applications/restaurant/${owner.restaurantId}/approve`)
       .set(bearer(admin))
@@ -1245,5 +1261,46 @@ describe('FEAT-022 part 3 — changes after the approval (SPEC-022-07 R6)', () =
       .get('/v1/admin/neighbourhoods/typed')
       .set(bearer(await staffToken(STAFF.support)))
       .expect(403);
+  });
+});
+
+// Review of FEAT-022 part 3, #1 and #4 — on a real database.
+describe('FEAT-022 part 3 review — logo addresses and one restaurant per account', () => {
+  // SPEC-022-05 R1 v2 (FEAT-022-Q20)
+  it('SPEC-022-05 R1 — an owner cannot set the logo or cover as an address (403); the photo route stays', async () => {
+    const owner = await signedUpRestaurant();
+    const refused = await request(server)
+      .patch(`/v1/restaurants/${owner.restaurantId}`)
+      .set(bearer(owner.access))
+      .send({
+        logoUrl: 'http://localhost:3001/v1/files/public-00000000-0000-4000-8000-0000000000ff.jpg',
+      });
+    expect(refused.status).toBe(403);
+    await request(server)
+      .post('/v1/restaurants/me/photos/logo')
+      .set(bearer(owner.access))
+      .set('Content-Type', 'image/jpeg')
+      .send(JPEG)
+      .expect(200);
+  });
+
+  // SPEC-022-08 R5 v4
+  it('SPEC-022-08 R5 — on the staff of a restaurant: « Inscrire mon restaurant » answers 409, no restaurant created', async () => {
+    const staff = await signUp({ ...fresh(), accountType: 'customer' });
+    const team = await prisma.restaurant.findFirstOrThrow({ where: { slug: 'chez-fatime' } });
+    await prisma.$executeRaw`INSERT INTO user_roles (user_id, role, scope_restaurant_id) VALUES (${staff.user.id}::uuid, 'restaurant_staff', ${team.id}::uuid)`;
+
+    const res = await request(server)
+      .post('/v1/me/roles/restaurant')
+      .set(bearer(staff.access))
+      .send({
+        restaurantName: `Chez Halimé ${randomUUID().slice(0, 6)}`,
+        neighbourhoodId: await neighbourhood('Klémat'),
+        acceptTerms: true,
+      });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ error: { code: 'ROLE_ALREADY_HELD' } });
+    expect(await prisma.restaurant.count({ where: { ownerUserId: staff.user.id } })).toBe(0);
   });
 });

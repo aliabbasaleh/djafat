@@ -6,8 +6,10 @@ import {
   pendingChangeOf,
   restaurantLocationErrors,
   restaurantLocationRequest,
+  restaurantPapersChanges,
   restaurantPapersErrors,
   restaurantPapersRequest,
+  restaurantPapersStart,
   mobileMoneyText,
   photoContentType,
   rejectionReasonError,
@@ -208,7 +210,10 @@ describe('FEAT-022 — the restaurant’s four steps and the changes in the SDK'
     expect(changeTopicText('owner_id')).toBe("Pièce d'identité du responsable");
     expect(changeTopicText('something_new')).toBe('Changement');
     expect(mobileMoneyText({ provider: 'moov', number: '+23599000001' })).toBe(
-      'Moov Money +23599000001',
+      'Moov Money 99 00 00 01',
+    );
+    expect(mobileMoneyText({ provider: 'airtel', number: '66 •• •• 01' })).toBe(
+      'Airtel Money 66 •• •• 01',
     );
   });
 });
@@ -258,6 +263,51 @@ describe('FEAT-022 — the forms of steps 1 and 4 and of a new Mobile Money numb
     expect(mobileMoneyRequest({ provider: 'moov', number: '99 00 00 03' })).toEqual({
       provider: 'moov',
       number: '+23599000003',
+    });
+  });
+
+  it('SPEC-022-07 R6 (review of part 3, #3) — saving one field never withdraws the other’s waiting change', () => {
+    const application = {
+      papers: { registryNumber: 'TD-NDJ-2026-B-1234', registryPhoto: true, ownerIdPhoto: true },
+      mobileMoney: { provider: 'airtel' as const, number: '+23566000001' },
+      pendingChanges: [
+        {
+          id: 'c-1',
+          kind: 'mobile_money' as const,
+          topic: 'mobile_money',
+          createdAt: '2026-11-24T08:00:00.000Z',
+          mobileMoney: { provider: 'moov' as const, number: '+23599000002' },
+        },
+      ],
+    };
+    const start = restaurantPapersStart(application);
+    // The field shows the number that will apply: the one waiting.
+    expect(start).toEqual({
+      registryNumber: 'TD-NDJ-2026-B-1234',
+      provider: 'moov',
+      number: '99 00 00 02',
+    });
+
+    // Only the registry number changed: the waiting number is not sent again.
+    expect(
+      restaurantPapersChanges({ ...start, registryNumber: 'TD-NDJ-2026-B-5678' }, start),
+    ).toEqual({ errors: {}, request: { registryNumber: 'TD-NDJ-2026-B-5678' } });
+    // Typing the approved number back withdraws the change (the API decides it).
+    expect(
+      restaurantPapersChanges({ ...start, provider: 'airtel', number: '66 00 00 01' }, start)
+        .request,
+    ).toEqual({ mobileMoney: { provider: 'airtel', number: '+23566000001' } });
+    // Nothing changed: nothing to send.
+    expect(restaurantPapersChanges(start, start)).toEqual({ errors: {}, request: null });
+    // A changed field is checked; an untouched empty one is not.
+    expect(
+      restaurantPapersChanges(
+        { registryNumber: '', provider: '', number: '+33 6 12 34 56 78' },
+        { registryNumber: '', provider: '', number: '' },
+      ).errors,
+    ).toEqual({
+      provider: 'Choisissez Airtel Money ou Moov Money.',
+      number: expect.stringContaining('+235'),
     });
   });
 

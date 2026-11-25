@@ -152,7 +152,7 @@ export default function ProfilePage() {
     }
   }
 
-  async function upload(kind: 'logo' | 'cover', file: File) {
+  async function upload(kind: 'logo' | 'cover', file: Blob) {
     setPhotoError((e) => ({ ...e, [kind]: undefined }));
     setUploading(kind);
     try {

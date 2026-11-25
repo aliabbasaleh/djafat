@@ -7,12 +7,12 @@ import {
   mobileMoneyText,
   pendingChangeOf,
   phoneFieldShowsDialCode,
-  phoneForField,
-  restaurantPapersErrors,
-  restaurantPapersRequest,
+  restaurantPapersChanges,
+  restaurantPapersStart,
   type FieldErrors,
   type MobileMoney,
   type RestaurantPaperKind,
+  type RestaurantPapersValues,
 } from '@djafat/sdk';
 import { Heading, Text, Stack, Skeleton, ErrorState, cx } from '@djafat/ui';
 import { Alert, Button, Input, Select } from '@/components/ui-client';
@@ -48,30 +48,45 @@ export default function PapersPage() {
   const [uploading, setUploading] = useState<RestaurantPaperKind | null>(null);
   const [photoError, setPhotoError] = useState<Partial<Record<RestaurantPaperKind, string>>>({});
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
-  const started = useRef(false);
+  /** What the fields started from — the value waiting for DJAFAT, else the saved one (R6). */
+  const [start, setStart] = useState<RestaurantPapersValues | null>(null);
   const form = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
-    if (!application || started.current) return;
-    started.current = true;
-    setRegistryNumber(application.papers.registryNumber ?? '');
-    setProvider(application.mobileMoney?.provider ?? '');
-    setNumber(phoneForField(application.mobileMoney?.number));
-  }, [application]);
+    if (!application || start) return;
+    const values = restaurantPapersStart(application);
+    setStart(values);
+    setRegistryNumber(values.registryNumber);
+    setProvider(values.provider);
+    setNumber(values.number);
+  }, [application, start]);
 
   const readOnly = underReview(application);
   const approved = application?.status === 'approved';
 
   async function save() {
     setMessage(null);
-    const values = { registryNumber, provider, number };
-    const found = restaurantPapersErrors(values);
+    if (!start) return;
+    // Only what changed leaves: an untouched field never withdraws its waiting change (R6).
+    const { errors: found, request } = restaurantPapersChanges(
+      { registryNumber, provider, number },
+      start,
+    );
     setErrors(found);
     if (Object.keys(found).length > 0) return focusFirstInvalid(form.current);
+    if (!request) {
+      setMessage({ tone: 'success', text: 'Rien n’a changé.' });
+      return;
+    }
     setSaving(true);
     try {
-      const view = await api.restaurant.application.updatePapers(restaurantPapersRequest(values));
+      const view = await api.restaurant.application.updatePapers(request);
       setApplication(view);
+      const next = restaurantPapersStart(view);
+      setStart(next);
+      setRegistryNumber(next.registryNumber);
+      setProvider(next.provider);
+      setNumber(next.number);
       setMessage({
         tone: 'success',
         text:
@@ -86,7 +101,7 @@ export default function PapersPage() {
     }
   }
 
-  async function upload(kind: RestaurantPaperKind, file: File) {
+  async function upload(kind: RestaurantPaperKind, file: Blob) {
     setMessage(null);
     setPhotoError((e) => ({ ...e, [kind]: undefined }));
     setUploading(kind);
@@ -174,7 +189,8 @@ export default function PapersPage() {
         />
         {waitingRegistry?.registryNumber && (
           <p className={cx(styles['pending'])}>
-            ⏳ {WAITING} : {waitingRegistry.registryNumber}
+            ⏳ {WAITING} : {waitingRegistry.registryNumber} (le numéro validé reste{' '}
+            {application.papers.registryNumber ?? '—'})
           </p>
         )}
         <Select
@@ -212,6 +228,9 @@ export default function PapersPage() {
         {waitingNumber?.mobileMoney && (
           <p className={cx(styles['pending'])}>
             ⏳ {WAITING} : {mobileMoneyText(waitingNumber.mobileMoney)}
+            {application.mobileMoney
+              ? ` — les paiements vont encore vers ${mobileMoneyText(application.mobileMoney)}`
+              : ''}
           </p>
         )}
         {!readOnly && (

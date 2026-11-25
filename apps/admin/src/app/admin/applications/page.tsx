@@ -166,7 +166,7 @@ export default function ApplicationsPage() {
                       variant="secondary"
                       size="sm"
                       href={`/admin/applications/${type}/${row.subjectId}`}
-                      aria-label={`Ouvrir le dossier de ${row.name ?? 'ce demandeur'}`}
+                      aria-label={`Ouvrir : ${changeTopicText(row.topic)} de ${row.name ?? 'ce demandeur'}`}
                     >
                       Ouvrir
                     </Button>

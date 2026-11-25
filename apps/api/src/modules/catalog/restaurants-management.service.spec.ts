@@ -12,7 +12,7 @@ function prismaStub(
   application: { status: string } | null = null,
 ) {
   const state = restaurant ? { ...restaurant, id: 'r1', slug: 'r1-slug', name: 'R1' } : null;
-  return {
+  const client: Record<string, unknown> = {
     restaurantApplication: { findUnique: vi.fn().mockResolvedValue(application) },
     restaurant: {
       findUnique: vi.fn().mockResolvedValue(state),
@@ -24,7 +24,11 @@ function prismaStub(
       create: vi.fn(),
     },
     city: { findUnique: vi.fn() },
-  } as unknown as PrismaService;
+    // FEAT-022 (part 3 review, #5): the application's lock, then the same client.
+    $executeRaw: vi.fn().mockResolvedValue(1),
+  };
+  client['$transaction'] = vi.fn((fn: (tx: unknown) => Promise<unknown>) => fn(client));
+  return client as unknown as PrismaService;
 }
 
 const auditStub = () => ({ log: vi.fn().mockResolvedValue(undefined) }) as unknown as AuditService;
@@ -249,11 +253,7 @@ describe('update — a restaurant that signed up opens only once DJAFAT approved
 
 // FEAT-022 part 3 — SPEC-022-05 R5.
 describe('update — while DJAFAT checks the application, steps 1 and 3 do not change (SPEC-022-05 R5)', () => {
-  it.each([
-    { addressText: 'Avenue Mobutu, Moursal' },
-    { logoUrl: 'https://cdn.example.com/logo.png' },
-    { coverUrl: 'https://cdn.example.com/cover.png' },
-  ])(
+  it.each([{ addressText: 'Avenue Mobutu, Moursal' }])(
     'SPEC-022-05 R5 — the owner cannot change %o (409 APPLICATION_LOCKED), nothing changes',
     async (input) => {
       const prisma = prismaStub(
@@ -305,6 +305,46 @@ describe('update — while DJAFAT checks the application, steps 1 and 3 do not c
     await expect(
       corrected.update('owner-1', 'r1', { addressText: 'Avenue Mobutu' }, false),
     ).resolves.toBeDefined();
+  });
+});
+
+// FEAT-022 part 3 review, #1 — SPEC-022-05 R1 v2, FEAT-022-Q20.
+describe('update — an owner never types the logo or cover address (FEAT-022-Q20)', () => {
+  it.each([
+    { logoUrl: 'http://api.test/v1/files/public-00000000-0000-4000-8000-0000000000ff.jpg' },
+    { coverUrl: 'https://cdn.example.com/cover.png' },
+  ])(
+    'an owner sending %o is refused (403), whatever the application’s state; nothing changes',
+    async (input) => {
+      for (const application of [null, { status: 'to_complete' }, { status: 'approved' }]) {
+        const prisma = prismaStub({ status: 'active', ownerUserId: 'owner-1' }, application);
+        const svc = new RestaurantsManagementService(
+          prisma,
+          auditStub(),
+          usersStub(new Set(['owner-1:r1'])),
+          availabilityStub(),
+        );
+        await expect(svc.update('owner-1', 'r1', input, false)).rejects.toMatchObject({
+          status: 403,
+          response: { code: 'FORBIDDEN' },
+        });
+        expect(prisma.restaurant.update).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it('the team still sets a logo address (admin tier)', async () => {
+    const prisma = prismaStub({ status: 'active', ownerUserId: 'owner-1' });
+    const svc = new RestaurantsManagementService(
+      prisma,
+      auditStub(),
+      usersStub(new Set()),
+      availabilityStub(),
+    );
+    await expect(
+      svc.update('admin-1', 'r1', { logoUrl: 'https://cdn.example.com/logo.png' }, true),
+    ).resolves.toBeDefined();
+    expect(prisma.restaurant.update).toHaveBeenCalled();
   });
 });
 
@@ -427,13 +467,16 @@ describe('getMine / replaceHours (Bloc 10, docs/33 §profile, §hours)', () => {
   ) {
     const deleteMany = vi.fn().mockResolvedValue({ count: 0 });
     const createMany = vi.fn().mockResolvedValue({ count: 0 });
+    const client: Record<string, unknown> = {
+      restaurant: { findUniqueOrThrow: vi.fn().mockResolvedValue(restaurant) },
+      restaurantApplication: { findUnique: vi.fn().mockResolvedValue(application) },
+      restaurantHours: { deleteMany, createMany },
+      // FEAT-022 (part 3 review, #5): one interactive transaction under the application's lock.
+      $executeRaw: vi.fn().mockResolvedValue(1),
+    };
+    client['$transaction'] = vi.fn((fn: (tx: unknown) => Promise<unknown>) => fn(client));
     return {
-      prisma: {
-        restaurant: { findUniqueOrThrow: vi.fn().mockResolvedValue(restaurant) },
-        restaurantApplication: { findUnique: vi.fn().mockResolvedValue(application) },
-        restaurantHours: { deleteMany, createMany },
-        $transaction: vi.fn((ops: unknown[]) => Promise.all(ops)),
-      } as unknown as PrismaService,
+      prisma: client as unknown as PrismaService,
       deleteMany,
       createMany,
     };

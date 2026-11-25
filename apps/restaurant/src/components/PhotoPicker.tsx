@@ -3,6 +3,7 @@
 import { useId, useRef } from 'react';
 import { cx } from '@djafat/ui';
 import { Button } from '@/components/ui-client';
+import { photoForUpload } from '@/lib/photo';
 import styles from './PhotoPicker.module.css';
 
 /** SPEC-022-04 R2: what the API accepts. */
@@ -10,7 +11,8 @@ const ACCEPT = 'image/jpeg,image/png,image/webp';
 
 /**
  * FEAT-022 (SPEC-022-04 R2, SPEC-022-05 R1): one photo from the computer or
- * the phone — JPEG, PNG or WebP, 5 MB at most (the API checks it again).
+ * the phone — JPEG, PNG or WebP, 5 MB at most (the API checks it again); a
+ * larger photo is reduced first (FEAT-022-Q09).
  * A public photo shows its preview; a private paper only says it was sent.
  */
 export function PhotoPicker({
@@ -37,7 +39,8 @@ export function PhotoPicker({
   readonly disabled?: boolean;
   readonly error?: string | null;
   readonly hint?: string;
-  readonly onPick: (file: File) => void;
+  /** The photo to send, already reduced when it was large (FEAT-022-Q09). */
+  readonly onPick: (photo: Blob) => void;
   readonly extra?: React.ReactNode;
 }) {
   const id = useId();
@@ -70,7 +73,7 @@ export function PhotoPicker({
         onChange={(e) => {
           const file = e.target.files?.[0];
           e.target.value = '';
-          if (file) onPick(file);
+          if (file) void photoForUpload(file).then(onPick);
         }}
       />
       <Button

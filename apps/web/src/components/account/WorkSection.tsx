@@ -80,6 +80,8 @@ export function WorkSection({
   const formRef = useRef<HTMLFormElement>(null);
   const isCourier = me.roles.includes('courier');
   const isOwner = me.roles.includes('restaurant_owner');
+  // SPEC-022-08 R5 (v4): one account, one restaurant — staff register theirs with another account.
+  const isStaff = me.roles.includes('restaurant_staff');
 
   useEffect(() => {
     if (!open || neighbourhoods !== null) return;
@@ -286,6 +288,11 @@ export function WorkSection({
           ) : (
             <Text>Vous avez un restaurant : ouvrez la console restaurant.</Text>
           )
+        ) : isStaff ? (
+          <Text>
+            Ce compte fait partie de l&apos;équipe d&apos;un restaurant : inscrivez le vôtre avec un
+            autre compte.
+          </Text>
         ) : open === 'restaurant' ? (
           <form
             ref={formRef}

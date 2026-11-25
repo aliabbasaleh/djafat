@@ -8,6 +8,7 @@ import {
   mobileMoneyText,
   pendingChangeOf,
   phoneForField,
+  phoneForSending,
   type CourierApplication,
   type MobileMoney,
 } from '@djafat/sdk';
@@ -53,15 +54,26 @@ export function MobileMoneyCard() {
   const approved = application.mobileMoney;
   const waiting = pendingChangeOf(application, 'mobile_money');
 
+  /** The form starts from the number that will apply: the one waiting, else the approved one (R6). */
+  const startFrom = waiting?.mobileMoney ?? approved;
+
   function start() {
     setMessage(null);
     setError(null);
-    setProvider(approved.provider);
-    setNumber(phoneForField(approved.number));
+    setProvider(startFrom.provider);
+    setNumber(phoneForField(startFrom.number));
     setEditing(true);
   }
 
   async function send() {
+    if (
+      provider === startFrom.provider &&
+      phoneForSending(number) === phoneForSending(phoneForField(startFrom.number))
+    ) {
+      setEditing(false);
+      setMessage('Rien n’a changé.');
+      return;
+    }
     const found = mobileMoneyErrors({ provider, number });
     if (found.provider) {
       setError({ field: 'provider', text: found.provider });

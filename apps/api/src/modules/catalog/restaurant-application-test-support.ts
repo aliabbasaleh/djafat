@@ -32,11 +32,27 @@ export interface RestaurantRow {
   neighbourhoodOther: string | null;
   lat: number | null;
   lng: number | null;
-  /** Opening slots and dish prices (minor units), counted by the service. */
+  /** Opening slots, counted by the service. */
   hours: number;
-  prices: bigint[];
+  /** The dishes: price (minor units), active or « removed », and their category (none: `null`). */
+  dishes: Dish[];
   updatedAt?: Date;
 }
+
+export interface Dish {
+  priceMinor: bigint;
+  isActive: boolean;
+  /** The category's own state; `null` for a dish without category (customers never see it). */
+  categoryActive: boolean | null;
+}
+
+/** A dish customers see: active, in an active category. */
+export const dish = (priceMinor: bigint, over: Partial<Dish> = {}): Dish => ({
+  priceMinor,
+  isActive: true,
+  categoryActive: true,
+  ...over,
+});
 
 export function restaurantApplicationRow(
   restaurantId: string,
@@ -72,7 +88,7 @@ export const FOUR_STEPS: {
     addressText: 'Avenue Charles de Gaulle, Klémat',
     landmark: 'En face de la pharmacie du Centre',
     hours: 7,
-    prices: [150_000n],
+    dishes: [dish(150_000n)],
     logoUrl: 'http://api.test/v1/files/public-00000000-0000-4000-8000-000000000001.jpg',
     coverUrl: 'http://api.test/v1/files/public-00000000-0000-4000-8000-000000000002.jpg',
   },
@@ -89,7 +105,9 @@ export function restaurantWorld() {
   const restaurants = new Map<string, RestaurantRow>();
   const applications = new Map<string, RestaurantApplication>();
   const users = new Map<string, UserRecord>();
+  /** `restaurant_owner` grants; `restaurant_staff` grants (staff never reach the owner routes). */
   const scopes = new Map<string, string>();
+  const staffScopes = new Map<string, string>();
   const changes = changesTable();
   const audits: AuditLogEntry[] = [];
   const stored: string[] = [];
@@ -125,6 +143,25 @@ export function restaurantWorld() {
           Object.assign(row, data);
           return structuredClone(row);
         }),
+      ),
+      // How many restaurants still show a photo (`endsWith` on the logo or the cover).
+      count: vi.fn(
+        later(
+          ({
+            where,
+          }: {
+            where: {
+              OR: Array<{ logoUrl?: { endsWith: string }; coverUrl?: { endsWith: string } }>;
+            };
+          }) =>
+            [...restaurants.values()].filter((r) =>
+              where.OR.some(
+                (c) =>
+                  (c.logoUrl !== undefined && (r.logoUrl ?? '').endsWith(c.logoUrl.endsWith)) ||
+                  (c.coverUrl !== undefined && (r.coverUrl ?? '').endsWith(c.coverUrl.endsWith)),
+              ),
+            ).length,
+        ),
       ),
       // The names typed under « Autre » (SPEC-022-09 R3), as `groupBy` counts them.
       groupBy: vi.fn(
@@ -181,11 +218,26 @@ export function restaurantWorld() {
         ),
       ),
     },
+    // Applies the filters the service asks for (price, active, active category).
     product: {
       count: vi.fn(
         later(
-          ({ where }: { where: { restaurantId: string; priceMinor: { gt: bigint } } }) =>
-            restaurantOf(where.restaurantId).prices.filter((p) => p > where.priceMinor.gt).length,
+          ({
+            where,
+          }: {
+            where: {
+              restaurantId: string;
+              priceMinor: { gt: bigint };
+              isActive?: boolean;
+              category?: { is: { isActive: boolean } };
+            };
+          }) =>
+            restaurantOf(where.restaurantId).dishes.filter(
+              (d) =>
+                d.priceMinor > where.priceMinor.gt &&
+                (where.isActive === undefined || d.isActive === where.isActive) &&
+                (where.category === undefined || d.categoryActive === where.category.is.isActive),
+            ).length,
         ),
       ),
     },
@@ -276,7 +328,10 @@ export function restaurantWorld() {
 
   const usersService = {
     getById: vi.fn(later((id: string) => users.get(id) ?? null)),
-    getRestaurantScope: vi.fn(later((userId: string) => scopes.get(userId) ?? null)),
+    getRestaurantScope: vi.fn(
+      later((userId: string) => scopes.get(userId) ?? staffScopes.get(userId) ?? null),
+    ),
+    getOwnedRestaurantScope: vi.fn(later((userId: string) => scopes.get(userId) ?? null)),
   };
 
   const service = new RestaurantApplicationService(
@@ -311,7 +366,7 @@ export function restaurantWorld() {
       lat: null,
       lng: null,
       hours: 0,
-      prices: [],
+      dishes: [],
       ...options.restaurant,
     });
     if (options.application !== null) {
@@ -345,5 +400,6 @@ export function restaurantWorld() {
     removed,
     photos,
     signedUp,
+    staffScopes,
   };
 }

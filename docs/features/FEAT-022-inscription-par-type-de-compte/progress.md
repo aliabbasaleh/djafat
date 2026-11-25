@@ -7,16 +7,16 @@ Un résultat de vérification n'est valable que pour le commit indiqué :
 après toute modification de code, spec, capture ou config qualité, relancer.
 -->
 
-| Étape                   | Statut   | Date       | Notes                                                                                                                                                            |
-| ----------------------- | -------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Intake                  | fait     | 2026-11-23 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous ; six maquettes texte lues                                                                   |
-| Specs                   | fait     | 2026-11-25 | SPEC-022-01 à 09 implémentées ; 05 et 09 en v2, 01, 03 et 08 en v3, 02, 04 et 06 en v4, 07 en v5                                                                 |
-| Grill-me                | fait     | 2026-11-25 | Q01 à Q06 et Q13, Q14 tranchées par l'utilisateur ; Q07 à Q12 et Q15 à Q24 hypothèses (Q18 à Q24 : partie 3)                                                     |
-| Brief                   | fait     | 2026-11-25 | quatre tranches ; la 4 avant la 3, mises en ligne ensemble (FEAT-022-Q14) ; ré-épinglé pour la partie 3 (05@2, 07@5, 09@2)                                       |
-| Tests dérivés des specs | fait     | 2026-11-25 | chaque scénario lié à un test ou à une capture (`check-specs --matrix FEAT-022`) ; partie 3 : unitaires, SDK et intégration 31/31                                |
-| Implémentation          | fait     | 2026-11-25 | parties 1, 2 (PR #31), 4 (PR #32, avec FEAT-024) et 3 (branche `feat/inscription-restaurants`)                                                                   |
-| Revue qualité           | en cours | 2026-11-24 | parties 1-2 : deux tours, « Prêt pour PR » (PR #31) ; partie 4 (avec FEAT-024) : deux tours, corrections faites — voir `../FEAT-024-saisies-verifiees/review.md` |
-| PR                      | en cours | 2026-11-24 | parties 1-2 : PR #31 ; partie 4 : branche `feat/inscription-ecrans` (avec FEAT-024), à fusionner avec la partie 3                                                |
+| Étape                   | Statut   | Date       | Notes                                                                                                                                  |
+| ----------------------- | -------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Intake                  | fait     | 2026-11-23 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous ; six maquettes texte lues                                         |
+| Specs                   | fait     | 2026-11-25 | SPEC-022-01 à 09 implémentées ; 09 en v2, 01, 03 et 05 en v3, 02, 04, 06 et 08 en v4, 07 en v5                                         |
+| Grill-me                | fait     | 2026-11-25 | Q01 à Q06 et Q13, Q14 tranchées par l'utilisateur ; Q07 à Q12 et Q15 à Q25 hypothèses (Q18 à Q25 : partie 3)                           |
+| Brief                   | fait     | 2026-11-25 | quatre tranches ; la 4 avant la 3, mises en ligne ensemble (FEAT-022-Q14) ; ré-épinglé pour la partie 3 (05@3, 07@5, 08@4, 09@2)       |
+| Tests dérivés des specs | fait     | 2026-11-25 | chaque scénario lié à un test ou à une capture (`check-specs --matrix FEAT-022`) ; partie 3 : unitaires, SDK et intégration 31/31      |
+| Implémentation          | fait     | 2026-11-25 | parties 1, 2 (PR #31), 4 (PR #32, avec FEAT-024) et 3 (branche `feat/inscription-restaurants`)                                         |
+| Revue qualité           | en cours | 2026-11-25 | parties 1-2 : PR #31 ; partie 4 : voir `../FEAT-024-saisies-verifiees/review.md` ; partie 3 : tour 1, corrections faites (`review.md`) |
+| PR                      | en cours | 2026-11-24 | parties 1-2 : PR #31 ; partie 4 : branche `feat/inscription-ecrans` (avec FEAT-024), à fusionner avec la partie 3                      |
 
 ## Intake (2026-11-23)
 
@@ -91,6 +91,10 @@ commit avait rencontré un test instable hors de la feature (`TEST-06`, voir `re
 - SPEC-022-09 R3 : page « Quartiers » de la console admin (ajouter, renommer, désactiver, réactiver ;
   noms saisis sous « Autre » à ajouter en un geste, `GET /admin/neighbourhoods/typed`).
 - Nouvelle dépendance : `leaflet` 1.9.4 dans `apps/restaurant` (déjà celle du site client).
+- Revue indépendante, tour 1 (`72d155d`) : 1 bloquant (un responsable pouvait faire supprimer le
+  logo d'un autre restaurant), 3 majeurs (plats comptés que les clients ne voient pas ; « Papiers »
+  retirait le changement de l'autre champ ; un membre de l'équipe d'un restaurant atteignait le dossier
+  d'un autre), 9 mineurs, 6 notes — corrigés, voir `review.md` (FEAT-022-Q25 ajoutée).
 - Limite : le numéro Mobile Money d'un restaurant n'est pas encore lu par les règlements des
   restaurants (enregistrés à la main par la finance, `settlements`) ; il est visible, masqué, dans le
   dossier.

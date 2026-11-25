@@ -20,7 +20,8 @@ export interface MapPoint {
  * attribution, the same Leaflet as the customer site's delivery map
  * (`apps/web/src/components/LiveMap.tsx`). The address field next to it
  * still works if the map cannot load; « Utiliser ma position » places the
- * point without it.
+ * point without it, and « Placer le point au centre de la carte » without a
+ * mouse (the map pans with the arrow keys).
  */
 export function LocationMap({
   point,
@@ -109,5 +110,26 @@ export function LocationMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the coordinates only
   }, [point?.lat, point?.lng]);
 
-  return <div ref={box} className={cx(styles['map'])} role="region" aria-label={label} />;
+  return (
+    <div className={cx(styles['wrap'])}>
+      <div ref={box} className={cx(styles['map'])} role="region" aria-label={label} />
+      {!readOnly && (
+        // Without a mouse: the map pans with the arrow keys, then the point goes to its centre.
+        <button
+          type="button"
+          className={cx(styles['centre'])}
+          onClick={() => {
+            const current = map.current;
+            if (!current) return;
+            const at = current.map.getCenter();
+            const next = { lat: at.lat, lng: at.lng };
+            place(next);
+            onChangeRef.current(next);
+          }}
+        >
+          Placer le point au centre de la carte
+        </button>
+      )}
+    </div>
+  );
 }

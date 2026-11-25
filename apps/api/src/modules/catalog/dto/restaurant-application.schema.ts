@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { LAUNCH_MARKET } from '@djafat/config';
-import { MOBILE_MONEY_PROVIDERS, RESTAURANT_DOCUMENT_KINDS } from '@djafat/core';
+import {
+  MOBILE_MONEY_PROVIDERS,
+  RESTAURANT_DOCUMENT_KINDS,
+  restaurantDocumentIsPublic,
+} from '@djafat/core';
 import { makePhoneInputSchema } from '@djafat/validation';
 
 /** Airtel Money and Moov Money wallets are Chadian: a Chad mobile only (FEAT-024, SPEC-024-02 R4). */
@@ -54,14 +58,16 @@ export type RestaurantPapersInput = z.infer<typeof RestaurantPapersSchema>;
  * `:kind` of `/v1/restaurants/me/application/files/:kind`: the private papers
  * of step 4, which open only by a signed link (SPEC-022-04 R3).
  */
-export const RestaurantPaperKindSchema = z.enum(['registry', 'owner_id']);
+export const RestaurantPaperKindSchema = z.enum(
+  RESTAURANT_DOCUMENT_KINDS.filter((k) => !restaurantDocumentIsPublic(k)) as [
+    'registry',
+    'owner_id',
+  ],
+);
 export type RestaurantPaperKind = z.infer<typeof RestaurantPaperKindSchema>;
 
 /** `:kind` of `/v1/restaurants/me/photos/:kind`: the public photos of step 3 (SPEC-022-04 R4). */
 export const RestaurantPublicPhotoKindSchema = z.enum(
-  RESTAURANT_DOCUMENT_KINDS.filter((k): k is 'logo' | 'cover' => k === 'logo' || k === 'cover') as [
-    'logo',
-    'cover',
-  ],
+  RESTAURANT_DOCUMENT_KINDS.filter(restaurantDocumentIsPublic) as ['logo', 'cover'],
 );
 export type RestaurantPublicPhotoKind = z.infer<typeof RestaurantPublicPhotoKindSchema>;

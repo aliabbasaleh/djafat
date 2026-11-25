@@ -27,6 +27,18 @@ const roleAlreadyHeld = (type: SignupDetails['type'], revoked: boolean) =>
   });
 
 /**
+ * SPEC-022-08 R5 (v4): one account, one restaurant — a member of a
+ * restaurant's team never registers another (« jamais … accès restaurant A
+ * ET B », migration 0028; review of FEAT-022 part 3, #4).
+ */
+const staffOfAnotherRestaurant = () =>
+  new ConflictException({
+    code: 'ROLE_ALREADY_HELD',
+    message:
+      "Ce compte fait partie de l'équipe d'un restaurant : inscrivez le vôtre avec un autre compte.",
+  });
+
+/**
  * « Devenir livreur » and « Inscrire mon restaurant » from « Mon profil »
  * (FEAT-022, SPEC-022-08): the signed-in account gets the role and its
  * application, with the sign-up's rules (age, neighbourhood, terms) and its
@@ -85,6 +97,12 @@ export class RoleSignupService {
       // R3, R5: the role — or what it left behind (a courier row, an owned restaurant).
       if (await this.users.hasRoleWithin(tx, userId, role))
         throw roleAlreadyHeld(signup.type, false);
+      if (
+        signup.type === 'restaurant' &&
+        (await this.users.hasRoleWithin(tx, userId, 'restaurant_staff'))
+      ) {
+        throw staffOfAnotherRestaurant();
+      }
       if (await this.registration.alreadyProvisioned(tx, userId, signup.type)) {
         throw roleAlreadyHeld(signup.type, true);
       }

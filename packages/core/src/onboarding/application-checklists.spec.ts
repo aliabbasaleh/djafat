@@ -10,12 +10,7 @@ import {
   type CourierApplicationFacts,
   type RestaurantApplicationFacts,
 } from './application-checklists.js';
-import {
-  RESTAURANT_DOCUMENT_KINDS,
-  isRestaurantDocumentKind,
-  restaurantDocumentIsPublic,
-  restaurantStepOfDocument,
-} from './application-checklists.js';
+import { RESTAURANT_DOCUMENT_KINDS, restaurantDocumentIsPublic } from './application-checklists.js';
 
 // FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte (SPEC-022-05, SPEC-022-06).
 
@@ -142,21 +137,13 @@ describe('SPEC-022-06 — the courier’s photos', () => {
 
 // FEAT-022 — SPEC-022-05 R1, SPEC-022-04 R3, R4 (part 3).
 describe("SPEC-022-05 — the restaurant's photos", () => {
-  it("logo and cover are public and fill « Logo et photos »; the registry and the owner's ID are private papers", () => {
+  it("logo and cover are public (step 3); the registry and the owner's ID are private papers (step 4)", () => {
     expect(RESTAURANT_DOCUMENT_KINDS).toEqual(['logo', 'cover', 'registry', 'owner_id']);
-    expect(
-      RESTAURANT_DOCUMENT_KINDS.map((k) => [
-        k,
-        restaurantDocumentIsPublic(k),
-        restaurantStepOfDocument(k),
-      ]),
-    ).toEqual([
-      ['logo', true, 'photos'],
-      ['cover', true, 'photos'],
-      ['registry', false, 'papers'],
-      ['owner_id', false, 'papers'],
+    expect(RESTAURANT_DOCUMENT_KINDS.map((k) => [k, restaurantDocumentIsPublic(k)])).toEqual([
+      ['logo', true],
+      ['cover', true],
+      ['registry', false],
+      ['owner_id', false],
     ]);
-    expect(isRestaurantDocumentKind('registry')).toBe(true);
-    expect(isRestaurantDocumentKind('face')).toBe(false);
   });
 });

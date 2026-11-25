@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { MoneyJson, RestaurantAvailabilityStatus, RestaurantStatus } from '@djafat/types';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { toMoneyJson } from '../../common/money/money.mapper';
@@ -58,6 +59,18 @@ export interface RestaurantProfileDto {
   readonly cityTimezone: string;
   readonly availability: RestaurantAvailabilityStatus;
   readonly hours: readonly RestaurantHoursWindowDto[];
+}
+
+/** FEAT-022 (SPEC-022-05 R5): the application is being checked. */
+const applicationLocked = () =>
+  new ConflictException({
+    code: 'APPLICATION_LOCKED',
+    message: 'Votre dossier est en vérification : il ne se modifie plus pour le moment.',
+  });
+
+/** The lock every change to a restaurant's application holds (`RestaurantApplicationService`, R7). */
+function lockApplication(tx: Prisma.TransactionClient, restaurantId: string) {
+  return tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`restaurant-application:${restaurantId}`}))`;
 }
 
 /**
@@ -139,29 +152,26 @@ export class RestaurantsManagementService {
         message: 'No restaurant is scoped to this account.',
       });
     }
-    // FEAT-022 (SPEC-022-05 R5): not while DJAFAT checks the application (the
-    // menu stays editable: nothing is visible to customers yet, FEAT-022-Q18).
-    const application = await this.prisma.restaurantApplication.findUnique({
-      where: { restaurantId },
-      select: { status: true },
-    });
-    if (application?.status === 'pending_review') {
-      throw new ConflictException({
-        code: 'APPLICATION_LOCKED',
-        message: 'Votre dossier est en vérification : il ne se modifie plus pour le moment.',
+    await this.prisma.$transaction(async (tx) => {
+      // FEAT-022 (SPEC-022-05 R5): not while DJAFAT checks the application (the
+      // menu stays editable, FEAT-022-Q18) — read under the application's lock,
+      // so a change never lands after the submit (SPEC-022-07 R7).
+      await lockApplication(tx, restaurantId);
+      const application = await tx.restaurantApplication.findUnique({
+        where: { restaurantId },
+        select: { status: true },
       });
-    }
-    await this.prisma.$transaction([
-      this.prisma.restaurantHours.deleteMany({ where: { restaurantId } }),
-      this.prisma.restaurantHours.createMany({
+      if (application?.status === 'pending_review') throw applicationLocked();
+      await tx.restaurantHours.deleteMany({ where: { restaurantId } });
+      await tx.restaurantHours.createMany({
         data: input.hours.map((h) => ({
           restaurantId,
           weekday: h.weekday,
           opensMinutes: h.opensMinutes,
           closesMinutes: h.closesMinutes,
         })),
-      }),
-    ]);
+      });
+    });
     await this.audit.log({
       actorUserId,
       action: 'RESTAURANT_HOURS_REPLACED',
@@ -256,46 +266,55 @@ export class RestaurantsManagementService {
         message: `Setting status "${input.status}" requires admin:write.`,
       });
     }
-    const goesPublic = input.status !== undefined && PUBLIC_STATUSES.includes(input.status);
-    // FEAT-022 (SPEC-022-05 R5): the address and the photos are steps 1 and 3.
-    const touchesSteps =
-      input.addressText !== undefined ||
-      input.logoUrl !== undefined ||
-      input.coverUrl !== undefined;
-    if (!isAdminTier && (goesPublic || touchesSteps)) {
-      // No application: created by the team, works as before FEAT-022.
-      const application = await this.prisma.restaurantApplication.findUnique({
-        where: { restaurantId },
-        select: { status: true },
+    // FEAT-022 (SPEC-022-05 R1 v2, FEAT-022-Q20): the logo and the cover are
+    // photos DJAFAT stores (`POST /restaurants/me/photos/:kind`), never an
+    // address an owner types — only the team sets one (review of part 3, #1).
+    if (!isAdminTier && (input.logoUrl !== undefined || input.coverUrl !== undefined)) {
+      throw new ForbiddenException({
+        code: 'FORBIDDEN',
+        message: 'Le logo et la photo de couverture se choisissent comme photos, dans « Profil ».',
       });
-      if (touchesSteps && application?.status === 'pending_review') {
-        throw new ConflictException({
-          code: 'APPLICATION_LOCKED',
-          message: 'Votre dossier est en vérification : il ne se modifie plus pour le moment.',
-        });
-      }
-      if (goesPublic && application && application.status !== 'approved') {
-        throw new ConflictException({
-          code: 'RESTAURANT_NOT_APPROVED',
-          message: "Votre restaurant n'est pas encore validé par DJAFAT.",
-        });
-      }
     }
-
-    const updated = await this.prisma.restaurant.update({
-      where: { id: restaurantId },
-      data: {
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
-        ...(input.phone !== undefined ? { phone: input.phone } : {}),
-        ...(input.addressText !== undefined ? { addressText: input.addressText } : {}),
-        ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl } : {}),
-        ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl } : {}),
-        ...(input.prepTimeMin !== undefined ? { prepTimeMin: input.prepTimeMin } : {}),
-        ...(input.minOrderMinor !== undefined ? { minOrderMinor: input.minOrderMinor } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {}),
-      },
-    });
+    const goesPublic = input.status !== undefined && PUBLIC_STATUSES.includes(input.status);
+    // FEAT-022 (SPEC-022-05 R5): the address is step 1.
+    const touchesSteps = input.addressText !== undefined;
+    const write = (db: Prisma.TransactionClient) =>
+      db.restaurant.update({
+        where: { id: restaurantId },
+        data: {
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.description !== undefined ? { description: input.description } : {}),
+          ...(input.phone !== undefined ? { phone: input.phone } : {}),
+          ...(input.addressText !== undefined ? { addressText: input.addressText } : {}),
+          ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl } : {}),
+          ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl } : {}),
+          ...(input.prepTimeMin !== undefined ? { prepTimeMin: input.prepTimeMin } : {}),
+          ...(input.minOrderMinor !== undefined ? { minOrderMinor: input.minOrderMinor } : {}),
+          ...(input.status !== undefined ? { status: input.status } : {}),
+        },
+      });
+    const updated =
+      !isAdminTier && (goesPublic || touchesSteps)
+        ? await this.prisma.$transaction(async (tx) => {
+            // Read under the application's lock (SPEC-022-07 R7). No application:
+            // created by the team, works as before FEAT-022.
+            await lockApplication(tx, restaurantId);
+            const application = await tx.restaurantApplication.findUnique({
+              where: { restaurantId },
+              select: { status: true },
+            });
+            if (touchesSteps && application?.status === 'pending_review') {
+              throw applicationLocked();
+            }
+            if (goesPublic && application && application.status !== 'approved') {
+              throw new ConflictException({
+                code: 'RESTAURANT_NOT_APPROVED',
+                message: "Votre restaurant n'est pas encore validé par DJAFAT.",
+              });
+            }
+            return write(tx);
+          })
+        : await write(this.prisma);
 
     await this.audit.log({
       actorUserId,

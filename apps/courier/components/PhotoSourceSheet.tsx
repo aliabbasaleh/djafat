@@ -51,7 +51,12 @@ export function PhotoSourceSheet({
         : await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS);
     const asset = result.canceled ? undefined : result.assets[0];
     if (!asset) return;
-    onPicked(forKind, await pickedPhoto(asset.uri));
+    try {
+      onPicked(forKind, await pickedPhoto(asset.uri));
+    } catch {
+      // Review of FEAT-022 part 3, #6: never a silent failure.
+      onError('Cette photo n’a pas pu être lue : reprenez-la, ou choisissez-en une autre.');
+    }
   }
 
   return (

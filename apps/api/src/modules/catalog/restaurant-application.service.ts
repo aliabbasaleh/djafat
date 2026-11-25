@@ -274,10 +274,14 @@ export class RestaurantApplicationService {
     let photos: { logoUrl: string | null; coverUrl: string | null };
     try {
       [replaced, photos] = await this.prisma.$transaction(async (tx) => {
-        if (await this.hasApplication(tx, restaurantId)) {
-          const application = await this.lockedRow(tx, restaurantId);
-          if (this.statusOf(application) === 'pending_review') throw locked();
-        }
+        // The same lock as every change to this restaurant's application — taken
+        // even without one, so two uploads never both keep their photo (R7).
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`restaurant-application:${restaurantId}`}))`;
+        const application = await tx.restaurantApplication.findUnique({
+          where: { restaurantId },
+          select: { status: true },
+        });
+        if (application?.status === 'pending_review') throw locked();
         const column = kind === 'logo' ? 'logoUrl' : 'coverUrl';
         const before = await tx.restaurant.findUniqueOrThrow({
           where: { id: restaurantId },
@@ -288,7 +292,20 @@ export class RestaurantApplicationService {
           data: { [column]: await this.photos.link(key), updatedAt: new Date() },
           select: { logoUrl: true, coverUrl: true },
         });
-        return [publicKeyOf(before[column]), after] as const;
+        // The replaced photo goes only when no restaurant shows it any more —
+        // an address set by the team may point to another restaurant's photo
+        // (review of FEAT-022 part 3, #1).
+        const old = publicKeyOf(before[column]);
+        if (!old) return [null, after] as const;
+        const stillShown = await tx.restaurant.count({
+          where: {
+            OR: [
+              { logoUrl: { endsWith: `/files/${old}` } },
+              { coverUrl: { endsWith: `/files/${old}` } },
+            ],
+          },
+        });
+        return [stillShown > 0 ? null : old, after] as const;
       });
     } catch (err) {
       await this.removeQuietly(key);
@@ -652,8 +669,9 @@ export class RestaurantApplicationService {
     };
   }
 
+  /** The restaurant this account OWNS (« Autorisations » : never one where it is only staff). */
   private async scopedRestaurant(userId: string): Promise<string> {
-    const restaurantId = await this.users.getRestaurantScope(userId);
+    const restaurantId = await this.users.getOwnedRestaurantScope(userId);
     if (!restaurantId) throw notFound();
     return restaurantId;
   }
@@ -666,14 +684,6 @@ export class RestaurantApplicationService {
     const application = await tx.restaurantApplication.findUnique({ where: { restaurantId } });
     if (!application) throw notFound();
     return application;
-  }
-
-  private async hasApplication(tx: Prisma.TransactionClient, restaurantId: string) {
-    const found = await tx.restaurantApplication.findUnique({
-      where: { restaurantId },
-      select: { restaurantId: true },
-    });
-    return found !== null;
   }
 
   private async view(restaurantId: string): Promise<RestaurantApplicationView> {
@@ -730,7 +740,16 @@ export class RestaurantApplicationService {
         SELECT ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng
           FROM restaurants WHERE id = ${restaurantId}::uuid`,
       db.restaurantHours.count({ where: { restaurantId } }),
-      db.product.count({ where: { restaurantId, priceMinor: { gt: 0n } } }),
+      // What customers see (`CatalogService.getMenu`): an active dish, with a
+      // price, in an active category — a dish « removed » is only deactivated.
+      db.product.count({
+        where: {
+          restaurantId,
+          priceMinor: { gt: 0n },
+          isActive: true,
+          category: { is: { isActive: true } },
+        },
+      }),
     ]);
     const point = points[0];
     const location: RestaurantLocation = {

@@ -70,7 +70,7 @@ export default function EarningsScreen() {
     try {
       const p = await api.courier.payouts.request();
       setMessage(
-        `Retrait de ${formatMoney(p.requested)} demandé : DJAFAT l'envoie sur votre Airtel Money.`,
+        `Retrait de ${formatMoney(p.requested)} demandé : DJAFAT l'envoie sur votre Mobile Money.`,
       );
       await load();
     } catch (err) {
@@ -150,8 +150,8 @@ export default function EarningsScreen() {
                   disabled={net < MIN_WITHDRAWAL}
                 />
                 <Text style={styles.note}>
-                  Sur votre Airtel Money, dès 2 000 FCFA ; frais Airtel à votre charge. Sinon,
-                  versement automatique chaque lundi, sans frais.
+                  Sur votre Mobile Money, dès 2 000 FCFA ; frais de l’opérateur à votre charge.
+                  Sinon, versement automatique chaque lundi, sans frais.
                 </Text>
               </>
             )}
