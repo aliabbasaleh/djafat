@@ -465,6 +465,9 @@ importers:
       '@djafat/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      leaflet:
+        specifier: 1.9.4
+        version: 1.9.4
       next:
         specifier: 15.5.29
         version: 15.5.29(@types/node@22.10.5)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -484,6 +487,9 @@ importers:
       '@djafat/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
+      '@types/leaflet':
+        specifier: 1.9.12
+        version: 1.9.12
       '@types/node':
         specifier: 22.10.5
         version: 22.10.5

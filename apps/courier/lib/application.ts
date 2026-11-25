@@ -126,7 +126,8 @@ export function applicationErrorMessage(err: unknown): string {
       case 'UNSUPPORTED_FILE':
         return 'Ce fichier n’est pas une photo JPEG, PNG ou WebP.';
       case 'APPLICATION_LOCKED':
-        return 'Votre dossier est en vérification : il ne se modifie plus.';
+        // The API says why: in review, or validated (vehicle, emergency contact: DJAFAT, Q19).
+        return err.message || 'Votre dossier est en vérification : il ne se modifie plus.';
       case 'APPLICATION_INCOMPLETE':
         return 'Il manque encore des éléments à votre dossier.';
       case 'VALIDATION_ERROR':

@@ -58,6 +58,9 @@ describe('the photo body parser', () => {
   it('knows the upload routes', () => {
     expect(isPhotoUploadRoute(UPLOAD)).toBe(true);
     expect(isPhotoUploadRoute('/v1/restaurants/me/application/files/:kind')).toBe(true);
+    // FEAT-022 part 3 (SPEC-022-05 R1, step 3): the logo and the cover.
+    expect(isPhotoUploadRoute('/v1/restaurants/me/photos/:kind')).toBe(true);
+    expect(isPhotoUploadRoute('/v1/restaurants/me/photos')).toBe(false);
     expect(isPhotoUploadRoute('/v1/auth/login')).toBe(false);
     expect(isPhotoUploadRoute(undefined)).toBe(false);
   });

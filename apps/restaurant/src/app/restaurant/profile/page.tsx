@@ -8,10 +8,14 @@ import {
   phoneFieldShowsDialCode,
   phoneForSending,
   type RestaurantProfile,
+  type UpdateRestaurantProfileInput,
 } from '@djafat/sdk';
 import { Heading, Text, Stack, Inline, Badge, ErrorState, Skeleton, cx } from '@djafat/ui';
 import { Button, Input, Textarea, Alert } from '@/components/ui-client';
+import { PhotoPicker } from '@/components/PhotoPicker';
+import { StepBackLink } from '@/components/StepBackLink';
 import { api } from '@/lib/api';
+import { errorText, underReview, useRestaurantApplication } from '@/lib/application';
 import { clearSession, getStoredUser, isOwner } from '@/lib/auth-storage';
 import { formatMoney, toMinorString } from '@/lib/format';
 import styles from './page.module.css';
@@ -42,12 +46,11 @@ const AVAILABILITY_TONE: Record<
  * `status` field (`draft`/`active`/`paused`) rather than inventing a second
  * on/off switch — see `RestaurantsManagementService.getMine`'s doc comment.
  *
- * `logoUrl`/`coverUrl` are plain URL fields, matching the API contract
- * exactly (`UpdateRestaurantSchema.logoUrl: z.string().url()`) — there is no
- * file-upload pipeline to wire to (the object-storage adapter is still a
- * Bloc-0 placeholder that throws on every call; see docs/33 §dette). Pasting
- * an already-hosted image URL is the one upload path the backend actually
- * supports today.
+ * FEAT-022 (SPEC-022-05 R1, R2 — step 3, « Logo et photos »): the logo and
+ * the cover are chosen from the computer or the phone and stored by DJAFAT
+ * (`POST /restaurants/me/photos/:kind`, SPEC-022-04 R4), no longer typed as
+ * web addresses. Saving sends only what changed; while DJAFAT checks the
+ * application, the address and the photos do not change (R5).
  */
 export default function ProfilePage() {
   const router = useRouter();
@@ -58,15 +61,18 @@ export default function ProfilePage() {
     description: '',
     phone: '',
     addressText: '',
-    logoUrl: '',
-    coverUrl: '',
     prepTimeMin: 20,
     minOrder: 0,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<'logo' | 'cover' | null>(null);
+  const [photoError, setPhotoError] = useState<{ logo?: string; cover?: string }>({});
   const canWrite = isOwner(getStoredUser());
+  // FEAT-022 (SPEC-022-05 R5): steps 1 and 3 read only while DJAFAT checks the application.
+  const { application } = useRestaurantApplication();
+  const locked = underReview(application);
 
   const load = useCallback(async () => {
     setState('loading');
@@ -78,8 +84,6 @@ export default function ProfilePage() {
         description: p.description ?? '',
         phone: p.phone ?? '',
         addressText: p.addressText ?? '',
-        logoUrl: p.logoUrl ?? '',
-        coverUrl: p.coverUrl ?? '',
         prepTimeMin: p.prepTimeMin,
         minOrder: Number(p.minOrder.minor),
       });
@@ -104,21 +108,29 @@ export default function ProfilePage() {
     setSuccess(null);
     setSaving(true);
     try {
-      await api.restaurant.update(profile.id, {
-        name: form.name,
-        description: form.description,
+      // FEAT-022: only what changed — an untouched address is not « changed » during the review.
+      const changes: UpdateRestaurantProfileInput = {
+        ...(form.name !== profile.name ? { name: form.name } : {}),
+        ...(form.description !== (profile.description ?? '')
+          ? { description: form.description }
+          : {}),
         // FEAT-024: the field shows « +235 »; 8 digits typed leave in international format.
-        phone: form.phone.trim() ? phoneForSending(form.phone) : form.phone,
-        addressText: form.addressText,
-        logoUrl: form.logoUrl,
-        coverUrl: form.coverUrl,
-        prepTimeMin: form.prepTimeMin,
-        minOrderMinor: toMinorString(form.minOrder),
-      });
+        ...(form.phone !== (profile.phone ?? '')
+          ? { phone: form.phone.trim() ? phoneForSending(form.phone) : form.phone }
+          : {}),
+        ...(form.addressText !== (profile.addressText ?? '')
+          ? { addressText: form.addressText }
+          : {}),
+        ...(form.prepTimeMin !== profile.prepTimeMin ? { prepTimeMin: form.prepTimeMin } : {}),
+        ...(form.minOrder !== Number(profile.minOrder.minor)
+          ? { minOrderMinor: toMinorString(form.minOrder) }
+          : {}),
+      };
+      if (Object.keys(changes).length > 0) await api.restaurant.update(profile.id, changes);
       setSuccess('Profil mis à jour.');
       await load();
-    } catch {
-      setError('Échec de la mise à jour.');
+    } catch (err) {
+      setError(errorText(err, 'Échec de la mise à jour.'));
     } finally {
       setSaving(false);
     }
@@ -137,6 +149,19 @@ export default function ProfilePage() {
       setError('Échec du changement de statut.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function upload(kind: 'logo' | 'cover', file: File) {
+    setPhotoError((e) => ({ ...e, [kind]: undefined }));
+    setUploading(kind);
+    try {
+      const photos = await api.restaurant.application.uploadPhoto(kind, file);
+      setProfile((p) => (p ? { ...p, logoUrl: photos.logoUrl, coverUrl: photos.coverUrl } : p));
+    } catch (err) {
+      setPhotoError((e) => ({ ...e, [kind]: errorText(err, "L'image n'a pas pu être envoyée.") }));
+    } finally {
+      setUploading(null);
     }
   }
 
@@ -159,6 +184,7 @@ export default function ProfilePage() {
 
   return (
     <Stack gap="lg">
+      <StepBackLink />
       <Inline justify="between" align="center" wrap>
         <Heading level={1}>Profil</Heading>
         <Badge tone={AVAILABILITY_TONE[profile.availability]} dot>
@@ -189,8 +215,49 @@ export default function ProfilePage() {
           consulter.
         </Alert>
       )}
+      {locked && (
+        <Alert tone="info">
+          Votre dossier est en vérification par DJAFAT : l&apos;adresse, le logo et la photo de
+          couverture ne se modifient plus pour le moment.
+        </Alert>
+      )}
       {error && <Alert tone="danger">{error}</Alert>}
       {success && <Alert tone="success">{success}</Alert>}
+
+      <section aria-labelledby="photos-title">
+        <Stack gap="md">
+          <Heading level={2} id="photos-title">
+            Logo et photos
+          </Heading>
+          <Inline gap="lg" wrap align="start">
+            <PhotoPicker
+              label="Logo"
+              actionLabel={profile.logoUrl ? 'Remplacer le logo' : 'Choisir le logo'}
+              preview={
+                profile.logoUrl ? { url: profile.logoUrl, alt: `Logo de ${profile.name}` } : null
+              }
+              busy={uploading === 'logo'}
+              disabled={!canWrite || locked}
+              error={photoError.logo ?? null}
+              onPick={(file) => void upload('logo', file)}
+            />
+            <PhotoPicker
+              label="Photo de couverture"
+              actionLabel={profile.coverUrl ? 'Remplacer la couverture' : 'Choisir la couverture'}
+              preview={
+                profile.coverUrl
+                  ? { url: profile.coverUrl, alt: `Photo de couverture de ${profile.name}` }
+                  : null
+              }
+              wide
+              busy={uploading === 'cover'}
+              disabled={!canWrite || locked}
+              error={photoError.cover ?? null}
+              onPick={(file) => void upload('cover', file)}
+            />
+          </Inline>
+        </Stack>
+      </section>
 
       <form
         className={cx(styles['grid'])}
@@ -219,7 +286,7 @@ export default function ProfilePage() {
           label="Adresse"
           value={form.addressText}
           onChange={(e) => setForm({ ...form, addressText: e.target.value })}
-          disabled={!canWrite}
+          disabled={!canWrite || locked}
         />
         <Input
           label="Temps de préparation (min)"
@@ -245,34 +312,6 @@ export default function ProfilePage() {
           disabled={!canWrite}
           rows={3}
         />
-        <Input
-          label="URL du logo"
-          type="url"
-          placeholder="https://…"
-          value={form.logoUrl}
-          onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
-          disabled={!canWrite}
-        />
-        <Input
-          label="URL de la couverture"
-          type="url"
-          placeholder="https://…"
-          value={form.coverUrl}
-          onChange={(e) => setForm({ ...form, coverUrl: e.target.value })}
-          disabled={!canWrite}
-        />
-
-        {(form.logoUrl || form.coverUrl) && (
-          <Inline gap="md">
-            {form.logoUrl && (
-              <img src={form.logoUrl} alt="Logo" className={cx(styles['preview'])} />
-            )}
-            {form.coverUrl && (
-              <img src={form.coverUrl} alt="Couverture" className={cx(styles['previewWide'])} />
-            )}
-          </Inline>
-        )}
-
         {canWrite && (
           <Button type="submit" loading={saving}>
             Enregistrer

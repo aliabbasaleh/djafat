@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { tokens } from '@djafat/tokens';
 import {
   COURIER_VEHICLES,
@@ -22,6 +21,7 @@ import { Screen } from '../../components/Screen';
 import { BigButton } from '../../components/BigButton';
 import { Badge } from '../../components/Badge';
 import { PhoneInput } from '../../components/PhoneInput';
+import { PhotoSourceSheet } from '../../components/PhotoSourceSheet';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 import {
@@ -36,19 +36,8 @@ import {
   canSubmit,
   itemState,
   photosOfItem,
-  pickedPhoto,
   vehicleChangeDropsPhotos,
 } from '../../lib/application';
-
-const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
-  mediaTypes: ['images'],
-  // Smaller before sending (SPEC-022-04: 5 MB at most, no re-encoding on the server).
-  quality: 0.6,
-  exif: false,
-  // iPhone photos as JPEG, not HEIC.
-  preferredAssetRepresentationMode:
-    ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
-};
 
 /**
  * FEAT-022 (SPEC-022-06, FEAT-022-VIS05): « Avant votre première course ».
@@ -113,26 +102,6 @@ export default function OnboardingScreen() {
   function changeVehicle(vehicle: CourierVehicle) {
     setConfirmVehicle(null);
     void run(() => api.courier.application.update({ vehicle })).then((ok) => ok && setOpen(null));
-  }
-
-  async function pick(kind: CourierDocumentKind, source: 'camera' | 'library') {
-    setSheetFor(null);
-    if (source === 'camera') {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        setError(
-          'Autorisez l’appareil photo dans les réglages du téléphone, ou choisissez une photo de la galerie.',
-        );
-        return;
-      }
-    }
-    const result =
-      source === 'camera'
-        ? await ImagePicker.launchCameraAsync(PICKER_OPTIONS)
-        : await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS);
-    const asset = result.canceled ? undefined : result.assets[0];
-    if (!asset) return;
-    await run(async () => api.courier.application.uploadPhoto(kind, await pickedPhoto(asset.uri)));
   }
 
   if (failed) {
@@ -283,30 +252,12 @@ export default function OnboardingScreen() {
         </Text>
       </View>
 
-      <Modal
-        visible={sheetFor !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSheetFor(null)}
-      >
-        <View style={styles.sheetBackdrop}>
-          <View style={styles.sheet} accessibilityViewIsModal>
-            <Text accessibilityRole="header" style={styles.sheetTitle}>
-              {sheetFor ? PHOTO_LABELS[sheetFor] : ''}
-            </Text>
-            <BigButton
-              label="Prendre une photo"
-              onPress={() => sheetFor && void pick(sheetFor, 'camera')}
-            />
-            <BigButton
-              label="Choisir dans la galerie"
-              variant="secondary"
-              onPress={() => sheetFor && void pick(sheetFor, 'library')}
-            />
-            <BigButton label="Annuler" variant="ghost" onPress={() => setSheetFor(null)} />
-          </View>
-        </View>
-      </Modal>
+      <PhotoSourceSheet
+        kind={sheetFor}
+        onClose={() => setSheetFor(null)}
+        onError={setError}
+        onPicked={(kind, photo) => void run(() => api.courier.application.uploadPhoto(kind, photo))}
+      />
     </Screen>
   );
 }
@@ -613,18 +564,4 @@ const styles = StyleSheet.create({
     marginBottom: tokens.space['3'],
   },
   online: { marginTop: tokens.space['4'], gap: tokens.space['2'], alignItems: 'stretch' },
-  sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: {
-    gap: tokens.space['3'],
-    padding: tokens.space['4'],
-    paddingBottom: tokens.space['6'],
-    borderTopLeftRadius: tokens.radius.lg,
-    borderTopRightRadius: tokens.radius.lg,
-    backgroundColor: tokens.color.bg.canvas,
-  },
-  sheetTitle: {
-    fontSize: tokens.type.size.h2,
-    fontWeight: '700',
-    color: tokens.color.text.primary,
-  },
 });

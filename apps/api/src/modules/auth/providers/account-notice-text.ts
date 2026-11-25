@@ -27,6 +27,7 @@ export function accountNoticeMessage(notice: AccountNotice): { subject: string; 
   if (notice.kind === 'application_rejected') {
     return rejectedMessage(notice.applicant, notice.reason);
   }
+  if (notice.kind === 'change_decided') return changeDecidedMessage(notice);
   if (notice.kind === 'email_changed') {
     return {
       subject: 'L’adresse e-mail de votre compte DJAFAT a été changée',
@@ -146,6 +147,70 @@ function rejectedMessage(applicant: Applicant, reason: string): { subject: strin
       courier
         ? "Ouvrez l'application DJAFAT Livreur, corrigez ce qui est demandé, puis touchez « Envoyer pour validation »."
         : 'Ouvrez la console restaurant, corrigez ce qui est demandé, puis touchez « Envoyer pour validation ».',
+      '',
+      "L'équipe DJAFAT",
+    ].join('\n'),
+  };
+}
+
+/** What changed (SPEC-022-07 R6), as the e-mail names it. */
+const CHANGE_LABELS: Readonly<Record<string, string>> = {
+  mobile_money: 'le nouveau numéro Mobile Money',
+  registry_number: 'le nouveau numéro RCCM ou NIF',
+  registry: 'la nouvelle photo du RCCM ou du NIF',
+  owner_id: "la nouvelle photo de la pièce d'identité du responsable",
+  face: 'la nouvelle photo du visage',
+  id_card: "la nouvelle photo de la pièce d'identité",
+  driving_licence: 'la nouvelle photo du permis',
+  vehicle_registration: 'la nouvelle photo de la carte grise',
+  insurance: "la nouvelle photo de l'assurance",
+  plate: 'la nouvelle photo de la plaque',
+};
+
+/** FEAT-022 SPEC-022-07 R5, R6: a change after the approval, accepted or refused. */
+function changeDecidedMessage(notice: Extract<AccountNotice, { kind: 'change_decided' }>): {
+  subject: string;
+  text: string;
+} {
+  const what = CHANGE_LABELS[notice.topic] ?? 'votre changement';
+  const of =
+    notice.applicant.type === 'restaurant' ? ` de « ${notice.applicant.restaurantName} »` : '';
+  const money = notice.topic === 'mobile_money';
+  const courier = notice.applicant.type === 'courier';
+  if (notice.status === 'approved') {
+    return {
+      subject: money
+        ? 'Votre nouveau numéro Mobile Money est accepté'
+        : 'Votre nouveau papier est accepté',
+      text: [
+        'Bonjour,',
+        '',
+        `DJAFAT a accepté ${what}${of}.`,
+        money
+          ? courier
+            ? 'Vos prochains gains y seront envoyés.'
+            : 'Les prochains paiements y seront envoyés.'
+          : "Il remplace l'ancien dans votre dossier.",
+        '',
+        "L'équipe DJAFAT",
+      ].join('\n'),
+    };
+  }
+  return {
+    subject: money
+      ? "Votre nouveau numéro Mobile Money n'est pas accepté"
+      : "Votre nouveau papier n'est pas accepté",
+    text: [
+      'Bonjour,',
+      '',
+      `DJAFAT n'a pas accepté ${what}${of}.`,
+      `Motif : ${notice.reason ?? '—'}`,
+      money
+        ? 'Les paiements continuent vers le numéro déjà validé.'
+        : 'Le papier déjà validé reste dans votre dossier.',
+      courier
+        ? "Vous pouvez en envoyer un autre depuis l'application DJAFAT Livreur."
+        : 'Vous pouvez en envoyer un autre depuis la console restaurant.',
       '',
       "L'équipe DJAFAT",
     ].join('\n'),

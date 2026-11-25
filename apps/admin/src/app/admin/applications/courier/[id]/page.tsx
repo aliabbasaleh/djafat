@@ -11,6 +11,7 @@ import {
 } from '@djafat/sdk';
 import { Heading, Text, Stack, Badge, ErrorState, Skeleton, cx } from '@djafat/ui';
 import { Button, Alert, Modal, Textarea } from '@/components/ui-client';
+import { PendingChanges } from '@/components/PendingChanges';
 import { api } from '@/lib/api';
 import { clearSession } from '@/lib/auth-storage';
 import {
@@ -23,7 +24,7 @@ import {
   photoAlt,
   sentOn,
 } from '@/lib/applications';
-import styles from './page.module.css';
+import styles from '@/components/ApplicationDetail.module.css';
 
 type LoadState = 'loading' | 'ready' | 'error' | 'missing';
 
@@ -38,9 +39,10 @@ const STATUS_LABEL: Record<
 };
 
 /**
- * FEAT-022 (SPEC-022-07 R2–R5, FEAT-022-VIS06): one courier's application —
+ * FEAT-022 (SPEC-022-07 R2–R6, FEAT-022-VIS06): one courier's application —
  * the facts, the photos (each through a 5-minute signed link), then
- * « Valider » or « Refuser… » with a reason the courier receives by e-mail.
+ * « Valider » or « Refuser… » with a reason the courier receives by e-mail;
+ * once validated, the changes waiting for a decision (R6).
  */
 export default function CourierApplicationPage() {
   const router = useRouter();
@@ -229,6 +231,10 @@ export default function CourierApplicationPage() {
           ))}
         </ul>
       </section>
+
+      {review.status === 'approved' && (
+        <PendingChanges type="courier" id={id} changes={review.pendingChanges} onDecided={load} />
+      )}
 
       {review.status === 'pending_review' && (
         <div className={cx(styles['actions'])}>

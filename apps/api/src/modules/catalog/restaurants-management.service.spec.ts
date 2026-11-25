@@ -247,6 +247,67 @@ describe('update — a restaurant that signed up opens only once DJAFAT approved
   });
 });
 
+// FEAT-022 part 3 — SPEC-022-05 R5.
+describe('update — while DJAFAT checks the application, steps 1 and 3 do not change (SPEC-022-05 R5)', () => {
+  it.each([
+    { addressText: 'Avenue Mobutu, Moursal' },
+    { logoUrl: 'https://cdn.example.com/logo.png' },
+    { coverUrl: 'https://cdn.example.com/cover.png' },
+  ])(
+    'SPEC-022-05 R5 — the owner cannot change %o (409 APPLICATION_LOCKED), nothing changes',
+    async (input) => {
+      const prisma = prismaStub(
+        { status: 'pending_review', ownerUserId: 'owner-1' },
+        { status: 'pending_review' },
+      );
+      const svc = new RestaurantsManagementService(
+        prisma,
+        auditStub(),
+        usersStub(new Set(['owner-1:r1'])),
+        availabilityStub(),
+      );
+      await expect(svc.update('owner-1', 'r1', input, false)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'APPLICATION_LOCKED' },
+      });
+      expect(prisma.restaurant.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('the description still changes; rejected, the address changes again; the team is never locked', async () => {
+    const pending = prismaStub(
+      { status: 'pending_review', ownerUserId: 'owner-1' },
+      { status: 'pending_review' },
+    );
+    const owner = new RestaurantsManagementService(
+      pending,
+      auditStub(),
+      usersStub(new Set(['owner-1:r1'])),
+      availabilityStub(),
+    );
+    await expect(
+      owner.update('owner-1', 'r1', { description: 'Grillades et jus frais' }, false),
+    ).resolves.toBeDefined();
+    await expect(
+      owner.update('admin-1', 'r1', { addressText: 'Avenue Mobutu' }, true),
+    ).resolves.toBeDefined();
+
+    const rejected = prismaStub(
+      { status: 'draft', ownerUserId: 'owner-1' },
+      { status: 'rejected' },
+    );
+    const corrected = new RestaurantsManagementService(
+      rejected,
+      auditStub(),
+      usersStub(new Set(['owner-1:r1'])),
+      availabilityStub(),
+    );
+    await expect(
+      corrected.update('owner-1', 'r1', { addressText: 'Avenue Mobutu' }, false),
+    ).resolves.toBeDefined();
+  });
+});
+
 describe('listForAdmin (Bloc 9, docs/30 §admin-api)', () => {
   function listPrismaStub(
     rows: Array<{
@@ -361,12 +422,15 @@ describe('getMine / replaceHours (Bloc 10, docs/33 §profile, §hours)', () => {
       city: { timezone: string };
       hours: Array<{ weekday: number; opensMinutes: number; closesMinutes: number }>;
     } | null,
+    // FEAT-022: the restaurant's application; none = created by the team (as before FEAT-022).
+    application: { status: string } | null = null,
   ) {
     const deleteMany = vi.fn().mockResolvedValue({ count: 0 });
     const createMany = vi.fn().mockResolvedValue({ count: 0 });
     return {
       prisma: {
         restaurant: { findUniqueOrThrow: vi.fn().mockResolvedValue(restaurant) },
+        restaurantApplication: { findUnique: vi.fn().mockResolvedValue(application) },
         restaurantHours: { deleteMany, createMany },
         $transaction: vi.fn((ops: unknown[]) => Promise.all(ops)),
       } as unknown as PrismaService,
@@ -433,6 +497,23 @@ describe('getMine / replaceHours (Bloc 10, docs/33 §profile, §hours)', () => {
     expect(createMany).toHaveBeenCalledWith({
       data: hours.map((h) => ({ restaurantId: 'r1', ...h })),
     });
+  });
+
+  // FEAT-022 — SPEC-022-05 R5 (part 3)
+  it('SPEC-022-05 R5 — while DJAFAT checks the application, the hours do not change (409 APPLICATION_LOCKED)', async () => {
+    const { prisma, deleteMany } = profilePrismaStub(null, { status: 'pending_review' });
+    const svc = new RestaurantsManagementService(
+      prisma,
+      auditStub(),
+      usersStub(new Set(), 'r1'),
+      availabilityStub(),
+    );
+    await expect(
+      svc.replaceHours('owner-1', {
+        hours: [{ weekday: 1, opensMinutes: 480, closesMinutes: 1320 }],
+      }),
+    ).rejects.toMatchObject({ status: 409, response: { code: 'APPLICATION_LOCKED' } });
+    expect(deleteMany).not.toHaveBeenCalled();
   });
 
   it('replaceHours refuses an actor with no restaurant scope', async () => {

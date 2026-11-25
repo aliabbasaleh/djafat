@@ -152,6 +152,65 @@ describe('SPEC-022-07 — the e-mails of a decision', () => {
   });
 });
 
+// FEAT-022 part 3 — SPEC-022-07 R5, R6: a change after the approval.
+describe('SPEC-022-07 R6 — the e-mails of a change after the approval', () => {
+  it('SPEC-022-07-SC05 — accepted: the next earnings go to the new number', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'change_decided',
+      to: 'abakar@example.td',
+      applicant: { type: 'courier' },
+      topic: 'mobile_money',
+      status: 'approved',
+    });
+    expect(subject).toBe('Votre nouveau numéro Mobile Money est accepté');
+    expect(text).toContain('DJAFAT a accepté le nouveau numéro Mobile Money.');
+    expect(text).toContain('Vos prochains gains y seront envoyés.');
+  });
+
+  it('refused: the reason, and the approved number keeps being paid', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'change_decided',
+      to: 'fatime@example.td',
+      applicant: { type: 'restaurant', restaurantName: 'Chez Fatimé' },
+      topic: 'mobile_money',
+      status: 'rejected',
+      reason: "Ce numéro n'est pas au nom du restaurant.",
+    });
+    expect(subject).toBe("Votre nouveau numéro Mobile Money n'est pas accepté");
+    expect(text).toContain(
+      "DJAFAT n'a pas accepté le nouveau numéro Mobile Money de « Chez Fatimé ».",
+    );
+    expect(text).toContain("Motif : Ce numéro n'est pas au nom du restaurant.");
+    expect(text).toContain('Les paiements continuent vers le numéro déjà validé.');
+    expect(text).toContain('console restaurant');
+  });
+
+  it('a new paper: named, and where to send another one', () => {
+    const accepted = accountNoticeMessage({
+      kind: 'change_decided',
+      to: 'abakar@example.td',
+      applicant: { type: 'courier' },
+      topic: 'driving_licence',
+      status: 'approved',
+    });
+    expect(accepted.subject).toBe('Votre nouveau papier est accepté');
+    expect(accepted.text).toContain('DJAFAT a accepté la nouvelle photo du permis.');
+
+    const refused = accountNoticeMessage({
+      kind: 'change_decided',
+      to: 'abakar@example.td',
+      applicant: { type: 'courier' },
+      topic: 'insurance',
+      status: 'rejected',
+      reason: "L'assurance a expiré.",
+    });
+    expect(refused.subject).toBe("Votre nouveau papier n'est pas accepté");
+    expect(refused.text).toContain("la nouvelle photo de l'assurance");
+    expect(refused.text).toContain('Le papier déjà validé reste dans votre dossier.');
+    expect(refused.text).toContain("l'application DJAFAT Livreur");
+  });
+});
+
 // FEAT-022 — SPEC-022-02 R8, SPEC-022-03 R6 (FEAT-022-Q13).
 describe('SPEC-022-02 R8, SPEC-022-03 R6 — « Bienvenue sur DJAFAT »', () => {
   it('SPEC-022-02-SC07 — the courier: the items to complete in the courier app, then « Envoyer pour validation »', () => {

@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ApiClientError, type ApplicationType, type ApplicationsQueue } from '@djafat/sdk';
+import {
+  ApiClientError,
+  changeTopicText,
+  type ApplicationType,
+  type ApplicationsQueue,
+} from '@djafat/sdk';
 import { Heading, Stack, EmptyState, ErrorState, Skeleton, Text, cx } from '@djafat/ui';
 import { Button, Tabs } from '@/components/ui-client';
 import { DataTable } from '@/components/DataTable';
@@ -20,10 +25,11 @@ function typeFromUrl(): ApplicationType {
 }
 
 /**
- * FEAT-022 (SPEC-022-07 R1, FEAT-022-VIS06): « Demandes à vérifier » — the
+ * FEAT-022 (SPEC-022-07 R1, R6, FEAT-022-VIS06): « Demandes à vérifier » — the
  * applications sent to DJAFAT, oldest first, in two tabs that show their
- * number. Admins only (the entry is hidden for support and finance, and the
- * API refuses them).
+ * number, then the changes made after a validation (a new Mobile Money
+ * number, a new paper). Admins only (the entry is hidden for support and
+ * finance, and the API refuses them).
  */
 export default function ApplicationsPage() {
   const router = useRouter();
@@ -97,7 +103,7 @@ export default function ApplicationsPage() {
           />
         )}
 
-        {state === 'ready' && queue && queue.items.length === 0 && (
+        {state === 'ready' && queue && queue.items.length === 0 && queue.changes.length === 0 && (
           <EmptyState
             icon="✅"
             title={type === 'courier' ? 'Aucun livreur à vérifier' : 'Aucun restaurant à vérifier'}
@@ -118,16 +124,53 @@ export default function ApplicationsPage() {
                 { header: 'Envoi', render: (row) => sentOn(row.submittedAt) },
                 {
                   header: '',
-                  render: (row) =>
-                    type === 'courier' ? (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        href={`/admin/applications/courier/${row.id}`}
-                      >
-                        Ouvrir
-                      </Button>
-                    ) : null,
+                  render: (row) => (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      href={`/admin/applications/${type}/${row.id}`}
+                      aria-label={`Ouvrir le dossier de ${row.name ?? 'ce demandeur'}`}
+                    >
+                      Ouvrir
+                    </Button>
+                  ),
+                },
+              ]}
+            />
+          </Stack>
+        )}
+
+        {state === 'ready' && queue && queue.changes.length > 0 && (
+          <Stack gap="sm">
+            <Heading level={2} size="h3">
+              Changements après validation ({queue.changes.length})
+            </Heading>
+            <Text tone="muted" size="small">
+              Un nouveau numéro Mobile Money ou un nouveau papier ; d’ici votre accord, la valeur
+              déjà validée reste en place.
+            </Text>
+            <DataTable
+              keyFor={(row) => row.id}
+              rows={queue.changes}
+              columns={[
+                { header: 'Nom', render: (row) => row.name ?? '—' },
+                { header: 'Changement', render: (row) => changeTopicText(row.topic) },
+                {
+                  header: 'Demande',
+                  render: (row) => sentOn(row.createdAt).replace('envoyée', 'demandé'),
+                },
+                {
+                  header: '',
+                  render: (row) => (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      href={`/admin/applications/${type}/${row.subjectId}`}
+                      aria-label={`Ouvrir le dossier de ${row.name ?? 'ce demandeur'}`}
+                    >
+                      Ouvrir
+                    </Button>
+                  ),
                 },
               ]}
             />

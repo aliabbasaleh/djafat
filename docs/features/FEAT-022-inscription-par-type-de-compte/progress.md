@@ -10,11 +10,11 @@ après toute modification de code, spec, capture ou config qualité, relancer.
 | Étape                   | Statut   | Date       | Notes                                                                                                                                                            |
 | ----------------------- | -------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Intake                  | fait     | 2026-11-23 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous ; six maquettes texte lues                                                                   |
-| Specs                   | fait     | 2026-11-24 | SPEC-022-01 à 09 clarifiées ; 01, 03 et 08 en v3, 02 et 07 en v4, 04 et 06 en v4 (06 implémentée)                                                                |
-| Grill-me                | fait     | 2026-11-23 | Q01 à Q06 tranchées par l'utilisateur, Q07 à Q12 hypothèses techniques                                                                                           |
-| Brief                   | fait     | 2026-11-24 | quatre tranches, une PR chacune ; ordre revu : la 4 avant la 3, mises en ligne ensemble (FEAT-022-Q14)                                                           |
-| Tests dérivés des specs | en cours | 2026-11-24 | parties 1, 2 et 4 : chaque scénario lié à un test ou à une capture ; restent ceux de la partie 3 (SPEC-022-05, 07-SC02, 07-SC05, 09-SC02)                        |
-| Implémentation          | en cours | 2026-11-24 | parties 1, 2 (PR #31) et 4 (branche `feat/inscription-ecrans`, avec FEAT-024) faites ; reste la partie 3 (restaurants)                                           |
+| Specs                   | fait     | 2026-11-25 | SPEC-022-01 à 09 implémentées ; 05 et 09 en v2, 01, 03 et 08 en v3, 02, 04 et 06 en v4, 07 en v5                                                                 |
+| Grill-me                | fait     | 2026-11-25 | Q01 à Q06 et Q13, Q14 tranchées par l'utilisateur ; Q07 à Q12 et Q15 à Q24 hypothèses (Q18 à Q24 : partie 3)                                                     |
+| Brief                   | fait     | 2026-11-25 | quatre tranches ; la 4 avant la 3, mises en ligne ensemble (FEAT-022-Q14) ; ré-épinglé pour la partie 3 (05@2, 07@5, 09@2)                                       |
+| Tests dérivés des specs | fait     | 2026-11-25 | chaque scénario lié à un test ou à une capture (`check-specs --matrix FEAT-022`) ; partie 3 : unitaires, SDK et intégration 31/31                                |
+| Implémentation          | fait     | 2026-11-25 | parties 1, 2 (PR #31), 4 (PR #32, avec FEAT-024) et 3 (branche `feat/inscription-restaurants`)                                                                   |
 | Revue qualité           | en cours | 2026-11-24 | parties 1-2 : deux tours, « Prêt pour PR » (PR #31) ; partie 4 (avec FEAT-024) : deux tours, corrections faites — voir `../FEAT-024-saisies-verifiees/review.md` |
 | PR                      | en cours | 2026-11-24 | parties 1-2 : PR #31 ; partie 4 : branche `feat/inscription-ecrans` (avec FEAT-024), à fusionner avec la partie 3                                                |
 
@@ -70,6 +70,30 @@ architecture, outillage, Prisma, typecheck 24/24, lint 24/24, tests 24/24, build
 intégration (base neuve) ; E2E indisponible (pas de suite versionnée). Le premier passage au même
 commit avait rencontré un test instable hors de la feature (`TEST-06`, voir `review.md`). Navigateur :
 23 contrôles, 15 captures.
+
+## Partie 3 — ce qui est fait (2026-11-25)
+
+- SPEC-022-05 : `GET /restaurants/me/application` et les routes des étapes 1 et 4, la photo des
+  papiers, l'envoi (409 avec ce qui manque) ; la console restaurant montre les quatre étapes
+  (FEAT-022-VIS04), le bouton d'envoi grisé dit ce qui reste ; pages « Emplacement » (carte Leaflet,
+  « Utiliser ma position », FEAT-022-Q23) et « Papiers » ; logo et couverture choisis depuis
+  l'appareil dans « Profil » (`POST /restaurants/me/photos/:kind`, aussi pour un restaurant de
+  l'équipe, FEAT-022-Q20) ; pendant la vérification, emplacement, horaires, photos et papiers ne
+  changent plus, le menu si (FEAT-022-Q18).
+- SPEC-022-07 (restaurants) : détail, « Valider » (les quatre étapes recontrôlées) et « Refuser… »,
+  e-mails ; un administrateur ne décide pas de son propre restaurant.
+- SPEC-022-07 R6 : après la validation, un nouveau numéro Mobile Money ou un nouveau papier attend un
+  administrateur (`application_changes`, un seul par chose changée), accepté avec le code
+  d'authentification (FEAT-022-Q21) ; « Versements livreurs » lit le numéro validé par un port
+  (FEAT-022-Q24) ; « Mes gains » (numéro) et « Mes papiers » (photos) dans l'application livreur ;
+  véhicule et contact d'urgence figés une fois validé (FEAT-022-Q19) ; « Changements après
+  validation » dans la file, comptés dans l'onglet (FEAT-022-Q22) ; e-mail `change_decided`.
+- SPEC-022-09 R3 : page « Quartiers » de la console admin (ajouter, renommer, désactiver, réactiver ;
+  noms saisis sous « Autre » à ajouter en un geste, `GET /admin/neighbourhoods/typed`).
+- Nouvelle dépendance : `leaflet` 1.9.4 dans `apps/restaurant` (déjà celle du site client).
+- Limite : le numéro Mobile Money d'un restaurant n'est pas encore lu par les règlements des
+  restaurants (enregistrés à la main par la finance, `settlements`) ; il est visible, masqué, dans le
+  dossier.
 
 ## Partie 4 — ce qui est fait (2026-11-24, avant la partie 3 : FEAT-022-Q14)
 

@@ -15,6 +15,7 @@ import { mockEmailOtpKey } from '../src/modules/auth/providers/mock-email-otp-de
 import { mockAccountNoticeKey } from '../src/modules/auth/providers/mock-account-notice.provider';
 import { mockOtpKey } from '../src/modules/auth/providers/mock-otp-delivery.provider';
 import { seedReferenceData } from '../prisma/reference-data';
+import { totpCodeAt } from '@djafat/core';
 
 // FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte, on a real
 // PostgreSQL (migration 0041, reference data) and Redis (mock e-mail codes).
@@ -650,12 +651,14 @@ describe('FEAT-022 part 2 — the courier’s application and DJAFAT’s decisio
     const body = res.body as {
       counts: { restaurant: number; courier: number };
       items: Array<{ id: string; neighbourhood: string }>;
+      changes: unknown[];
     };
     const ids = body.items.map((i) => i.id);
     expect(ids.indexOf(earlier!)).toBeLessThan(ids.indexOf(later!));
     expect(ids.indexOf(earlier!)).toBeGreaterThanOrEqual(0);
     expect(ids).not.toContain(draft);
-    expect(body.counts.restaurant).toBe(body.items.length);
+    // SPEC-022-07 v5 R1, R6: a tab counts what it lists — applications, then changes.
+    expect(body.counts.restaurant).toBe(body.items.length + body.changes.length);
     expect(body.items.find((i) => i.id === earlier)?.neighbourhood).toBe('Klémat');
     const couriers = await request(server)
       .get('/v1/admin/applications?type=courier')
@@ -840,5 +843,407 @@ describe('FEAT-024 / FEAT-022 — more over HTTP', () => {
     const samePhone = { ...fresh(), phone: existing.phone, ...courierFields };
     const refused = await request(server).post('/v1/auth/register').send(samePhone).expect(409);
     expect(refused.body).toMatchObject({ error: { code: 'PHONE_ALREADY_USED' } });
+  });
+});
+
+// FEAT-022 part 3 — SPEC-022-05 (the four steps), SPEC-022-07 R2–R8 for restaurants,
+// R6 (changes after the approval) and SPEC-022-09 R3, on PostgreSQL + PostGIS and Redis.
+
+const bearer = (access: string) => ({ Authorization: `Bearer ${access}` });
+
+/** A restaurant that signed up (SPEC-022-03), and its id. */
+async function signedUpRestaurant(): Promise<SignedIn & { email: string; restaurantId: string }> {
+  const input = fresh();
+  const signedIn = await signUp({
+    ...input,
+    accountType: 'restaurant',
+    restaurantName: `Chez Fatimé ${randomUUID().slice(0, 6)}`,
+    neighbourhoodId: await neighbourhood('Klémat'),
+    acceptTerms: true,
+  });
+  const restaurant = await prisma.restaurant.findFirstOrThrow({
+    where: { ownerUserId: signedIn.user.id },
+  });
+  return { ...signedIn, email: input.email, restaurantId: restaurant.id };
+}
+
+/** The four steps over HTTP (SPEC-022-05 R1): the point, hours and a priced dish, both photos, the papers. */
+async function fillFourSteps(owner: SignedIn & { restaurantId: string }): Promise<void> {
+  await request(server)
+    .put('/v1/restaurants/me/application/location')
+    .set(bearer(owner.access))
+    .send({
+      lat: 12.1067,
+      lng: 15.0444,
+      addressText: 'Avenue Charles de Gaulle, Klémat',
+      landmark: 'En face de la pharmacie du Centre',
+    })
+    .expect(200);
+  await request(server)
+    .put('/v1/restaurants/me/hours')
+    .set(bearer(owner.access))
+    .send({ hours: [{ weekday: 1, opensMinutes: 480, closesMinutes: 1320 }] })
+    .expect(200);
+  await request(server)
+    .post(`/v1/restaurants/${owner.restaurantId}/products`)
+    .set(bearer(owner.access))
+    .send({ name: 'Poulet braisé', priceMinor: '150000' })
+    .expect(201);
+  for (const kind of ['logo', 'cover']) {
+    await request(server)
+      .post(`/v1/restaurants/me/photos/${kind}`)
+      .set(bearer(owner.access))
+      .set('Content-Type', 'image/jpeg')
+      .send(JPEG)
+      .expect(200);
+  }
+  await request(server)
+    .put('/v1/restaurants/me/application/papers')
+    .set(bearer(owner.access))
+    .send({
+      registryNumber: 'TD-NDJ-2026-B-1234',
+      mobileMoney: { provider: 'airtel', number: '66 00 00 01' },
+    })
+    .expect(200);
+  for (const kind of ['registry', 'owner_id']) {
+    await request(server)
+      .post(`/v1/restaurants/me/application/files/${kind}`)
+      .set(bearer(owner.access))
+      .set('Content-Type', 'image/jpeg')
+      .send(JPEG)
+      .expect(200);
+  }
+}
+
+/** A fresh admin (promoted in the database), signed in; stepped up when asked. */
+async function freshAdmin(options: { stepUp?: boolean } = {}): Promise<string> {
+  const digits = String(randomInt(0, 1_000_000)).padStart(6, '0');
+  const phone = `+23566${digits}`;
+  await request(server).post('/v1/auth/otp/request').send({ phone, purpose: 'login' }).expect(202);
+  const code = await redis.client.get(mockOtpKey(phone));
+  const first = await request(server)
+    .post('/v1/auth/otp/verify')
+    .send({ phone, code, purpose: 'login' })
+    .expect(200);
+  const userId = (first.body as { user: { id: string } }).user.id;
+  await prisma.$executeRaw`INSERT INTO user_roles (user_id, role) VALUES (${userId}::uuid, 'admin')`;
+  const access = await staffToken(phone);
+  if (options.stepUp) {
+    const setup = await request(server).post('/v1/auth/mfa/setup').set(bearer(access)).expect(200);
+    const code = await totpCodeAt(setup.body.secretBase32 as string, Date.now());
+    await request(server)
+      .post('/v1/auth/mfa/verify')
+      .set(bearer(access))
+      .send({ code })
+      .expect(200);
+  }
+  return access;
+}
+
+describe('FEAT-022 part 3 — the restaurant’s four steps and DJAFAT’s decision, over HTTP', () => {
+  // SPEC-022-05-SC01, SPEC-022-05-SC02, SPEC-022-05-SC03 (R5: hours and « Profil » locked too)
+  it('SPEC-022-05-SC01 — nothing filled: 409 with the four steps; SC03 — each step fills over HTTP (map point in PostGIS); SC02 — sent: pending_review, then locked', async () => {
+    const owner = await signedUpRestaurant();
+
+    const empty = await request(server)
+      .post('/v1/restaurants/me/application/submit')
+      .set(bearer(owner.access));
+    expect(empty.status).toBe(409);
+    expect(empty.body).toMatchObject({
+      error: {
+        code: 'APPLICATION_INCOMPLETE',
+        details: { missing: ['location', 'hours_menu', 'photos', 'papers'] },
+      },
+    });
+
+    await fillFourSteps(owner);
+    const view = await request(server)
+      .get('/v1/restaurants/me/application')
+      .set(bearer(owner.access))
+      .expect(200);
+    expect(
+      (view.body as { steps: Array<{ step: string; done: boolean }> }).steps.every((s) => s.done),
+    ).toBe(true);
+    const [point] = await prisma.$queryRaw<Array<{ lat: number; lng: number }>>`
+      SELECT ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng
+        FROM restaurants WHERE id = ${owner.restaurantId}::uuid`;
+    expect(point).toEqual({ lat: 12.1067, lng: 15.0444 });
+
+    const sent = await request(server)
+      .post('/v1/restaurants/me/application/submit')
+      .set(bearer(owner.access))
+      .expect(200);
+    expect((sent.body as { status: string }).status).toBe('pending_review');
+    expect(
+      await prisma.restaurant.findUniqueOrThrow({ where: { id: owner.restaurantId } }),
+    ).toMatchObject({ status: 'pending_review' });
+
+    for (const attempt of [
+      request(server)
+        .put('/v1/restaurants/me/application/location')
+        .set(bearer(owner.access))
+        .send({ lat: 12.11, lng: 15.05, addressText: 'Moursal' }),
+      request(server).put('/v1/restaurants/me/hours').set(bearer(owner.access)).send({ hours: [] }),
+      request(server)
+        .patch(`/v1/restaurants/${owner.restaurantId}`)
+        .set(bearer(owner.access))
+        .send({ addressText: 'Moursal' }),
+    ]) {
+      const refused = await attempt;
+      expect(refused.status).toBe(409);
+      expect(refused.body).toMatchObject({ error: { code: 'APPLICATION_LOCKED' } });
+    }
+  });
+
+  // SPEC-022-07-SC02, SPEC-022-07 R3 (FEAT-022-Q18)
+  it('FEAT-022-Q18 — a dish set to 0 XAF during the review: « Valider » answers 409; SPEC-022-07-SC02 — then validated: active, its page opens, the owner is e-mailed', async () => {
+    const owner = await signedUpRestaurant();
+    await fillFourSteps(owner);
+    await request(server)
+      .post('/v1/restaurants/me/application/submit')
+      .set(bearer(owner.access))
+      .expect(200);
+    const restaurant = await prisma.restaurant.findUniqueOrThrow({
+      where: { id: owner.restaurantId },
+    });
+    await request(server).get(`/v1/restaurants/${restaurant.slug}`).expect(404);
+    const admin = await staffToken(STAFF.admin);
+
+    await prisma.product.updateMany({
+      where: { restaurantId: owner.restaurantId },
+      data: { priceMinor: 0n },
+    });
+    const incomplete = await request(server)
+      .post(`/v1/admin/applications/restaurant/${owner.restaurantId}/approve`)
+      .set(bearer(admin))
+      .send({});
+    expect(incomplete.status).toBe(409);
+    expect(incomplete.body).toMatchObject({
+      error: { code: 'APPLICATION_INCOMPLETE', details: { missing: ['hours_menu'] } },
+    });
+
+    await prisma.product.updateMany({
+      where: { restaurantId: owner.restaurantId },
+      data: { priceMinor: 150_000n },
+    });
+    const approved = await request(server)
+      .post(`/v1/admin/applications/restaurant/${owner.restaurantId}/approve`)
+      .set(bearer(admin))
+      .send({})
+      .expect(200);
+    expect(approved.body).toMatchObject({ id: owner.restaurantId, status: 'approved' });
+    expect(
+      await prisma.restaurant.findUniqueOrThrow({ where: { id: owner.restaurantId } }),
+    ).toMatchObject({ status: 'active' });
+    await request(server).get(`/v1/restaurants/${restaurant.slug}`).expect(200);
+    expect(await lastNotice(owner.email, 'application_approved')).toMatchObject({
+      subject: `Votre restaurant « ${restaurant.name} » est validé`,
+    });
+    const audit = await prisma.auditLog.findFirst({
+      where: { action: 'APPLICATION_APPROVED', entityId: owner.restaurantId },
+    });
+    expect(audit).not.toBeNull();
+  });
+
+  // SPEC-022-07-SC04, SPEC-022-07 R2 (restaurant)
+  it('SPEC-022-07-SC04 — the papers open for an admin by a signed link; support is refused', async () => {
+    const owner = await signedUpRestaurant();
+    await fillFourSteps(owner);
+    const admin = await staffToken(STAFF.admin);
+    const support = await staffToken(STAFF.support);
+
+    const link = await request(server)
+      .get(`/v1/admin/applications/restaurant/${owner.restaurantId}/files/registry`)
+      .set(bearer(admin))
+      .expect(200);
+    expect(link.body).toMatchObject({ expiresInSeconds: 300 });
+    await request(server)
+      .get(`/v1/admin/applications/restaurant/${owner.restaurantId}/files/registry`)
+      .set(bearer(support))
+      .expect(403);
+    const detail = await request(server)
+      .get(`/v1/admin/applications/restaurant/${owner.restaurantId}`)
+      .set(bearer(admin))
+      .expect(200);
+    expect(detail.body).toMatchObject({
+      pricedProducts: 1,
+      hasOpeningHours: true,
+      papers: { registryPhoto: true, ownerIdPhoto: true },
+      mobileMoney: { provider: 'airtel' },
+    });
+    expect(JSON.stringify(detail.body)).not.toContain('66000001');
+  });
+});
+
+describe('FEAT-022 part 3 — changes after the approval (SPEC-022-07 R6)', () => {
+  // SPEC-022-07-SC05, SPEC-022-07-SC06 (a change decided twice), FEAT-022-Q21, Q24
+  it('SPEC-022-07-SC05 — a new Mobile Money number waits; payouts keep the approved one; accepted with the step-up code, payouts go to the new one; « En ligne » never stops', async () => {
+    const courier = await motoCourier({ complete: true });
+    await submit(courier.access);
+    const admin = await staffToken(STAFF.admin);
+    await request(server)
+      .post(`/v1/admin/applications/courier/${courier.user.id}/approve`)
+      .set(bearer(admin))
+      .send({})
+      .expect(200);
+    const payout = await prisma.courierPayout.create({
+      data: {
+        courierId: courier.user.id,
+        kind: 'on_demand',
+        feePayer: 'courier',
+        currency: 'XAF',
+        requestedMinor: 250_000n,
+      },
+    });
+    const payoutNumber = async () => {
+      const res = await request(server)
+        .get('/v1/admin/payouts?status=requested')
+        .set(bearer(admin))
+        .expect(200);
+      return (
+        res.body as Array<{ id: string; courier: { mobileMoney: { number: string } | null } }>
+      ).find((p) => p.id === payout.id)?.courier.mobileMoney?.number;
+    };
+    try {
+      expect(await payoutNumber()).toBe('+23566000001');
+
+      const changed = await request(server)
+        .put('/v1/couriers/me/application')
+        .set(bearer(courier.access))
+        .send({ mobileMoney: { provider: 'airtel', number: '66 00 00 02' } })
+        .expect(200);
+      const change = (
+        changed.body as { pendingChanges: Array<{ id: string; mobileMoney: { number: string } }> }
+      ).pendingChanges[0]!;
+      expect(change.mobileMoney.number).toBe('+23566000002');
+      expect(await payoutNumber()).toBe('+23566000001');
+      await request(server)
+        .post('/v1/couriers/me/status')
+        .set(bearer(courier.access))
+        .send({ status: 'online' })
+        .expect(201);
+
+      const queue = await request(server)
+        .get('/v1/admin/applications?type=courier')
+        .set(bearer(admin))
+        .expect(200);
+      expect((queue.body as { changes: Array<{ id: string }> }).changes.map((c) => c.id)).toContain(
+        change.id,
+      );
+
+      // No recent code: 428; a fresh admin who steps up accepts it.
+      const unverified = await request(server)
+        .post(`/v1/admin/applications/courier/${courier.user.id}/changes/${change.id}/approve`)
+        .set(bearer(admin))
+        .send({});
+      expect(unverified.status).toBe(428);
+      const steppedUp = await freshAdmin({ stepUp: true });
+      await request(server)
+        .post(`/v1/admin/applications/courier/${courier.user.id}/changes/${change.id}/approve`)
+        .set(bearer(steppedUp))
+        .send({})
+        .expect(200);
+      expect(await payoutNumber()).toBe('+23566000002');
+      expect(await lastNotice(courier.email, 'change_decided')).toMatchObject({
+        subject: 'Votre nouveau numéro Mobile Money est accepté',
+      });
+      const again = await request(server)
+        .post(`/v1/admin/applications/courier/${courier.user.id}/changes/${change.id}/approve`)
+        .set(bearer(steppedUp))
+        .send({});
+      expect(again.status).toBe(409);
+      expect(again.body).toMatchObject({ error: { code: 'ALREADY_DECIDED' } });
+    } finally {
+      await prisma.courierPayout.delete({ where: { id: payout.id } });
+      await request(server)
+        .post('/v1/couriers/me/status')
+        .set(bearer(courier.access))
+        .send({ status: 'offline' });
+    }
+  });
+
+  // SPEC-022-07 R6 (restaurant), R5 (its e-mail)
+  it('SPEC-022-07 R6 — a validated restaurant’s new paper waits; refused with a reason, the approved one stays and the owner is told', async () => {
+    const owner = await signedUpRestaurant();
+    await fillFourSteps(owner);
+    await request(server)
+      .post('/v1/restaurants/me/application/submit')
+      .set(bearer(owner.access))
+      .expect(200);
+    const admin = await staffToken(STAFF.admin);
+    await request(server)
+      .post(`/v1/admin/applications/restaurant/${owner.restaurantId}/approve`)
+      .set(bearer(admin))
+      .send({})
+      .expect(200);
+    const approvedKey = (
+      await prisma.restaurantApplication.findUniqueOrThrow({
+        where: { restaurantId: owner.restaurantId },
+      })
+    ).ownerIdPhotoKey;
+
+    const view = await request(server)
+      .post('/v1/restaurants/me/application/files/owner_id')
+      .set(bearer(owner.access))
+      .set('Content-Type', 'image/jpeg')
+      .send(JPEG)
+      .expect(200);
+    const change = (view.body as { pendingChanges: Array<{ id: string; topic: string }> })
+      .pendingChanges[0]!;
+    expect(change.topic).toBe('owner_id');
+    await request(server)
+      .get(`/v1/admin/applications/restaurant/${owner.restaurantId}/changes/${change.id}/file`)
+      .set(bearer(admin))
+      .expect(200);
+
+    await request(server)
+      .post(`/v1/admin/applications/restaurant/${owner.restaurantId}/changes/${change.id}/reject`)
+      .set(bearer(admin))
+      .send({ reason: "La pièce d'identité a expiré." })
+      .expect(200);
+
+    expect(
+      (
+        await prisma.restaurantApplication.findUniqueOrThrow({
+          where: { restaurantId: owner.restaurantId },
+        })
+      ).ownerIdPhotoKey,
+    ).toBe(approvedKey);
+    expect(await lastNotice(owner.email, 'change_decided')).toMatchObject({
+      subject: "Votre nouveau papier n'est pas accepté",
+    });
+    expect(
+      await prisma.restaurant.findUniqueOrThrow({ where: { id: owner.restaurantId } }),
+    ).toMatchObject({ status: 'active' });
+  });
+
+  // SPEC-022-09-SC02, SPEC-022-09 R3
+  it('SPEC-022-09-SC02 — « Autre » with « Gassi Est »: kept on the courier, and listed for the admin to add', async () => {
+    const name = `Gassi Est ${randomUUID().slice(0, 4)}`;
+    const input = fresh();
+    const courier = await signUp({
+      ...input,
+      accountType: 'courier',
+      vehicle: 'velo',
+      neighbourhoodOther: name,
+      birthDate: bornYearsAgo(30),
+      acceptTerms: true,
+    });
+    expect(
+      await prisma.courier.findUniqueOrThrow({ where: { userId: courier.user.id } }),
+    ).toMatchObject({ neighbourhoodId: null, neighbourhoodOther: name });
+    const admin = await staffToken(STAFF.admin);
+
+    const typed = await request(server)
+      .get('/v1/admin/neighbourhoods/typed')
+      .set(bearer(admin))
+      .expect(200);
+    expect(
+      (typed.body as { names: Array<{ name: string; couriers: number }> }).names,
+    ).toContainEqual({ name, couriers: 1, restaurants: 0 });
+    await request(server)
+      .get('/v1/admin/neighbourhoods/typed')
+      .set(bearer(await staffToken(STAFF.support)))
+      .expect(403);
   });
 });

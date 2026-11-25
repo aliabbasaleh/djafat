@@ -17,6 +17,7 @@ import {
 import { Button, Switch } from '@/components/ui-client';
 import { CategoryFormModal, type CategoryFormValues } from '@/components/CategoryFormModal';
 import { ProductFormModal, type ProductFormValues } from '@/components/ProductFormModal';
+import { StepBackLink } from '@/components/StepBackLink';
 import { api } from '@/lib/api';
 import { clearSession } from '@/lib/auth-storage';
 import { formatMoney } from '@/lib/format';
@@ -142,6 +143,7 @@ export default function MenuPage() {
 
   return (
     <Stack gap="lg">
+      <StepBackLink />
       <Inline justify="between" align="center" wrap>
         <Heading level={1}>Menu</Heading>
         <Button

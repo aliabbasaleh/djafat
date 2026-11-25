@@ -19,6 +19,8 @@ const NAV_ITEMS: ReadonlyArray<{ label: string; href: string; access?: readonly 
   { label: 'Tableau de bord', href: '/admin' },
   // FEAT-022 (SPEC-022-07): full admins only — support and finance do not see the queue.
   { label: 'Demandes', href: '/admin/applications' },
+  // FEAT-022 (SPEC-022-09 R3, R4): the neighbourhood list, admins only.
+  { label: 'Quartiers', href: '/admin/neighbourhoods' },
   { label: 'Utilisateurs', href: '/admin/users' },
   { label: 'Restaurants', href: '/admin/restaurants' },
   { label: 'Livreurs', href: '/admin/couriers' },

@@ -11,6 +11,10 @@ import { MenuCategoriesService } from './menu-categories.service';
 import { ProductsManagementService } from './products-management.service';
 import { GeoModule } from '../geo/geo.module';
 import { RestaurantApplicationService } from './restaurant-application.service';
+import {
+  RestaurantApplicationController,
+  RestaurantPhotosController,
+} from './restaurant-application.controller';
 
 /**
  * Catalog & Restaurant Discovery (Bloc 2, docs/20). Depends only on
@@ -24,7 +28,14 @@ import { RestaurantApplicationService } from './restaurant-application.service';
  */
 @Module({
   imports: [UsersModule, AuthModule, GeoModule],
-  controllers: [CatalogController, CatalogManagementController, RestaurantsAdminController],
+  controllers: [
+    CatalogController,
+    CatalogManagementController,
+    RestaurantsAdminController,
+    // FEAT-022 (SPEC-022-05): the four steps of a restaurant that signed up.
+    RestaurantApplicationController,
+    RestaurantPhotosController,
+  ],
   providers: [
     CatalogService,
     RestaurantAvailabilityService,

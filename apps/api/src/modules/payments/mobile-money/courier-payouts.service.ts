@@ -1,10 +1,14 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import type { MoneyJson } from '@djafat/types';
 import { money } from '@djafat/core';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { toMoneyJson } from '../../../common/money/money.mapper';
+import {
+  COURIER_PAYOUT_ACCOUNT_PORT,
+  type CourierPayoutAccountPort,
+} from '../../../common/ports/courier-payout-account.port';
 import { LedgerService } from '../../ledger/ledger.service';
 import { LedgerReadService } from '../../ledger/ledger-read.service';
 import { PlatformService } from '../../platform/platform.service';
@@ -66,6 +70,7 @@ export class CourierPayoutsService {
     private readonly platform: PlatformService,
     private readonly users: UsersService,
     private readonly events: EventEmitter2,
+    @Inject(COURIER_PAYOUT_ACCOUNT_PORT) private readonly payoutAccounts: CourierPayoutAccountPort,
   ) {}
 
   async listMine(courierId: string): Promise<CourierPayoutDto[]> {
@@ -148,19 +153,32 @@ export class CourierPayoutsService {
     return { created };
   }
 
-  /** Staff: payouts to send (or all), with the courier's Airtel number. */
+  /**
+   * Staff: payouts to send (or all), with where to send them: the Mobile
+   * Money number DJAFAT approved (FEAT-022, SPEC-022-07 R6 — a new number
+   * still waiting is never shown), else the account's phone (a courier
+   * created by the team, as before FEAT-022).
+   */
   async listForStaff(status?: string) {
     const rows = await this.prisma.courierPayout.findMany({
       where: status ? { status } : {},
       orderBy: { requestedAt: 'asc' },
       take: 200,
     });
+    const accounts = await this.payoutAccounts.approvedPayoutAccounts([
+      ...new Set(rows.map((r) => r.courierId)),
+    ]);
     return Promise.all(
       rows.map(async (r) => {
         const u = await this.users.getById(r.courierId);
         return {
           ...toDto(r),
-          courier: { id: r.courierId, name: u?.fullName ?? null, phone: u?.phone ?? null },
+          courier: {
+            id: r.courierId,
+            name: u?.fullName ?? null,
+            phone: u?.phone ?? null,
+            mobileMoney: accounts.get(r.courierId) ?? null,
+          },
         };
       }),
     );

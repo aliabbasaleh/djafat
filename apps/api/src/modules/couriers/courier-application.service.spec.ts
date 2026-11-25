@@ -337,3 +337,141 @@ describe('SPEC-022-07 — DJAFAT decides on a courier', () => {
     expect(world.applications.get('u-gone')?.status).toBe('pending_review');
   });
 });
+
+// FEAT-022 part 3 — SPEC-022-07 R6: after the approval, a new number or photo waits for DJAFAT.
+describe('SPEC-022-07 R6 — a validated courier changes their Mobile Money number or a photo', () => {
+  const PHOTO = Uint8Array.of(0xff, 0xd8, 0xff);
+
+  it('SPEC-022-07-SC05 — the new number waits: the earnings keep the approved one, the courier sees it waiting, the admin sees it masked', async () => {
+    const world = courierWorld();
+    world.signedUp('u-abakar', { application: { ...COMPLETE_MOTO, status: 'approved' } });
+
+    const view = await world.service.updateMine('u-abakar', {
+      mobileMoney: { provider: 'airtel', number: '+23566000002' },
+    });
+
+    expect(world.applications.get('u-abakar')?.mobileMoneyNumber).toBe('+23566000001');
+    expect(view.status).toBe('approved');
+    expect(view.mobileMoney).toEqual({ provider: 'airtel', number: '+23566000001' });
+    expect(view.pendingChanges).toEqual([
+      expect.objectContaining({
+        kind: 'mobile_money',
+        mobileMoney: { provider: 'airtel', number: '+23566000002' },
+      }),
+    ]);
+    const review = await world.service.getForReview('u-abakar');
+    expect(review.pendingChanges).toHaveLength(1);
+    expect(review.pendingChanges[0]?.mobileMoney?.number).not.toContain('66000002');
+  });
+
+  it('SPEC-022-07 R6 — a newer number replaces the waiting one; the approved number again withdraws it', async () => {
+    const world = courierWorld();
+    world.signedUp('u-abakar', { application: { ...COMPLETE_MOTO, status: 'approved' } });
+
+    await world.service.updateMine('u-abakar', {
+      mobileMoney: { provider: 'airtel', number: '+23566000002' },
+    });
+    await world.service.updateMine('u-abakar', {
+      mobileMoney: { provider: 'moov', number: '+23599000003' },
+    });
+    expect(world.changes.pending('u-abakar').map((c) => c.newValue)).toEqual([
+      { provider: 'moov', number: '+23599000003' },
+    ]);
+
+    await world.service.updateMine('u-abakar', {
+      mobileMoney: { provider: 'airtel', number: '+23566000001' },
+    });
+    expect(world.changes.pending('u-abakar')).toEqual([]);
+  });
+
+  it('FEAT-022-Q19 — once validated, the vehicle and the emergency contact do not change in the app (409 APPLICATION_LOCKED)', async () => {
+    const world = courierWorld();
+    world.signedUp('u-abakar', { application: { ...COMPLETE_MOTO, status: 'approved' } });
+
+    for (const attempt of [
+      world.service.updateMine('u-abakar', { vehicle: 'velo' }),
+      world.service.updateMine('u-abakar', {
+        emergencyContact: { name: 'Achta Moussa', phone: '+23599445566' },
+      }),
+    ]) {
+      expect(await rejection(attempt)).toMatchObject({
+        status: 409,
+        body: { code: 'APPLICATION_LOCKED' },
+      });
+    }
+    expect(world.couriers.get('u-abakar')?.vehicleType).toBe('moto');
+    expect(world.changes.rows.size).toBe(0);
+  });
+
+  it('SPEC-022-07 R6 — a new photo waits; a newer one replaces it (the older is deleted); the approved photo stays', async () => {
+    const world = courierWorld();
+    world.signedUp('u-abakar', { application: { ...COMPLETE_MOTO, status: 'approved' } });
+
+    await world.service.storeDocument('u-abakar', 'driving_licence', PHOTO);
+    await world.service.storeDocument('u-abakar', 'driving_licence', PHOTO);
+
+    expect(world.applications.get('u-abakar')?.drivingLicencePhotoKey).toBe('private-licence.jpg');
+    expect(world.changes.pending('u-abakar').map((c) => c.newValue)).toEqual([
+      { kind: 'driving_licence', key: world.stored[1] },
+    ]);
+    expect(world.removed).toEqual([world.stored[0]]);
+  });
+
+  it('SPEC-022-07 R6 — accepted, the new photo replaces the approved one (deleted); refused, the new one is deleted and the approved one stays', async () => {
+    const world = courierWorld();
+    world.signedUp('u-abakar', { application: { ...COMPLETE_MOTO, status: 'approved' } });
+    await world.service.storeDocument('u-abakar', 'insurance', PHOTO);
+    const [accepted] = world.changes.pending('u-abakar');
+
+    const yes = await world.service.decideChange('u-abakar', accepted!.id, 'u-admin', {
+      status: 'approved',
+    });
+
+    expect(yes).toMatchObject({ topic: 'insurance', status: 'approved' });
+    expect(world.applications.get('u-abakar')?.insurancePhotoKey).toBe(world.stored[0]);
+    expect(world.removed).toEqual(['private-insurance.jpg']);
+
+    await world.service.storeDocument('u-abakar', 'plate', PHOTO);
+    const [refused] = world.changes.pending('u-abakar');
+    await world.service.decideChange('u-abakar', refused!.id, 'u-admin', {
+      status: 'rejected',
+      reason: 'La plaque est illisible sur la photo.',
+    });
+
+    expect(world.applications.get('u-abakar')?.platePhotoKey).toBe('private-plate.jpg');
+    expect(world.removed).toEqual(['private-insurance.jpg', world.stored[1]]);
+    expect(world.audits.map((a) => a.action)).toEqual(['CHANGE_APPROVED', 'CHANGE_REJECTED']);
+  });
+
+  it('SPEC-022-07 R7, R8 — a second decision: 409 ALREADY_DECIDED; one’s own change: 403; another courier’s: 404', async () => {
+    const world = courierWorld();
+    world.signedUp('u-abakar', { application: { ...COMPLETE_MOTO, status: 'approved' } });
+    world.signedUp('u-other', { application: { ...COMPLETE_MOTO, status: 'approved' } });
+    await world.service.updateMine('u-abakar', {
+      mobileMoney: { provider: 'airtel', number: '+23566000002' },
+    });
+    const [change] = world.changes.pending('u-abakar');
+
+    expect(
+      await rejection(
+        world.service.decideChange('u-abakar', change!.id, 'u-abakar', { status: 'approved' }),
+      ),
+    ).toMatchObject({ status: 403 });
+    expect(
+      await rejection(
+        world.service.decideChange('u-other', change!.id, 'u-admin', { status: 'approved' }),
+      ),
+    ).toMatchObject({ status: 404, body: { code: 'CHANGE_NOT_FOUND' } });
+
+    await world.service.decideChange('u-abakar', change!.id, 'u-admin', { status: 'approved' });
+    expect(
+      await rejection(
+        world.service.decideChange('u-abakar', change!.id, 'u-admin-2', {
+          status: 'rejected',
+          reason: 'Trop tard, mais refusé quand même.',
+        }),
+      ),
+    ).toMatchObject({ status: 409, body: { code: 'ALREADY_DECIDED' } });
+    expect(world.applications.get('u-abakar')?.mobileMoneyNumber).toBe('+23566000002');
+  });
+});

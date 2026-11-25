@@ -1,0 +1,14 @@
+.map {
+  width: 100%;
+  height: 360px;
+  border-radius: 12px;
+  border: 1px solid var(--djafat-color-border-default);
+  overflow: hidden;
+}
+
+.pin {
+  font-size: 32px;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+}

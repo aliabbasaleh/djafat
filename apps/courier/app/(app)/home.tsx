@@ -224,6 +224,12 @@ export default function HomeScreen() {
 
       <View style={styles.footerLinks}>
         <BigButton label="Gains" variant="ghost" onPress={() => router.push('/(app)/earnings')} />
+        {/* FEAT-022 (SPEC-022-07 R6): replace a paper once validated. */}
+        <BigButton
+          label="Mes papiers"
+          variant="ghost"
+          onPress={() => router.push('/(app)/papers')}
+        />
       </View>
     </Screen>
   );

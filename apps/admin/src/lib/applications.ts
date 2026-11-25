@@ -2,7 +2,9 @@ import {
   ApiClientError,
   type ApplicationDecision,
   type ApplicationPhoto,
+  type ApplicationType,
   type CourierApplicationReview,
+  type RestaurantPaperKind,
 } from '@djafat/sdk';
 
 /**
@@ -60,17 +62,49 @@ export function photoAlt(kind: ApplicationPhoto['kind'], name: string | null): s
   return `${PHOTO_LABELS[kind]} de ${name ?? 'ce livreur'}`;
 }
 
-/** R5: what happened, including when the e-mail could not leave (the decision stands). */
-export function decisionMessage(decision: ApplicationDecision): string {
-  const done = decision.status === 'approved' ? 'Dossier validé.' : 'Dossier refusé.';
-  switch (decision.email) {
+/** SPEC-022-07 R2 (restaurant): the two private papers. */
+export const RESTAURANT_PAPER_LABELS: Readonly<Record<RestaurantPaperKind, string>> = {
+  registry: 'RCCM ou NIF',
+  owner_id: 'Pièce d’identité du responsable',
+};
+
+/** « Pièce d’identité du responsable de Chez Fatimé ». */
+export function paperAlt(kind: RestaurantPaperKind, restaurantName: string): string {
+  return `${RESTAURANT_PAPER_LABELS[kind]} de ${restaurantName}`;
+}
+
+const WHO: Record<ApplicationType, { the: string; tell: string }> = {
+  courier: { the: 'Le livreur', tell: 'le livreur' },
+  restaurant: { the: 'Le responsable du restaurant', tell: 'le responsable du restaurant' },
+};
+
+function emailOutcome(email: ApplicationDecision['email'], type: ApplicationType): string {
+  switch (email) {
     case 'sent':
-      return `${done} Le livreur a reçu un e-mail.`;
+      return `${WHO[type].the} a reçu un e-mail.`;
     case 'no_address':
-      return `${done} Ce compte n’a pas d’adresse e-mail : prévenez le livreur autrement.`;
+      return `Ce compte n’a pas d’adresse e-mail : prévenez ${WHO[type].tell} autrement.`;
     default:
-      return `${done} L’e-mail n’a pas pu partir : prévenez le livreur autrement.`;
+      return `L’e-mail n’a pas pu partir : prévenez ${WHO[type].tell} autrement.`;
   }
+}
+
+/** R5: what happened, including when the e-mail could not leave (the decision stands). */
+export function decisionMessage(
+  decision: ApplicationDecision,
+  type: ApplicationType = 'courier',
+): string {
+  const done = decision.status === 'approved' ? 'Dossier validé.' : 'Dossier refusé.';
+  return `${done} ${emailOutcome(decision.email, type)}`;
+}
+
+/** R6: a change after the approval, accepted or refused, and its e-mail. */
+export function changeDecisionMessage(
+  decision: ApplicationDecision,
+  type: ApplicationType,
+): string {
+  const done = decision.status === 'approved' ? 'Changement accepté.' : 'Changement refusé.';
+  return `${done} ${emailOutcome(decision.email, type)}`;
 }
 
 export function decisionErrorMessage(err: unknown): string {
@@ -79,6 +113,9 @@ export function decisionErrorMessage(err: unknown): string {
       return 'Un autre administrateur a déjà décidé ce dossier : rechargez la page.';
     }
     if (err.code === 'APPLICATION_NOT_FOUND') return 'Ce dossier n’existe plus.';
+    if (err.code === 'CHANGE_NOT_FOUND') {
+      return 'Ce changement a été remplacé par un plus récent : rechargez la page.';
+    }
     if (err.code === 'VALIDATION_ERROR') return 'Vérifiez le motif du refus.';
     return err.message;
   }

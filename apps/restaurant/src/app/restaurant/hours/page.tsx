@@ -5,7 +5,14 @@ import { useRouter } from 'next/navigation';
 import { ApiClientError } from '@djafat/sdk';
 import { Heading, Text, Stack, Inline, EmptyState, ErrorState, Skeleton, cx } from '@djafat/ui';
 import { Button, Alert, Switch } from '@/components/ui-client';
+import { StepBackLink } from '@/components/StepBackLink';
 import { api } from '@/lib/api';
+import {
+  UNDER_REVIEW_TEXT,
+  errorText,
+  underReview,
+  useRestaurantApplication,
+} from '@/lib/application';
 import { clearSession, getStoredUser, isOwner } from '@/lib/auth-storage';
 import { weekdayLabel, minutesToTimeInput, timeInputToMinutes } from '@/lib/format';
 import styles from './page.module.css';
@@ -45,7 +52,11 @@ export default function HoursPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const canWrite = isOwner(getStoredUser());
+  const owner = isOwner(getStoredUser());
+  // FEAT-022 (SPEC-022-05 R5): while DJAFAT checks the application, the hours read only.
+  const { application } = useRestaurantApplication();
+  const locked = underReview(application);
+  const canWrite = owner && !locked;
 
   const load = useCallback(async () => {
     setState('loading');
@@ -97,8 +108,8 @@ export default function HoursPage() {
         }));
       await api.restaurant.replaceHours(hours);
       setSuccess('Horaires mis à jour.');
-    } catch {
-      setError('Échec de la mise à jour des horaires.');
+    } catch (err) {
+      setError(errorText(err, 'Échec de la mise à jour des horaires.'));
     } finally {
       setSaving(false);
     }
@@ -123,12 +134,14 @@ export default function HoursPage() {
 
   return (
     <Stack gap="lg">
+      <StepBackLink next={{ href: '/restaurant/menu?etape=2', label: 'Ensuite : le menu' }} />
       <Heading level={1}>Horaires</Heading>
       <Text size="small" tone="secondary">
         Fuseau horaire de la ville : {timezone}
       </Text>
 
-      {!canWrite && (
+      {locked && <Alert tone="info">{UNDER_REVIEW_TEXT}</Alert>}
+      {!owner && (
         <Alert tone="info">
           Seul le propriétaire du restaurant peut modifier les horaires. Vous pouvez les consulter.
         </Alert>

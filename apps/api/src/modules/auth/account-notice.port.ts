@@ -3,7 +3,7 @@
  * have an account" (sent instead of a registration code, SPEC-020-03 R3),
  * "your password was changed" (SPEC-020-05) and, since FEAT-022, the welcome
  * of a courier or a restaurant and DJAFAT's decision on an application
- * (SPEC-022-07 R5). Chosen by `EMAIL_PROVIDER`, like
+ * (SPEC-022-07 R5), and of a change after the approval (R6). Chosen by `EMAIL_PROVIDER`, like
  * the code transport. Best effort: a provider never throws, so a notice that
  * cannot leave never fails the request that sends it.
  */
@@ -30,6 +30,20 @@ export type AccountNotice =
       readonly to: string;
       readonly applicant: Applicant;
       readonly reason: string;
+    }
+  /**
+   * FEAT-022 SPEC-022-07 R5, R6: DJAFAT decided a change made after the
+   * approval — a new Mobile Money number or a new paper.
+   */
+  | {
+      readonly kind: 'change_decided';
+      readonly to: string;
+      readonly applicant: Applicant;
+      /** `mobile_money`, `registry_number`, or the photo's kind. */
+      readonly topic: string;
+      readonly status: 'approved' | 'rejected';
+      /** Present when rejected. */
+      readonly reason?: string;
     };
 
 /** Who applied (FEAT-022): a courier, or a restaurant's owner for that restaurant. */

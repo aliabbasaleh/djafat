@@ -2,7 +2,7 @@ import type { MoneyJson, Role } from '@djafat/types';
 import type { ApiHttp } from './http.js';
 import type { Order } from './orders.js';
 import type { CourierPayout } from './payouts.js';
-import { createApplicationsAdminClient } from './applications.js';
+import { createApplicationsAdminClient, type MobileMoney } from './applications.js';
 
 /**
  * Bloc 9 — admin operations client bindings (docs/30). Every route here is
@@ -154,10 +154,39 @@ export interface OpenRefund {
   readonly createdAt: string;
 }
 
+/** FEAT-022 (SPEC-022-09 R4): a neighbourhood as the admin console lists it. */
+export interface AdminNeighbourhood {
+  readonly id: string;
+  readonly name: string;
+  readonly active: boolean;
+  readonly fromReferenceData: boolean;
+}
+
+/** SPEC-022-09 R3: a name typed under « Autre », not yet in the list. */
+export interface TypedNeighbourhood {
+  readonly name: string;
+  readonly couriers: number;
+  readonly restaurants: number;
+}
+
 export function createAdminClient(http: ApiHttp) {
   return {
     /** FEAT-022: « Demandes à vérifier » (SPEC-022-07). */
     applications: createApplicationsAdminClient(http),
+    /** FEAT-022 (SPEC-022-09 R3, R4): N'Djamena's neighbourhoods — never deleted. */
+    neighbourhoods: {
+      list: () =>
+        http.get<{ neighbourhoods: readonly AdminNeighbourhood[] }>('/admin/neighbourhoods'),
+      typed: () =>
+        http.get<{ names: readonly TypedNeighbourhood[] }>('/admin/neighbourhoods/typed'),
+      /** 409 `NEIGHBOURHOOD_EXISTS` for a name an active one already has (accents and case aside). */
+      create: (name: string) =>
+        http.post<AdminNeighbourhood>('/admin/neighbourhoods', { body: { name } }),
+      update: (id: string, patch: { name?: string; active?: boolean }) =>
+        http.patch<AdminNeighbourhood>(`/admin/neighbourhoods/${encodeURIComponent(id)}`, {
+          body: patch,
+        }),
+    },
     users: {
       search: (params: { search?: string; page?: number; limit?: number } = {}) =>
         http.get<Paginated<AdminUserSummary>>('/admin/users', { query: { ...params } }),
@@ -219,12 +248,22 @@ export function createAdminClient(http: ApiHttp) {
         ),
     },
     payouts: {
-      /** FEAT-014: courier payouts (to send: `status: 'requested'`), with the courier's Airtel number. */
+      /**
+       * FEAT-014: courier payouts (to send: `status: 'requested'`), with the
+       * courier's number; FEAT-022 (SPEC-022-07 R6): `mobileMoney` is the
+       * number DJAFAT approved, the one to send to — `null` for a courier
+       * created by the team (then `phone`, as before).
+       */
       list: (status?: string) =>
         http.get<
           ReadonlyArray<
             CourierPayout & {
-              readonly courier: { id: string; name: string | null; phone: string | null };
+              readonly courier: {
+                id: string;
+                name: string | null;
+                phone: string | null;
+                mobileMoney: MobileMoney | null;
+              };
             }
           >
         >('/admin/payouts', { query: status ? { status } : {} }),

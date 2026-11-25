@@ -7,6 +7,7 @@ import { ApiClientError } from '@djafat/sdk';
 import { Screen } from '../../components/Screen';
 import { BigButton } from '../../components/BigButton';
 import { Badge } from '../../components/Badge';
+import { MobileMoneyCard } from '../../components/MobileMoneyCard';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 import { formatMoney } from '../../lib/format';
@@ -156,6 +157,9 @@ export default function EarningsScreen() {
             )}
             {message && <Text style={styles.note}>{message}</Text>}
           </View>
+
+          {/* FEAT-022 (SPEC-022-07 R6): where the earnings go, and a new number for DJAFAT. */}
+          <MobileMoneyCard />
 
           <Text style={styles.section}>Mes courses</Text>
           {days.length === 0 && (

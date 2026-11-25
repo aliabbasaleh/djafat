@@ -139,6 +139,18 @@ export class RestaurantsManagementService {
         message: 'No restaurant is scoped to this account.',
       });
     }
+    // FEAT-022 (SPEC-022-05 R5): not while DJAFAT checks the application (the
+    // menu stays editable: nothing is visible to customers yet, FEAT-022-Q18).
+    const application = await this.prisma.restaurantApplication.findUnique({
+      where: { restaurantId },
+      select: { status: true },
+    });
+    if (application?.status === 'pending_review') {
+      throw new ConflictException({
+        code: 'APPLICATION_LOCKED',
+        message: 'Votre dossier est en vérification : il ne se modifie plus pour le moment.',
+      });
+    }
     await this.prisma.$transaction([
       this.prisma.restaurantHours.deleteMany({ where: { restaurantId } }),
       this.prisma.restaurantHours.createMany({
@@ -244,13 +256,25 @@ export class RestaurantsManagementService {
         message: `Setting status "${input.status}" requires admin:write.`,
       });
     }
-    if (input.status !== undefined && !isAdminTier && PUBLIC_STATUSES.includes(input.status)) {
+    const goesPublic = input.status !== undefined && PUBLIC_STATUSES.includes(input.status);
+    // FEAT-022 (SPEC-022-05 R5): the address and the photos are steps 1 and 3.
+    const touchesSteps =
+      input.addressText !== undefined ||
+      input.logoUrl !== undefined ||
+      input.coverUrl !== undefined;
+    if (!isAdminTier && (goesPublic || touchesSteps)) {
       // No application: created by the team, works as before FEAT-022.
       const application = await this.prisma.restaurantApplication.findUnique({
         where: { restaurantId },
         select: { status: true },
       });
-      if (application && application.status !== 'approved') {
+      if (touchesSteps && application?.status === 'pending_review') {
+        throw new ConflictException({
+          code: 'APPLICATION_LOCKED',
+          message: 'Votre dossier est en vérification : il ne se modifie plus pour le moment.',
+        });
+      }
+      if (goesPublic && application && application.status !== 'approved') {
         throw new ConflictException({
           code: 'RESTAURANT_NOT_APPROVED',
           message: "Votre restaurant n'est pas encore validé par DJAFAT.",

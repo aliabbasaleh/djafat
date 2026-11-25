@@ -56,3 +56,52 @@
   flex-direction: column;
   gap: calc(var(--djafat-space-3) * 1px);
 }
+
+/* FEAT-022 part 3: a restaurant's logo and cover, and the changes after the approval. */
+.images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--djafat-space-3) * 1px);
+  align-items: flex-end;
+}
+
+.logo {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  border: 1px solid var(--djafat-color-border-default);
+}
+
+.cover {
+  width: 200px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  border: 1px solid var(--djafat-color-border-default);
+}
+
+.changes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-3) * 1px);
+}
+
+.change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--djafat-space-2) * 1px);
+  padding-bottom: calc(var(--djafat-space-2) * 1px);
+  border-bottom: 1px solid var(--djafat-color-border-default);
+}
+
+.changeText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

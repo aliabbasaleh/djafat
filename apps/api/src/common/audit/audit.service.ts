@@ -58,6 +58,9 @@ export type AuditAction =
   | 'APPLICATION_SUBMITTED'
   | 'APPLICATION_APPROVED'
   | 'APPLICATION_REJECTED'
+  // FEAT-022 — a change after the approval, decided by an admin (SPEC-022-07 R6).
+  | 'CHANGE_APPROVED'
+  | 'CHANGE_REJECTED'
   // FEAT-022 — a signed-in customer became a courier or a restaurant (SPEC-022-08).
   | 'ROLE_SELF_SIGNUP';
 

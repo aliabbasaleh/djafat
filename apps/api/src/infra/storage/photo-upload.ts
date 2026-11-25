@@ -35,9 +35,16 @@ export const PHOTO_UPLOAD_CONTENT_TYPES: readonly string[] = [
  */
 const DRAIN_LIMIT_BYTES = 4 * MAX_PHOTO_BYTES;
 
-/** The routes that take a photo as their body: `…/application/files/:kind` (couriers; restaurants next). */
+/**
+ * The routes that take a photo as their body: `…/application/files/:kind`
+ * (couriers' and restaurants' papers) and `/restaurants/me/photos/:kind` (a
+ * restaurant's logo and cover, FEAT-022 part 3).
+ */
 export function isPhotoUploadRoute(url: string | undefined): boolean {
-  return url !== undefined && /\/application\/files\/:kind$/.test(url);
+  return (
+    url !== undefined &&
+    (/\/application\/files\/:kind$/.test(url) || /\/restaurants\/me\/photos\/:kind$/.test(url))
+  );
 }
 
 type ParserDone = (err: Error | null, body?: Buffer) => void;

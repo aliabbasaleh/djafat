@@ -15,6 +15,7 @@ import {
   courierApplicationItems,
   courierDocumentKinds,
   isApplicationStatus,
+  isCourierDocumentKind,
   isCourierVehicle,
   maskNationalPhone,
   missingCourierItems,
@@ -27,6 +28,22 @@ import {
   type MobileMoneyProvider,
 } from '@djafat/core';
 import { AuditService } from '../../common/audit/audit.service';
+import {
+  changeMobileMoney,
+  changeTopic,
+  changeValue,
+  dropPendingChange,
+  listPendingChanges,
+  markChangeDecided,
+  pendingChangeToDecide,
+  pendingChangesOf,
+  queueChange,
+  toPendingChange,
+  type ChangeDecision,
+  type ChangeVerdict,
+  type PendingChange,
+  type PendingChangeRow,
+} from '../../common/onboarding/application-changes.repository';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { PRIVATE_LINK_SECONDS, PhotoStorage } from '../../infra/storage/photo-storage';
 import { NeighbourhoodsService } from '../geo/neighbourhoods.service';
@@ -48,6 +65,18 @@ export interface CourierApplicationView {
   /** The last rejection's reason (SPEC-022-06 R6); shown while `rejected`. */
   readonly rejectionReason: string | null;
   readonly submittedAt: string | null;
+  /** SPEC-022-07 R6: after the approval, a new number or photo waiting for DJAFAT. */
+  readonly pendingChanges: readonly PendingChange[];
+}
+
+/** A courier's change waiting for DJAFAT, in the admin's queue (SPEC-022-07 R6). */
+export interface CourierChangeQueueRow extends PendingChangeRow {
+  readonly name: string | null;
+}
+
+/** A change DJAFAT decided, for the e-mail to the courier (SPEC-022-07 R5, R6). */
+export interface CourierChangeDecision extends ChangeDecision {
+  readonly courierUserId: string;
 }
 
 /** A row of the admin's queue (SPEC-022-07 R1). */
@@ -76,6 +105,8 @@ export interface CourierApplicationReview {
   readonly submittedAt: string | null;
   /** A rejected application sent again keeps the previous reason, for the reviewer. */
   readonly previousRejectionReason: string | null;
+  /** R6: what changed since the approval and waits for a decision (numbers masked). */
+  readonly pendingChanges: readonly PendingChange[];
 }
 
 export interface CourierApplicationUpdate {
@@ -113,6 +144,21 @@ const locked = () =>
     message: 'Votre dossier est en vérification ou déjà validé : il ne se modifie plus ici.',
   });
 
+/** SPEC-022-07 R6: once approved, only the Mobile Money number and the photos change (for an admin to accept). */
+const lockedOnceApproved = () =>
+  new ConflictException({
+    code: 'APPLICATION_LOCKED',
+    message:
+      "Votre dossier est validé : pour changer de véhicule ou de contact d'urgence, contactez DJAFAT.",
+  });
+
+/** FEAT-022-Q17: never one's own application, nor its changes. */
+const ownApplication = () =>
+  new ForbiddenException({
+    code: 'FORBIDDEN',
+    message: 'Votre propre dossier doit être décidé par un autre administrateur.',
+  });
+
 /**
  * FEAT-022 (SPEC-022-06, SPEC-022-07 for couriers): a courier's application —
  * filled and sent by the courier, decided by DJAFAT. Every change to one
@@ -147,6 +193,9 @@ export class CourierApplicationService {
       emergencyContact: this.emergencyContactOf(application),
       rejectionReason: application.status === 'rejected' ? application.rejectionReason : null,
       submittedAt: application.submittedAt?.toISOString() ?? null,
+      pendingChanges: (await pendingChangesOf(this.prisma, 'courier', userId)).map((change) =>
+        toPendingChange(change),
+      ),
     };
   }
 
@@ -168,7 +217,28 @@ export class CourierApplicationService {
     }
     const dropped = await this.prisma.$transaction(async (tx) => {
       const application = await this.lockedRow(tx, userId);
-      if (!applicationIsEditable(this.statusOf(application))) throw locked();
+      const status = this.statusOf(application);
+      if (status === 'approved') {
+        // SPEC-022-07 R6: the new number waits for an admin; until then the
+        // earnings keep going to the approved one. The approved number again
+        // withdraws the change.
+        if (input.vehicle || input.emergencyContact) throw lockedOnceApproved();
+        const next = input.mobileMoney;
+        if (!next) return [];
+        if (
+          next.provider === application.mobileMoneyProvider &&
+          next.number === application.mobileMoneyNumber
+        ) {
+          await dropPendingChange(tx, 'courier', userId, 'mobile_money');
+        } else {
+          await queueChange(tx, 'courier', userId, 'mobile_money', {
+            provider: next.provider,
+            number: next.number,
+          });
+        }
+        return [];
+      }
+      if (!applicationIsEditable(status)) throw locked();
       const now = new Date();
       // R3: on a bicycle or on foot, the licence and the vehicle papers are neither asked nor
       // kept — their photos go with the change (review of FEAT-022 parts 1-2, note 18).
@@ -221,13 +291,18 @@ export class CourierApplicationService {
     bytes: Uint8Array,
   ): Promise<CourierApplicationView> {
     const before = await this.load(userId);
-    if (!applicationIsEditable(this.statusOf(before.application))) throw locked();
+    if (!photoCanChange(this.statusOf(before.application))) throw locked();
     const { key } = await this.photos.store('private', bytes);
     let previous: string | null;
     try {
       previous = await this.prisma.$transaction(async (tx) => {
         const application = await this.lockedRow(tx, userId);
-        if (!applicationIsEditable(this.statusOf(application))) throw locked();
+        const status = this.statusOf(application);
+        if (!photoCanChange(status)) throw locked();
+        if (status === 'approved') {
+          // SPEC-022-07 R6: the new paper waits for an admin; the approved one stays.
+          return queueChange(tx, 'courier', userId, 'document', { kind, key });
+        }
         const data: Prisma.CourierApplicationUpdateInput = { updatedAt: new Date() };
         data[PHOTO_COLUMN[kind]] = key;
         await tx.courierApplication.update({ where: { courierUserId: userId }, data });
@@ -340,7 +415,108 @@ export class CourierApplicationService {
       submittedAt: application.submittedAt?.toISOString() ?? null,
       previousRejectionReason:
         application.status === 'pending_review' ? application.rejectionReason : null,
+      pendingChanges: (await pendingChangesOf(this.prisma, 'courier', userId)).map((change) =>
+        toPendingChange(change, (n) => maskNationalPhone(n, LAUNCH_MARKET)),
+      ),
     };
+  }
+
+  /** SPEC-022-09 R3, SC02: the neighbourhood names couriers typed under « Autre », with how many. */
+  async otherNeighbourhoodNames(): Promise<Array<{ name: string; count: number }>> {
+    const rows = await this.prisma.courier.groupBy({
+      by: ['neighbourhoodOther'],
+      where: { neighbourhoodId: null, neighbourhoodOther: { not: null } },
+      _count: { _all: true },
+    });
+    return rows.flatMap((row) =>
+      row.neighbourhoodOther ? [{ name: row.neighbourhoodOther, count: row._count._all }] : [],
+    );
+  }
+
+  /** SPEC-022-07 R6: the couriers' changes waiting for DJAFAT, oldest first. */
+  async listPendingChangesForReview(): Promise<CourierChangeQueueRow[]> {
+    const rows = await listPendingChanges(this.prisma, 'courier');
+    if (rows.length === 0) return [];
+    const names = await this.namesOf([...new Set(rows.map((r) => r.subjectId))]);
+    return rows
+      .filter((row) => names.has(row.subjectId))
+      .map((row) => ({ ...row, name: names.get(row.subjectId) ?? null }));
+  }
+
+  /** R6: the photo of a pending paper, by a 5-minute link (the route admits admins only). */
+  async changeLinkForReview(
+    userId: string,
+    changeId: string,
+  ): Promise<{ url: string; expiresInSeconds: number }> {
+    const change = await this.prisma.applicationChange.findUnique({ where: { id: changeId } });
+    const key =
+      change && change.subjectType === 'courier' && change.subjectId === userId
+        ? changeValue(change.newValue, 'key')
+        : null;
+    if (!key) {
+      throw new NotFoundException({ code: 'FILE_NOT_FOUND', message: 'Aucune photo envoyée.' });
+    }
+    return { url: await this.photos.link(key), expiresInSeconds: PRIVATE_LINK_SECONDS };
+  }
+
+  /**
+   * R6: an admin accepts a change — the earnings go to the new number from
+   * now on, the new paper replaces the old one — or refuses it with a reason
+   * (the approved value stays). Never the admin's own application (R8).
+   */
+  async decideChange(
+    userId: string,
+    changeId: string,
+    adminUserId: string,
+    verdict: ChangeVerdict,
+  ): Promise<CourierChangeDecision> {
+    const user = await this.users.getById(userId);
+    if (!user || user.status === 'deleted') throw notFound();
+    if (userId === adminUserId) throw ownApplication();
+    let removed: string | null = null;
+    const decided = await this.prisma.$transaction(async (tx) => {
+      const application = await this.lockedRow(tx, userId);
+      const change = await pendingChangeToDecide(tx, 'courier', userId, changeId);
+      const topic = changeTopic(change.kind, change.newValue);
+      if (verdict.status === 'approved') {
+        const data: Prisma.CourierApplicationUpdateInput = { updatedAt: new Date() };
+        const mobileMoney = changeMobileMoney(change);
+        const key = changeValue(change.newValue, 'key');
+        if (mobileMoney) {
+          data.mobileMoneyProvider = mobileMoney.provider;
+          data.mobileMoneyNumber = mobileMoney.number;
+        } else if (isCourierDocumentKind(topic) && key) {
+          data[PHOTO_COLUMN[topic]] = key;
+          removed = application[PHOTO_COLUMN[topic]];
+        }
+        await tx.courierApplication.update({ where: { courierUserId: userId }, data });
+      } else {
+        removed = changeValue(change.newValue, 'key'); // the refused photo is not kept
+      }
+      await markChangeDecided(tx, changeId, adminUserId, verdict);
+      await this.audit.log(
+        {
+          actorUserId: adminUserId,
+          action: verdict.status === 'approved' ? 'CHANGE_APPROVED' : 'CHANGE_REJECTED',
+          entityType: 'courier_application',
+          entityId: userId,
+          metadata: {
+            changeId,
+            topic,
+            ...(verdict.status === 'rejected' ? { reason: verdict.reason } : {}),
+          },
+        },
+        tx,
+      );
+      return {
+        changeId,
+        kind: change.kind === 'mobile_money' ? ('mobile_money' as const) : ('document' as const),
+        topic,
+        status: verdict.status,
+      };
+    });
+    if (removed) await this.removeQuietly(removed);
+    return { ...decided, courierUserId: userId };
   }
 
   /** SPEC-022-07 R3: approved — the courier can go online. 409 `ALREADY_DECIDED` if not waiting (R7). */
@@ -364,12 +540,7 @@ export class CourierApplicationService {
     if (!user || user.status === 'deleted') throw notFound();
     // FEAT-022-Q17: never one's own application — like a role, which an admin
     // never changes on their own account (`UsersService.assertCanMutateRole`).
-    if (userId === adminUserId) {
-      throw new ForbiddenException({
-        code: 'FORBIDDEN',
-        message: 'Votre propre dossier doit être décidé par un autre administrateur.',
-      });
-    }
+    if (userId === adminUserId) throw ownApplication();
     await this.prisma.$transaction(async (tx) => {
       const application = await this.lockedRow(tx, userId);
       const status = this.statusOf(application);
@@ -521,4 +692,9 @@ export class CourierApplicationService {
       );
     }
   }
+}
+
+/** Photos change while the courier fills the application, and after the approval (for an admin, R6). */
+function photoCanChange(status: ApplicationStatus): boolean {
+  return applicationIsEditable(status) || status === 'approved';
 }

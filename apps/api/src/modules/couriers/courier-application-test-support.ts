@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import type { CourierApplication } from '@prisma/client';
 import type { AuditLogEntry, AuditService } from '../../common/audit/audit.service';
+import { changesTable } from '../../common/onboarding/application-changes-test-support';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { PhotoStorage } from '../../infra/storage/photo-storage';
 import type { NeighbourhoodsService } from '../geo/neighbourhoods.service';
@@ -92,6 +93,8 @@ export function courierWorld() {
   const applications = new Map<string, CourierApplication>();
   const users = new Map<string, UserRecord>();
   const audits: AuditLogEntry[] = [];
+  // FEAT-022 (SPEC-022-07 R6): changes after the approval.
+  const changes = changesTable();
   const stored: string[] = [];
   const removed: string[] = [];
   let nextKey = 0;
@@ -126,6 +129,21 @@ export function courierWorld() {
           return structuredClone(row);
         }),
       ),
+      // The names typed under « Autre » (SPEC-022-09 R3), as `groupBy` counts them.
+      groupBy: vi.fn(
+        later(() => {
+          const counts = new Map<string, number>();
+          for (const c of couriers.values()) {
+            if (c.neighbourhoodId === null && c.neighbourhoodOther !== null) {
+              counts.set(c.neighbourhoodOther, (counts.get(c.neighbourhoodOther) ?? 0) + 1);
+            }
+          }
+          return [...counts].map(([neighbourhoodOther, n]) => ({
+            neighbourhoodOther,
+            _count: { _all: n },
+          }));
+        }),
+      ),
     },
     courierApplication: {
       findUnique: vi.fn(
@@ -158,6 +176,7 @@ export function courierWorld() {
         ),
       ),
     },
+    applicationChange: changes.model,
     $executeRaw: vi.fn(later(() => 1)),
   };
 
@@ -167,6 +186,7 @@ export function courierWorld() {
       const before = {
         couriers: structuredClone([...couriers]),
         applications: structuredClone([...applications]),
+        changes: changes.snapshot(),
         audits: audits.length,
       };
       try {
@@ -176,6 +196,7 @@ export function courierWorld() {
         for (const [k, v] of before.couriers) couriers.set(k, v);
         applications.clear();
         for (const [k, v] of before.applications) applications.set(k, v);
+        changes.restore(before.changes);
         audits.splice(before.audits);
         throw err;
       }
@@ -247,5 +268,16 @@ export function courierWorld() {
     users.set(userId, userRecord(userId, options.user));
   }
 
-  return { service, couriers, applications, users, audits, stored, removed, photos, signedUp };
+  return {
+    service,
+    couriers,
+    applications,
+    changes,
+    users,
+    audits,
+    stored,
+    removed,
+    photos,
+    signedUp,
+  };
 }

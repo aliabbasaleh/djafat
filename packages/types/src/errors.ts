@@ -88,6 +88,8 @@ export const API_ERROR_CODES = [
   'ALREADY_DECIDED',
   /** FEAT-022 — an application not sent yet cannot be decided (409, SPEC-022-07 R7). */
   'APPLICATION_NOT_SUBMITTED',
+  /** FEAT-022 — no such change waiting for this application, or replaced by a newer one (404, SPEC-022-07 R6). */
+  'CHANGE_NOT_FOUND',
   /** FEAT-022 — a signed-up restaurant opens to customers only once approved (409, SPEC-022-03 R3). */
   'RESTAURANT_NOT_APPROVED',
   /** FEAT-022 — the server has no room left for photos; nothing was kept (507, SPEC-022-04). */

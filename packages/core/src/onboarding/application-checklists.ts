@@ -125,3 +125,26 @@ export function missingRestaurantSteps(facts: RestaurantApplicationFacts): Resta
   const done = restaurantStepsDone(facts);
   return RESTAURANT_STEPS.filter((step) => !done[step]);
 }
+
+/**
+ * SPEC-022-05 R1 (steps 3 and 4): the restaurant's photos. The logo and the
+ * cover are public (customers see them once validated, SPEC-022-04 R4); the
+ * registry (RCCM or NIF) and the owner's ID are private, like a courier's
+ * papers (R3).
+ */
+export const RESTAURANT_DOCUMENT_KINDS = ['logo', 'cover', 'registry', 'owner_id'] as const;
+export type RestaurantDocumentKind = (typeof RESTAURANT_DOCUMENT_KINDS)[number];
+
+export function isRestaurantDocumentKind(value: string): value is RestaurantDocumentKind {
+  return (RESTAURANT_DOCUMENT_KINDS as readonly string[]).includes(value);
+}
+
+/** Who may open the photo: anyone by its address, or its owner and DJAFAT by a signed link. */
+export function restaurantDocumentIsPublic(kind: RestaurantDocumentKind): boolean {
+  return kind === 'logo' || kind === 'cover';
+}
+
+/** The step a photo fills (SPEC-022-05 R1). */
+export function restaurantStepOfDocument(kind: RestaurantDocumentKind): RestaurantStep {
+  return restaurantDocumentIsPublic(kind) ? 'photos' : 'papers';
+}

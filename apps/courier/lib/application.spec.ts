@@ -33,6 +33,8 @@ function application(over: Partial<CourierApplication> = {}): CourierApplication
       { kind: 'plate', uploaded: false },
     ],
     mobileMoney: null,
+    // FEAT-022 part 3 (SPEC-022-07 R6): no change waiting.
+    pendingChanges: [],
     emergencyContact: null,
     rejectionReason: null,
     submittedAt: null,
