@@ -8,6 +8,13 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-25 — Sync S-051: new brand images, 0.28.1
+
+The user's new logo and icon in `djafat/`, the old « D » icons and the posters removed (no code used them; the
+apps' favicons unchanged). Verification: `git grep` for references, `check:hygiene`. Nothing new learned.
+
+---
+
 ## 2026-11-25 — Sync S-050: FEAT-022 part 3 (restaurants), 0.28.0
 
 The restaurant's four steps in its console, DJAFAT's decisions on restaurants, changes after approval

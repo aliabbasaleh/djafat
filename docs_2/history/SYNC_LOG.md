@@ -10,6 +10,17 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-051 — 2026-11-25 — new brand images (logo, icon), version 0.28.1
+
+**Our own commit** `50a8469` on `feat/inscription-restaurants` (PR #33), the user's image changes in `djafat/`
+committed at their request: `logo.png` replaced (2023×777), `icon.png` added (1254×1254), the four old « D »
+icons and the five posters removed. **Checked:** no code or document uses the removed files (`git grep`); the
+apps' favicons (`apps/*/src/app/icon.png`) are separate and unchanged; `check:hygiene` clean. **Added / Removed:**
+the images above. **Fixed / Changed:** none. **New findings:** none. **Not verified:** nothing to run — images
+only. The main checkout now sits on `feat/inscription-restaurants` (the top of the PR stack).
+
+---
+
 ## S-050 — 2026-11-25 — FEAT-022 part 3 (restaurants: four steps, decisions, changes after approval), version 0.28.0
 
 **Our own commits** `72d155d` to `4bebbc5` on `feat/inscription-restaurants` (above PR #32), described in
