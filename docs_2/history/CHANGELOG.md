@@ -8,6 +8,13 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-25 — Sync S-052: favicons from the new icon, FEAT-022 decisions confirmed, 0.28.2
+
+The three web apps' favicons come from the new icon; the user confirmed six FEAT-022 decisions (Q18–Q22, Q25).
+Verification: the running sites serve the new favicon; `verify:fast`. Nothing new learned.
+
+---
+
 ## 2026-11-25 — Sync S-051: new brand images, 0.28.1
 
 The user's new logo and icon in `djafat/`, the old « D » icons and the posters removed (no code used them; the

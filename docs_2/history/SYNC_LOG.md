@@ -10,6 +10,17 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-052 — 2026-11-25 — favicons from the new icon, FEAT-022 decisions confirmed, version 0.28.2
+
+**Our own commit** `0a78bdc` on `feat/inscription-restaurants` (PR #33). **Changed:** the favicons of the site,
+the admin console and the restaurant console (`apps/*/src/app/icon.png`) now come from the new DJAFAT icon
+(orange « D » on white, 512 px, 9 KB); the user confirmed FEAT-022-Q18 to Q22 and Q25, recorded as decided
+(`clarifications.md`, SPEC-022-05 v5). **Checked:** the three running sites serve the new file
+(`/icon.png`, 9018 bytes); `verify:fast` clean. **Added / Removed / Fixed / New findings:** none.
+**Not verified:** how browsers render the new favicon at 16–32 px (not looked at).
+
+---
+
 ## S-051 — 2026-11-25 — new brand images (logo, icon), version 0.28.1
 
 **Our own commit** `50a8469` on `feat/inscription-restaurants` (PR #33), the user's image changes in `djafat/`

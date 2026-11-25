@@ -5,8 +5,8 @@
 # Change these lines ONLY as the last step of an incremental audit sync (docs_2/README.md §3),
 # and name the sync below.
 # Commits that change only docs_2/ are never reported, so recording a review is silent.
-# Last sync: S-051 (2026-11-25)
-50a84699ee8988e31cdb75d138d864badae79311 HEAD
+# Last sync: S-052 (2026-11-25)
+0a78bdc2ee668f49afca3742d4d0c41e8ff36312 HEAD
 1ce673a6a350da7992f4a44c78b4fafa030d5aab origin/feat/equipe-connexion-email
 262b8cfb7d8b4d67584d6b5bca64d8eb217eb726 origin/ci/cheaper-runs
 c6e5ac10237499db23446f09bd2f20d952d5dea2 origin/main

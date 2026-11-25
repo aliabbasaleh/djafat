@@ -3,13 +3,13 @@
 **The single source of truth for where DJAFAT stands.** Update it with every meaningful change
 (rules in [`README.md`](README.md)). Details live in the linked documents; this page points.
 
-|                        |                                                                                                                                                                                                                                                              |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Last updated**       | 2026-11-21                                                                                                                                                                                                                                                   |
-| **Branch described**   | `main` @ `afaa7c2` (DJAFAT 0.23.4) — pull requests #13 to #24 merged on 2026-11-18 _(sync S-034)_                                                                                                                                                            |
-| **Evidence collected** | 2026-11-10 for the old `main`; 2026-11-13 end-to-end run of the code now on `main`; hosted CI                                                                                                                                                                |
-| **Last synced**        | S-051, 2026-11-25 — `main` is `c6e5ac1` (0.24.5). Open: PR #29, #28 (FEAT-021), #31 (FEAT-022 parts 1-2), #32 (FEAT-024 + part 4) and, above it, #33 (FEAT-022 part 3 + new brand images, 0.28.1; to merge with #32). GitHub's checks do not start (billing) |
-| **Updated by**         | Initial full audit; syncs S-001 to S-034                                                                                                                                                                                                                     |
+|                        |                                                                                                                                                                                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Last updated**       | 2026-11-21                                                                                                                                                                                                                                     |
+| **Branch described**   | `main` @ `afaa7c2` (DJAFAT 0.23.4) — pull requests #13 to #24 merged on 2026-11-18 _(sync S-034)_                                                                                                                                              |
+| **Evidence collected** | 2026-11-10 for the old `main`; 2026-11-13 end-to-end run of the code now on `main`; hosted CI                                                                                                                                                  |
+| **Last synced**        | S-052, 2026-11-25 — `main` is `c6e5ac1` (0.24.5). Open: PR #29, #28 (FEAT-021), #31 (FEAT-022 parts 1-2), #32 (FEAT-024 + part 4) and, above it, #33 (FEAT-022 part 3, brand images, favicons, 0.28.2). GitHub's checks do not start (billing) |
+| **Updated by**         | Initial full audit; syncs S-001 to S-034                                                                                                                                                                                                       |
 
 ---
 
