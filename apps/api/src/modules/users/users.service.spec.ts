@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { Role } from '@djafat/types';
 import type { AuditService } from '../../common/audit/audit.service';
+import type { PrismaService } from '../../infra/prisma/prisma.service';
 import { UsersService } from './users.service';
 import { makeUsersFakeDb, seedUser } from './users-test-support';
 
@@ -74,6 +76,27 @@ describe('UsersService.grantRole / revokeRole (Bloc 9, docs/30 §role-management
 
     await expect(
       service.grantRole(actor, target.id, 'restaurant_staff', RESTAURANT_B),
+    ).rejects.toMatchObject({ response: { code: 'VALIDATION_ERROR' } });
+  });
+
+  // FEAT-022 part 3 review, round 2 (R2-3) — FEAT-022-Q25, migration 0028.
+  it('one account, one restaurant: an owner of A is never made staff of B, nor the reverse; both roles at A are fine', async () => {
+    const { service, users } = buildService();
+    const owner = seedUser(users);
+    const staff = seedUser(users);
+    const actor = actorOf('super_admin');
+
+    await service.grantRole(actor, owner.id, 'restaurant_owner', RESTAURANT_A);
+    await expect(
+      service.grantRole(actor, owner.id, 'restaurant_staff', RESTAURANT_B),
+    ).rejects.toMatchObject({ response: { code: 'VALIDATION_ERROR' } });
+    await expect(
+      service.grantRole(actor, owner.id, 'restaurant_staff', RESTAURANT_A),
+    ).resolves.toEqual({ granted: true });
+
+    await service.grantRole(actor, staff.id, 'restaurant_staff', RESTAURANT_A);
+    await expect(
+      service.grantRole(actor, staff.id, 'restaurant_owner', RESTAURANT_B),
     ).rejects.toMatchObject({ response: { code: 'VALIDATION_ERROR' } });
   });
 
@@ -397,5 +420,70 @@ describe('UsersService.searchUsers (Bloc 9, docs/30 §admin-api)', () => {
     const result = await service.searchUsers(undefined, 999_999, 20);
     expect(result.items).toEqual([]);
     expect(result.total).toBe(1); // the real total — pagination metadata stays honest even on an empty page
+  });
+});
+
+// FEAT-022 — review of parts 1-2, finding 6 (docs/features/FEAT-022-inscription-par-type-de-compte).
+describe('createRegisteredCustomer — a collision names only what is really taken', () => {
+  const INPUT = {
+    fullName: 'Fatimé Hassan',
+    phone: '+23566120400',
+    email: 'fatime@example.td',
+    passwordHash: 'hash',
+  };
+  const row = {
+    id: 'u-holder',
+    phone: INPUT.phone,
+    phoneVerifiedAt: null,
+    emailVerifiedAt: null,
+    passwordHash: null,
+    email: INPUT.email,
+    fullName: 'Someone',
+    countryId: null,
+    locale: 'fr',
+    status: 'active',
+    createdAt: new Date(),
+  };
+
+  function service(taken: { phone?: boolean; email?: boolean }) {
+    const collision = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: 'test',
+      meta: { target: ['slug'] },
+    });
+    const prisma = {
+      $transaction: vi.fn(() => Promise.reject(collision)),
+      user: {
+        findFirst: vi.fn(({ where }: { where: { id?: string; phone?: string; email?: string } }) =>
+          Promise.resolve(
+            where.id ||
+              (where.phone !== undefined && taken.phone) ||
+              (where.email !== undefined && taken.email)
+              ? row
+              : null,
+          ),
+        ),
+      },
+    };
+    const audit = { log: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
+    return { users: new UsersService(prisma as unknown as PrismaService, audit), collision };
+  }
+
+  it('SPEC-022-03-SC04 — another key (what the sign-up created with the account) is passed on, never « e-mail déjà utilisé »', async () => {
+    const { users, collision } = service({});
+    await expect(users.createRegisteredCustomer(INPUT)).rejects.toBe(collision);
+  });
+
+  it('a number or an address really taken keeps its own answer', async () => {
+    await expect(
+      service({ phone: true }).users.createRegisteredCustomer(INPUT),
+    ).rejects.toMatchObject({
+      response: { code: 'PHONE_ALREADY_USED' },
+    });
+    await expect(
+      service({ email: true }).users.createRegisteredCustomer(INPUT),
+    ).rejects.toMatchObject({
+      response: { code: 'EMAIL_ALREADY_USED' },
+    });
   });
 });

@@ -1,3 +1,5 @@
+import type { TeamSessionKeeper } from '@djafat/sdk';
+
 /**
  * Minimal client-side session storage for the admin app (Bloc 9, docs/30
  * §admin-web) — same bounded approach `apps/web` took in Bloc 4 (docs/22
@@ -123,3 +125,42 @@ export function isFinance(user: StoredAdminUser | null): boolean {
 export function isFullAdmin(user: StoredAdminUser | null): boolean {
   return !!user && (user.roles.includes('admin') || user.roles.includes('super_admin'));
 }
+
+/** FEAT-021 (SPEC-021-03 R3): this console's remembered device — `clearSession` leaves it. */
+const DEVICE_KEY = 'djafat.admin.device';
+
+export function getDeviceToken(): string | null {
+  if (!isBrowser()) return null;
+  try {
+    return window.localStorage.getItem(DEVICE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setDeviceToken(token: string): void {
+  if (!isBrowser()) return;
+  try {
+    window.localStorage.setItem(DEVICE_KEY, token);
+  } catch {
+    // Ignore: the next login on this browser simply asks for a code again.
+  }
+}
+
+/**
+ * FEAT-021 (SPEC-021-02 R3): what the login screen does with a session — admin
+ * roles only. A refused account also drops the session this browser held, as
+ * this console's login always did.
+ */
+export const adminSessionKeeper: TeamSessionKeeper = {
+  hasAccess: (user) => hasAdminAccess(user),
+  deniedMessage: 'Ce compte n’a pas accès à l’administration DJAFAT.',
+  clearSession,
+  saveSession: ({ access, refresh, user }) =>
+    setSession({
+      access,
+      refresh,
+      user: { id: user.id, phone: user.phone, fullName: user.fullName, roles: user.roles },
+    }),
+  saveDeviceToken: setDeviceToken,
+};

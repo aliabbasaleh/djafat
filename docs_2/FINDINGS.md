@@ -11,6 +11,7 @@ these IDs instead of repeating the detail.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
 - **Counts:** 3 Critical · 11 High · 22 Medium · 13 Low = 49 open findings, plus 21 resolved
   _(updated 2026-11-18, sync S-034: `TEST-05`, `ADM-01`, `ADM-02`, `ORD-01`, `PAY-04`, `ORD-02`, `ADM-03`, `SEC-02` and `OPS-05` resolved on `main`)_
+  _(updated 2026-11-25, sync S-050: new `SEC-09` and `SEC-10`, found by review and fixed on `feat/inscription-restaurants` before any merge — never on `main`, not counted as open)_
   _(updated 2026-11-18, sync S-030: new `OPS-06`; sync S-032: `TEST-04` and `DOC-03` resolved on `main`)_
   _(updated 2026-11-14, sync S-008: new `DOC-03`; 2026-11-17, sync S-011: new `TEST-04`; sync
   S-013: `PAY-01`, `PAY-03`, `SEC-01`, `FE-03` and `PAY-05` resolved on `main`; sync S-014: new `TEST-05`)_
@@ -77,6 +78,9 @@ verified.
 | [TEST-03](#test-03)   | Worker integration tests fail on a seeded database and are not in CI                        | Broken              | Medium   | RUN      |
 | [ARCH-02](#arch-02)   | Dispatch logic exists twice (API and worker)                                                | Needs Improvement   | Medium   | CODE     |
 | [AUTH-02](#auth-02)   | No profile update, phone change or account deletion                                         | Not Implemented     | Medium   | CODE     |
+| [AUTH-03](#auth-03)   | A malformed phone with a valid password crashed the registration (500)                      | Broken              | Medium   | RUN      |
+| [SEC-09](#sec-09)     | A restaurant owner could get another restaurant's logo or cover deleted                     | Broken              | High     | CODE     |
+| [SEC-10](#sec-10)     | A restaurant's staff member, owner of another, could reach the first one's papers           | Broken              | High     | CODE     |
 | [NOTIF-01](#notif-01) | Notifications are stored but never shown or pushed                                          | Partially Completed | Medium   | LIVE     |
 | [STOR-01](#stor-01)   | No file upload: object storage is a stub                                                    | Not Implemented     | Medium   | CODE     |
 | [OBS-01](#obs-01)     | No error tracking, metrics or tracing; request IDs are not propagated                       | Not Implemented     | Medium   | LIVE     |
@@ -100,6 +104,7 @@ verified.
 | [FE-07](#fe-07)       | Typed routes are configured but never checked                                               | Broken              | Low      | RUN      |
 | [PAY-09](#pay-09)     | Payment idempotency scope is global; attempt counter never moves                            | Needs Improvement   | Low      | CODE     |
 | [TEST-05](#test-05)   | The mobile typecheck is silenced by a known-failure entry                                   | Needs Improvement   | Low      | CODE     |
+| [TEST-06](#test-06)   | A delivery-code unit test fails about once in a thousand runs                               | Needs Improvement   | Low      | RUN      |
 
 ---
 
@@ -742,6 +747,9 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Sync S-021 re-check (2026-11-18), CODE:** unchanged in `infra/docker-compose.yml`:
   `postgis/postgis:16-3.5` has no ARM64 image and MinIO is pinned to `RELEASE.2024-12-18…` (which
   the owner reports can no longer be pulled). Not re-run on a clean machine.
+- **Sync S-047 note (2026-11-23), CLAIM:** a teammate re-tested the MinIO image on quay.io **and** Docker Hub:
+  still refused (roadmap 0.24.5, `93252b8`). FEAT-022 (local branch) keeps photos on the server disk instead
+  (FEAT-022-Q01), so photos no longer wait for MinIO; the development compose file is unchanged. Open.
 
 ### OPS-02
 
@@ -796,6 +804,10 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   Prisma "up to date". Health check tested against a fake ntfy receiver and simulated failures. Not done:
   installing the cron jobs on the server, an off-server backup copy. End of the trial server: see `OPS-06`.
 - **Sync S-034 (2026-11-18), merges:** The scripts are on `main` since #22 (`3e92261`); installing the cron jobs on the server and an off-server backup copy are still to do. The end of the trial server is `OPS-06`.
+- **Sync S-048 note (2026-11-24), CODE, branch only (FEAT-022, PR to come):** the nightly backup also
+  archives the photos volume (under a temporary name, then renamed) and reports a missing volume;
+  `restore-check.sh` fails when a photo referenced by the restored database is missing from the archive of
+  the same night. Syntax-checked only; not run on the server. Status unchanged.
 
 ### SEC-02
 
@@ -1158,6 +1170,50 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Fix:** one implementation — shared SQL in a package, or the worker as the only dispatcher.
 - **Verify:** a single source for the candidate query.
 
+### AUTH-03
+
+**A malformed phone with a valid password crashed the registration (500)** · Broken · Medium · RUN · Status: fixed on `feat/inscription-ecrans` (`b9e7ef2` and before, PR to come; not on `main`) _(added 2026-11-24, sync S-049)_
+
+- **Where:** `apps/api/src/modules/auth/dto/register.schema.ts` (FEAT-020): the personal-password rule
+  ran in a `superRefine` even when the phone (or name) had failed its own check, and received zod's
+  `NEVER` instead of a string.
+- **Observed:** a unit test of `RegisterSchema.safeParse({ …, phone: '12' })` with a valid password threw
+  `TypeError: (context.phone ?? "").replace is not a function` on the code before the fix — the API
+  would answer 500 instead of 422 on the phone field.
+- **Fix (branch):** only the fields that passed their check reach the rule; regression test at the end of
+  `register.schema.spec.ts`.
+- **Verify:** the test passes on the branch; after the merge, `POST /auth/register` with `phone: "12"`
+  and a valid password answers 422 on `phone`.
+
+### SEC-09
+
+**A restaurant owner could get another restaurant's logo or cover deleted** · Broken · High · CODE · Status: fixed on `feat/inscription-restaurants` (`6163d15`, never pushed before the fix; not on `main`) _(added 2026-11-25, sync S-050)_
+
+- **Where:** `apps/api/src/modules/catalog/restaurant-application.service.ts` (`storePublicPhoto`, FEAT-022
+  part 3 commit `72d155d`): the replaced photo was the `public-<uuid>` key read from the previous
+  `logoUrl`/`coverUrl`, and an owner could still type any address there (`PATCH /restaurants/:id`).
+- **Scenario:** an owner sets its logo address to another restaurant's photo, then uploads a logo: the other
+  restaurant's file was deleted. Found by the independent review (round 1).
+- **Fix (branch):** an owner can no longer send `logoUrl`/`coverUrl` (403, FEAT-022-Q20); a replaced photo is
+  deleted only when no restaurant still shows it; tests in `restaurant-application.service.spec.ts` and
+  `restaurants-management.service.spec.ts`, and in integration.
+- **Verify:** after the merge, an owner's `PATCH /restaurants/:id` with a `logoUrl` answers 403.
+
+### SEC-10
+
+**A restaurant's staff member, owner of another, could reach the first one's papers** · Broken · High · CODE · Status: fixed on `feat/inscription-restaurants` (`6163d15`, `957be96`; not on `main`) _(added 2026-11-25, sync S-050)_
+
+- **Where:** `UsersService.getRestaurantScope` returned the first owner-or-staff grant (`LIMIT 1`, no order);
+  the owner-only routes of FEAT-022 part 3 used it, and « Inscrire mon restaurant » (part 4) let a staff
+  member of A become owner of B.
+- **Scenario:** that account could be resolved to A and read A's Mobile Money number and papers, or change
+  them. Found by the independent review (round 1).
+- **Fix (branch):** the owner routes use the owner grant only (`getOwnedRestaurantScope`);
+  `getRestaurantScope` is ordered, owner first; « Inscrire mon restaurant » is refused to a staff account
+  (409, SPEC-022-08 v5, FEAT-022-Q25), and so are an admin grant of a restaurant role at a second
+  restaurant and an owner's second `POST /restaurants` (`957be96`); unit and integration tests.
+- **Verify:** after the merge, a staff account's `POST /me/roles/restaurant` answers 409.
+
 ### AUTH-02
 
 **No profile update, phone change or account deletion** · Not Implemented · Medium · CODE
@@ -1184,6 +1240,15 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Consequence:** logos, covers and product photos are free-text URLs typed into forms.
 - **Fix:** S3-compatible adapter, signed uploads, image variants.
 - **Verify:** upload a product photo from the restaurant console.
+- **Sync S-047 note (2026-11-23), CODE + RUN, branch only (`wip/feat-022-part1`, not pushed):** FEAT-022 adds a
+  disk adapter behind `ObjectStoragePort` (`FilesystemObjectStorage`), `GET /files/:key` (private files only by a
+  5-minute HMAC link), and the courier's photo uploads (body = the photo, 5 MB, type from its bytes, metadata
+  removed); tested in integration and in a browser. Restaurant logos and covers come with FEAT-022 part 3; product
+  photos are not planned. Status unchanged until merged: Not Implemented on `main`.
+- **Sync S-050 note (2026-11-25), CODE + RUN, branch only (`feat/inscription-restaurants`, PR to come):** restaurant
+  logos and covers are uploaded from the restaurant console (`POST /restaurants/me/photos/:kind`, also for a
+  restaurant created by the team), shrunk in the browser above 4 MB; an owner can no longer type their address
+  (`SEC-09`). Product photos still not planned. Status unchanged until merged.
 
 ### OBS-01
 
@@ -1355,6 +1420,21 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 ### TEST-05
 
 **The mobile typecheck is silenced by a known-failure entry** · Needs Improvement · Low · CODE · Status: Resolved on `main` (pull request #17, merged as `0ab2644` on 2026-11-18, sync S-034; `main` @ `afaa7c2` is identical to the verified tip of the stack); fix present on `fix/mobile-typed-routes` (version 0.21.8), verified there (sync S-025) _(added 2026-11-17, sync S-014; on `main` since pull request #8, `57120ed`, sync S-019)_ — `cabf058` on `feat/welcome-greeting` records `@djafat/mobile#typecheck` in `scripts/pipeline/baselines/known-failures.json` as pre-existing ("expo-router's generated route-literal type is stale…"). On `main` it passes (RUN, 2026-11-17: `turbo run typecheck --filter=@djafat/mobile`, and in every `verify:fast` run that day; CI green): it fails only where Expo has generated its typed routes (`.expo/types`, gitignored), against calls such as `router.push(`/orders/${id}`)`. Once the entry is in, any real mobile type error is reported as pre-existing on every machine. Fix: write those calls in typed-route form (or regenerate the types) and drop the entry. Verify: with `.expo/types` generated, `pnpm --filter @djafat/mobile typecheck` passes. _Sync S-025 note (2026-11-18), RUN: reproduced (Expo's dev server generated `.expo/types`; the type check then failed with 9 errors, all calls cast to `` `/${string}` ``). The nine calls now use typed-route objects (`{ pathname, params }`), and login only follows an in-app `redirect` (`/(app)/…`). The type check passes with the generated types (0 errors) and without them, as in CI (0 errors); the `@djafat/mobile#typecheck`entry is removed from`known-failures.json`, together with the stale `@djafat/mobile#build`and`@djafat/courier#build`entries (both apps build:`expo export` succeeded for each). Navigation not run on a device.\_
+
+### TEST-06
+
+**A delivery-code unit test fails about once in a thousand runs** · Needs Improvement · Low · RUN · Status: Open _(added 2026-11-24, sync S-048)_
+
+- **Where:** `apps/api/src/modules/deliveries/delivery-code-retrieval.spec.ts:68`,
+  `expect(stored.valueHash).not.toContain(issued)`.
+- **Observed:** `verify --full` of 2026-11-24 at `230d5eb` (FEAT-022 branch, which does not touch
+  `deliveries`): « Expected: "6731" », the stored hash `9579fed16c7fe6731713…` contained the random 4-digit code
+  by chance. A 64-character hex hash contains a given 4-digit string in roughly 1 run in 1,000; the next run
+  passed.
+- **Why it matters:** a red run without any defect, on a laptop or in CI (Linux and Windows).
+- **Fix:** assert what the test means — the stored value is a hash (64 hex characters) and never the code —
+  instead of searching the hash for the code's digits; keep the check on the encrypted reference.
+- **Verify:** the spec passes repeatedly (e.g. 5,000 runs of that test) without a failure.
 
 ---
 

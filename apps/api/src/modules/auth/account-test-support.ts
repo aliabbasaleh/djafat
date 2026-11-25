@@ -202,6 +202,8 @@ export function account(over: Partial<Account> = {}): Account {
 /** `tx`: what `createRegisteredCustomer`'s in-transaction step receives (the registrations fake). */
 export function fakeUsers(initial: Account[] = [], options: { tx?: unknown } = {}) {
   const accounts: Account[] = [...initial];
+  /** FEAT-022: roles granted inside the registration's transaction. */
+  const grants: Array<{ userId: string; role: string; restaurantId: string | null }> = [];
   const live = () => accounts.filter((a) => !a.deleted);
   const record = (a: Account): UserRecord => ({ ...a, hasPassword: a.passwordHash !== null });
   const find = (pred: (a: Account) => boolean) => {
@@ -210,6 +212,12 @@ export function fakeUsers(initial: Account[] = [], options: { tx?: unknown } = {
   };
   return {
     accounts,
+    grants,
+    grantRoleWithin: vi.fn(
+      later((_tx: unknown, userId: string, grant: { role: string; restaurantId?: string }) => {
+        grants.push({ userId, role: grant.role, restaurantId: grant.restaurantId ?? null });
+      }),
+    ),
     findByPhone: vi.fn(later((phone: string) => find((x) => x.phone === phone))),
     findByEmail: vi.fn(later((email: string) => find((x) => x.email === email))),
     findByVerifiedEmail: vi.fn(
@@ -241,6 +249,7 @@ export function fakeUsers(initial: Account[] = [], options: { tx?: unknown } = {
         async (
           input: { fullName: string; phone: string; email: string; passwordHash: string },
           beforeCreate?: (tx: never) => Promise<void>,
+          afterCreate?: (tx: never, userId: string) => Promise<void>,
         ) => {
           if (beforeCreate) await beforeCreate(options.tx as never);
           if (live().some((x) => x.phone === input.phone)) {
@@ -259,6 +268,17 @@ export function fakeUsers(initial: Account[] = [], options: { tx?: unknown } = {
             passwordHash: input.passwordHash,
           });
           accounts.push(created);
+          // One transaction (FEAT-022): if the courier or restaurant cannot be created, nor is the account.
+          if (afterCreate) {
+            const grantsBefore = grants.length;
+            try {
+              await afterCreate(options.tx as never, created.id);
+            } catch (err) {
+              accounts.splice(accounts.indexOf(created), 1);
+              grants.splice(grantsBefore);
+              throw err;
+            }
+          }
           return { userId: created.id };
         },
       ),

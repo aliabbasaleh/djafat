@@ -93,6 +93,20 @@ export class CouriersService implements CourierPort {
         message: 'This courier account is suspended.',
       });
     }
+    if (status === 'online') {
+      // FEAT-022 (SPEC-022-06 R5): a courier who signed up waits for DJAFAT's approval; one
+      // created by the team has no application and works as before.
+      const application = await this.prisma.courierApplication.findUnique({
+        where: { courierUserId: userId },
+        select: { status: true },
+      });
+      if (application && application.status !== 'approved') {
+        throw new ConflictException({
+          code: 'COURIER_NOT_APPROVED',
+          message: "Votre dossier n'est pas encore validé par DJAFAT.",
+        });
+      }
+    }
     if (status === 'offline' && current.activeDeliveryId) {
       throw new ConflictException({
         code: 'DELIVERY_INVALID_STATE',

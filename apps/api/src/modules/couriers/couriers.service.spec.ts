@@ -21,8 +21,15 @@ interface CourierRow {
 /** A minimal fake sufficient for pure validation + write-path unit tests (no concurrency here — see deliveries-assignment-race.spec.ts for lockAndClaim/release under real parallelism). */
 function fakePrisma() {
   const couriers: CourierRow[] = [];
+  /** FEAT-022: applications by courier; none = a courier created by the team. */
+  const applications = new Map<string, { status: string }>();
   const rawCalls: Array<{ text: string; values: unknown[] }> = [];
   const db = {
+    courierApplication: {
+      findUnique: vi.fn((args: { where: { courierUserId: string } }) =>
+        Promise.resolve(applications.get(args.where.courierUserId) ?? null),
+      ),
+    },
     courier: {
       upsert: vi.fn(
         (args: { where: { userId: string }; create: { userId: string; status: string } }) => {
@@ -104,7 +111,7 @@ function fakePrisma() {
       return Promise.resolve(1);
     }),
   };
-  return { db, couriers, rawCalls };
+  return { db, couriers, rawCalls, applications };
 }
 
 describe('CouriersService.setStatus (docs/25 §4, §16)', () => {
@@ -153,6 +160,40 @@ describe('CouriersService.setStatus (docs/25 §4, §16)', () => {
     await expect(service.setStatus('c1', 'online')).rejects.toMatchObject({
       response: { code: 'COURIER_SUSPENDED' },
     });
+  });
+
+  // SPEC-022-02-SC04, SPEC-022-06-SC04 (FEAT-022)
+  it('SPEC-022-06-SC04 — « En ligne » is refused before the approval, accepted after; a courier without an application goes online as before', async () => {
+    const { db, couriers, applications } = fakePrisma();
+    const service = new CouriersService(db as never, fakePlatform());
+
+    applications.set('signed-up', { status: 'pending_review' });
+    await expect(service.setStatus('signed-up', 'online')).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'COURIER_NOT_APPROVED' },
+    });
+    expect(couriers.find((c) => c.userId === 'signed-up')?.status).toBe('offline');
+
+    applications.set('signed-up', { status: 'approved' });
+    await service.setStatus('signed-up', 'online');
+    expect(couriers.find((c) => c.userId === 'signed-up')?.status).toBe('online');
+
+    await service.setStatus('team-courier', 'online'); // no application: created by the team
+    expect(couriers.find((c) => c.userId === 'team-courier')?.status).toBe('online');
+  });
+
+  // SPEC-022-02-SC04 (FEAT-022)
+  it('SPEC-022-02-SC04 — a courier « to complete » or refused never goes online; going offline stays possible', async () => {
+    const { db, couriers, applications } = fakePrisma();
+    const service = new CouriersService(db as never, fakePlatform());
+    for (const status of ['to_complete', 'rejected']) {
+      applications.set(`c-${status}`, { status });
+      await expect(service.setStatus(`c-${status}`, 'online')).rejects.toMatchObject({
+        response: { code: 'COURIER_NOT_APPROVED' },
+      });
+      await service.setStatus(`c-${status}`, 'offline');
+      expect(couriers.find((c) => c.userId === `c-${status}`)?.status).toBe('offline');
+    }
   });
 
   it('creates the profile lazily on first status write (idempotent)', async () => {

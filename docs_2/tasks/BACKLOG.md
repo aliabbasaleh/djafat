@@ -414,7 +414,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-503 · File upload and image handling
 
-- **Area:** `apps/api` storage, restaurant console · **Priority:** Medium · **Why:** [`STOR-01`](../FINDINGS.md#stor-01) · **Status:** Not started
+- **Area:** `apps/api` storage, restaurant console · **Priority:** Medium · **Why:** [`STOR-01`](../FINDINGS.md#stor-01) · **Status:** In progress on a local branch (FEAT-022: disk storage, private photo uploads; logos in part 3) _(updated 2026-11-23, sync S-047)_
 - **Test:** upload a product photo.
 
 ### T-504 · Pricing: zones or distance, taxes, promotions
@@ -493,6 +493,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 ### T-611 · Customer accounts by e-mail and password (FEAT-020) _(added 2026-11-21, sync S-035)_
 
 - **Area:** `auth`, `users`, migration 0040, `@djafat/sdk`, `apps/web`, `apps/mobile` · **Priority:** High · **Why:** the user's request of 2026-11-21 (`docs/features/FEAT-020-compte-email-mot-de-passe`) · **Status:** Implemented, verified on the branch `feat/compte-email-password` (unit, real PostgreSQL + Redis integration, browser run) — not on `main`; _(updated 2026-11-22, sync S-037)_ a real registration code reached DJAFAT's Gmail inbox (SPEC-020-01-SC06, local `.env`); _(updated 2026-11-22, sync S-039)_ reviewed three times, corrected, `verify --full` without new failure — pull request next _(updated 2026-11-23, sync S-041)_ **merged into `main` by PR #27 (0.24.4) without GitHub's checks** — the owner account's Actions minutes are used up, merged at the user's request; re-run CI on `main` once billing is fixed; the server is not updated yet.
+- **Sync S-047 (2026-11-23):** done in production — merged in 0.24.4; the roadmap (0.24.5, `93252b8`) says the real Gmail is set on the server and a real code arrived (CLAIM); our registration request to `api.djafat.com` was accepted the same day (LIVE) and the user confirmed the mailbox receives it. Not moved to the completed list: the receipt was not seen by us.
 - **Done when:** merged into `main`; the official Gmail address and its Google app password set in the server's `.env.prod` (`EMAIL_PROVIDER=smtp`, `SMTP_USER`, `SMTP_PASSWORD`); a real registration code received in a real mailbox (SPEC-020-01-SC06, only the user holds the password).
 - **Test:** `pnpm --filter @djafat/api test:int -- test/customer-account.int.spec.ts`; on the server, register with a real address.
 
@@ -501,6 +502,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Area:** `apps/mobile`, `auth` · **Priority:** Medium · **Why:** FEAT-020-Q09, Q21, Q23 · **Status:** Not started
 - **Done when:** a « Mon profil » screen in the app (password, number); a customer can change a mistyped number; deciding whether « Se déconnecter partout » also forgets remembered devices.
 - **Added from the FEAT-020 review** _(2026-11-22, sync S-039)_: an operational alert when an account e-mail cannot leave (codes now leave in the background); hide « Mot de passe oublié ? » when `/auth/methods` says e-mail is unavailable; decide how an account without a password guards its e-mail and first password against a stolen session; watch no-shows of new e-mail accounts (cash on delivery at T1).
+- **Added from FEAT-021** _(2026-11-23, sync S-043)_: a step-up code (MFA) before changing the e-mail or the password for roles enrolled in MFA (FEAT-021-Q11, deferred by the user); the contrast of « Bientôt disponible » (1.86:1, shared style of FEAT-020).
 - **Test:** each with its own feature and specs.
 
 ### T-613 · Deploy the CORS fix _(added 2026-11-21, sync S-035)_
@@ -509,4 +511,22 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Done when:** `https://api.<domain>` answers a `PATCH` preflight with PUT, PATCH and DELETE allowed.
 - **Test:** `curl -s -o /dev/null -D - -X OPTIONS -H 'Origin: https://<domain>' -H 'Access-Control-Request-Method: PATCH' https://api.<domain>/v1/me`.
 
-Last updated: 2026-11-23 (sync S-041)
+### T-614 · Team log in by e-mail and password; SMS off (FEAT-021) _(added 2026-11-22, sync S-038)_
+
+- **Area:** `apps/admin`, `apps/restaurant`, `apps/courier`, `packages/config`, `auth` · **Priority:** High · **Why:** the user's decision of 2026-11-22 to switch SMS off until DJAFAT has an API (codes today land in a test box on the server); the three team apps only accept a phone code (`docs/features/FEAT-021-equipe-connexion-email`) · **Status:** Implemented and reviewed twice on `feat/equipe-connexion-email` (0.25.0), verified locally (unit, browser screenshots, full verify) — pull request to merge; then switch SMS off on the server (`infra/deploy/README.md` §4) _(updated 2026-11-23, sync S-043)_
+- **Done when:** the three team apps log in by e-mail and password (code by e-mail on a new device); the API starts in production with `SMS_PROVIDER=disabled` when e-mail is configured; the server runs with SMS off.
+- **Test:** the FEAT-021 specs' tests; on the server, log in to each app with an e-mail and password.
+
+### T-615 · Sign-up as customer, courier or restaurant, validated by DJAFAT (FEAT-022) _(added 2026-11-22, sync S-038)_
+
+- **Area:** `auth`, `users`, `catalog`, `couriers`, `admin`, `notifications`, the four front ends · **Priority:** High · **Why:** the user's request of 2026-11-22 (`docs/features/FEAT-022-inscription-par-type-de-compte`) · **Status:** Confirmed by the user, specs to write; needs T-614
+- **Done when:** a courier and a restaurant sign up on their own, complete their profile in their app, and only work after an admin approves them; document photos are private.
+- **Test:** the FEAT-022 specs' tests.
+
+### T-616 · Free WhatsApp login: the customer sends the code (FEAT-023) _(added 2026-11-22, sync S-038)_
+
+- **Area:** `auth` (WhatsApp webhook), web and mobile login · **Priority:** Medium · **Why:** Meta charges every business-sent message since 2026-10-01, including FEAT-008's reply with the code; customer-sent messages stay free (`docs/features/FEAT-023-whatsapp-gratuit`) · **Status:** Confirmed by the user, specs to write; switched on only once DJAFAT's number is on Meta's WhatsApp Cloud API
+- **Done when:** a customer logs in by sending the displayed code from WhatsApp, and DJAFAT sends no WhatsApp message.
+- **Test:** the FEAT-023 specs' tests.
+
+Last updated: 2026-11-23 (sync S-043)

@@ -1,9 +1,12 @@
 import Constants from 'expo-constants';
-import { createApiClient, type RenewedTokens } from '@djafat/sdk';
+import { createApiClient, signupUrl, type RenewedTokens } from '@djafat/sdk';
 
 const apiBaseUrl =
   (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl ??
   'http://localhost:3001/v1';
+
+/** FEAT-022 (SPEC-022-01 R6): the site's courier sign-up form, found from the API's address. */
+export const COURIER_SIGNUP_URL = signupUrl(apiBaseUrl, 'courier');
 
 /**
  * A module-level mutable slot, not React state: the `ApiClient` singleton is

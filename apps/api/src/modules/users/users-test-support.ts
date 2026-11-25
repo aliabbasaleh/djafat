@@ -125,6 +125,9 @@ export function makeUsersFakeDb() {
     $executeRaw: vi.fn((strings: TemplateStringsArray, ...values: unknown[]): Promise<number> => {
       const text = rawText(strings);
 
+      // FEAT-022: the per-account lock of a role grant (one caller per test: a no-op).
+      if (text.includes('pg_advisory_xact_lock')) return Promise.resolve(1);
+
       if (text.includes('INSERT INTO user_roles')) {
         const [userId, role, scopeRestaurantId] = values as [string, string, string | null];
         const exactMatch = roles.find(
@@ -169,6 +172,22 @@ export function makeUsersFakeDb() {
     $queryRaw: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
       const text = rawText(strings);
 
+      // FEAT-022 (FEAT-022-Q25): a restaurant role held at ANOTHER restaurant.
+      if (text.includes('AS other FROM user_roles')) {
+        const [userId, scopeRestaurantId] = values as [string, string | null];
+        return Promise.resolve(
+          roles
+            .filter(
+              (r) =>
+                r.userId === userId &&
+                (r.role === 'restaurant_owner' || r.role === 'restaurant_staff') &&
+                r.scopeRestaurantId !== null &&
+                r.scopeRestaurantId !== scopeRestaurantId,
+            )
+            .slice(0, 1)
+            .map((r) => ({ other: r.scopeRestaurantId })),
+        );
+      }
       if (text.includes('SELECT role, scope_restaurant_id FROM user_roles')) {
         const [userId] = values as [string];
         return Promise.resolve(

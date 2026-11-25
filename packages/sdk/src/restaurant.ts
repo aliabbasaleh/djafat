@@ -1,6 +1,7 @@
 import type { MoneyJson, Role } from '@djafat/types';
 import type { ApiHttp } from './http.js';
 import type { OwnerBalance, Paginated } from './admin.js';
+import { createRestaurantApplicationClient } from './applications.js';
 
 /**
  * Bloc 10 — `apps/restaurant` client bindings (docs/33). Every route here is
@@ -155,6 +156,8 @@ export interface RestaurantOrderSummary {
 
 export function createRestaurantClient(http: ApiHttp) {
   return {
+    /** FEAT-022 (SPEC-022-05): the four steps of a restaurant that signed up, and its photos. */
+    application: createRestaurantApplicationClient(http),
     getMine: () => http.get<RestaurantProfile>('/restaurants/me'),
     update: (restaurantId: string, input: UpdateRestaurantProfileInput) =>
       http.patch<RestaurantProfile>(`/restaurants/${encodeURIComponent(restaurantId)}`, {

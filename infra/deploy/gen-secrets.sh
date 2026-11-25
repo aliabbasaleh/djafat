@@ -62,6 +62,8 @@ PAYMENT_WEBHOOK_BASE_URL=https://api.$DOMAIN/v1/payments/webhook
 JWT_ACCESS_SECRET=$(hex)
 REFRESH_TOKEN_HASH_SECRET=$(hex)
 OTP_HASH_SECRET=$(hex)
+# FEAT-022: signs the 5-minute links to private photos (derived from JWT_ACCESS_SECRET when absent).
+FILE_URL_SECRET=$(hex)
 MFA_ENCRYPTION_KEY=$(b64)
 DELIVERY_CODE_ENCRYPTION_KEY=$(b64)
 SMS_GATEWAY_ENCRYPTION_KEY=$(b64)

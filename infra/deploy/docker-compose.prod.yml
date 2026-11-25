@@ -61,6 +61,11 @@ services:
   api:
     build: { context: ../.., dockerfile: infra/docker/api.Dockerfile }
     <<: *api-env
+    # FEAT-022 (SPEC-022-04): photos on the server's disk, in a volume the nightly backup copies.
+    environment:
+      OBJECT_STORAGE_DIR: /data/uploads
+    volumes:
+      - uploads:/data/uploads
     restart: unless-stopped
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -123,7 +128,7 @@ services:
     restart: unless-stopped
     ports: ['127.0.0.1:4020:4020']
 
-  # Nightly database dump, 14 days kept, in ./backups on the server.
+  # Nightly database dump and photos archive (FEAT-022), 14 days kept, in ./backups on the server.
   backup:
     image: ${POSTGIS_IMAGE:-postgis/postgis:16-3.5}
     restart: unless-stopped
@@ -132,12 +137,14 @@ services:
     volumes:
       - ./backups:/backups
       - ./backup.sh:/backup.sh:ro
+      - uploads:/data/uploads:ro
     entrypoint: ['sh', '/backup.sh']
     depends_on:
       postgres: { condition: service_healthy }
 
 volumes:
   pgdata:
+  uploads:
   redisdata:
   miniodata:
   caddydata:

@@ -91,6 +91,14 @@ export class ApiClientError extends Error {
 export interface RequestOptions {
   readonly query?: Record<string, string | number | boolean | undefined>;
   readonly body?: unknown;
+  /**
+   * FEAT-022: a file sent as is (a photo), instead of a JSON `body` — the
+   * request's body is the bytes, with this content type.
+   */
+  readonly binary?: {
+    readonly data: Blob | ArrayBuffer | Uint8Array;
+    readonly contentType: string;
+  };
   readonly idempotencyKey?: string;
   readonly signal?: AbortSignal;
   /**
@@ -221,8 +229,11 @@ export class ApiHttp {
     if (token) headers.set('authorization', `Bearer ${token}`);
     if (options.idempotencyKey) headers.set('idempotency-key', options.idempotencyKey);
 
-    let payload: string | undefined;
-    if (options.body !== undefined) {
+    let payload: string | Blob | ArrayBuffer | Uint8Array | undefined;
+    if (options.binary) {
+      headers.set('content-type', options.binary.contentType);
+      payload = options.binary.data;
+    } else if (options.body !== undefined) {
       headers.set('content-type', 'application/json');
       payload = JSON.stringify(options.body);
     }

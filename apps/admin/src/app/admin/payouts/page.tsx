@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ApiClientError, type CourierPayout } from '@djafat/sdk';
+import { ApiClientError, mobileMoneyText, type CourierPayout, type MobileMoney } from '@djafat/sdk';
 import { Heading, Stack, Text, cx } from '@djafat/ui';
 import { Alert, Button, Input } from '@/components/ui-client';
 import { api } from '@/lib/api';
@@ -9,7 +9,13 @@ import { formatMoney } from '@/lib/format';
 import styles from '../phone-order/page.module.css';
 
 type StaffPayout = CourierPayout & {
-  readonly courier: { id: string; name: string | null; phone: string | null };
+  readonly courier: {
+    id: string;
+    name: string | null;
+    phone: string | null;
+    /** FEAT-022 (SPEC-022-07 R6): the number DJAFAT approved — never one still waiting. */
+    mobileMoney: MobileMoney | null;
+  };
 };
 
 /**
@@ -91,7 +97,9 @@ export default function PayoutsPage() {
       {rows?.map((p) => (
         <section key={p.id} className={cx(styles['card'])} aria-label={`Versement ${p.id}`}>
           <Text weight="bold">
-            {p.courier.name ?? 'Livreur'} · {p.courier.phone} · {formatMoney(p.requested)}
+            {p.courier.name ?? 'Livreur'} ·{' '}
+            {p.courier.mobileMoney ? mobileMoneyText(p.courier.mobileMoney) : p.courier.phone} ·{' '}
+            {formatMoney(p.requested)}
           </Text>
           <Text size="small" tone="secondary">
             {p.kind === 'weekly'

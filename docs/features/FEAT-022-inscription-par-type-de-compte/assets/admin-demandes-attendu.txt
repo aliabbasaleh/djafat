@@ -1,0 +1,25 @@
+FEAT-022-VIS06 — apps/admin, demandes à vérifier, 1280x800
+Nature : attendu. Vérification par photos dans l'application, choisie par
+l'utilisateur le 2026-11-22 (question « Checking ») ; validation par DJAFAT
+(question « Approval »).
+
+ DJAFAT Admin — Demandes à vérifier
+ ──────────────────────────────────────────────────────────────────────
+  [ Restaurants (3) ]   Livreurs (5)
+
+  Chez Fatimé      Klémat      envoyée le 22/11 à 10:14      [Ouvrir]
+  Grill 235        Moursal     envoyée le 22/11 à 09:02      [Ouvrir]
+  …
+
+ Détail :
+  Chez Fatimé — Klémat, N'Djamena — responsable : Fatimé Hassan, 66 •• •• 00
+  Emplacement (carte) · Horaires · Menu (12 plats) · Logo et photos
+  Papiers : RCCM [voir la photo] · Pièce d'identité [voir la photo]
+  Mobile Money : Airtel Money 66 •• •• 00
+
+  [ Valider ]   [ Refuser… ]   → motif obligatoire, envoyé au demandeur
+
+Notes :
+- Les photos des papiers ne s'ouvrent qu'ici et pour leur propriétaire,
+  jamais par un lien public.
+- Le demandeur reçoit un e-mail à chaque décision.

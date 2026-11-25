@@ -142,7 +142,7 @@ export class CatalogManagementController {
     @CurrentActor() actor: AuthenticatedActor,
     @Body(new ZodValidationPipe(CreateRestaurantSchema)) body: CreateRestaurantInput,
   ) {
-    return this.restaurants.create(actor.userId, body);
+    return this.restaurants.create(actor.userId, body, actor.permissions.includes('admin:write'));
   }
 
   @Patch('restaurants/:id')

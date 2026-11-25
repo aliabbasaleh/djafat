@@ -11,6 +11,12 @@
 **Aujourd'hui** : en démo, les codes arrivent dans une boîte de test interne au serveur, jamais par
 SMS. En production, l'API refuse de démarrer avec le faux fournisseur.
 
+**En attendant une passerelle** _(ajouté le 22 nov. 2026, FEAT-021)_ : le SMS peut être coupé
+(`SMS_PROVIDER=disabled`) ; clients et équipe se connectent alors par e-mail et mot de passe, et
+le bouton SMS s'affiche « Bientôt disponible ». Procédure, dans l'ordre : `infra/deploy/README.md`
+§4, « Couper le SMS ». Le jour où la passerelle existe, la configuration ci-dessous suffit, sans
+changer le code.
+
 **À obtenir** : une passerelle SMS qui livre au Tchad (agrégateur, offre « SMS en masse » d'un
 opérateur, ou passerelle sur un téléphone Android avec carte SIM), et :
 

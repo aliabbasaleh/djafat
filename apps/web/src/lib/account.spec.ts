@@ -7,6 +7,7 @@ import {
   fieldErrorsFromApi,
   passwordSectionMode,
   phoneSectionState,
+  registrationRequest,
   safeRedirect,
   validateRegisterForm,
 } from './account';
@@ -160,5 +161,44 @@ describe('SPEC-020-09 — « Mon profil »', () => {
       { id: 'email', available: true },
     ]);
     expect(sms.sms).toMatchObject({ enabled: true, note: null });
+  });
+});
+
+// FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte (SPEC-022-01).
+describe('SPEC-022-01 — the customer keeps FEAT-020’s sign-up', () => {
+  const COURIER = {
+    vehicle: 'moto' as const,
+    neighbourhood: 'n-1',
+    neighbourhoodOther: '',
+    birthDate: '2001-04-12',
+    acceptTerms: true,
+  };
+  const RESTAURANT = {
+    restaurantName: 'Chez Fatimé',
+    neighbourhood: 'n-1',
+    neighbourhoodOther: '',
+    acceptTerms: true,
+  };
+
+  it('SPEC-022-01-SC03 — the customer request is FEAT-020’s: the same four fields, no type added', () => {
+    expect(registrationRequest('customer', FORM, COURIER, RESTAURANT)).toEqual({
+      fullName: 'Awa Hassan',
+      phone: '66 12 34 56',
+      email: 'awa@example.td',
+      password: 'kissar-boulou-27',
+    });
+  });
+
+  it('SPEC-022-01 R3 — a courier and a restaurant add their type and fields', () => {
+    expect(registrationRequest('courier', FORM, COURIER, RESTAURANT)).toMatchObject({
+      accountType: 'courier',
+      vehicle: 'moto',
+      neighbourhoodId: 'n-1',
+      acceptTerms: true,
+    });
+    expect(registrationRequest('restaurant', FORM, COURIER, RESTAURANT)).toMatchObject({
+      accountType: 'restaurant',
+      restaurantName: 'Chez Fatimé',
+    });
   });
 });

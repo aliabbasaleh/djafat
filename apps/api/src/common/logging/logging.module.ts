@@ -4,6 +4,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { CORRELATION_ID_HEADER } from '@djafat/config';
 import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/config.service';
+import { withoutFileSignature } from './file-link-redaction.mapper';
 
 /**
  * Structured logging (pino) + per-request correlation id. Every log line and
@@ -28,6 +29,10 @@ import { AppConfigService } from '../config/config.service';
             return incoming;
           },
           customProps: (req: { id?: string }) => ({ traceId: req.id }),
+          // FEAT-022: a private photo's 5-minute link never lands in the logs.
+          serializers: {
+            req: (req: { url?: unknown; query?: unknown }) => withoutFileSignature(req),
+          },
           redact: {
             paths: [
               'req.headers.authorization',

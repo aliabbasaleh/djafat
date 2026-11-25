@@ -47,6 +47,35 @@ echo "migrations: $migrations (live: $live_migrations) · users: $users · unbal
 [ "$users" -gt 0 ] || fail "the restored database has no users"
 [ "$unbalanced" -eq 0 ] || fail "$unbalanced unbalanced ledger groups in the restored database"
 
+# FEAT-022 (SPEC-022-04 R5, SC05): every photo the restored database refers to is in the
+# photos archive of the same night (backup.sh writes djafat-<stamp>.dump, uploads-<stamp>.tar.gz).
+# A photo replaced in the minutes between the two can fail one night's check; the next night clears it.
+STAMP="$(basename "$DUMP" .dump)"
+STAMP="${STAMP#djafat-}"
+FILES="backups/uploads-$STAMP.tar.gz"
+KEYS=""
+if [ "$(sql "$SCRATCH" "select to_regclass('public.courier_applications') is not null")" = "t" ]; then
+  KEYS=$(sql "$SCRATCH" "select k from (
+      select unnest(array[face_photo_key, id_card_photo_key, driving_licence_photo_key,
+        vehicle_registration_photo_key, insurance_photo_key, plate_photo_key]) as k from courier_applications
+      union all
+      select unnest(array[registry_photo_key, owner_id_photo_key]) from restaurant_applications
+    ) refs where k is not null")
+fi
+if [ -n "$KEYS" ]; then
+  [ -f "$FILES" ] || fail "the database refers to photos but $FILES does not exist"
+  LISTING="$(tar -tzf "$FILES" 2>/dev/null)" || fail "the photos archive $FILES is unreadable"
+  missing=0
+  for key in $KEYS; do
+    printf '%s\n' "$LISTING" | grep -Fqx "uploads/$key" || missing=$((missing + 1))
+  done
+  echo "photos archive: $(basename "$FILES") · $(printf '%s\n' "$KEYS" | wc -l | tr -d ' ') photo(s) referenced, $missing missing"
+  [ "$missing" -eq 0 ] || fail "$missing photo(s) referenced by the database are missing from $FILES"
+elif [ -f "$FILES" ]; then
+  tar -tzf "$FILES" >/dev/null 2>&1 || fail "the photos archive $FILES is unreadable"
+  echo "photos archive: $(basename "$FILES") · no photo referenced yet"
+fi
+
 $COMPOSE exec -T postgres dropdb -U djafat "$SCRATCH"
 printf 'OK %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "$DUMP")" > "$RESULT"
 echo "restore check OK: $DUMP is restorable"

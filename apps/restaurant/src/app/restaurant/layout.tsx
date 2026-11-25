@@ -15,6 +15,8 @@ const NAV_ITEMS = [
   { label: 'Horaires', href: '/restaurant/hours' },
   { label: 'Relevé', href: '/restaurant/wallet' },
   { label: 'Profil', href: '/restaurant/profile' },
+  // FEAT-022 (SPEC-022-05 R1, SPEC-022-07 R6): papers and the payments' Mobile Money number.
+  { label: 'Papiers', href: '/restaurant/papers' },
   { label: 'Support', href: '/restaurant/support' },
 ];
 

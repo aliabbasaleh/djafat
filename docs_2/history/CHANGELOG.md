@@ -8,6 +8,106 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-25 — Sync S-052: favicons from the new icon, FEAT-022 decisions confirmed, 0.28.2
+
+The three web apps' favicons come from the new icon; the user confirmed six FEAT-022 decisions (Q18–Q22, Q25).
+Verification: the running sites serve the new favicon; `verify:fast`. Nothing new learned.
+
+---
+
+## 2026-11-25 — Sync S-051: new brand images, 0.28.1
+
+The user's new logo and icon in `djafat/`, the old « D » icons and the posters removed (no code used them; the
+apps' favicons unchanged). Verification: `git grep` for references, `check:hygiene`. Nothing new learned.
+
+---
+
+## 2026-11-25 — Sync S-050: FEAT-022 part 3 (restaurants), 0.28.0
+
+The restaurant's four steps in its console, DJAFAT's decisions on restaurants, changes after approval
+(waiting for an admin, accepted with the step-up code; payouts keep the approved number), « Mes gains » /
+« Mes papiers » in the courier app, the admin « Quartiers » page. Areas: `catalog`, `couriers`, `admin`,
+`payments` (read through a new port), restaurant, admin and courier apps, SDK. Verification: `verify --full`
+at `70733f3`, 33 integration tests on a fresh database, browser run (28 checks). Learned: the independent
+review (three rounds) found two cross-restaurant authorization problems before any push — new findings
+`SEC-09`, `SEC-10`, fixed on the branch; admin role grants now keep « one account, one restaurant ».
+
+---
+
+## 2026-11-24 — Sync S-049: checked inputs (FEAT-024) and sign-up screens (FEAT-022 part 4), 0.27.0
+
+**Added (branch, PR to come):** no SMS code abroad — a foreign number uses WhatsApp (when in service) or
+the e-mail; no fixed line for an account or a code; Mobile Money in Chad; names in letters; help for a
+mistyped e-mail; « +235 » in every phone field. Courier and restaurant sign-up screens, welcome e-mail,
+« Devenir livreur » and « Inscrire mon restaurant » in « Mon profil ». **Fixed:** a malformed phone could
+crash the sign-up (AUTH-03). To merge with FEAT-022 part 3 only.
+
+---
+
+## 2026-11-24 — Sync S-048: FEAT-022 parts 1-2 reviewed and corrected (0.26.0); PR #29 is 0.24.6
+
+**Fixed (review):** a restaurant that signed up could be made visible by its owner without DJAFAT — refused
+now; photo uploads are read only on their routes and for a valid session; a full disk answers « plus de
+place » without leaving files; photos lose what phones append after the image; a switch to a bicycle asks
+before deleting photos. **Changed:** the photos backup and its weekly check cover every photo the database
+refers to. PR #29 takes 0.24.6 (`main` merged in).
+
+---
+
+## 2026-11-23 — Sync S-047: `main` 0.24.5; FEAT-022 part 2 (local branch, not pushed)
+
+**`main` (teammate, PR #30):** customer accounts by e-mail run on djafat.com with DJAFAT's real Gmail; the MinIO
+image is still locked (claims; our registration request was accepted by the live API). PR #29 must move to 0.24.6
+before its merge (`main` is 0.24.5). **FEAT-022 part 2:** couriers fill and send their application in the courier
+app; admins check it in « Demandes à vérifier » and approve or refuse with a reason, by e-mail; private photos open
+only through 5-minute links. Four older problems fixed on the way (error details, images across sub-domains,
+console sub-pages, disabled buttons in the courier app's browser build).
+
+---
+
+## 2026-11-23 — Sync S-046: FEAT-022 part 1 (local branch, not pushed)
+
+**Added:** the N'Djamena neighbourhood list (admin-editable, never reset by a reinstall), photos on the server disk
+(private papers only through 5-minute signed links, metadata removed, nightly backup of the volume), sign-up as a
+courier or a restaurant on the API (created with the account, in one transaction). **Changed:** a courier who signed
+up goes online only once approved. **Verified:** fast checks; 129 integration tests on a fresh database.
+
+---
+
+## 2026-11-23 — Sync S-045: FEAT-022 specs adjusted
+
+**Changed (docs only):** sign-up reachable from every login screen (SPEC-022-01 v2), photo metadata stripped
+without a native image library (SPEC-022-04 v2), a taken phone number said openly as in FEAT-020 (SPEC-022-02, 08 v2).
+
+---
+
+## 2026-11-23 — Sync S-044: sign-up by account type specified (FEAT-022)
+
+**Added (docs only):** FEAT-022's specs, decisions and brief on `feat/inscription-par-type`. **Decided by the user:**
+photos on the server disk (papers private), a neighbourhood list plus « Autre », a new Mobile Money number approved
+before use, couriers 18 or older with a birth date, a terms checkbox with a placeholder text. **Followed:** PR #28
+(FEAT-021) and PR #29 (cheaper CI) — no GitHub job runs on them until billing is fixed.
+
+---
+
+## 2026-11-23 — Sync S-043: the team logs in by e-mail and password (FEAT-021, 0.25.0)
+
+**Added:** `packages/sdk/src/team-login.ts` (one role check for every way in, the FEAT-020 password rules before any
+reset is sent), `requestPhoneLoginCode` / `verifyPhoneLoginCode` in the SDK client; the admin console, the restaurant
+console and the courier app log in by e-mail and password (a code by e-mail on a new device, « Mot de passe
+oublié ? »), SMS and WhatsApp shown « Bientôt disponible » until `/auth/methods` offers them; `infra/deploy/README.md`
+§4: how to switch SMS off, with a read-only pre-cut check. **Changed:** production accepts `SMS_PROVIDER=disabled`
+with `EMAIL_PROVIDER=smtp` (SPEC-021-01, supersedes SPEC-008-01 R3); the first admin creates an account on the site.
+**Fixed:** the consoles' login form touched the screen edges at 390 px (already on `main`).
+
+**Verified:** `verify --full` on a fresh database, no new failure (typecheck, lint, tests, build, audit, integration;
+e2e unavailable); 15 execution screenshots opened; the pre-cut query on the local database. **Decided:**
+FEAT-021-Q11 — SMS is switched off only once every active team account has a verified e-mail and a password; a
+step-up code on e-mail and password changes for MFA roles is deferred (T-612). **Not verified:** a GitHub run (no
+job starts until billing is fixed), the cut-over on the server.
+
+---
+
 ## 2026-11-23 — Sync S-041: PR #27 merged into `main` without GitHub's checks (FEAT-020, 0.24.4)
 
 **Changed:** at the user's request (« just merge it and comment it in the changelog »), PR #27 is merged although
@@ -41,6 +141,17 @@ was only typed; three ways to learn whether an address had an account; an e-mail
 neither the password nor an alert. **Changed by the user's decisions:** a verified e-mail opens cash on
 delivery at level T1; phone orders are refused for such numbers until confirmed. **Learned:** a fix can
 open its own hole (the first redirect fix normalised `/..//x` into `//x`) — the second review caught it.
+
+---
+
+## 2026-11-22 — Sync S-038: three features confirmed (FEAT-021, FEAT-022, FEAT-023)
+
+**Added (plans, no code):** the user decided to switch SMS off until DJAFAT has an API, so admins, restaurants and
+couriers will log in by e-mail and password (FEAT-021, T-614); anyone will sign up as customer, courier or restaurant,
+complete their profile in their own app and be validated by DJAFAT (FEAT-022, T-615); WhatsApp login will be free
+because the customer sends the code (FEAT-023, T-616). **Learned:** Meta's official pricing page (read 2026-11-22)
+charges every business-sent message since 2026-10-01, including replies in the 24-hour window; FEAT-008's reply with
+the code is therefore no longer free.
 
 ---
 

@@ -22,6 +22,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { AddressesModule } from './modules/addresses/addresses.module';
 import { GeoModule } from './modules/geo/geo.module';
+import { CourierOnboardingModule } from './modules/couriers/courier-onboarding.module';
+import { RestaurantOnboardingModule } from './modules/catalog/restaurant-onboarding.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { PricingModule } from './modules/pricing/pricing.module';
 import { CartsModule } from './modules/carts/carts.module';
@@ -54,6 +56,8 @@ import { AdminModule } from './modules/admin/admin.module';
     UsersModule,
     AddressesModule,
     GeoModule,
+    CourierOnboardingModule,
+    RestaurantOnboardingModule,
     CatalogModule,
     PricingModule,
     CartsModule,

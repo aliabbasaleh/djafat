@@ -45,13 +45,68 @@ textarea.control {
 
 select.control {
   appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position:
     calc(100% - 18px) 50%,
     calc(100% - 13px) 50%;
   background-size: 5px 5px;
   background-repeat: no-repeat;
   padding-right: calc(var(--djafat-space-6) * 1px);
+}
+
+/* FEAT-024: « +235 » in front of a phone box. */
+.affixed {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+.affixed .control {
+  flex: 1;
+  min-width: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.leading {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 calc(var(--djafat-space-3) * 1px);
+  border: 1px solid var(--djafat-color-border-strong);
+  border-right: 0;
+  border-radius: calc(var(--djafat-radius-md) * 1px) 0 0 calc(var(--djafat-radius-md) * 1px);
+  background: var(--djafat-color-bg-surface-alt);
+  color: var(--djafat-color-text-secondary);
+  font-family: var(--djafat-type-family);
+  font-size: calc(var(--djafat-type-size-body) * 1px);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* FEAT-024: « Vouliez-vous dire … ? » under a field. */
+.suggestion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--djafat-space-2) * 1px);
+  margin: calc(var(--djafat-space-1) * 1px) 0 0;
+  font-size: calc(var(--djafat-type-size-label) * 1px);
+  color: var(--djafat-color-text-primary);
+}
+.suggestionAction {
+  min-height: 44px;
+  padding: 0 calc(var(--djafat-space-3) * 1px);
+  border: 1px solid var(--djafat-color-brand-primary);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  background: var(--djafat-color-bg-surface);
+  color: var(--djafat-color-brand-primary);
+  font-family: var(--djafat-type-family);
+  font-size: calc(var(--djafat-type-size-label) * 1px);
+  font-weight: 600;
+  cursor: pointer;
+}
+.suggestionAction:focus-visible {
+  outline: 2px solid var(--djafat-color-focus-ring);
+  outline-offset: 1px;
 }
 
 .helpText {
@@ -73,8 +128,8 @@ select.control {
   background: var(--djafat-color-bg-surface);
   border: 1px solid var(--djafat-color-border-strong);
   border-radius: calc(var(--djafat-radius-lg) * 1px);
-  padding: calc(var(--djafat-space-1) * 1px) calc(var(--djafat-space-2) * 1px) calc(var(--djafat-space-1) * 1px)
-    calc(var(--djafat-space-3) * 1px);
+  padding: calc(var(--djafat-space-1) * 1px) calc(var(--djafat-space-2) * 1px)
+    calc(var(--djafat-space-1) * 1px) calc(var(--djafat-space-3) * 1px);
 }
 .searchRow:focus-within {
   border-color: var(--djafat-color-brand-primary);
@@ -134,7 +189,8 @@ select.control {
   flex-shrink: 0;
   border-radius: calc(var(--djafat-radius-pill) * 1px);
   background: var(--djafat-color-border-strong);
-  transition: background-color calc(var(--djafat-motion-duration-fast) * 1ms) var(--djafat-motion-easing-standard);
+  transition: background-color calc(var(--djafat-motion-duration-fast) * 1ms)
+    var(--djafat-motion-easing-standard);
 }
 .switchTrack.checked {
   background: var(--djafat-color-brand-primary);
@@ -148,7 +204,8 @@ select.control {
   border-radius: 50%;
   background: #fff;
   box-shadow: var(--djafat-shadow-subtle);
-  transition: transform calc(var(--djafat-motion-duration-fast) * 1ms) var(--djafat-motion-easing-standard);
+  transition: transform calc(var(--djafat-motion-duration-fast) * 1ms)
+    var(--djafat-motion-easing-standard);
 }
 .switchTrack.checked .switchThumb {
   transform: translateX(16px);

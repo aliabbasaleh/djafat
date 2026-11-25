@@ -13,6 +13,7 @@
  */
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { LAUNCH_MARKET, PLATFORM_SETTINGS_DEFAULTS } from '@djafat/config';
+import { placeNameKey } from '@djafat/core';
 import { CashPaymentProvider } from '../src/modules/payments/providers/cash/cash-payment.provider';
 import { MockPaymentProvider } from '../src/modules/payments/providers/mock/mock-payment.provider';
 import {
@@ -109,6 +110,48 @@ export async function seedReferenceData(
               ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography)
       ON CONFLICT (city_id, name) DO NOTHING
     `;
+  }
+
+  // --- neighbourhoods (FEAT-022, SPEC-022-09) ------------------------------------
+  // The first list of N'Djamena's neighbourhoods; DJAFAT corrects it in the admin
+  // console (FEAT-022-Q12). Each reference row has a stable `code`: a reinstall
+  // skips it even after an admin renamed or disabled it (R1), and a name an admin
+  // already added is skipped too (any unique index, no conflict target).
+  const neighbourhoods: Array<[string, string]> = [
+    ['abena', 'Abéna'],
+    ['ambassatna', 'Ambassatna'],
+    ['amriguebe', 'Amriguébé'],
+    ['ardep-djoumbal', 'Ardep Djoumbal'],
+    ['atrone', 'Atrone'],
+    ['bololo', 'Bololo'],
+    ['boutalbagar', 'Boutalbagar'],
+    ['chagoua', 'Chagoua'],
+    ['dembe', 'Dembé'],
+    ['diguel', 'Diguel'],
+    ['djambal-bahr', 'Djambal Bahr'],
+    ['farcha', 'Farcha'],
+    ['gardole', 'Gardolé'],
+    ['gassi', 'Gassi'],
+    ['goudji', 'Goudji'],
+    ['habbena', 'Habbena'],
+    ['kabalaye', 'Kabalaye'],
+    ['klemat', 'Klémat'],
+    ['lamadji', 'Lamadji'],
+    ['madjorio', 'Madjorio'],
+    ['milezi', 'Milézi'],
+    ['moursal', 'Moursal'],
+    ['ndingangali', 'Ndingangali'],
+    ['paris-congo', 'Paris-Congo'],
+    ['ridina', 'Ridina'],
+    ['sabangali', 'Sabangali'],
+    ['toukra', 'Toukra'],
+    ['walia', 'Walia'],
+  ];
+  for (const [code, name] of neighbourhoods) {
+    await prisma.$executeRaw`
+      INSERT INTO neighbourhoods (city_id, code, name, name_key)
+      VALUES (${city.id}::uuid, ${code}, ${name}, ${placeNameKey(name)})
+      ON CONFLICT DO NOTHING`;
   }
 
   // --- roles -----------------------------------------------------------------

@@ -19,6 +19,8 @@ function build(current: { status: string; activeDeliveryId: string | null }) {
   };
   const prisma = {
     $executeRaw: vi.fn(async () => 1),
+    // FEAT-022: no application — a courier created by the team (SPEC-022-06 R5).
+    courierApplication: { findUnique: vi.fn(async () => null) },
     courier: {
       upsert: vi.fn(async () => row),
       findUnique: vi.fn(async () => row),

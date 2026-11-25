@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { MoneyJson, RestaurantAvailabilityStatus, RestaurantStatus } from '@djafat/types';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { toMoneyJson } from '../../common/money/money.mapper';
@@ -20,6 +21,13 @@ import type { ReplaceRestaurantHoursInput } from './dto/restaurant-hours.schema'
 
 /** Statuses an owner may set themselves — anything else needs `admin:write` (docs/20 §6, §35). */
 const OWNER_SELF_SERVICE_STATUSES: readonly RestaurantStatus[] = ['draft', 'active', 'paused'];
+
+/**
+ * FEAT-022 (SPEC-022-03 R3, SPEC-022-07 R3): statuses customers see. A restaurant that
+ * signed up reaches them only through DJAFAT's approval, never by its owner's hand
+ * (found by the FEAT-022 review: « Fermer maintenant » then « Rouvrir » published it).
+ */
+const PUBLIC_STATUSES: readonly RestaurantStatus[] = ['active', 'paused'];
 
 export interface RestaurantAdminDto {
   readonly id: string;
@@ -51,6 +59,25 @@ export interface RestaurantProfileDto {
   readonly cityTimezone: string;
   readonly availability: RestaurantAvailabilityStatus;
   readonly hours: readonly RestaurantHoursWindowDto[];
+}
+
+/** FEAT-022 (SPEC-022-05 R5): the application is being checked. */
+const applicationLocked = () =>
+  new ConflictException({
+    code: 'APPLICATION_LOCKED',
+    message: 'Votre dossier est en vérification : il ne se modifie plus pour le moment.',
+  });
+
+/** FEAT-022-Q20: the logo and the cover are photos DJAFAT stores, never an address an owner types. */
+const photoAddressRefused = () =>
+  new ForbiddenException({
+    code: 'FORBIDDEN',
+    message: 'Le logo et la photo de couverture se choisissent comme photos, dans « Profil ».',
+  });
+
+/** The lock every change to a restaurant's application holds (`RestaurantApplicationService`, R7). */
+function lockApplication(tx: Prisma.TransactionClient, restaurantId: string) {
+  return tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`restaurant-application:${restaurantId}`}))`;
 }
 
 /**
@@ -132,17 +159,26 @@ export class RestaurantsManagementService {
         message: 'No restaurant is scoped to this account.',
       });
     }
-    await this.prisma.$transaction([
-      this.prisma.restaurantHours.deleteMany({ where: { restaurantId } }),
-      this.prisma.restaurantHours.createMany({
+    await this.prisma.$transaction(async (tx) => {
+      // FEAT-022 (SPEC-022-05 R5): not while DJAFAT checks the application (the
+      // menu stays editable, FEAT-022-Q18) — read under the application's lock,
+      // so a change never lands after the submit (SPEC-022-07 R7).
+      await lockApplication(tx, restaurantId);
+      const application = await tx.restaurantApplication.findUnique({
+        where: { restaurantId },
+        select: { status: true },
+      });
+      if (application?.status === 'pending_review') throw applicationLocked();
+      await tx.restaurantHours.deleteMany({ where: { restaurantId } });
+      await tx.restaurantHours.createMany({
         data: input.hours.map((h) => ({
           restaurantId,
           weekday: h.weekday,
           opensMinutes: h.opensMinutes,
           closesMinutes: h.closesMinutes,
         })),
-      }),
-    ]);
+      });
+    });
     await this.audit.log({
       actorUserId,
       action: 'RESTAURANT_HOURS_REPLACED',
@@ -179,7 +215,15 @@ export class RestaurantsManagementService {
     return restaurant;
   }
 
-  async create(actorUserId: string, input: CreateRestaurantInput): Promise<RestaurantAdminDto> {
+  async create(
+    actorUserId: string,
+    input: CreateRestaurantInput,
+    isAdminTier = false,
+  ): Promise<RestaurantAdminDto> {
+    // FEAT-022 (FEAT-022-Q20): an owner never types the logo or cover address.
+    if (!isAdminTier && (input.logoUrl !== undefined || input.coverUrl !== undefined)) {
+      throw photoAddressRefused();
+    }
     const city = await this.prisma.city.findUnique({
       where: { id: input.cityId },
       include: { country: true },
@@ -192,22 +236,43 @@ export class RestaurantsManagementService {
     }
 
     const slug = await this.generateUniqueSlug(input.name);
-    const restaurant = await this.prisma.restaurant.create({
-      data: {
-        countryId: city.countryId,
-        cityId: city.id,
-        ownerUserId: actorUserId,
-        slug,
-        name: input.name,
-        currency: city.country.currency, // server-resolved — never client-supplied (docs/20 §14)
-        status: 'draft',
-        ...(input.description !== undefined ? { description: input.description } : {}),
-        ...(input.phone !== undefined ? { phone: input.phone } : {}),
-        ...(input.addressText !== undefined ? { addressText: input.addressText } : {}),
-        ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl } : {}),
-        ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl } : {}),
-      },
-    });
+    const insert = (db: Prisma.TransactionClient) =>
+      db.restaurant.create({
+        data: {
+          countryId: city.countryId,
+          cityId: city.id,
+          ownerUserId: actorUserId,
+          slug,
+          name: input.name,
+          currency: city.country.currency, // server-resolved — never client-supplied (docs/20 §14)
+          status: 'draft',
+          ...(input.description !== undefined ? { description: input.description } : {}),
+          ...(input.phone !== undefined ? { phone: input.phone } : {}),
+          ...(input.addressText !== undefined ? { addressText: input.addressText } : {}),
+          ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl } : {}),
+          ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl } : {}),
+        },
+      });
+    const restaurant = isAdminTier
+      ? await insert(this.prisma)
+      : await this.prisma.$transaction(async (tx) => {
+          // FEAT-022 (FEAT-022-Q06, review of part 3 R2-2): an owner has one
+          // restaurant — signing up made owners self-service. Same lock as the
+          // sign-up and « Inscrire mon restaurant » (`role-signup:<user>`).
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`role-signup:${actorUserId}`}))`;
+          // A restaurant created by the team names the admin as `ownerUserId`: its
+          // owner is found by the role (review of part 3, note R3-1).
+          const ownsOne =
+            (await tx.restaurant.count({ where: { ownerUserId: actorUserId } })) > 0 ||
+            (await this.users.getOwnedRestaurantScope(actorUserId)) !== null;
+          if (ownsOne) {
+            throw new ConflictException({
+              code: 'ROLE_ALREADY_HELD',
+              message: 'Ce compte a déjà un restaurant : ouvrez la console restaurant.',
+            });
+          }
+          return insert(tx);
+        });
 
     await this.audit.log({
       actorUserId,
@@ -237,21 +302,53 @@ export class RestaurantsManagementService {
         message: `Setting status "${input.status}" requires admin:write.`,
       });
     }
-
-    const updated = await this.prisma.restaurant.update({
-      where: { id: restaurantId },
-      data: {
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
-        ...(input.phone !== undefined ? { phone: input.phone } : {}),
-        ...(input.addressText !== undefined ? { addressText: input.addressText } : {}),
-        ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl } : {}),
-        ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl } : {}),
-        ...(input.prepTimeMin !== undefined ? { prepTimeMin: input.prepTimeMin } : {}),
-        ...(input.minOrderMinor !== undefined ? { minOrderMinor: input.minOrderMinor } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {}),
-      },
-    });
+    // FEAT-022 (SPEC-022-05 R1 v2, FEAT-022-Q20): the logo and the cover are
+    // photos DJAFAT stores (`POST /restaurants/me/photos/:kind`), never an
+    // address an owner types — only the team sets one (review of part 3, #1).
+    if (!isAdminTier && (input.logoUrl !== undefined || input.coverUrl !== undefined)) {
+      throw photoAddressRefused();
+    }
+    const goesPublic = input.status !== undefined && PUBLIC_STATUSES.includes(input.status);
+    // FEAT-022 (SPEC-022-05 R5): the address is step 1, and the status follows
+    // the application during the review (review of part 3, R2-1).
+    const touchesSteps = input.addressText !== undefined || input.status !== undefined;
+    const write = (db: Prisma.TransactionClient) =>
+      db.restaurant.update({
+        where: { id: restaurantId },
+        data: {
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.description !== undefined ? { description: input.description } : {}),
+          ...(input.phone !== undefined ? { phone: input.phone } : {}),
+          ...(input.addressText !== undefined ? { addressText: input.addressText } : {}),
+          ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl } : {}),
+          ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl } : {}),
+          ...(input.prepTimeMin !== undefined ? { prepTimeMin: input.prepTimeMin } : {}),
+          ...(input.minOrderMinor !== undefined ? { minOrderMinor: input.minOrderMinor } : {}),
+          ...(input.status !== undefined ? { status: input.status } : {}),
+        },
+      });
+    const updated =
+      !isAdminTier && (goesPublic || touchesSteps)
+        ? await this.prisma.$transaction(async (tx) => {
+            // Read under the application's lock (SPEC-022-07 R7). No application:
+            // created by the team, works as before FEAT-022.
+            await lockApplication(tx, restaurantId);
+            const application = await tx.restaurantApplication.findUnique({
+              where: { restaurantId },
+              select: { status: true },
+            });
+            // Publishing before the approval keeps its own answer (SPEC-022-03 R3); any
+            // other step or status change waits for the decision (SPEC-022-05 R5).
+            if (goesPublic && application && application.status !== 'approved') {
+              throw new ConflictException({
+                code: 'RESTAURANT_NOT_APPROVED',
+                message: "Votre restaurant n'est pas encore validé par DJAFAT.",
+              });
+            }
+            if (touchesSteps && application?.status === 'pending_review') throw applicationLocked();
+            return write(tx);
+          })
+        : await write(this.prisma);
 
     await this.audit.log({
       actorUserId,
