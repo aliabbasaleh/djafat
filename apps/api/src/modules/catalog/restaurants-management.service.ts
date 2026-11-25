@@ -260,7 +260,12 @@ export class RestaurantsManagementService {
           // restaurant — signing up made owners self-service. Same lock as the
           // sign-up and « Inscrire mon restaurant » (`role-signup:<user>`).
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`role-signup:${actorUserId}`}))`;
-          if ((await tx.restaurant.count({ where: { ownerUserId: actorUserId } })) > 0) {
+          // A restaurant created by the team names the admin as `ownerUserId`: its
+          // owner is found by the role (review of part 3, note R3-1).
+          const ownsOne =
+            (await tx.restaurant.count({ where: { ownerUserId: actorUserId } })) > 0 ||
+            (await this.users.getOwnedRestaurantScope(actorUserId)) !== null;
+          if (ownsOne) {
             throw new ConflictException({
               code: 'ROLE_ALREADY_HELD',
               message: 'Ce compte a déjà un restaurant : ouvrez la console restaurant.',

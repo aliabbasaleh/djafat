@@ -48,12 +48,15 @@ const availabilityStub = (status: 'OPEN' | 'CLOSED' | 'PAUSED' | 'UNAVAILABLE' =
 function usersStub(
   membersOf: Set<string> = new Set(['owner-1:r1']),
   restaurantScope: string | null = null,
+  // FEAT-022 (review of part 3, R3-1): the restaurant the account owns by its role.
+  ownedScope: string | null = null,
 ) {
   return {
     isMemberOfRestaurant: vi.fn((userId: string, restaurantId: string) =>
       Promise.resolve(membersOf.has(`${userId}:${restaurantId}`)),
     ),
     getRestaurantScope: vi.fn().mockResolvedValue(restaurantScope),
+    getOwnedRestaurantScope: vi.fn().mockResolvedValue(ownedScope),
   } as unknown as UsersService;
 }
 
@@ -378,6 +381,21 @@ describe('create — an owner has one restaurant, and types no photo address', (
       response: { code: 'ROLE_ALREADY_HELD' },
     });
     expect(second.created).toEqual([]);
+  });
+
+  it('review note R3-1 — the owner of a restaurant created by the team (owner by role only) creates no second one', async () => {
+    const stub = createStub(0); // `ownerUserId` names the admin who created it
+    const svc = new RestaurantsManagementService(
+      stub.prisma,
+      auditStub(),
+      usersStub(new Set(), null, 'r-team'),
+      availabilityStub(),
+    );
+    await expect(svc.create('owner-1', input)).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'ROLE_ALREADY_HELD' },
+    });
+    expect(stub.created).toEqual([]);
   });
 
   it('an owner sending a logo address is refused (403); the team creates without limit', async () => {
