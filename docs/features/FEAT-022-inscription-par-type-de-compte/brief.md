@@ -1,14 +1,14 @@
 ---
 feature: FEAT-022
 # prettier-ignore
-specs: [SPEC-022-01@3, SPEC-022-02@4, SPEC-022-03@3, SPEC-022-04@4, SPEC-022-05@3, SPEC-022-06@4, SPEC-022-07@5, SPEC-022-08@4, SPEC-022-09@2]
+specs: [SPEC-022-01@3, SPEC-022-02@4, SPEC-022-03@3, SPEC-022-04@4, SPEC-022-05@4, SPEC-022-06@4, SPEC-022-07@5, SPEC-022-08@5, SPEC-022-09@2]
 ---
 
 # FEAT-022 — Brief d'exécution
 
 ## Sources
 
-- Feature : `feature.md` — Specs : `specs/SPEC-022-01.md` à `SPEC-022-09.md` (implémentées ; 09 en v2, 01, 03 et 05 en v3, 02, 04, 06 et 08 en v4, 07 en v5).
+- Feature : `feature.md` — Specs : `specs/SPEC-022-01.md` à `SPEC-022-09.md` (implémentées ; 09 en v2, 01 et 03 en v3, 02, 04, 05 et 06 en v4, 07 et 08 en v5).
 - Décisions : `clarifications.md` (Q01 à Q06, Q13 et Q14 de l'utilisateur ; Q07 à Q12 et Q15 à Q25 hypothèses).
 - Intake : `progress.md` ; règles : `README.md` (« Règles non négociables »),
   `docs/pipeline/architecture-policy.md` ; graphe des modules : `packages/eslint-config/api-boundaries.js`.

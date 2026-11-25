@@ -429,6 +429,21 @@ export function restaurantPapersChanges(
   };
 }
 
+/**
+ * Step 4 not yet complete (review of part 3, R2-4): what is still missing, in
+ * the owner's words — so a partial save never reads as « done ».
+ */
+export function restaurantPapersMissing(
+  application: Pick<RestaurantApplication, 'papers' | 'mobileMoney'>,
+): string[] {
+  return [
+    ...(application.papers.registryNumber ? [] : ['le numéro RCCM ou NIF']),
+    ...(application.papers.registryPhoto ? [] : ['la photo du RCCM ou du NIF']),
+    ...(application.papers.ownerIdPhoto ? [] : ["la pièce d'identité"]),
+    ...(application.mobileMoney ? [] : ['le numéro Mobile Money']),
+  ];
+}
+
 /** R6: the waiting change of one topic, if any (« en attente de DJAFAT »). */
 export function pendingChangeOf(
   application: { readonly pendingChanges: readonly PendingChange[] },

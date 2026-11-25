@@ -8,6 +8,7 @@ import {
   restaurantLocationRequest,
   restaurantPapersChanges,
   restaurantPapersErrors,
+  restaurantPapersMissing,
   restaurantPapersRequest,
   restaurantPapersStart,
   mobileMoneyText,
@@ -309,6 +310,21 @@ describe('FEAT-022 — the forms of steps 1 and 4 and of a new Mobile Money numb
       provider: 'Choisissez Airtel Money ou Moov Money.',
       number: expect.stringContaining('+235'),
     });
+  });
+
+  it('review of part 3, R2-4 — a partial save of step 4 says what is still missing', () => {
+    expect(
+      restaurantPapersMissing({
+        papers: { registryNumber: 'TD-NDJ-2026-B-1234', registryPhoto: false, ownerIdPhoto: true },
+        mobileMoney: null,
+      }),
+    ).toEqual(['la photo du RCCM ou du NIF', 'le numéro Mobile Money']);
+    expect(
+      restaurantPapersMissing({
+        papers: { registryNumber: 'TD-NDJ-2026-B-1234', registryPhoto: true, ownerIdPhoto: true },
+        mobileMoney: { provider: 'airtel', number: '+23566000001' },
+      }),
+    ).toEqual([]);
   });
 
   it('SPEC-022-07 R6 — the waiting change of a topic', () => {

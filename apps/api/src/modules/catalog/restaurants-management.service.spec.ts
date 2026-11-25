@@ -308,6 +308,95 @@ describe('update — while DJAFAT checks the application, steps 1 and 3 do not c
   });
 });
 
+// FEAT-022 part 3 review, round 2 (R2-1) — SPEC-022-05 R5.
+describe('update — during the review the status follows the application (SPEC-022-05 R5)', () => {
+  it('the owner cannot set « draft » while DJAFAT checks the application (409 APPLICATION_LOCKED), nothing changes', async () => {
+    const prisma = prismaStub(
+      { status: 'pending_review', ownerUserId: 'owner-1' },
+      { status: 'pending_review' },
+    );
+    const svc = new RestaurantsManagementService(
+      prisma,
+      auditStub(),
+      usersStub(new Set(['owner-1:r1'])),
+      availabilityStub(),
+    );
+    await expect(svc.update('owner-1', 'r1', { status: 'draft' }, false)).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'APPLICATION_LOCKED' },
+    });
+    expect(prisma.restaurant.update).not.toHaveBeenCalled();
+  });
+});
+
+// FEAT-022 part 3 review, round 2 (R2-2) — FEAT-022-Q06, Q20.
+describe('create — an owner has one restaurant, and types no photo address', () => {
+  function createStub(owned: number) {
+    const created: unknown[] = [];
+    const client: Record<string, unknown> = {
+      city: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'city-1',
+          countryId: 'td',
+          country: { currency: 'XAF' },
+        }),
+      },
+      restaurant: {
+        findUnique: vi.fn().mockResolvedValue(null), // the slug is free
+        count: vi.fn().mockResolvedValue(owned),
+        create: vi.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
+          created.push(data);
+          return Promise.resolve({ id: 'r-new', ...data });
+        }),
+      },
+      $executeRaw: vi.fn().mockResolvedValue(1),
+    };
+    client['$transaction'] = vi.fn((fn: (tx: unknown) => Promise<unknown>) => fn(client));
+    return { prisma: client as unknown as PrismaService, created };
+  }
+  const input = { cityId: 'city-1', name: 'Chez Halimé' };
+
+  it('a first restaurant is created (draft); a second one is refused (409 ROLE_ALREADY_HELD)', async () => {
+    const first = createStub(0);
+    const svc = new RestaurantsManagementService(
+      first.prisma,
+      auditStub(),
+      usersStub(),
+      availabilityStub(),
+    );
+    await expect(svc.create('owner-1', input)).resolves.toMatchObject({ status: 'draft' });
+
+    const second = createStub(1);
+    const again = new RestaurantsManagementService(
+      second.prisma,
+      auditStub(),
+      usersStub(),
+      availabilityStub(),
+    );
+    await expect(again.create('owner-1', input)).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'ROLE_ALREADY_HELD' },
+    });
+    expect(second.created).toEqual([]);
+  });
+
+  it('an owner sending a logo address is refused (403); the team creates without limit', async () => {
+    const stub = createStub(3);
+    const svc = new RestaurantsManagementService(
+      stub.prisma,
+      auditStub(),
+      usersStub(),
+      availabilityStub(),
+    );
+    await expect(
+      svc.create('owner-1', { ...input, logoUrl: 'https://cdn.example.com/logo.png' }),
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      svc.create('admin-1', { ...input, logoUrl: 'https://cdn.example.com/logo.png' }, true),
+    ).resolves.toMatchObject({ id: 'r-new' });
+  });
+});
+
 // FEAT-022 part 3 review, #1 — SPEC-022-05 R1 v2, FEAT-022-Q20.
 describe('update — an owner never types the logo or cover address (FEAT-022-Q20)', () => {
   it.each([

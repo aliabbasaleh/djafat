@@ -36,6 +36,9 @@ export async function photoForUpload(file: Blob): Promise<Blob> {
     canvas.height = size.height;
     const context = canvas.getContext('2d');
     if (!context) return file;
+    // JPEG has no transparency: a transparent logo gets white, not black.
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, size.width, size.height);
     context.drawImage(bitmap, 0, 0, size.width, size.height);
     bitmap.close();
     const reduced = await new Promise<Blob | null>((resolve) =>

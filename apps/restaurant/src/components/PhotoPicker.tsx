@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef } from 'react';
+import { useId, useRef, useState } from 'react';
 import { cx } from '@djafat/ui';
 import { Button } from '@/components/ui-client';
 import { photoForUpload } from '@/lib/photo';
@@ -45,6 +45,8 @@ export function PhotoPicker({
 }) {
   const id = useId();
   const input = useRef<HTMLInputElement | null>(null);
+  /** While a large photo is being reduced (no second pick meanwhile). */
+  const [shrinking, setShrinking] = useState(false);
   return (
     <div className={cx(styles['picker'])}>
       <span className={cx(styles['label'])} id={`${id}-label`}>
@@ -73,15 +75,19 @@ export function PhotoPicker({
         onChange={(e) => {
           const file = e.target.files?.[0];
           e.target.value = '';
-          if (file) void photoForUpload(file).then(onPick);
+          if (!file) return;
+          setShrinking(true);
+          void photoForUpload(file)
+            .then(onPick)
+            .finally(() => setShrinking(false));
         }}
       />
       <Button
         type="button"
         variant="secondary"
         size="sm"
-        loading={busy}
-        disabled={disabled || busy}
+        loading={busy || shrinking}
+        disabled={disabled || busy || shrinking}
         aria-describedby={`${id}-hint${error ? ` ${id}-error` : ''}`}
         onClick={() => input.current?.click()}
       >

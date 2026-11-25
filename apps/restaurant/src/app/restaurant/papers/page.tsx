@@ -8,6 +8,7 @@ import {
   pendingChangeOf,
   phoneFieldShowsDialCode,
   restaurantPapersChanges,
+  restaurantPapersMissing,
   restaurantPapersStart,
   type FieldErrors,
   type MobileMoney,
@@ -87,12 +88,15 @@ export default function PapersPage() {
       setRegistryNumber(next.registryNumber);
       setProvider(next.provider);
       setNumber(next.number);
+      const missing = view.status === 'approved' ? [] : restaurantPapersMissing(view);
       setMessage({
         tone: 'success',
         text:
           view.status === 'approved' && view.pendingChanges.length > 0
             ? 'Enregistré : DJAFAT vérifie le changement. Les paiements continuent vers le numéro déjà validé.'
-            : 'Papiers et paiement enregistrés.',
+            : missing.length > 0
+              ? `Enregistré. Il reste : ${missing.join(', ')}.`
+              : 'Papiers et paiement enregistrés.',
       });
     } catch (err) {
       setMessage({ tone: 'danger', text: errorText(err, "L'enregistrement n'a pas abouti.") });

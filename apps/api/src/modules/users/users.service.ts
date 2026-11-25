@@ -418,6 +418,9 @@ export class UsersService {
    *   - a user already holding a restaurant scope under a DIFFERENT
    *     restaurant is a genuine conflict (migration 0028's partial unique
    *     index), translated to a clean `VALIDATION_ERROR` — never a raw 500.
+   *     FEAT-022 (FEAT-022-Q25): whatever the role — an owner of one
+   *     restaurant is never made staff of another, nor the reverse — under
+   *     the same per-account lock as self sign-up (`role-signup:<user>`).
    */
   async grantRole(
     actor: { readonly userId: string; readonly roles: readonly Role[] },
@@ -431,21 +434,39 @@ export class UsersService {
 
     let granted: boolean;
     try {
-      // Targets `user_roles_pkey_idx` (migrations/0003_identity) by its exact
-      // expression list — Postgres can't promote an expression-based unique
-      // index to a named constraint, so `ON CONFLICT ON CONSTRAINT` isn't an
-      // option here (42809); matching the expressions is.
-      const affected = await this.prisma.$executeRaw`
-        INSERT INTO user_roles (user_id, role, scope_restaurant_id)
-        VALUES (${targetUserId}::uuid, ${role}, ${scopeRestaurantId}::uuid)
-        ON CONFLICT (
-          user_id, role,
-          COALESCE(scope_restaurant_id, '00000000-0000-0000-0000-000000000000'),
-          COALESCE(scope_country_id,    '00000000-0000-0000-0000-000000000000'),
-          COALESCE(scope_city_id,       '00000000-0000-0000-0000-000000000000')
-        ) DO NOTHING
-      `;
-      granted = affected > 0;
+      granted = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`role-signup:${targetUserId}`}))`;
+        if (role === 'restaurant_owner' || role === 'restaurant_staff') {
+          const elsewhere = await tx.$queryRaw<Array<{ other: string }>>`
+            SELECT scope_restaurant_id::text AS other FROM user_roles
+            WHERE user_id = ${targetUserId}::uuid
+              AND (role = 'restaurant_owner' OR role = 'restaurant_staff')
+              AND scope_restaurant_id IS NOT NULL
+              AND scope_restaurant_id <> ${scopeRestaurantId}::uuid
+            LIMIT 1`;
+          if (elsewhere.length > 0) {
+            throw new ConflictException({
+              code: 'VALIDATION_ERROR',
+              message: `User ${targetUserId} already has a role at another restaurant — one account, one restaurant: revoke it first.`,
+            });
+          }
+        }
+        // Targets `user_roles_pkey_idx` (migrations/0003_identity) by its exact
+        // expression list — Postgres can't promote an expression-based unique
+        // index to a named constraint, so `ON CONFLICT ON CONSTRAINT` isn't an
+        // option here (42809); matching the expressions is.
+        const affected = await tx.$executeRaw`
+          INSERT INTO user_roles (user_id, role, scope_restaurant_id)
+          VALUES (${targetUserId}::uuid, ${role}, ${scopeRestaurantId}::uuid)
+          ON CONFLICT (
+            user_id, role,
+            COALESCE(scope_restaurant_id, '00000000-0000-0000-0000-000000000000'),
+            COALESCE(scope_country_id,    '00000000-0000-0000-0000-000000000000'),
+            COALESCE(scope_city_id,       '00000000-0000-0000-0000-000000000000')
+          ) DO NOTHING
+        `;
+        return affected > 0;
+      });
     } catch (err) {
       if (isUniqueViolation(err)) {
         throw new ConflictException({

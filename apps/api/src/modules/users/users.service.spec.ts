@@ -79,6 +79,27 @@ describe('UsersService.grantRole / revokeRole (Bloc 9, docs/30 §role-management
     ).rejects.toMatchObject({ response: { code: 'VALIDATION_ERROR' } });
   });
 
+  // FEAT-022 part 3 review, round 2 (R2-3) — FEAT-022-Q25, migration 0028.
+  it('one account, one restaurant: an owner of A is never made staff of B, nor the reverse; both roles at A are fine', async () => {
+    const { service, users } = buildService();
+    const owner = seedUser(users);
+    const staff = seedUser(users);
+    const actor = actorOf('super_admin');
+
+    await service.grantRole(actor, owner.id, 'restaurant_owner', RESTAURANT_A);
+    await expect(
+      service.grantRole(actor, owner.id, 'restaurant_staff', RESTAURANT_B),
+    ).rejects.toMatchObject({ response: { code: 'VALIDATION_ERROR' } });
+    await expect(
+      service.grantRole(actor, owner.id, 'restaurant_staff', RESTAURANT_A),
+    ).resolves.toEqual({ granted: true });
+
+    await service.grantRole(actor, staff.id, 'restaurant_staff', RESTAURANT_A);
+    await expect(
+      service.grantRole(actor, staff.id, 'restaurant_owner', RESTAURANT_B),
+    ).rejects.toMatchObject({ response: { code: 'VALIDATION_ERROR' } });
+  });
+
   it('restaurant_staff without a scope is rejected', async () => {
     const { service, users } = buildService();
     const target = seedUser(users);
