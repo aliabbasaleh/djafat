@@ -7,16 +7,16 @@ Un résultat de vérification n'est valable que pour le commit indiqué :
 après toute modification de code, spec, capture ou config qualité, relancer.
 -->
 
-| Étape                   | Statut   | Date       | Notes                                                                                                                               |
-| ----------------------- | -------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Intake                  | fait     | 2026-11-23 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous ; six maquettes texte lues                                      |
-| Specs                   | fait     | 2026-11-25 | SPEC-022-01 à 09 implémentées ; 09 en v2, 01 et 03 en v3, 02, 04, 05 et 06 en v4, 07 et 08 en v5                                    |
-| Grill-me                | fait     | 2026-11-25 | Q01 à Q06 et Q13, Q14 tranchées par l'utilisateur ; Q07 à Q12 et Q15 à Q25 hypothèses (Q18 à Q25 : partie 3)                        |
-| Brief                   | fait     | 2026-11-25 | quatre tranches ; la 4 avant la 3, mises en ligne ensemble (FEAT-022-Q14) ; ré-épinglé pour la partie 3 (05@4, 07@5, 08@5, 09@2)    |
-| Tests dérivés des specs | fait     | 2026-11-25 | chaque scénario lié à un test ou à une capture (`check-specs --matrix FEAT-022`) ; partie 3 : unitaires, SDK et intégration 33/33   |
-| Implémentation          | fait     | 2026-11-25 | parties 1, 2 (PR #31), 4 (PR #32, avec FEAT-024) et 3 (branche `feat/inscription-restaurants`)                                      |
-| Revue qualité           | fait     | 2026-11-25 | parties 1-2 : PR #31 ; partie 4 : voir `../FEAT-024-saisies-verifiees/review.md` ; partie 3 : deux tours indépendants (`review.md`) |
-| PR                      | en cours | 2026-11-24 | parties 1-2 : PR #31 ; partie 4 : branche `feat/inscription-ecrans` (avec FEAT-024), à fusionner avec la partie 3                   |
+| Étape                   | Statut | Date       | Notes                                                                                                                                |
+| ----------------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Intake                  | fait   | 2026-11-23 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous ; six maquettes texte lues                                       |
+| Specs                   | fait   | 2026-11-25 | SPEC-022-01 à 09 implémentées ; 09 en v2, 01 et 03 en v3, 02, 04, 05 et 06 en v4, 07 et 08 en v5                                     |
+| Grill-me                | fait   | 2026-11-25 | Q01 à Q06 et Q13, Q14 tranchées par l'utilisateur ; Q07 à Q12 et Q15 à Q25 hypothèses (Q18 à Q25 : partie 3)                         |
+| Brief                   | fait   | 2026-11-25 | quatre tranches ; la 4 avant la 3, mises en ligne ensemble (FEAT-022-Q14) ; ré-épinglé pour la partie 3 (05@4, 07@5, 08@5, 09@2)     |
+| Tests dérivés des specs | fait   | 2026-11-25 | chaque scénario lié à un test ou à une capture (`check-specs --matrix FEAT-022`) ; partie 3 : unitaires, SDK et intégration 33/33    |
+| Implémentation          | fait   | 2026-11-25 | parties 1, 2 (PR #31), 4 (PR #32, avec FEAT-024) et 3 (branche `feat/inscription-restaurants`)                                       |
+| Revue qualité           | fait   | 2026-11-25 | parties 1-2 : PR #31 ; partie 4 : voir `../FEAT-024-saisies-verifiees/review.md` ; partie 3 : trois tours indépendants (`review.md`) |
+| PR                      | fait   | 2026-11-25 | parties 1-2 : PR #31 ; partie 4 (avec FEAT-024) : PR #32 ; partie 3 : `pr.md`, PR au-dessus de la #32, à fusionner avec elle         |
 
 ## Intake (2026-11-23)
 
@@ -62,6 +62,9 @@ Constats :
 
 ## Dernière vérification
 
+Partie 3, `70733f3` (2026-11-25) : `verify --full` — rapport dans `verification.md` ; intégration 33/33
+(avec les suites du catalogue et des rôles : 88/88) ; navigateur 28/28.
+
 Partie 4 (avec FEAT-024), `83c65db` (2026-11-24) : `verify --full` sans nouvel échec, E2E indisponible
 (rapport dans `../FEAT-024-saisies-verifiees/verification.md`) ; intégration 25/25 ; navigateur 30/30.
 
@@ -96,7 +99,8 @@ commit avait rencontré un test instable hors de la feature (`TEST-06`, voir `re
   retirait le changement de l'autre champ ; un membre de l'équipe d'un restaurant atteignait le dossier
   d'un autre), 9 mineurs, 6 notes — corrigés dans `6163d15` (FEAT-022-Q25 ajoutée) ; tour 2 : 5
   mineurs et 1 note, corrigés (statut figé pendant la vérification, un restaurant par responsable
-  aussi par `POST /restaurants` et par l'administration, message de « Papiers ») — voir `review.md`.
+  aussi par `POST /restaurants` et par l'administration, message de « Papiers ») ; tour 3 : « Prêt
+  pour PR », une note corrigée (`70733f3`) — voir `review.md`.
 - Limite : le numéro Mobile Money d'un restaurant n'est pas encore lu par les règlements des
   restaurants (enregistrés à la main par la finance, `settlements`) ; il est visible, masqué, dans le
   dossier.

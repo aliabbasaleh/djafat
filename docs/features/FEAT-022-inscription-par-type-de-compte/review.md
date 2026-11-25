@@ -1,4 +1,4 @@
-# FEAT-022 — Revue qualité (parties 1 et 2)
+# FEAT-022 — Revue qualité (partie 3 : restaurants)
 
 <!--
 Produit par /feature-review (sous-agent spec-reviewer, contexte neuf).
@@ -6,16 +6,18 @@ Deux parties séparées : ce que les OUTILS ont mesuré (déterministe) et ce qu
 la REVUE juge (avis argumenté). Ne jamais présenter un avis comme une mesure.
 -->
 
-Périmètre : tranches 1 (fondations) et 2 (livreurs) de `brief.md` — base `78dd615`. Les tranches 3
-(restaurants, page « Quartiers ») et 4 (écrans d'inscription) sont hors de cette revue.
+Périmètre : la tranche 3 de `brief.md` — quatre étapes de la console restaurant (SPEC-022-05),
+décisions des restaurants et changements après la validation (SPEC-022-07), page « Quartiers »
+(SPEC-022-09), photos des restaurants (SPEC-022-04). Base `c832501` (tête de la PR #32). Les revues
+des parties 1-2 (PR #31) et 4 (`../FEAT-024-saisies-verifiees/review.md`) restent dans l'historique.
 
 ## 1. Résultats déterministes
 
-**verify:full** sur `230d5eb` — 2026-11-24T04:18:18.911Z
+**verify:full** sur `70733f3` — 2026-11-25T13:20:25.603Z
 
 | Vérification       | Résultat        | Détail                                                                            |
 | ------------------ | --------------- | --------------------------------------------------------------------------------- |
-| `format`           | ✅ pass         | 6s                                                                                |
+| `format`           | ✅ pass         | 7s                                                                                |
 | `specs`            | ✅ pass         | 0s                                                                                |
 | `hygiene`          | ✅ pass         | 0s                                                                                |
 | `arch`             | ✅ pass         | 1s                                                                                |
@@ -26,81 +28,88 @@ Périmètre : tranches 1 (fondations) et 2 (livreurs) de `brief.md` — base `78
 | `test`             | ✅ pass         | 24/24 tasks ok                                                                    |
 | `build`            | ✅ pass         | 16/16 tasks ok                                                                    |
 | `audit`            | ✅ pass         | no advisory beyond the baseline                                                   |
-| `test:int`         | ✅ pass         | 66s                                                                               |
+| `test:int`         | ✅ pass         | 73s                                                                               |
 | `e2e`              | ⚪ indisponible | no versioned E2E suite yet — the 19-step pilot is a manual runbook (docs/36 §6.4) |
 
 **Verdict** : no new failure — NOT all green (0 pre-existing failure(s), 1 unavailable, 0 skipped)
 
-Premier passage à `230d5eb` (04:09Z) : un échec dans `test` — `apps/api/src/modules/deliveries/delivery-code-retrieval.spec.ts:68`, hors de la feature (module non modifié) : le code de livraison tiré au hasard (« 6731 ») figurait par hasard dans l'empreinte hexadécimale (`9579fed16c7fe6731713…`), environ une fois sur mille. Test non modifié ici ; consigné comme constat `TEST-06` (docs_2, sync S-048). Le passage répété, ci-dessous, est celui retenu.
+**Traçabilité** (`node scripts/pipeline/check-specs.mjs --matrix FEAT-022`) : chaque scénario de
+FEAT-022 est relié à un test ou à une capture.
+
+**Autres mesures** (même code) :
+
+- intégration `apps/api/test/account-onboarding.int.spec.ts` : 33/33 sur une base neuve (PostgreSQL
+  avec PostGIS, Redis), dont l'accord d'un changement avec le vrai code d'authentification ;
+- navigateur (console restaurant et console admin en 1280×800, application livreur en version web
+  390×844) : 28/28 contrôles, captures `assets/exec-SPEC-022-05-*`, `exec-SPEC-022-07-*`,
+  `exec-SPEC-022-09-*` ;
+- **non vérifié** : les tuiles de la carte (le navigateur de test n'y accède pas : fond gris, le
+  point s'affiche) ; l'envoi réel des e-mails (fournisseur simulé).
 
 ## 2. Constats de revue
 
-### Tour 1 — `08c1ae3` (sous-agent spec-reviewer, 2026-11-23)
+### Tour 1 (`72d155d`) — corrections requises : 1 bloquant, 3 majeurs, 9 mineurs, 6 notes
 
-Verdict du tour 1 : corrections requises (1 bloquant, 4 majeurs, 9 mineurs, 9 notes). Les corrections
-sont dans `ad01d05`.
+| #   | Sévérité | Constat (résumé)                                                                                                  | Suite                                                                                                                                  |
+| --- | -------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | bloquant | un responsable pouvait faire supprimer le logo d'un autre restaurant (adresse visant sa photo, puis un envoi)     | corrigé (`6163d15`) : adresse de logo ou de couverture refusée à un responsable (403, Q20) ; photo supprimée seulement si plus montrée |
+| 2   | majeur   | l'étape 2 comptait des plats que les clients ne voient pas (désactivés, sans catégorie, catégorie masquée)        | corrigé : plat actif dans une catégorie active (SPEC-022-05 v3) ; tests du domaine et d'intégration par l'API                          |
+| 3   | majeur   | « Papiers » renvoyait les deux champs : enregistrer l'un retirait le changement en attente de l'autre             | corrigé : seuls les champs changés partent ; le formulaire part de la valeur en attente ; test SDK et contrôle navigateur              |
+| 4   | majeur   | un membre de l'équipe d'un restaurant, devenu responsable d'un autre, pouvait atteindre les papiers du premier    | corrigé : restaurant trouvé par le rôle de responsable ; « Inscrire mon restaurant » refusé à un membre d'équipe (SPEC-022-08 v4, Q25) |
+| 5   | mineur   | verrous de la vérification lus hors du verrou du dossier (horaires, « Profil ») ; deux envois de logo sans verrou | corrigé : même verrou consultatif partout                                                                                              |
+| 6   | mineur   | application livreur : une photo illisible échouait sans message (extraction de la feuille photo)                  | corrigé : message                                                                                                                      |
+| 7   | mineur   | console restaurant : photos non réduites avant l'envoi (Q09)                                                      | corrigé : réduites au-delà de 4 Mo (2 560 px, JPEG)                                                                                    |
+| 8   | mineur   | « voir la photo » et « Ouvrir » ne disaient pas de quel changement il s'agit                                      | corrigé : noms accessibles                                                                                                             |
+| 9   | mineur   | « Valider » refusé (étape qui ne tient plus) sans la liste des étapes                                             | corrigé : étapes nommées, page rechargée                                                                                               |
+| 10  | mineur   | numéros affichés au format international ; « Airtel » dit pour un portefeuille Moov                               | corrigé : affichage national ; « Mobile Money », « frais de l'opérateur »                                                              |
+| 11  | mineur   | trois fonctions du domaine utilisées par leur seul test                                                           | corrigé : deux retirées, la troisième sert aux schémas                                                                                 |
+| 12  | mineur   | « Sources » du brief périmées                                                                                     | corrigé                                                                                                                                |
+| 13  | note     | l'assertion du test d'intégration SC01 (`items + changes`) changée                                                | jugée justifiée par la revue (SPEC-022-07 v5 R1, Q22)                                                                                  |
+| 14  | note     | le dépôt `application-changes.repository.ts` dans `common/`                                                       | accepté par la revue (une table, deux modules qui ne s'importent pas) ; doublons proches entre les deux services, notés                |
+| 15  | note     | Q19, Q20, Q22 sont des choix de produit notés en hypothèses                                                       | soumis à l'utilisateur dans la PR (avec Q25)                                                                                           |
+| 16  | note     | `verification.md` portait le passage de `230d5eb`                                                                 | régénéré au commit final                                                                                                               |
+| 17  | note     | « la nouvelle photo … Il remplace l'ancien » dans l'e-mail                                                        | corrigé : « Elle remplace l'ancienne »                                                                                                 |
+| 18  | note     | pas de moyen au clavier de placer le point précisément                                                            | corrigé : « Placer le point au centre de la carte » (la carte se déplace aux flèches)                                                  |
 
-| #   | Sévérité | Emplacement                                                                     | Constat                                                                                                                                                                      | Justification                                                | Correction (`ad01d05`)                                                                                                                                                                                |
-| --- | -------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | bloquant | `apps/api/src/modules/catalog/restaurants-management.service.ts:22`, `:229-238` | Le responsable d'un restaurant inscrit pouvait le rendre visible lui-même (`PATCH … {status: 'active'}`, ou « Fermer maintenant » puis « Rouvrir ») sans décision de DJAFAT. | FEAT-022-AC04, AC08 ; SPEC-022-03 R3, SC02 ; SPEC-022-07 R3  | Refusé tant que le dossier n'est pas `approved` : 409 `RESTAURANT_NOT_APPROVED` ; sans dossier (créé par l'équipe), règle d'avant. Tests unitaires et HTTP réel. SPEC-022-03 v2.                      |
-| 2   | majeur   | `apps/api/src/infra/storage/photo-upload.ts:36-65`                              | L'analyseur des photos s'appliquait à toutes les routes : n'importe quel POST anonyme lisait jusqu'à 5 Mo (20 Mo drainés) avant les gardes.                                  | Ligne 14 du fichier ; durcissement contre le déni de service | Lecture seulement sur `…/application/files/:kind` et avec une session ; toute autre route : 415 sans rien lire (test : le flux n'est jamais démarré). SPEC-022-04 v4.                                 |
-| 3   | majeur   | `apps/api/src/infra/storage/filesystem-object-storage.ts:34-41`                 | Disque plein : 500 et fichier temporaire laissé (puis sauvegardé).                                                                                                           | SPEC-022-04 « Erreurs et cas limites »                       | 507 `STORAGE_FULL` (inscrit) et fichier temporaire supprimé pour tout échec d'écriture ; test avec un écrivain qui échoue.                                                                            |
-| 4   | majeur   | `apps/api/src/modules/admin/neighbourhoods-admin.controller.ts`                 | Pas de page « Quartiers » ni de noms saisis sous « Autre » ; le test cité pour SPEC-022-09-SC02 ne vérifiait que la base.                                                    | SPEC-022-09 R3, R4, SC02                                     | Reporté explicitement en tranche 3 (`brief.md`) ; le test cite SPEC-022-09 R2.                                                                                                                        |
-| 5   | majeur   | `apps/api/src/infra/storage/photo-file.ts:72-75`                                | Tout ce qui suit la fin d'image d'un JPEG était gardé : images ajoutées par le téléphone (avec leur EXIF, parfois la position), traînes, vidéos.                             | SPEC-022-04 l. 86-87 ; FEAT-022-Q09                          | Données lues jusqu'à EOI (octets bourrés, RSTn, segments entre passes progressives), le reste supprimé ; APP2 « MPF » supprimé ; JPEG sans fin refusé. Tests.                                         |
-| 6   | mineur   | `apps/api/src/modules/catalog/restaurant-onboarding.service.ts:28-44`           | Deux inscriptions simultanées du même nom se heurtaient sur l'adresse web, signalée comme « e-mail déjà utilisé ».                                                           | SPEC-022-03-SC04                                             | Verrou de transaction sur l'adresse avant de choisir ; une collision n'est attribuée au numéro ou à l'e-mail que s'ils existent vraiment. Tests.                                                      |
-| 7   | mineur   | `infra/deploy/restore-check.sh:50-55`, `backup.sh:9-12`                         | Le contrôle passait sans archive des photos ; la sauvegarde sautait les photos en silence sans volume.                                                                       | SPEC-022-04 R5, SC05                                         | `restore-check.sh` exige l'archive de la même nuit et chaque photo citée par la base ; `backup.sh` écrit l'échec. Syntaxe vérifiée ; SC05 reste manuel sur le serveur.                                |
-| 8   | mineur   | `assets/exec-SPEC-022-0[67]-*.png`                                              | Captures non versionnées et en retard sur le code (🛵 pour un vélo).                                                                                                         | CLAUDE.md : un résultat ancien est périmé                    | Reprises sur le code corrigé (21 contrôles du navigateur) et versionnées avec la PR.                                                                                                                  |
-| 9   | mineur   | `specs/SPEC-022-04.md:34` contre `SPEC-022-06.md:100`                           | R6 de SPEC-022-04 contredisait les Contrats de SPEC-022-06 v3 ; le test citait R6 en affirmant l'inverse.                                                                    | Les specs doivent s'accorder ; un test énonce la spec        | SPEC-022-04 v4 limite R6 aux changements après validation ; le test cite SPEC-022-06 (Contrats).                                                                                                      |
-| 10  | mineur   | `account-notice.provider.spec.ts:132`, `application-checklists.spec.ts:109`     | Ces tests citaient SPEC-022-07-SC02 et SPEC-022-05-SC01 sans en vérifier le résultat (tranche 3).                                                                            | Procédure de revue ; critères de fin du brief                | Ils citent SPEC-022-07 R5 et SPEC-022-05 R1, R6 ; la matrice ne les compte plus comme couverts.                                                                                                       |
-| 11  | mineur   | `apps/api/test/account-onboarding.int.spec.ts:393`                              | Signature « falsifiée » parfois identique (1 chance sur 64) : test instable.                                                                                                 | Tests déterministes (Linux, Windows)                         | Le dernier caractère est toujours changé.                                                                                                                                                             |
-| 12  | mineur   | `apps/courier/app/(app)/onboarding.tsx:82`, `home.tsx:68,82`                    | Nouvelle désactivation `exhaustive-deps` ; l'ancienne cachait aussi `router`.                                                                                                | CLAUDE.md « Never … »                                        | `[router, signOut]` (identités stables), désactivation retirée ; `home.tsx` liste `router`.                                                                                                           |
-| 13  | mineur   | `apps/courier/app/(app)/onboarding.tsx:309`, `:232-235`, `:216`                 | Radios en `aria-selected`, sans groupe nommé ; « En ligne » grisé sans lien vers son explication ; erreur sans région live sur TalkBack.                                     | SPEC-022-06 « UI et accessibilité »                          | `aria-checked` dans des `radiogroup` nommés ; `hint` et `aria-describedby` sur « En ligne » ; région live polie. Vérifié dans le navigateur.                                                          |
-| 14  | mineur   | `apps/api/src/infra/storage/photo-file.ts:84`                                   | L'orientation EXIF partait avec l'EXIF : photos en portrait affichées couchées.                                                                                              | SPEC-022-07 R2 (papiers lisibles)                            | EXIF minimal gardant la seule orientation (gros et petit boutiste). Tests.                                                                                                                            |
-| 15  | note     | `migrations/0041_account_onboarding/migration.sql:34-35`                        | CHECK de `vehicle_type` sans normalisation préalable.                                                                                                                        | Données existantes                                           | Non modifié : 0041 est déjà appliquée sur la base de développement (modifier la migration casserait la somme de contrôle de Prisma) ; aucune valeur n'était écrite dans cette colonne avant FEAT-022. |
-| 16  | note     | `courier-application.service.ts:347-351`                                        | `ALREADY_DECIDED` aussi pour un dossier jamais envoyé.                                                                                                                       | SPEC-022-07 R7                                               | 409 `APPLICATION_NOT_SUBMITTED` (inscrit) ; SPEC-022-07 v3.                                                                                                                                           |
-| 17  | note     | `file-keys.ts:14-15`, `bootstrap.ts:29`                                         | Forme des clés et commentaire « multipart » en retard sur le code.                                                                                                           | Q08 révisée                                                  | SPEC-022-04 v4 ; commentaire corrigé.                                                                                                                                                                 |
-| 18  | note     | `courier-application.service.ts:184-189`                                        | Après un passage à vélo, permis et papiers du véhicule restaient stockés.                                                                                                    | SPEC-022-06 R3                                               | Photos supprimées au changement ; SPEC-022-06 v4 ; test.                                                                                                                                              |
-| 19  | note     | `users.service.ts:600`, `logging.module.ts:31-42`                               | Lien signé (5 min) dans les journaux ; suppression de compte sans effacer le dossier.                                                                                        | Données personnelles hors des journaux                       | Journaux : requête des `/files/…?sig=` retirée (vérifié sur l'API réelle). Suppression de compte : à traiter quand elle sera branchée (aucun appelant).                                               |
-| 20  | note     | `migration.sql:98-111`                                                          | `application_changes` sans ancienne valeur.                                                                                                                                  | SPEC-022-07 l. 117                                           | Tranche 3.                                                                                                                                                                                            |
-| 21  | note     | `infra/deploy/gen-secrets.sh:15`, `.env.example`                                | Variables du stockage absentes des exemples ; un serveur existant ne reçoit pas `FILE_URL_SECRET`.                                                                           | Q09                                                          | `.env.example` et `infra/deploy/README.md` (serveur déjà installé).                                                                                                                                   |
-| 22  | note     | `package.json:3`, `docs/ROADMAP.md`                                             | Pas de version ni de ligne de journal.                                                                                                                                       | CLAUDE.md « Every push = a version »                         | 0.26.0 dans le commit envoyé.                                                                                                                                                                         |
-| 23  | note     | `apps/courier/lib/application.ts:85-87`                                         | `canSubmit` vrai sans véhicule (liste vide).                                                                                                                                 | Robustesse                                                   | Exige un véhicule et une liste non vide ; « Véhicule : à choisir ». Test.                                                                                                                             |
+### Tour 2 (`6163d15`) — corrections requises : 5 mineurs, 1 note (aucun bloquant ni majeur)
 
-### Tour 2 — `ad01d05`
+Le sous-agent s'est arrêté une première fois en cours de lecture (limite d'utilisation du compte) ;
+il a repris après la levée de la limite et rendu ce tour. Constats du tour 1 jugés clos : 1 à 12, 17
+et 18 ; 13 et 14 sans suite ; 15 (décisions à confirmer) et 16 (rapport) restent des étapes de PR.
 
-Verdict du tour 2 : bloquant résolu ; tous les autres constats résolus, reportés explicitement (4 :
-page « Quartiers » en tranche 3 ; 20 : tranche 3) ou acceptés sans changement (15, 22 : version dans le
-commit envoyé). Restaient le constat 2 en partie (seulement la présence de l'en-tête vérifiée), le 8
-(captures à versionner) et deux nouveaux constats mineurs. Corrections dans `b8d1c9c`.
+| #    | Sévérité | Constat (résumé)                                                                                                | Suite                                                                                                                                                     |
+| ---- | -------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R2-1 | mineur   | un responsable pouvait mettre son restaurant en « brouillon » pendant la vérification (reporté des parties 1-2) | corrigé (`957be96`) : statut figé pendant la vérification (409 `APPLICATION_LOCKED`, SPEC-022-05 v4 R5) ; « actif » avant l'accord garde sa réponse       |
+| R2-2 | mineur   | `POST /restaurants` : un responsable inscrit pouvait créer d'autres restaurants, avec des adresses de photo     | corrigé : un restaurant par responsable (409), pas d'adresse de photo (403) ; l'équipe crée comme avant (la création par un responsable reste : Bloc 9.1) |
+| R2-3 | mineur   | « un compte n'atteint jamais deux restaurants » : l'administration pouvait encore le faire                      | corrigé : l'attribution d'un rôle de restaurant pour un autre restaurant est refusée (409) ; règle écrite sur les trois chemins (SPEC-022-08 v5, Q25)     |
+| R2-4 | mineur   | « Papiers » disait « enregistrés » alors que l'étape 4 n'était pas complète                                     | corrigé : « Enregistré. Il reste : … »                                                                                                                    |
+| R2-5 | mineur   | `progress.md` (31/31) et `review.md` sans la partie 3                                                           | corrigé                                                                                                                                                   |
+| R2-6 | note     | un logo PNG transparent réduit devenait noir ; pas d'état d'attente pendant la réduction                        | corrigé : fond blanc ; bouton occupé pendant la réduction                                                                                                 |
 
-| #   | Sévérité | Emplacement                                                                | Constat                                                                                                                                                                                                                                       | Correction (`b8d1c9c`)                                                                                                                                                      |
-| --- | -------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| N1  | mineur   | `apps/api/src/infra/storage/photo-upload.ts:71`                            | Un `Authorization: Bearer x` forgé faisait encore lire jusqu'à 20 Mo à la route d'envoi avant le 401 du garde.                                                                                                                                | Le jeton d'accès est vérifié (signature, expiration — `TokenService.verifyAccessToken`, sans I/O) avant le premier octet ; test : jeton forgé, rien lu.                     |
-| N2  | mineur   | `apps/courier/app/(app)/onboarding.tsx:170`                                | Un toucher sur « Vélo » ou « À pied » supprimait aussitôt jusqu'à quatre photos déjà envoyées, sans confirmation.                                                                                                                             | « Passer à Vélo ? … seront supprimées » avec « Oui » / « Non, garder Moto » ; test de la règle ; capture `exec-SPEC-022-06-R3-confirmation-390.png`.                        |
-| N3  | note     | `apps/api/src/infra/storage/photo-upload.ts:62-69`                         | Un chemin inconnu envoyé avec ces types répond 415 au lieu de 404 (l'analyseur passe avant le 404).                                                                                                                                           | Accepté : sans effet.                                                                                                                                                       |
-| 3   | note     | `apps/api/src/infra/storage/filesystem-object-storage.ts:46`               | La première création du dossier, hors du `try`, donnait encore 500 sur un disque plein.                                                                                                                                                       | Dans le `try` : 507 aussi.                                                                                                                                                  |
-| 4   | note     | `place-name.spec.ts:18`, `onboarding.schema.spec.ts:8`, test d'intégration | Deux tests citaient encore SPEC-022-09-SC02 ; le test d'intégration citait R2 pour la première moitié de R3.                                                                                                                                  | Ils citent SPEC-022-09 R3 ; la matrice ne compte plus SC02.                                                                                                                 |
-| 6   | note     | `restaurant-onboarding.service.ts`                                         | Le verrou est par base d'adresse : « Chez Fatimé 2 » inscrit pendant qu'un second « Chez Fatimé » prend `-2`, ou un restaurant créé par l'administration au même instant, peuvent encore se heurter (erreur 500 désormais, plus de faux 409). | Accepté : rare ; à reprendre si cela arrive.                                                                                                                                |
-| 7   | note     | `infra/deploy/backup.sh`, `restore-check.sh:69`                            | Archive écrite sous son nom définitif ; `grep -qx` traitait le point des clés comme un joker.                                                                                                                                                 | Archive écrite en `.part` puis renommée ; `grep -Fqx` ; une photo remplacée entre la sauvegarde de la base et l'archive peut faire échouer une nuit (écrit dans le script). |
-| 1   | note     | `restaurants-management.service.ts:22`                                     | Le responsable peut encore passer son restaurant de `pending_review` à `draft` (statut libre-service).                                                                                                                                        | Tranche 3 (l'envoi du dossier restaurant y est construit).                                                                                                                  |
-| 8   | mineur   | `assets/exec-*.png`                                                        | Captures non versionnées.                                                                                                                                                                                                                     | Reprises sur `b8d1c9c` (23 contrôles du navigateur réussis) et versionnées avec la version 0.26.0.                                                                          |
+Contrôles après ces corrections : `verify:fast` sans échec ; intégration (dossiers, catalogue, rôles
+de l'administration) 88/88 sur une base neuve ; `verify --full` au commit final (section 1).
 
-Axes couverts : exactitude fonctionnelle vs specs · régressions · sens des
-dépendances · placement des responsabilités · sécurité et autorisations ·
-adéquation des tests (testent la SPEC, pas l'implémentation) · abstractions
-superflues · critères visuels et accessibilité.
+### Tour 3 (`957be96`)
+
+« Prêt pour PR » : constats du tour 2 clos (R2-1 à R2-4, R2-6 ; R2-5 clos avec ce fichier). Une
+note :
+
+| #    | Sévérité | Constat (résumé)                                                                                                             | Suite                                                                                         |
+| ---- | -------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| R3-1 | note     | le responsable d'un restaurant créé par l'équipe (`ownerUserId` = l'administrateur) pouvait encore créer un second brouillon | corrigé (`70733f3`) : le rôle de responsable compte aussi ; test unitaire (sans nouveau tour) |
+
+Restent des étapes de PR, pas du code : les décisions Q19, Q20, Q22 et Q25 à confirmer par
+l'utilisateur ; ce fichier et le rapport de `verify --full` du commit final, commités avec la PR.
+
+Axes couverts : exactitude fonctionnelle vs specs · régressions (parties 1, 2 et 4, versements
+FEAT-014, restaurants et livreurs de l'équipe, règles de FEAT-024) · sens des dépendances (aucune
+nouvelle arête : port `COURIER_PAYOUT_ACCOUNT_PORT`) · placement des responsabilités · sécurité et
+isolation (portée du responsable, papiers par lien signé, code d'authentification après le contrôle
+du rôle, R8) · intégrité (un changement par chose, photos remplacées ou refusées supprimées) ·
+adéquation des tests · accessibilité.
 
 ## 3. Verdict
 
-**Prêt pour PR.** Aucun constat bloquant ni majeur ouvert après deux tours ; `verify --full` sans nouvel échec à `230d5eb` (E2E indisponible : pas de suite versionnée). Limites connues : pas essayé sur un vrai téléphone (appareil photo, galerie) ; `restore-check.sh` non exécuté sur le serveur ; tranches 3 et 4 à venir (page « Quartiers », restaurants, changements après validation, écrans d'inscription).
-
-## Tranche 4 (avec FEAT-024, 2026-11-24)
-
-La tranche 4 (écrans d'inscription par type, « Mon profil », e-mail de bienvenue) a été revue avec
-FEAT-024, dans la même PR : trois tours de revue indépendante, verdict « Prêt pour PR » sur `83c65db`,
-`verify --full` sans nouvel échec (E2E indisponible). Rapport complet :
-[`../FEAT-024-saisies-verifiees/review.md`](../FEAT-024-saisies-verifiees/review.md). Constats propres
-à FEAT-022, corrigés : focus des formulaires, rôles lus en base dans « Mon profil », restes d'un rôle
-retiré (409), un administrateur ne décide pas de son propre dossier (SPEC-022-07 v4, R8, SC08),
-session gardée dès le bon code dans l'application client. Limite : écrans de l'application client à
-vérifier sur un téléphone. **À fusionner avec la tranche 3.**
+**Prêt pour PR** (tour 3 du sous-agent indépendant) : aucun constat ouvert dans le code ; la note
+R3-1 est corrigée depuis. À la fusion : après la PR #32, et une fois les décisions Q19, Q20, Q22 et
+Q25 confirmées par l'utilisateur.
