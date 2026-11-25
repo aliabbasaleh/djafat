@@ -10,9 +10,9 @@ après toute modification de code, spec, capture ou config qualité, relancer.
 | Étape                   | Statut | Date       | Notes                                                                                                                                |
 | ----------------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Intake                  | fait   | 2026-11-23 | `check:specs` sans erreur ; chaque critère relié au code ci-dessous ; six maquettes texte lues                                       |
-| Specs                   | fait   | 2026-11-25 | SPEC-022-01 à 09 implémentées ; 09 en v2, 01 et 03 en v3, 02, 04, 05 et 06 en v4, 07 et 08 en v5                                     |
-| Grill-me                | fait   | 2026-11-25 | Q01 à Q06 et Q13, Q14 tranchées par l'utilisateur ; Q07 à Q12 et Q15 à Q25 hypothèses (Q18 à Q25 : partie 3)                         |
-| Brief                   | fait   | 2026-11-25 | quatre tranches ; la 4 avant la 3, mises en ligne ensemble (FEAT-022-Q14) ; ré-épinglé pour la partie 3 (05@4, 07@5, 08@5, 09@2)     |
+| Specs                   | fait   | 2026-11-25 | SPEC-022-01 à 09 implémentées ; 09 en v2, 01 et 03 en v3, 02, 04 et 06 en v4, 05, 07 et 08 en v5                                     |
+| Grill-me                | fait   | 2026-11-25 | tranchées par l'utilisateur : Q01 à Q06, Q13, Q14, Q18 à Q22, Q25 ; hypothèses : Q07 à Q12, Q15 à Q17, Q23, Q24                      |
+| Brief                   | fait   | 2026-11-25 | quatre tranches ; la 4 avant la 3, mises en ligne ensemble (FEAT-022-Q14) ; ré-épinglé pour la partie 3 (05@5, 07@5, 08@5, 09@2)     |
 | Tests dérivés des specs | fait   | 2026-11-25 | chaque scénario lié à un test ou à une capture (`check-specs --matrix FEAT-022`) ; partie 3 : unitaires, SDK et intégration 33/33    |
 | Implémentation          | fait   | 2026-11-25 | parties 1, 2 (PR #31), 4 (PR #32, avec FEAT-024) et 3 (branche `feat/inscription-restaurants`)                                       |
 | Revue qualité           | fait   | 2026-11-25 | parties 1-2 : PR #31 ; partie 4 : voir `../FEAT-024-saisies-verifiees/review.md` ; partie 3 : trois tours indépendants (`review.md`) |
@@ -54,6 +54,10 @@ Constats :
   restaurant : nom et quartier à l'inscription ; livreur : véhicule et quartier ; les quatre blocs du
   restaurant et les quatre groupes de papiers du livreur ; photos des papiers prises dans
   l'application ; un compte, plusieurs rôles.
+
+- 2026-11-25, l'utilisateur : FEAT-022-Q18 à Q22 et Q25 confirmées (menu modifiable pendant la
+  vérification, véhicule et contact d'urgence figés une fois validé, logo et couverture en photos,
+  code d'authentification pour accepter un changement, nombre des onglets, un compte par restaurant).
 
 ## Bloquants
 
