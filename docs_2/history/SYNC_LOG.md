@@ -10,6 +10,25 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-053 — 2026-11-26 — teammate merge of the PR #33 stack into `main` (`feat/connexion-integration`)
+
+**New branch** `origin/feat/connexion-integration` by **kcerha**, one commit `c12e590` (2026-11-25): a merge
+of `origin/feat/inscription-restaurants` (`dab6e0f`, the PR #33 stack, reviewed in S-045 to S-052) into
+`main` (`c6e5ac1`, reviewed). No pull request yet. Against its two parents the merge brings four files.
+**Added:** `lint-staged.config.cjs` — the pre-commit commands leave `package.json` for a config that runs
+them in batches (Prettier 40 files, ESLint 25 per call), same commands and flags; written because a
+375-file merge made the type-aware ESLint run out of memory and passed the Windows command-line limit.
+**Changed:** `scripts/pipeline/hooks/stop.mjs` checks Prettier in batches of 40 (same flags and timeout per
+batch, stops at the first failing batch); `docs/ROADMAP.md` conflict resolved — the stack's 0.25.0 to
+0.28.2 rows with `main`'s 0.24.5 and 0.24.4 rows and their commits (`93252b8`, `631b433`), `main`'s
+wording of the « Comptes clients » row, the stack's FEAT-021 row. **Removed:** the `lint-staged` block of
+the root `package.json` (moved). **Fixed / New findings:** none (`CI-03` untouched by this commit).
+**Checked (RUN):** the config's functions, called on 60 paths, give 2 Prettier and 3 ESLint commands with
+quoted paths; one file gives the same two commands as before. **Not verified:** a real commit through the
+batched hook; Windows.
+
+---
+
 ## S-052 — 2026-11-25 — favicons from the new icon, FEAT-022 decisions confirmed, version 0.28.2
 
 **Our own commit** `0a78bdc` on `feat/inscription-restaurants` (PR #33). **Changed:** the favicons of the site,

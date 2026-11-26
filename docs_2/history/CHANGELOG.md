@@ -8,6 +8,14 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-26 — Sync S-053: teammate merge of the PR #33 stack into `main`
+
+`feat/connexion-integration` (kcerha) merges our stack into `main`, with the pre-commit commands batched
+(`lint-staged.config.cjs`) and the stop hook's Prettier check batched. Verification: the batching exercised
+(RUN); not run as a real commit nor on Windows. Nothing new learned about the code.
+
+---
+
 ## 2026-11-25 — Sync S-052: favicons from the new icon, FEAT-022 decisions confirmed, 0.28.2
 
 The three web apps' favicons come from the new icon; the user confirmed six FEAT-022 decisions (Q18–Q22, Q25).
