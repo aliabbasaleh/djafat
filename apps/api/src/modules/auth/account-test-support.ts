@@ -90,6 +90,8 @@ export function fakeOtp() {
     failures,
     consumeIpBudget: vi.fn(later(() => undefined)),
     consumeTargetBudget: vi.fn(later((to: OtpTarget) => spend(to.target))),
+    /** FEAT-023: a WhatsApp code for an account's number, in that number's budget. */
+    consumePhoneBudget: vi.fn(later((phone: string) => spend(phone))),
     requestCode: vi.fn(
       later(
         (
@@ -230,6 +232,8 @@ export function fakeUsers(initial: Account[] = [], options: { tx?: unknown } = {
         return a;
       }),
     ),
+    /** Like `UsersService.getById`: `null` for an unknown or deleted account. */
+    getById: vi.fn(later((id: string) => find((x) => x.id === id))),
     findOrCreateByPhone: vi.fn(
       later((phone: string) => {
         const a = live().find((x) => x.phone === phone);
@@ -486,6 +490,8 @@ export function fakePlatform() {
   return {
     getPasswordLoginRateLimitPerIp: vi.fn(later(() => ({ limit: 50, windowSeconds: 900 }))),
     getTrustedDeviceTtlSeconds: vi.fn(later(() => 30 * 24 * 3600)),
+    /** `otp_ttl_seconds` default: 5 minutes (FEAT-020-VIS03, FEAT-023-VIS02). */
+    getOtpTtlSeconds: vi.fn(later(() => 300)),
   } as unknown as PlatformService;
 }
 

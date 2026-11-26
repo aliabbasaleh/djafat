@@ -1,18 +1,20 @@
 import { createHmac } from 'node:crypto';
-import { HttpException, HttpStatus } from '@nestjs/common';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppConfigService } from '../../common/config/config.service';
 import type { RedisService } from '../../common/redis/redis.service';
-import type { RateLimiterService } from '../../common/rate-limit/rate-limiter.service';
-import type { OtpService } from './otp.service';
+import type { WhatsappCodeService, WhatsappReceipt } from './whatsapp-code.service';
 import { WhatsappInboundService } from './whatsapp-inbound.service';
+import { readWhatsappCode } from './whatsapp-message';
 
-// FEAT-008 — docs/features/FEAT-008-whatsapp-login (SPEC-008-02).
-// Payload shape: WhatsApp Cloud API "messages" webhook. Numbers are fictitious.
+// FEAT-008 (SPEC-008-02: signature, subscription) and FEAT-023 (SPEC-023-02:
+// a message carrying a code). Payload shape: WhatsApp Cloud API "messages"
+// webhook. Numbers are fictitious.
 
 const SECRET = 'test-app-secret';
 const PNID = '100000000000001';
-const NOW = Date.parse('2026-11-07T10:00:00Z');
+const NOW = Date.parse('2026-11-25T10:00:00Z');
+const LOGIN =
+  "Je me connecte à DJAFAT : 482915 (n'envoyez ce code que pour vous connecter vous-même)";
 
 interface Msg {
   from: string;
@@ -28,7 +30,7 @@ function msg(over: Partial<Msg> = {}): Msg {
     id: 'wamid.A1',
     timestamp: String(Math.floor(NOW / 1000) - 5),
     type: 'text',
-    text: { body: 'Code DJAFAT' },
+    text: { body: LOGIN },
     ...over,
   };
 }
@@ -45,7 +47,7 @@ function body(messages: Msg[], phoneNumberId = PNID): Buffer {
               field: 'messages',
               value: {
                 messaging_product: 'whatsapp',
-                metadata: { display_phone_number: '23560000001', phone_number_id: phoneNumberId },
+                metadata: { display_phone_number: '23566868973', phone_number_id: phoneNumberId },
                 messages,
               },
             },
@@ -60,13 +62,12 @@ const sign = (raw: Buffer, secret = SECRET) =>
   `sha256=${createHmac('sha256', secret).update(raw).digest('hex')}`;
 
 function build(
-  opts: { globalAllowed?: boolean; otpFails?: boolean; secret?: string | undefined } = {},
+  opts: { secret?: string | undefined; receipt?: WhatsappReceipt; receiveFails?: boolean } = {},
 ) {
   const values: Record<string, unknown> = {
     WHATSAPP_APP_SECRET: 'secret' in opts ? opts.secret : SECRET,
     WHATSAPP_VERIFY_TOKEN: 'verify-me',
     WHATSAPP_PHONE_NUMBER_ID: PNID,
-    WHATSAPP_MAX_CODES_PER_HOUR: 300,
   };
   const config = { get: (k: string) => values[k] } as unknown as AppConfigService;
   const seen = new Set<string>();
@@ -77,52 +78,38 @@ function build(
         seen.add(key);
         return 'OK';
       }),
+      del: vi.fn(async (key: string) => (seen.delete(key) ? 1 : 0)),
     },
   } as unknown as RedisService;
-  const rateLimiter = {
-    consume: vi.fn(async () => ({
-      allowed: opts.globalAllowed ?? true,
-      remaining: 1,
-      resetAt: new Date(NOW),
-    })),
-  } as unknown as RateLimiterService;
-  const otp = {
-    requestCode: vi.fn(async () => {
-      if (opts.otpFails) {
-        throw new HttpException(
-          { code: 'RATE_LIMITED', message: 'x' },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
+  const codes = {
+    receive: vi.fn(async () => {
+      if (opts.receiveFails) throw new Error('database down');
+      return opts.receipt ?? 'matched';
     }),
-  } as unknown as OtpService;
-  return { service: new WhatsappInboundService(otp, config, redis, rateLimiter), otp };
+  };
+  const service = new WhatsappInboundService(
+    codes as unknown as WhatsappCodeService,
+    config,
+    redis,
+  );
+  return { service, codes, redis };
 }
 
-describe('SPEC-008-02 — receive WhatsApp messages and answer with a code', () => {
-  // SPEC-008-02-SC01
-  it('SPEC-008-02-SC01 — a signed "Code DJAFAT" from a Chadian number requests a login code for +235…', async () => {
-    const { service, otp } = build();
-    const raw = body([msg()]);
-    await service.handle(raw, sign(raw), NOW);
-    expect(otp.requestCode).toHaveBeenCalledTimes(1);
-    expect(otp.requestCode).toHaveBeenCalledWith(
-      { channel: 'whatsapp', target: '+23566123456' },
-      'login',
-      null,
-    );
-  });
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
+describe('SPEC-008-02 — the signed webhook (unchanged by FEAT-023)', () => {
   // SPEC-008-02-SC02
   it('SPEC-008-02-SC02 — a wrong or missing signature is refused with 401 and nothing is processed', async () => {
-    const { service, otp } = build();
+    const { service, codes } = build();
     const raw = body([msg()]);
     await expect(service.handle(raw, sign(raw, 'other-secret'), NOW)).rejects.toMatchObject({
       status: 401,
     });
     await expect(service.handle(raw, undefined, NOW)).rejects.toMatchObject({ status: 401 });
     await expect(service.handle(raw, 'sha256=zz', NOW)).rejects.toMatchObject({ status: 401 });
-    expect(otp.requestCode).not.toHaveBeenCalled();
+    expect(codes.receive).not.toHaveBeenCalled();
 
     const unconfigured = build({ secret: undefined });
     await expect(unconfigured.service.handle(raw, sign(raw), NOW)).rejects.toMatchObject({
@@ -142,53 +129,72 @@ describe('SPEC-008-02 — receive WhatsApp messages and answer with a code', () 
       expect.objectContaining({ status: 403 }),
     );
   });
+});
 
-  // SPEC-008-02-SC04
-  it('SPEC-008-02-SC04 — greetings, foreign numbers, stale messages, another business number and media are ignored', async () => {
-    const { service, otp } = build();
-    const ignored = [
-      body([msg({ id: 'w1', text: { body: 'Bonjour, je veux commander' } })]),
-      body([msg({ id: 'w2', from: '2356612345' })]), // +235 with 7 digits: invalid
-      body([msg({ id: 'w3', timestamp: String(Math.floor(NOW / 1000) - 11 * 60) })]),
-      body([msg({ id: 'w4' })], '999999999999999'),
-      body([{ from: '23566123456', id: 'w5', timestamp: msg().timestamp, type: 'image' }]),
-    ];
-    for (const raw of ignored) await service.handle(raw, sign(raw), NOW);
-    expect(otp.requestCode).not.toHaveBeenCalled();
-
-    // accents and case do not matter for the keyword; a valid foreign number
-    // (diaspora) is accepted, as in FEAT-005 (FEAT-008-Q03)
-    const raw = body([msg({ id: 'w6', text: { body: '  CÔDE djafat ' } })]);
-    await service.handle(raw, sign(raw), NOW);
-    const diaspora = body([msg({ id: 'w7', from: '33612345678' })]);
-    await service.handle(diaspora, sign(diaspora), NOW);
-    expect(otp.requestCode).toHaveBeenCalledTimes(2);
-    expect(otp.requestCode).toHaveBeenLastCalledWith(
-      { channel: 'whatsapp', target: '+33612345678' },
-      'login',
-      null,
-    );
+describe('SPEC-023-02 — a message carrying a code', () => {
+  // SPEC-023-02-SC01
+  it('SPEC-023-02-SC01 — a signed code message is handed over with its sender; nothing is sent back', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const { service, codes } = build();
+    const raw = body([msg()]);
+    await expect(service.handle(raw, sign(raw), NOW)).resolves.toEqual({ codesReceived: 1 });
+    expect(codes.receive).toHaveBeenCalledWith({ from: '+23566123456', code: '482915' });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  // SPEC-008-02-SC05
-  it('SPEC-008-02-SC05 — the same message delivered twice yields one code', async () => {
-    const { service, otp } = build();
+  // SPEC-023-02-SC05
+  it('SPEC-023-02-SC05 — the same message delivered twice by Meta is handed over once', async () => {
+    const { service, codes } = build();
     const raw = body([msg({ id: 'wamid.DUP' })]);
     await service.handle(raw, sign(raw), NOW);
     await service.handle(raw, sign(raw), NOW);
-    expect(otp.requestCode).toHaveBeenCalledTimes(1);
+    expect(codes.receive).toHaveBeenCalledTimes(1);
   });
 
-  // SPEC-008-02-SC06
-  it('SPEC-008-02-SC06 — hourly cap reached or per-number refusal: nothing sent, handled without error', async () => {
-    const capped = build({ globalAllowed: false });
-    const raw = body([msg()]);
-    await expect(capped.service.handle(raw, sign(raw), NOW)).resolves.toBeDefined();
-    expect(capped.otp.requestCode).not.toHaveBeenCalled();
+  // SPEC-023-02-SC06, SPEC-023-08-SC01 (« Code DJAFAT » gets nothing)
+  it('SPEC-023-02-SC06 — « Code DJAFAT », no « DJAFAT », two codes, a bad number, a stale message, a photo, another business number: ignored', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const { service, codes } = build();
+    const ignored = [
+      body([msg({ id: 'w1', text: { body: 'Code DJAFAT' } })]),
+      body([msg({ id: 'w2', text: { body: 'Bonjour, mon code est 482915' } })]),
+      body([msg({ id: 'w3', text: { body: 'DJAFAT 482915 ou 731022 ?' } })]),
+      body([msg({ id: 'w4', from: '2356612345' })]), // +235 with 7 digits: invalid
+      body([msg({ id: 'w5', timestamp: String(Math.floor(NOW / 1000) - 11 * 60) })]),
+      body([{ from: '23566123456', id: 'w6', timestamp: msg().timestamp, type: 'image' }]),
+      body([msg({ id: 'w7' })], '999999999999999'),
+    ];
+    for (const raw of ignored) {
+      await expect(service.handle(raw, sign(raw), NOW)).resolves.toEqual({ codesReceived: 0 });
+    }
+    expect(codes.receive).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 
-    const refused = build({ otpFails: true });
-    const raw2 = body([msg({ id: 'r1' }), msg({ id: 'r2', from: '23599887766' })]);
-    await expect(refused.service.handle(raw2, sign(raw2), NOW)).resolves.toBeDefined();
-    expect(refused.otp.requestCode).toHaveBeenCalledTimes(2); // one failure does not stop the next
+  it('SPEC-023-02 R3 — the code is read whatever the case and accents, even edited, never inside a longer number', () => {
+    expect(readWhatsappCode(LOGIN)).toBe('482915');
+    expect(readWhatsappCode('djafàt 482915')).toBe('482915');
+    expect(readWhatsappCode('DJAFAT : 482915, 482915')).toBe('482915'); // pasted twice: one code
+    expect(readWhatsappCode('DJAFAT 66482915')).toBeNull(); // eight digits: a phone number
+    expect(readWhatsappCode('DJAFAT 48 29 15')).toBeNull();
+    expect(readWhatsappCode('Code DJAFAT')).toBeNull();
+  });
+
+  // SPEC-023-02 « Erreurs et cas limites »: not processed → Meta redelivers.
+  it('SPEC-023-02 « Erreurs » — a failure half-way answers 500 and lets Meta’s redelivery through', async () => {
+    const failing = build({ receiveFails: true });
+    const raw = body([msg({ id: 'wamid.RETRY' })]);
+    await expect(failing.service.handle(raw, sign(raw), NOW)).rejects.toThrow('database down');
+    expect(failing.redis.client.del).toHaveBeenCalledWith('wa:msg:wamid.RETRY');
+    await expect(failing.service.handle(raw, sign(raw), NOW)).rejects.toThrow('database down');
+    expect(failing.codes.receive).toHaveBeenCalledTimes(2);
+  });
+
+  it('a code nobody waits for or a locked sender: handled without error, counted as not received', async () => {
+    for (const receipt of ['no_code', 'locked'] as const) {
+      const { service } = build({ receipt });
+      const raw = body([msg({ id: `w-${receipt}` })]);
+      await expect(service.handle(raw, sign(raw), NOW)).resolves.toEqual({ codesReceived: 0 });
+    }
   });
 });

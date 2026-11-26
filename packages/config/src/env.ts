@@ -142,13 +142,14 @@ const OtpSchema = z.object({
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
   /** Token Meta echoes during webhook subscription — secret, environment only. */
   WHATSAPP_VERIFY_TOKEN: z.string().min(1).optional(),
-  /** DJAFAT's WhatsApp number, E.164 — used to build the wa.me link. */
+  /**
+   * DJAFAT's WhatsApp number, E.164 — the customer sends the login code to it
+   * (wa.me link, FEAT-023). DJAFAT never answers a login by WhatsApp.
+   */
   WHATSAPP_BUSINESS_NUMBER: z
     .string()
     .regex(/^\+\d{8,15}$/, 'WHATSAPP_BUSINESS_NUMBER must be E.164, e.g. +23560000001')
     .optional(),
-  /** Global cap on WhatsApp codes per hour (protects the bill beyond the free tier). */
-  WHATSAPP_MAX_CODES_PER_HOUR: intFromString(300),
   /**
    * DJAFAT's merchant wallets (FEAT-009): `airtel_money=+23560000010,tigo_cash=+23560000020`.
    * A wallet absent here is not registered, so never offered. Not a secret

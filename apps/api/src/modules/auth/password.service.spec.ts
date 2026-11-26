@@ -339,35 +339,17 @@ describe('SPEC-020-04 — log in with email and password, a code on a new device
     }
   });
 
-  it('SPEC-020-04-SC10 — WhatsApp verifies with the code DJAFAT replied to the confirmed number', async () => {
+  // SPEC-020-04 v5: WhatsApp no longer replies with a code (FEAT-023); the customer's
+  // message finishes the login — `whatsapp-code.service.spec.ts`, SPEC-023-03-SC04.
+  it('SPEC-020-04-SC10 — WhatsApp is offered for the confirmed number, masked, with no link (the code is asked for on screen)', async () => {
     const t = build(
       [account({ passwordHash: HASH, phone: '+23566123456', phoneVerifiedAt: new Date() })],
       fakeConfig({ WHATSAPP_PROVIDER: 'cloud' }),
     );
     const res = await t.service.login({ email: EMAIL, password: PASSWORD }, META);
     if (res.status !== 'code_required') throw new Error('expected a challenge');
-    expect(res.channels).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: 'whatsapp',
-          available: true,
-          link: expect.stringContaining('wa.me'),
-        }),
-      ]),
-    );
-    // The inbound webhook replied to « Code DJAFAT » with a login code (FEAT-008).
-    await t.otp.requestCode({ channel: 'whatsapp', target: '+23566123456' }, 'login', null);
-    await expect(
-      t.service.verifyChallenge(
-        {
-          challengeId: res.challengeId,
-          channel: 'whatsapp',
-          code: t.otp.lastCode().code,
-          rememberDevice: false,
-        },
-        META,
-      ),
-    ).resolves.toMatchObject({ access: expect.any(String) });
+    const whatsapp = res.channels.find((c) => c.id === 'whatsapp');
+    expect(whatsapp).toEqual({ id: 'whatsapp', available: true, destination: '+235 •• •• 34 56' });
   });
 });
 

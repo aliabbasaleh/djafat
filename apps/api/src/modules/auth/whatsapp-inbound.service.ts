@@ -13,8 +13,8 @@ import { LAUNCH_MARKET } from '@djafat/config';
 import { makePhoneInputSchema } from '@djafat/validation';
 import { AppConfigService } from '../../common/config/config.service';
 import { RedisService } from '../../common/redis/redis.service';
-import { RateLimiterService } from '../../common/rate-limit/rate-limiter.service';
-import { OtpService } from './otp.service';
+import { WhatsappCodeService } from './whatsapp-code.service';
+import { readWhatsappCode } from './whatsapp-message';
 
 const MAX_MESSAGE_AGE_MS = 10 * 60 * 1000; // FEAT-008-Q07
 const DEDUP_TTL_SECONDS = 24 * 60 * 60; // FEAT-008-Q06
@@ -39,21 +39,21 @@ interface InboundPayload {
 }
 
 /**
- * Receives the messages customers send to DJAFAT's WhatsApp number and
- * replies with a login code (FEAT-008, SPEC-008-02). The customer writes
- * first, so the reply is a free service message. A message alone never logs
- * anyone in (FEAT-008-Q01): only the reply's code does, and only the owner
- * of the number sees it.
+ * Receives the messages customers send to DJAFAT's WhatsApp number (FEAT-008,
+ * SPEC-008-02 for the signature, subscription, freshness and duplicates). Since
+ * FEAT-023 (SPEC-023-02) a message carrying a code shown on a screen is handed
+ * to `WhatsappCodeService`, which notes who sent it; DJAFAT answers nothing —
+ * Meta bills every message a business sends. FEAT-017's order messages go to
+ * the offline orders, unchanged.
  */
 @Injectable()
 export class WhatsappInboundService {
   private readonly logger = new Logger(WhatsappInboundService.name);
 
   constructor(
-    private readonly otp: OtpService,
+    private readonly codes: WhatsappCodeService,
     private readonly config: AppConfigService,
     private readonly redis: RedisService,
-    private readonly rateLimiter: RateLimiterService,
     @Optional() private readonly events?: EventEmitter2,
   ) {}
 
@@ -75,28 +75,28 @@ export class WhatsappInboundService {
     rawBody: Buffer,
     signature: string | undefined,
     now: number = Date.now(),
-  ): Promise<{ codesRequested: number }> {
+  ): Promise<{ codesReceived: number }> {
     this.assertSigned(rawBody, signature);
     let payload: InboundPayload;
     try {
       payload = JSON.parse(rawBody.toString('utf8')) as InboundPayload;
     } catch {
-      return { codesRequested: 0 }; // signed but unreadable: nothing to do, no retry loop
+      return { codesReceived: 0 }; // signed but unreadable: nothing to do, no retry loop
     }
 
     const ourNumberId = this.config.get('WHATSAPP_PHONE_NUMBER_ID');
-    let codesRequested = 0;
+    let codesReceived = 0;
     for (const entry of payload.entry ?? []) {
       for (const change of entry.changes ?? []) {
         if (change.field !== 'messages') continue;
         const value = change.value;
         if (!value || value.metadata?.phone_number_id !== ourNumberId) continue;
         for (const message of value.messages ?? []) {
-          if (await this.handleMessage(message, now)) codesRequested += 1;
+          if (await this.handleMessage(message, now)) codesReceived += 1;
         }
       }
     }
-    return { codesRequested };
+    return { codesReceived };
   }
 
   private async handleMessage(message: InboundMessage, now: number): Promise<boolean> {
@@ -107,29 +107,23 @@ export class WhatsappInboundService {
       await this.handleOrderMessage(message, text, now);
       return false;
     }
-    if (!asksForCode(text)) return false; // FEAT-008-Q02
+    const code = readWhatsappCode(text); // SPEC-023-02 R3 — « Code DJAFAT » is not one any more
+    if (!code) return false;
     const sentAt = Number(message.timestamp) * 1000;
     if (!Number.isFinite(sentAt) || now - sentAt > MAX_MESSAGE_AGE_MS) return false;
-    const phone = PhoneInput.safeParse(`+${message.from}`); // FEAT-008-Q03: same rule as FEAT-005
+    const phone = PhoneInput.safeParse(`+${message.from}`); // R4: Chad or foreign, as FEAT-005/024
     if (!phone.success) return false;
     if (!(await this.firstDelivery(message.id))) return false;
-
-    const cap = await this.rateLimiter.consume(
-      'otp:whatsapp:global',
-      this.config.get('WHATSAPP_MAX_CODES_PER_HOUR'),
-      3600,
-    );
-    if (!cap.allowed) {
-      this.logger.warn('WhatsApp login codes: hourly cap reached, message not answered');
-      return false;
-    }
     try {
-      await this.otp.requestCode({ channel: 'whatsapp', target: phone.data }, 'login', null);
-      return true;
+      const receipt = await this.codes.receive({ from: phone.data, code });
+      return receipt !== 'no_code' && receipt !== 'locked';
     } catch (err) {
-      const status = err instanceof HttpException ? err.getStatus() : 500;
-      this.logger.warn(`WhatsApp login code not sent (${status}) for ${redactPhone(phone.data)}`);
-      return false;
+      // Not processed: let Meta's redelivery through the duplicate check (R1), then answer 500.
+      await this.forget(message.id);
+      this.logger.error(
+        `WhatsApp code from ${redactPhone(phone.data)} not processed: ${err instanceof Error ? err.name : 'error'}`,
+      );
+      throw err;
     }
   }
 
@@ -175,7 +169,10 @@ export class WhatsappInboundService {
     }
   }
 
-  /** Best effort: if Redis is down, a duplicate only yields a second code under the same limits. */
+  /**
+   * Best effort: if Redis is down, a duplicate is read twice — harmless, a code
+   * is taken once (SPEC-023-02 R6) and the second read counts as a failure.
+   */
   private async firstDelivery(messageId: string): Promise<boolean> {
     try {
       const r = await this.redis.client.set(
@@ -190,6 +187,15 @@ export class WhatsappInboundService {
       return true;
     }
   }
+
+  /** A message that failed half-way is no longer « seen »: Meta's retry is processed. */
+  private async forget(messageId: string): Promise<void> {
+    try {
+      await this.redis.client.del(`wa:msg:${messageId}`);
+    } catch {
+      // Redis down: the retry is then dropped as a duplicate — logged by the caller.
+    }
+  }
 }
 
 /** FEAT-017 — the payload of `order_message.received`. */
@@ -201,16 +207,6 @@ export interface OrderMessageReceived {
 
 function isOrderMessage(text: string): boolean {
   return /^\s*djf1\s/i.test(text);
-}
-
-/** "code" anywhere, ignoring case and accents ("Code DJAFAT", "côde"). */
-function asksForCode(text: string): boolean {
-  return /\bcode\b/.test(
-    text
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
-      .toLowerCase(),
-  );
 }
 
 function safeEqual(a: string, b: string): boolean {

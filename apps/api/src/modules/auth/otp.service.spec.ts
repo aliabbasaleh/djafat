@@ -22,7 +22,6 @@ function service() {
     { get: () => undefined } as unknown as AppConfigService,
     {} as OtpDeliveryPort,
     {} as OtpDeliveryPort,
-    {} as OtpDeliveryPort,
   );
   const spies = {
     ip: vi.spyOn(otp, 'consumeIpBudget').mockResolvedValue(undefined),
@@ -107,7 +106,6 @@ function smsService(env: Record<string, string | undefined> = {}) {
     { get: (key: string) => settings[key] } as unknown as AppConfigService,
     sms as unknown as OtpDeliveryPort,
     {} as OtpDeliveryPort,
-    {} as OtpDeliveryPort,
   );
   const spies = {
     ip: vi.spyOn(otp, 'consumeIpBudget').mockResolvedValue(undefined),
@@ -191,12 +189,7 @@ describe('SPEC-024-01 — SMS: Chad mobiles only', () => {
     });
   });
 
-  it('SPEC-024-01 R7 — WhatsApp has no country rule', async () => {
-    const whatsapp = { send: vi.fn().mockResolvedValue(undefined) };
-    const { otp } = smsService();
-    (otp as unknown as { whatsappDelivery: OtpDeliveryPort }).whatsappDelivery =
-      whatsapp as unknown as OtpDeliveryPort;
-    await otp.requestCode({ channel: 'whatsapp', target: '+33612345678' }, 'login', null);
-    expect(whatsapp.send).toHaveBeenCalledWith(expect.objectContaining({ to: '+33612345678' }));
-  });
+  // SPEC-024-01 R7 (WhatsApp has no country rule) moved with WhatsApp itself: since
+  // FEAT-023 no code leaves by WhatsApp; `whatsapp-code.service.spec.ts` logs a
+  // confirmed foreign number in by its message (SPEC-023-02-SC02).
 });

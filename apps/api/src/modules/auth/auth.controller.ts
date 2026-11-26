@@ -13,8 +13,6 @@ import {
   OtpVerifySchema,
   type OtpRequestInput,
   type OtpVerifyInput,
-  WhatsappVerifySchema,
-  type WhatsappVerifyInput,
 } from './dto/otp-request.schema';
 import { RefreshSchema, type RefreshInput } from './dto/refresh.schema';
 import {
@@ -44,18 +42,8 @@ export class AuthController {
     return { methods: authMethodsFrom((key) => this.config.get(key)) };
   }
 
-  /** WhatsApp login: the code DJAFAT replied in the customer's chat (FEAT-008, SPEC-008-03). */
-  @Post('whatsapp/verify')
-  @HttpCode(200)
-  verifyWhatsapp(
-    @Body(new ZodValidationPipe(WhatsappVerifySchema)) body: WhatsappVerifyInput,
-    @Req() req: FastifyRequest,
-  ) {
-    return this.auth.verifyWhatsappAndLogin(body.phone, body.code, {
-      ...requestMeta(req),
-      countryId: null,
-    });
-  }
+  // WhatsApp login: `WhatsappController` (FEAT-023 — the customer sends the code;
+  // FEAT-008's `POST /auth/whatsapp/verify` is gone with the paid reply).
 
   @Post('otp/request')
   @HttpCode(202)

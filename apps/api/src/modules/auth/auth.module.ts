@@ -15,17 +15,13 @@ import { RolesGuard } from './guards/roles.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
 import { OwnershipGuard } from './guards/ownership.guard';
 import { StepUpGuard } from './guards/step-up.guard';
-import {
-  OTP_DELIVERY_PORT,
-  OTP_EMAIL_DELIVERY_PORT,
-  OTP_WHATSAPP_DELIVERY_PORT,
-} from './otp-delivery.token';
+import { OTP_DELIVERY_PORT, OTP_EMAIL_DELIVERY_PORT } from './otp-delivery.token';
+import { WhatsappCodeService } from './whatsapp-code.service';
+import { WhatsappController } from './whatsapp.controller';
 import { WhatsappInboundService } from './whatsapp-inbound.service';
 import { WhatsappTextReplyService } from './whatsapp-text-reply.service';
 import { WhatsappWebhookController } from './whatsapp-webhook.controller';
 import { DisabledSmsOtpDeliveryProvider } from './providers/disabled-sms-otp-delivery.provider';
-import { MockWhatsappOtpDeliveryProvider } from './providers/mock-whatsapp-otp-delivery.provider';
-import { CloudWhatsappOtpDeliveryProvider } from './providers/cloud-whatsapp-otp-delivery.provider';
 import { SmtpEmailOtpDeliveryProvider } from './providers/smtp-email-otp-delivery.provider';
 import { MockEmailOtpDeliveryProvider } from './providers/mock-email-otp-delivery.provider';
 import { MockOtpDeliveryProvider } from './providers/mock-otp-delivery.provider';
@@ -57,6 +53,7 @@ import { RoleSignupService } from './role-signup.service';
     AuthController,
     MeController,
     WhatsappWebhookController,
+    WhatsappController, // FEAT-023
     RegistrationController, // FEAT-020
     PasswordController, // FEAT-020
   ],
@@ -74,6 +71,7 @@ import { RoleSignupService } from './role-signup.service';
     StepUpGuard,
     WhatsappInboundService,
     WhatsappTextReplyService,
+    WhatsappCodeService, // FEAT-023 — the customer sends the code
     // FEAT-020 — customer accounts with an email and a password.
     RegistrationService,
     PasswordService,
@@ -116,17 +114,8 @@ import { RoleSignupService } from './role-signup.service';
         })[config.get('EMAIL_PROVIDER')](),
       inject: [AppConfigService, RedisService],
     },
-    // FEAT-008: WhatsApp channel, chosen by `WHATSAPP_PROVIDER`. `loadApiEnv`
-    // refuses `cloud` without its credentials; the mock answers 503 in production.
-    {
-      provide: OTP_WHATSAPP_DELIVERY_PORT,
-      useFactory: (config: AppConfigService, redis: RedisService) =>
-        ({
-          mock: () => new MockWhatsappOtpDeliveryProvider(redis, config),
-          cloud: () => new CloudWhatsappOtpDeliveryProvider(config),
-        })[config.get('WHATSAPP_PROVIDER')](),
-      inject: [AppConfigService, RedisService],
-    },
+    // FEAT-023: no WhatsApp code transport — DJAFAT never sends a code by
+    // WhatsApp (billed by Meta); `WhatsappCodeService` receives the customer's.
   ],
   // FEAT-022: `admin` e-mails DJAFAT's decision on an application through the same notices.
   exports: [

@@ -23,11 +23,7 @@ import { PlatformService } from '../platform/platform.service';
 import { authMethodsFrom } from './auth-methods';
 import { generateOtpCode, hashOtpCode, timingSafeEqualHex } from './crypto.util';
 import { smsUnavailable } from './providers/disabled-sms-otp-delivery.provider';
-import {
-  OTP_DELIVERY_PORT,
-  OTP_EMAIL_DELIVERY_PORT,
-  OTP_WHATSAPP_DELIVERY_PORT,
-} from './otp-delivery.token';
+import { OTP_DELIVERY_PORT, OTP_EMAIL_DELIVERY_PORT } from './otp-delivery.token';
 
 /** `@djafat/types` `OtpDeliveryPurpose` — one list for the DB CHECK, the transports and this service. */
 export type OtpPurpose = OtpDeliveryPurpose;
@@ -47,14 +43,14 @@ export interface OtpRequestOptions {
 }
 
 /**
- * Where a code goes (FEAT-007, FEAT-008). `target` is an E.164 phone for
- * `sms` and `whatsapp`, and a lower-cased email for `email`. One store, one
- * lock table, one security logic for every channel (migrations 0030, 0031).
- * A phone's SMS and WhatsApp codes share its lock and request budget, but a
- * code only verifies on the channel it was sent on.
+ * Where a code goes (FEAT-007). `target` is an E.164 phone for `sms` and a
+ * lower-cased email for `email`. One store, one lock table, one security logic
+ * for every channel (migrations 0030, 0031). WhatsApp sends no code since
+ * FEAT-023 (the customer sends one, `WhatsappCodeService`), but a phone's SMS
+ * codes and WhatsApp codes still share its lock and request budget.
  */
 export interface OtpTarget {
-  readonly channel: 'sms' | 'email' | 'whatsapp';
+  readonly channel: 'sms' | 'email';
   readonly target: string;
 }
 
@@ -87,7 +83,6 @@ export class OtpService {
     private readonly config: AppConfigService,
     @Inject(OTP_DELIVERY_PORT) private readonly delivery: OtpDeliveryPort,
     @Inject(OTP_EMAIL_DELIVERY_PORT) private readonly emailDelivery: OtpDeliveryPort,
-    @Inject(OTP_WHATSAPP_DELIVERY_PORT) private readonly whatsappDelivery: OtpDeliveryPort,
   ) {}
 
   /** SMS code to a phone (unchanged contract). */
@@ -163,11 +158,7 @@ export class OtpService {
         context: options.context ?? null,
       },
     });
-    const transport = {
-      sms: this.delivery,
-      email: this.emailDelivery,
-      whatsapp: this.whatsappDelivery,
-    }[to.channel];
+    const transport = to.channel === 'sms' ? this.delivery : this.emailDelivery;
     await transport.send({ to: to.target, code, ttlSeconds, locale: 'fr', purpose });
 
     await this.audit.log({
@@ -215,6 +206,14 @@ export class OtpService {
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
+  }
+
+  /**
+   * FEAT-023 (SPEC-023-01 R6): a WhatsApp code for an account's number counts
+   * in that number's budget, like an SMS code (429 once spent).
+   */
+  consumePhoneBudget(phone: string): Promise<void> {
+    return this.consumeTargetBudget({ channel: 'sms', target: phone });
   }
 
   /**

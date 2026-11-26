@@ -60,7 +60,8 @@ export type ChallengeSendInput = z.infer<typeof ChallengeSendSchema>;
 export const ChallengeVerifySchema = z
   .object({
     challengeId: z.string().uuid(),
-    channel: z.enum(['email', 'sms', 'whatsapp']),
+    // FEAT-023 (SPEC-023-08 R1): WhatsApp finishes a login by the customer's message, not a typed code.
+    channel: z.enum(['email', 'sms']),
     code: OtpCode,
     /** « Se souvenir de cet appareil », checked by default (FEAT-020-VIS03). */
     rememberDevice: z.boolean().default(true),

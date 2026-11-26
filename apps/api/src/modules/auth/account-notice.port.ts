@@ -3,7 +3,8 @@
  * have an account" (sent instead of a registration code, SPEC-020-03 R3),
  * "your password was changed" (SPEC-020-05) and, since FEAT-022, the welcome
  * of a courier or a restaurant and DJAFAT's decision on an application
- * (SPEC-022-07 R5), and of a change after the approval (R6). Chosen by `EMAIL_PROVIDER`, like
+ * (SPEC-022-07 R5), and of a change after the approval (R6); since FEAT-023, the alert after a
+ * login by WhatsApp (SPEC-023-04). Chosen by `EMAIL_PROVIDER`, like
  * the code transport. Best effort: a provider never throws, so a notice that
  * cannot leave never fails the request that sends it.
  */
@@ -44,6 +45,17 @@ export type AccountNotice =
       readonly status: 'approved' | 'rejected';
       /** Present when rejected. */
       readonly reason?: string;
+    }
+  /**
+   * FEAT-023 SPEC-023-04: a session was just opened by a WhatsApp message —
+   * when, and on which device (`deviceLabel`), so a customer tricked into
+   * sending a code learns it (FEAT-023-Q03).
+   */
+  | {
+      readonly kind: 'whatsapp_login';
+      readonly to: string;
+      readonly at: Date;
+      readonly device: string;
     };
 
 /** Who applied (FEAT-022): a courier, or a restaurant's owner for that restaurant. */

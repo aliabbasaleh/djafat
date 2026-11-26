@@ -12,8 +12,8 @@ import { DisabledSmsOtpDeliveryProvider } from './providers/disabled-sms-otp-del
 // FEAT-008 — docs/features/FEAT-008-whatsapp-login (SPEC-008-01).
 
 describe('SPEC-008-01 — login methods registry and switchable SMS', () => {
-  // SPEC-008-01-SC01
-  it('SPEC-008-01-SC01 — everything configured: whatsapp, sms, email available, in that order, with the wa.me link', () => {
+  // SPEC-008-01-SC01 (v4: the wa.me link moved to the code a screen asks for, SPEC-023-01 R4)
+  it('SPEC-008-01-SC01 — everything configured: whatsapp, sms, email available, in that order, no link', () => {
     const methods = listAuthMethods({
       NODE_ENV: 'production',
       WHATSAPP_PROVIDER: 'cloud',
@@ -22,11 +22,7 @@ describe('SPEC-008-01 — login methods registry and switchable SMS', () => {
       EMAIL_PROVIDER: 'smtp',
     });
     expect(methods).toEqual([
-      {
-        id: 'whatsapp',
-        available: true,
-        link: 'https://wa.me/23560000001?text=Code%20DJAFAT',
-      },
+      { id: 'whatsapp', available: true },
       { id: 'sms', available: true },
       { id: 'email', available: true },
     ]);
@@ -85,7 +81,6 @@ describe('SPEC-008-01 — a disabled SMS channel never touches budgets or the co
         get: (k: string) => (k === 'SMS_PROVIDER' ? 'disabled' : undefined),
       } as unknown as AppConfigService,
       new DisabledSmsOtpDeliveryProvider(),
-      {} as OtpDeliveryPort,
       {} as OtpDeliveryPort,
     );
     await expect(otp.requestOtp('+23566000099', 'login', '10.0.0.1')).rejects.toMatchObject({

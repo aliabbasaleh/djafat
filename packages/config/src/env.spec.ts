@@ -254,7 +254,6 @@ describe('SPEC-008-01 — WhatsApp and switchable SMS configuration', () => {
     const ok = loadApiEnv({ ...prod, ...cloud });
     expect(ok.SMS_PROVIDER).toBe('disabled');
     expect(ok.WHATSAPP_PROVIDER).toBe('cloud');
-    expect(ok.WHATSAPP_MAX_CODES_PER_HOUR).toBe(300);
     expect(ok.WHATSAPP_GRAPH_URL).toBe('https://graph.facebook.com/v21.0');
     const { WHATSAPP_ACCESS_TOKEN: _omit, ...noToken } = cloud;
     expect(() => loadApiEnv({ ...prod, ...noToken })).toThrowError(/WHATSAPP_ACCESS_TOKEN/);
@@ -262,6 +261,38 @@ describe('SPEC-008-01 — WhatsApp and switchable SMS configuration', () => {
     const dev = loadApiEnv(baseEnv);
     expect(dev.WHATSAPP_PROVIDER).toBe('mock');
     expect(dev.SMS_PROVIDER).toBe('mock');
+  });
+});
+
+describe('SPEC-023-08 — WhatsApp switches on with its settings, without the paid reply', () => {
+  // SPEC-023-08-SC02
+  it('SPEC-023-08-SC02 — production: off without its settings, on with the five of cloud, refused when one is missing; no hourly cap any more', () => {
+    const prod = {
+      ...baseEnv,
+      NODE_ENV: 'production',
+      SMS_PROVIDER: 'disabled',
+      EMAIL_PROVIDER: 'smtp',
+      SMTP_HOST: 'smtp.gmail.com',
+      SMTP_USER: 'djafat@gmail.com',
+      SMTP_PASSWORD: 'abcdefghijklmnop',
+    };
+    const off = loadApiEnv(prod);
+    expect(off.WHATSAPP_PROVIDER).toBe('mock');
+    expect(off.WHATSAPP_BUSINESS_NUMBER).toBeUndefined();
+    const cloud = {
+      WHATSAPP_PROVIDER: 'cloud',
+      WHATSAPP_ACCESS_TOKEN: 'tok',
+      WHATSAPP_PHONE_NUMBER_ID: '100000000000001',
+      WHATSAPP_APP_SECRET: 'app-secret',
+      WHATSAPP_VERIFY_TOKEN: 'verify-me',
+      WHATSAPP_BUSINESS_NUMBER: '+23566868973',
+    };
+    const on = loadApiEnv({ ...prod, ...cloud });
+    expect(on.WHATSAPP_PROVIDER).toBe('cloud');
+    expect(on.WHATSAPP_BUSINESS_NUMBER).toBe('+23566868973');
+    expect('WHATSAPP_MAX_CODES_PER_HOUR' in on).toBe(false);
+    const { WHATSAPP_APP_SECRET: _omit, ...noSecret } = cloud;
+    expect(() => loadApiEnv({ ...prod, ...noSecret })).toThrowError(/WHATSAPP_APP_SECRET/);
   });
 });
 

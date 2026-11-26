@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PhoneVerifySchema } from './dto/phone-link.schema';
 import { PhoneLinkService } from './phone-link.service';
 import {
   META,
@@ -43,7 +44,7 @@ describe('SPEC-020-06 — confirm one’s number from « Mon profil »', () => {
   it('SPEC-020-06-SC02 — the right SMS code confirms the number and audits; a wrong code is OTP_INVALID', async () => {
     const { service, otp, users, audit } = build();
     await service.request('u-a', META.ip);
-    const user = await service.verify('u-a', 'sms', otp.lastCode().code, META);
+    const user = await service.verify('u-a', otp.lastCode().code, META);
     expect(user.phoneVerifiedAt).toBeInstanceOf(Date);
     expect(users.accounts[0]?.phoneVerifiedAt).toBeInstanceOf(Date);
     expect(audit.log).toHaveBeenCalledWith(
@@ -51,25 +52,25 @@ describe('SPEC-020-06 — confirm one’s number from « Mon profil »', () => {
     );
 
     await service.request('u-b', META.ip);
-    await expect(service.verify('u-b', 'sms', '000000', META)).rejects.toMatchObject({
+    await expect(service.verify('u-b', '000000', META)).rejects.toMatchObject({
       response: { code: 'OTP_INVALID' },
     });
   });
 
-  // SPEC-020-06-SC03
-  it('SPEC-020-06-SC03 — by WhatsApp: the code DJAFAT replied to « Code DJAFAT » confirms the number', async () => {
-    const { service, otp } = build();
-    // The inbound webhook replied with a login code to the customer's own message (FEAT-008).
-    await otp.requestCode({ channel: 'whatsapp', target: PHONE }, 'login', null);
-    const user = await service.verify('u-a', 'whatsapp', otp.lastCode().code, META);
-    expect(user.phoneVerifiedAt).toBeInstanceOf(Date);
+  // SPEC-020-06-SC03 (v5): by WhatsApp the customer SENDS a code (FEAT-023) — no code is
+  // typed here; the confirmation itself is SPEC-023-02-SC07 and SPEC-023-03-SC05.
+  it('SPEC-020-06-SC03 — by WhatsApp: no typed code any more, `POST /me/phone/verify` takes the SMS one only', () => {
+    expect(PhoneVerifySchema.safeParse({ channel: 'whatsapp', code: '123456' }).success).toBe(
+      false,
+    );
+    expect(PhoneVerifySchema.safeParse({ channel: 'sms', code: '123456' }).success).toBe(true);
   });
 
   // SPEC-020-06-SC04
   it('SPEC-020-06-SC04 — a code bound to another account does not verify this one', async () => {
     const { service, otp, users } = build();
     await service.request('u-a', META.ip);
-    await expect(service.verify('u-b', 'sms', otp.lastCode().code, META)).rejects.toMatchObject({
+    await expect(service.verify('u-b', otp.lastCode().code, META)).rejects.toMatchObject({
       response: { code: 'OTP_INVALID' },
     });
     expect(users.accounts[1]?.phoneVerifiedAt).toBeNull();
