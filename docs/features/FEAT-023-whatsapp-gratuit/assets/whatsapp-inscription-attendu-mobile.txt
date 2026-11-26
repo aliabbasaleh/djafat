@@ -1,0 +1,27 @@
+FEAT-023-VIS03 — apps/web /compte, juste après l'inscription, 390x844 (mobile)
+Nature : attendu. Choisi par l'utilisateur le 2026-11-25 (question
+« Foreign no. » : « Right after sign-up », FEAT-023-Q04). Seulement pour un
+numéro étranger, et quand WhatsApp est en service ; sinon l'inscription se
+termine comme aujourd'hui.
+
+  ✅ Votre compte est créé.
+
+  Confirmer mon numéro par WhatsApp
+
+  Votre numéro +33 6 12 34 56 78 ne reçoit pas de SMS. Confirmez-le par
+  WhatsApp pour vous connecter ensuite par WhatsApp.
+
+  1. Appuyez sur le bouton : WhatsApp s'ouvre avec le message déjà écrit,
+     qui contient le code 271804.
+  2. Envoyez-le depuis ce numéro, puis revenez ici.
+
+  [        🟢 Ouvrir WhatsApp        ]
+
+  ⏳ En attente de votre message… (valable 5 min)
+
+  [ Plus tard ]
+
+ Ensuite :
+  ✅ Numéro confirmé : vous pouvez vous connecter par WhatsApp.
+  « Plus tard » : l'inscription se termine ; « Mon profil » garde
+     « Confirmer par WhatsApp ».
