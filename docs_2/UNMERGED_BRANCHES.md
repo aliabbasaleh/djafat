@@ -236,6 +236,10 @@ requests at once (their heads are ancestors of it); merge it only once its Linux
 `fix/login-method-icons` (PR #26, the owner) was closed unmerged on 2026-11-23 as superseded: FEAT-020 carries its
 icons in `apps/web/src/components/account/ChannelIcons.tsx`. The branch is gone from GitHub (seen 2026-11-27).
 
+_(updated 2026-11-27, sync S-055)_ **Merged.** PR #34 (`feat/connexion-integration` → `main`, five checks green) went in
+as `e93536b`. GitHub marked #28 merged; #31, #32 and #33 are closed with a pointer to #34; the five branches are
+deleted. #29 is brought up to date with `main` as 0.28.4 (`e245d2c`).
+
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
 
 ### What it adds

@@ -10,6 +10,32 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-055 — 2026-11-27 — the sign-up stack merged into `main` (PR #34); PR #29 brought up to date as 0.28.4
+
+**Trigger:** the user said the repository is now public, so GitHub's checks run again, and asked to merge all the
+branches. **PR #34** (`feat/connexion-integration` → `main`, opened by us on the teammate's branch with S-053, S-054
+and 0.28.3 on top): five checks green (Linux lint, typecheck, test and build; integration on PostgreSQL + Redis;
+local setup on Windows; gitleaks; pnpm audit); merged with a merge commit, `e93536b`. `main` is DJAFAT 0.28.3 and
+holds FEAT-021, FEAT-022 parts 1 to 4 and FEAT-024; its own push runs (CI, Security) are green on `e93536b`.
+**Pull requests:** GitHub marked #28 merged (its head is in `main`); #31, #32 and #33 are closed with a pointer to #34
+(GitHub refuses to retarget a branch that has no new commits; #31 closed itself when its base branch was deleted);
+the branches `feat/connexion-integration`, `feat/equipe-connexion-email`, `feat/inscription-par-type`,
+`feat/inscription-ecrans` and `feat/inscription-restaurants` are deleted. **PR #29** (`ci/cheaper-runs`): `main`
+merged in (`e245d2c`), version 0.28.4 (renumbered from 0.24.6), its S-042 records slotted under S-043, and the
+roadmap item on GitHub's checks ticked. **Verified (RUN), before the merge, at `b12a118`:** `verify --full` on a
+separate database (`djafat_auth1127`, Redis index 11, mock e-mail and SMS) — every check passes, the whole
+integration suite included (87 s), except `build`, which failed only because `NODE_ENV=development` was exported
+from `.env` (new [`TEST-07`](../FINDINGS.md#test-07)); rebuilt with `NODE_ENV=production`: 9/9. Then the sign-up and
+sign-in of the four account types in headless Chrome against production builds: 31 checks of 31
+([`../TESTING_AND_QUALITY_ASSURANCE.md`](../TESTING_AND_QUALITY_ASSURANCE.md) §5). The batched pre-commit hook ran on
+a real 379-file merge (9 ESLint and 8 Prettier batches, 32 s, nothing changed), once the worktree had its packages
+built and its dependencies installed. **Fixed:** [`CI-03`](../FINDINGS.md#ci-03), resolved on `main` since PR #1
+(root `eslint` 9.17.0) and now verified by that commit, which needed no extra `PATH`; T-407 done. **New findings:**
+`TEST-07`. **Not verified:** the customer mobile app on a phone (it has no web build); real e-mail delivery; the
+deployment of 0.28.x to the server (not done yet).
+
+---
+
 ## S-054 — 2026-11-27 — the teammate's integration branch checked out; three roadmap lines restored, version 0.28.3
 
 **Trigger:** the user asked to commit and sync the teammate's work. **Range:** `origin/feat/connexion-integration`

@@ -172,6 +172,25 @@ and delivered with the customer's code; the admin console listed the order. Afte
 was `succeeded` and the ledger balanced. One step failed: the customer has no screen showing the
 delivery code ([`FE-03`](FINDINGS.md#fe-03)). Details: [`UNMERGED_BRANCHES.md`](UNMERGED_BRANCHES.md) §3.5.
 
+### Sign-up and sign-in of the four account types _(added 2026-11-27, sync S-055)_
+
+At `b12a118`, now `main` 0.28.3, on a separate stack: the API from its build, the site and the two consoles as
+production builds (`next start`), the courier app's web export; database `djafat_auth1127` (migrated, seeded), Redis
+index 11, mock e-mail and SMS — codes read from Redis, nothing sent. Headless Chrome over the DevTools protocol:
+**31 checks of 31**.
+
+| Account    | Sign-up                                                                             | Sign-in and refusals                                                                                                                                                          |
+| ---------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Customer   | site « Créer un compte » → Client, e-mail code, signed in, role `customer`          | same browser: direct; a new device asks the e-mail code; wrong password refused; « Mot de passe oublié ? » works and the old password then fails (401)                        |
+| Courier    | site → Livreur → « ✅ Compte livreur créé », roles `courier` and `customer`         | courier app with the e-mail code, lands on « Avant votre première course » with « En ligne » locked; wrong password and a customer account refused                            |
+| Restaurant | site → Restaurant → « ✅ Compte restaurant créé », absent from the public catalogue | restaurant console with the e-mail code, the four steps; « Mot de passe oublié ? » works; a customer account refused                                                          |
+| Admin      | none by design (accounts are created by DJAFAT)                                     | after adding a verified e-mail and a password: admin console with the e-mail code, « Demandes à vérifier »; customer, courier and owner refused; wrong password refused; TOTP |
+
+Also seen: once a password exists, changing the e-mail asks for the current one (403); past 50 password attempts
+from one network in 15 minutes the API answers « Trop de tentatives depuis ce réseau »
+(`password_login_rate_limit_per_ip`, configurable). Not covered: the customer mobile app on a phone (no web build),
+real e-mail delivery, WhatsApp (off).
+
 ## 6. How to repeat the live scenarios
 
 1. Start PostgreSQL, PgBouncer and Redis (see [`DEPLOYMENT_AND_ENVIRONMENT.md`](DEPLOYMENT_AND_ENVIRONMENT.md) §2), migrate, seed.

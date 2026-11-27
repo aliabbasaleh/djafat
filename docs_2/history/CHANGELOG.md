@@ -8,6 +8,17 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-27 — Sync S-055: the sign-up stack in `main` (PR #34, 0.28.3); PR #29 updated (0.28.4)
+
+The repository is public, so GitHub's checks run again: PR #34 (the teammate's integration branch) merged with its
+five checks green; #28 marked merged, #31 to #33 closed, their branches deleted; PR #29 brought up to date as
+0.28.4. Verification: `verify --full` on a separate database (all pass but a `build` failure caused by
+`NODE_ENV=development`, `TEST-07`), and the sign-up and sign-in of customers, couriers, restaurants and admins in a
+real browser, 31/31. `CI-03` resolved, T-407 done. Learned: a fresh worktree needs `pnpm install` and the workspace
+packages built before the type-aware pre-commit ESLint means anything.
+
+---
+
 ## 2026-11-27 — Sync S-054: the integration branch checked out, three roadmap lines restored, 0.28.3
 
 The main checkout follows the teammate's `feat/connexion-integration`. Its merge had put back the pre-0.24.5 text of
