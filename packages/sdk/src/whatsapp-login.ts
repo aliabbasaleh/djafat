@@ -48,9 +48,13 @@ export function whatsappDesktopHint(businessNumber: string): string {
   return `Sur un ordinateur : envoyez ce message depuis votre téléphone au numéro WhatsApp de DJAFAT, ${whatsappNumberText(businessNumber)}.`;
 }
 
-/** SPEC-023-05 R1: « ⏳ En attente de votre message… (valable 5 min) » — the minutes left, at least 1. */
+/**
+ * SPEC-023-05 R1: « ⏳ En attente de votre message… (valable 5 min) » — the
+ * minutes left, rounded (a few seconds of clock difference with the server
+ * never show « 6 min »), at least 1.
+ */
 export function whatsappWaitingText(expiresAt: string, now: number = Date.now()): string {
-  const minutes = Math.max(1, Math.ceil((Date.parse(expiresAt) - now) / 60_000));
+  const minutes = Math.max(1, Math.round((Date.parse(expiresAt) - now) / 60_000));
   return `⏳ En attente de votre message… (valable ${minutes} min)`;
 }
 

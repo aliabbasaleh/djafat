@@ -43,7 +43,10 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
     setShown({ kind: 'loading' });
     api.auth
       .startWhatsapp()
-      .then((code) => setShown({ kind: 'code', code }))
+      .then((code) => {
+        setNow(Date.now()); // the validity counts from the code's arrival
+        setShown({ kind: 'code', code });
+      })
       .catch((err: unknown) =>
         setShown({
           kind: 'error',

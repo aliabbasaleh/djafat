@@ -11,10 +11,10 @@ après toute modification de code, spec, capture ou config qualité, relancer.
 | ----------------------- | ------- | ---------- | ---------------------------------------------------------------------------------------- |
 | Intake                  | fait    | 2026-11-25 | `feature.md` complétée avec les réponses de l'utilisateur, confirmée (« Yes, build it ») |
 | Specs                   | fait    | 2026-11-25 | SPEC-023-01 à 08                                                                         |
-| Grill-me                | à faire |            |                                                                                          |
-| Brief                   | à faire |            |                                                                                          |
-| Tests dérivés des specs | à faire |            |                                                                                          |
-| Implémentation          | à faire |            |                                                                                          |
+| Grill-me                | fait    | 2026-11-25 | aucune question produit ouverte ; Q05 à Q18 hypothèses techniques                        |
+| Brief                   | fait    | 2026-11-26 | huit specs épinglées v1                                                                  |
+| Tests dérivés des specs | fait    | 2026-11-26 | API, SDK, intégration réelle ; voir « Preuves »                                          |
+| Implémentation          | fait    | 2026-11-27 | API (`f9a8023`), écrans, SDK, guide (`7f4640c`), correctifs des captures                 |
 | Revue qualité           | à faire |            |                                                                                          |
 | PR                      | à faire |            |                                                                                          |
 
@@ -75,6 +75,35 @@ aux commandes.
 ## Décisions
 
 - FEAT-023-Q01 à Q04 tranchées par l'utilisateur le 2026-11-25 (`clarifications.md`).
+- Specs remplacées en partie, avec une version de plus et une note : SPEC-008-01 (v4), 02 (v3),
+  03 (v2), 04 (v2) ; SPEC-020-04 (v2), 06 (v3), 07 (v2) ; SPEC-021-02 (v3) ; SPEC-024-01 (v2 : le
+  refus du SMS pour un numéro étranger dit « connectez-vous par WhatsApp », plus « recevez le code
+  par WhatsApp »).
+
+## Preuves (2026-11-27)
+
+- Unitaires : API 1 246/1 246 (dont `whatsapp-code.service.spec.ts` 23, `whatsapp-inbound`,
+  `device-label`), SDK 100/100 puis `whatsapp-login.spec.ts` 15/15, cœur 251/251, config 30/30.
+- Intégration sur une base neuve (PostgreSQL + PostGIS, Redis) : 15 fichiers, 160/160, dont
+  `whatsapp-login.int.spec.ts` 5/5 (webhook signé, attente, session, e-mail du faux fournisseur).
+- Navigateur (Chrome sans tête, pile de la branche sur des ports libres, message simulé par
+  `scripts/dev/whatsapp-message.mjs`) : 13 contrôles sur 13 —
+  - site 390×844 : `exec-SPEC-023-05-SC07-whatsapp-390.png` (textes de FEAT-023-VIS02 dans
+    l'ordre, pas de champ de numéro, lien `wa.me` avec le message), `…-connecte-390.png`,
+    `…-inconnu-390.png` (les deux boutons), `…-creer-un-compte-390.png` (numéro rempli) ;
+  - inscription au numéro étranger : `exec-SPEC-023-06-SC06-etape-inscription-390.png`
+    (FEAT-023-VIS03 dans l'ordre, « Plus tard »), puis « Mon profil » :
+    `…-profil-whatsapp-390.png`, `…-profil-confirme-390.png` (« Confirmé ✓ ») ;
+  - console restaurant 1280×800 : `exec-SPEC-023-07-SC05-console-whatsapp-1280.png`,
+    `…-console-ouverte-1280.png` ; application livreur (web) 390×844 :
+    `…-livreur-whatsapp-390.png`, `…-livreur-ouvert-390.png`.
+- Corrigé grâce aux captures : « valable 6 min » au lieu de 5 (heure prise avant l'arrivée du
+  code, minutes arrondies au-dessus) ; arrondi à la minute la plus proche, heure prise à
+  l'arrivée du code.
+- **Non vérifié** : l'application client (Expo) en image — son export web échoue ici
+  (`react-native-web` absent d'`apps/mobile`, sur un écran existant, sans lien avec FEAT-023) :
+  à contrôler sur un téléphone ; le vrai Meta (aucun compte) ; l'envoi réel de l'e-mail
+  d'alerte (faux fournisseur).
 
 ## Bloquants
 
@@ -82,8 +111,8 @@ aux commandes.
 
 ## Dernière vérification
 
-Aucune pour l'instant.
+`verify:fast` sans échec au commit `7f4640c` ; `verify --full` au commit final (`verification.md`).
 
 ## Reste à faire
 
-- Grill-me, brief, tests, implémentation, captures, revue, PR.
+- Revue indépendante, `verify --full`, PR.

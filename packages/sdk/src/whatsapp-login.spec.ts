@@ -58,6 +58,10 @@ describe('SPEC-023-05 — the WhatsApp view of the site and the customer app', (
     expect(whatsappWaitingText(expiresAt, now + 299_000)).toBe(
       '⏳ En attente de votre message… (valable 1 min)',
     );
+    // A screen whose clock is a little behind the server's still reads 5 minutes.
+    expect(whatsappWaitingText(expiresAt, now - 2_000)).toBe(
+      '⏳ En attente de votre message… (valable 5 min)',
+    );
   });
 
   // SPEC-023-05-SC02

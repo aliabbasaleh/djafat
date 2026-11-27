@@ -72,7 +72,10 @@ export function WhatsappStep(props: WhatsappStepProps) {
     setShown({ kind: 'loading' });
     handlers.current
       .start()
-      .then((code) => setShown({ kind: 'code', code }))
+      .then((code) => {
+        setNow(Date.now()); // the validity counts from the code's arrival
+        setShown({ kind: 'code', code });
+      })
       .catch((err: unknown) =>
         setShown({
           kind: 'error',
