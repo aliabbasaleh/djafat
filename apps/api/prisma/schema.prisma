@@ -467,33 +467,37 @@ enum PaymentStatus {
 }
 
 model Restaurant {
-  id            String              @id @default(uuid()) @db.Uuid
-  countryId     String              @map("country_id") @db.Uuid
-  cityId        String              @map("city_id") @db.Uuid
-  city          City                @relation(fields: [cityId], references: [id])
-  ownerUserId   String?             @map("owner_user_id") @db.Uuid
-  slug          String              @unique
-  name          String
-  description   String?
-  phone         String?
-  addressText   String?             @map("address_text")
-  logoUrl       String?             @map("logo_url")
-  coverUrl      String?             @map("cover_url")
-  currency      String              @db.Char(3)
+  id                 String              @id @default(uuid()) @db.Uuid
+  countryId          String              @map("country_id") @db.Uuid
+  cityId             String              @map("city_id") @db.Uuid
+  city               City                @relation(fields: [cityId], references: [id])
+  ownerUserId        String?             @map("owner_user_id") @db.Uuid
+  slug               String              @unique
+  name               String
+  description        String?
+  phone              String?
+  addressText        String?             @map("address_text")
+  logoUrl            String?             @map("logo_url")
+  coverUrl           String?             @map("cover_url")
+  currency           String              @db.Char(3)
   /// draft | pending_review | active | paused | suspended | closed — docs/20 §6.
-  status        String              @default("draft")
+  status             String              @default("draft")
   /// Cache recomputed from `reviews` (Bloc 8+) — never written by the catalog module itself.
-  ratingAvg     Decimal             @default(0) @map("rating_avg") @db.Decimal(2, 1)
-  ratingCount   Int                 @default(0) @map("rating_count")
-  prepTimeMin   Int                 @default(20) @map("prep_time_min")
-  minOrderMinor BigInt              @default(0) @map("min_order_minor")
-  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime            @default(now()) @map("updated_at") @db.Timestamptz(6)
-  products      Product[]
-  categories    MenuCategory[]
-  hours         RestaurantHours[]
-  closures      RestaurantClosure[]
-  orders        Order[]
+  ratingAvg          Decimal             @default(0) @map("rating_avg") @db.Decimal(2, 1)
+  ratingCount        Int                 @default(0) @map("rating_count")
+  prepTimeMin        Int                 @default(20) @map("prep_time_min")
+  minOrderMinor      BigInt              @default(0) @map("min_order_minor")
+  /// FEAT-022 (SPEC-022-03, SPEC-022-05): neighbourhood from the list or typed under « Autre »; landmark.
+  neighbourhoodId    String?             @map("neighbourhood_id") @db.Uuid
+  neighbourhoodOther String?             @map("neighbourhood_other")
+  landmark           String?
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime            @default(now()) @map("updated_at") @db.Timestamptz(6)
+  products           Product[]
+  categories         MenuCategory[]
+  hours              RestaurantHours[]
+  closures           RestaurantClosure[]
+  orders             Order[]
 
   // `geom geography(Point,4326)` and the generated `search_vector tsvector`
   // exist in SQL (migration 0014) but are intentionally NOT modelled here —
@@ -855,6 +859,7 @@ model Courier {
   lastHeading      Decimal?  @map("last_heading")
   lastSpeedMps     Decimal?  @map("last_speed_mps")
   lastLocationAt   DateTime? @map("last_location_at") @db.Timestamptz(6)
+  /// moto | velo | voiture | a_pied (FEAT-022, CHECK in migration 0041); null before FEAT-022.
   vehicleType      String?   @map("vehicle_type")
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
@@ -862,7 +867,96 @@ model Courier {
   /// FEAT-010: courier holds cash at or above the ceiling; dispatch skips them.
   cashBlockedAt DateTime? @map("cash_blocked_at") @db.Timestamptz(6)
 
+  /// FEAT-022 (SPEC-022-02): the neighbourhood from the list, or the name typed under « Autre ».
+  neighbourhoodId    String?   @map("neighbourhood_id") @db.Uuid
+  neighbourhoodOther String?   @map("neighbourhood_other")
+  birthDate          DateTime? @map("birth_date") @db.Date
+
   @@map("couriers")
+}
+
+/// FEAT-022 (SPEC-022-09): N'Djamena's neighbourhoods, edited by DJAFAT.
+model Neighbourhood {
+  id        String   @id @default(uuid()) @db.Uuid
+  cityId    String   @map("city_id") @db.Uuid
+  /// Stable key of a reference-data row (R1); null = added by an admin.
+  code      String?
+  name      String
+  /// Lower-case, accents removed: unique among a city's active neighbourhoods (partial index, SQL).
+  nameKey   String   @map("name_key")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("neighbourhoods")
+}
+
+/// FEAT-022 (SPEC-022-02, SPEC-022-06): a courier's application. Photo keys are private storage keys.
+model CourierApplication {
+  courierUserId               String    @id @map("courier_user_id") @db.Uuid
+  /// to_complete | pending_review | approved | rejected
+  status                      String    @default("to_complete")
+  termsAcceptedAt             DateTime? @map("terms_accepted_at") @db.Timestamptz(6)
+  /// airtel | moov
+  mobileMoneyProvider         String?   @map("mobile_money_provider")
+  mobileMoneyNumber           String?   @map("mobile_money_number")
+  emergencyContactName        String?   @map("emergency_contact_name")
+  emergencyContactPhone       String?   @map("emergency_contact_phone")
+  facePhotoKey                String?   @map("face_photo_key")
+  idCardPhotoKey              String?   @map("id_card_photo_key")
+  drivingLicencePhotoKey      String?   @map("driving_licence_photo_key")
+  vehicleRegistrationPhotoKey String?   @map("vehicle_registration_photo_key")
+  insurancePhotoKey           String?   @map("insurance_photo_key")
+  platePhotoKey               String?   @map("plate_photo_key")
+  rejectionReason             String?   @map("rejection_reason")
+  submittedAt                 DateTime? @map("submitted_at") @db.Timestamptz(6)
+  decidedAt                   DateTime? @map("decided_at") @db.Timestamptz(6)
+  decidedBy                   String?   @map("decided_by") @db.Uuid
+  createdAt                   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("courier_applications")
+}
+
+/// FEAT-022 (SPEC-022-03, SPEC-022-05): a restaurant's application (RCCM or NIF, owner's ID, payout number).
+model RestaurantApplication {
+  restaurantId        String    @id @map("restaurant_id") @db.Uuid
+  /// to_complete | pending_review | approved | rejected
+  status              String    @default("to_complete")
+  termsAcceptedAt     DateTime? @map("terms_accepted_at") @db.Timestamptz(6)
+  registryNumber      String?   @map("registry_number")
+  registryPhotoKey    String?   @map("registry_photo_key")
+  ownerIdPhotoKey     String?   @map("owner_id_photo_key")
+  /// airtel | moov
+  mobileMoneyProvider String?   @map("mobile_money_provider")
+  mobileMoneyNumber   String?   @map("mobile_money_number")
+  rejectionReason     String?   @map("rejection_reason")
+  submittedAt         DateTime? @map("submitted_at") @db.Timestamptz(6)
+  decidedAt           DateTime? @map("decided_at") @db.Timestamptz(6)
+  decidedBy           String?   @map("decided_by") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("restaurant_applications")
+}
+
+/// FEAT-022 (SPEC-022-07 R6): a payout number or a paper changed after the approval, waiting for an admin.
+model ApplicationChange {
+  id              String    @id @default(uuid()) @db.Uuid
+  /// courier | restaurant
+  subjectType     String    @map("subject_type")
+  subjectId       String    @map("subject_id") @db.Uuid
+  /// mobile_money | document
+  kind            String
+  newValue        Json      @map("new_value")
+  /// pending | approved | rejected
+  status          String    @default("pending")
+  rejectionReason String?   @map("rejection_reason")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  decidedAt       DateTime? @map("decided_at") @db.Timestamptz(6)
+  decidedBy       String?   @map("decided_by") @db.Uuid
+
+  @@map("application_changes")
 }
 
 /// A dispatch proposal sent to one courier (docs/25 §5) — distinct lifecycle

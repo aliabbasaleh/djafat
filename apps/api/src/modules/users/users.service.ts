@@ -174,6 +174,8 @@ export class UsersService {
     },
     /** Runs first, in the same transaction (FEAT-020 SPEC-020-03 R5: the registration is consumed with the account). */
     beforeCreate?: (tx: Prisma.TransactionClient) => Promise<void>,
+    /** Runs last, in the same transaction (FEAT-022: the courier or restaurant created with the account). */
+    afterCreate?: (tx: Prisma.TransactionClient, userId: string) => Promise<void>,
   ): Promise<{ userId: string }> {
     const now = new Date();
     try {
@@ -192,6 +194,7 @@ export class UsersService {
           select: { id: true },
         });
         await tx.$executeRaw`INSERT INTO user_roles (user_id, role) VALUES (${created.id}::uuid, 'customer')`;
+        if (afterCreate) await afterCreate(tx, created.id);
         return created;
       });
       return { userId: user.id };
@@ -204,11 +207,48 @@ export class UsersService {
             "Ce numéro a déjà un compte. Connectez-vous avec ce numéro ou avec l'e-mail de ce compte.",
         });
       }
-      throw new ConflictException({
-        code: 'EMAIL_ALREADY_USED',
-        message: 'Cette adresse e-mail est déjà utilisée par un autre compte.',
-      });
+      if (await this.findByEmail(input.email)) {
+        throw new ConflictException({
+          code: 'EMAIL_ALREADY_USED',
+          message: 'Cette adresse e-mail est déjà utilisée par un autre compte.',
+        });
+      }
+      // Another unique key (e.g. what `afterCreate` created): never blamed on a free address.
+      throw err;
     }
+  }
+
+  /**
+   * FEAT-022 (SPEC-022-02 R4, SPEC-022-03 R2): a role granted inside the caller's
+   * transaction — `courier` (global) or `restaurant_owner` limited to the restaurant
+   * just created (`scope_restaurant_id`). Granting it twice changes nothing.
+   */
+  async grantRoleWithin(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    grant:
+      | { readonly role: 'courier' }
+      | { readonly role: 'restaurant_owner'; readonly restaurantId: string },
+  ): Promise<void> {
+    const scope = grant.role === 'restaurant_owner' ? grant.restaurantId : null;
+    await tx.$executeRaw`
+      INSERT INTO user_roles (user_id, role, scope_restaurant_id)
+      VALUES (${userId}::uuid, ${grant.role}, ${scope}::uuid)
+      ON CONFLICT DO NOTHING`;
+  }
+
+  /**
+   * FEAT-022 (SPEC-022-08 R3, R5): whether the user already holds `role`, read
+   * inside the caller's transaction (after its lock), whatever the scope.
+   */
+  async hasRoleWithin(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    role: 'courier' | 'restaurant_owner' | 'restaurant_staff',
+  ): Promise<boolean> {
+    const rows = await tx.$queryRaw<Array<{ held: boolean }>>`
+      SELECT true AS held FROM user_roles WHERE user_id = ${userId}::uuid AND role = ${role} LIMIT 1`;
+    return rows.length > 0;
   }
 
   /** FEAT-020: the stored hash, read only to verify a password — it never travels in a `UserRecord`. */
@@ -315,10 +355,29 @@ export class UsersService {
    * scope for these roles — but a pre-Bloc-9 seed row could still be global).
    */
   async getRestaurantScope(userId: string): Promise<string | null> {
+    // One grant per restaurant role at most (migration 0028); the owner's comes
+    // first, so an answer never depends on the row order (review of FEAT-022 part 3, #4).
     const rows = await this.prisma.$queryRaw<Array<{ scope_restaurant_id: string | null }>>`
       SELECT scope_restaurant_id FROM user_roles
       WHERE user_id = ${userId}::uuid
         AND role IN ('restaurant_owner', 'restaurant_staff')
+        AND scope_restaurant_id IS NOT NULL
+      ORDER BY (role = 'restaurant_owner') DESC
+      LIMIT 1
+    `;
+    return rows[0]?.scope_restaurant_id ?? null;
+  }
+
+  /**
+   * FEAT-022 (SPEC-022-05 « Autorisations »): the restaurant this account
+   * OWNS — never one where it is only on the staff. The owner-only routes
+   * (papers, Mobile Money) resolve their restaurant here.
+   */
+  async getOwnedRestaurantScope(userId: string): Promise<string | null> {
+    const rows = await this.prisma.$queryRaw<Array<{ scope_restaurant_id: string | null }>>`
+      SELECT scope_restaurant_id FROM user_roles
+      WHERE user_id = ${userId}::uuid
+        AND role = 'restaurant_owner'
         AND scope_restaurant_id IS NOT NULL
       LIMIT 1
     `;
@@ -359,6 +418,9 @@ export class UsersService {
    *   - a user already holding a restaurant scope under a DIFFERENT
    *     restaurant is a genuine conflict (migration 0028's partial unique
    *     index), translated to a clean `VALIDATION_ERROR` — never a raw 500.
+   *     FEAT-022 (FEAT-022-Q25): whatever the role — an owner of one
+   *     restaurant is never made staff of another, nor the reverse — under
+   *     the same per-account lock as self sign-up (`role-signup:<user>`).
    */
   async grantRole(
     actor: { readonly userId: string; readonly roles: readonly Role[] },
@@ -372,21 +434,39 @@ export class UsersService {
 
     let granted: boolean;
     try {
-      // Targets `user_roles_pkey_idx` (migrations/0003_identity) by its exact
-      // expression list — Postgres can't promote an expression-based unique
-      // index to a named constraint, so `ON CONFLICT ON CONSTRAINT` isn't an
-      // option here (42809); matching the expressions is.
-      const affected = await this.prisma.$executeRaw`
-        INSERT INTO user_roles (user_id, role, scope_restaurant_id)
-        VALUES (${targetUserId}::uuid, ${role}, ${scopeRestaurantId}::uuid)
-        ON CONFLICT (
-          user_id, role,
-          COALESCE(scope_restaurant_id, '00000000-0000-0000-0000-000000000000'),
-          COALESCE(scope_country_id,    '00000000-0000-0000-0000-000000000000'),
-          COALESCE(scope_city_id,       '00000000-0000-0000-0000-000000000000')
-        ) DO NOTHING
-      `;
-      granted = affected > 0;
+      granted = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`role-signup:${targetUserId}`}))`;
+        if (role === 'restaurant_owner' || role === 'restaurant_staff') {
+          const elsewhere = await tx.$queryRaw<Array<{ other: string }>>`
+            SELECT scope_restaurant_id::text AS other FROM user_roles
+            WHERE user_id = ${targetUserId}::uuid
+              AND (role = 'restaurant_owner' OR role = 'restaurant_staff')
+              AND scope_restaurant_id IS NOT NULL
+              AND scope_restaurant_id <> ${scopeRestaurantId}::uuid
+            LIMIT 1`;
+          if (elsewhere.length > 0) {
+            throw new ConflictException({
+              code: 'VALIDATION_ERROR',
+              message: `User ${targetUserId} already has a role at another restaurant — one account, one restaurant: revoke it first.`,
+            });
+          }
+        }
+        // Targets `user_roles_pkey_idx` (migrations/0003_identity) by its exact
+        // expression list — Postgres can't promote an expression-based unique
+        // index to a named constraint, so `ON CONFLICT ON CONSTRAINT` isn't an
+        // option here (42809); matching the expressions is.
+        const affected = await tx.$executeRaw`
+          INSERT INTO user_roles (user_id, role, scope_restaurant_id)
+          VALUES (${targetUserId}::uuid, ${role}, ${scopeRestaurantId}::uuid)
+          ON CONFLICT (
+            user_id, role,
+            COALESCE(scope_restaurant_id, '00000000-0000-0000-0000-000000000000'),
+            COALESCE(scope_country_id,    '00000000-0000-0000-0000-000000000000'),
+            COALESCE(scope_city_id,       '00000000-0000-0000-0000-000000000000')
+          ) DO NOTHING
+        `;
+        return affected > 0;
+      });
     } catch (err) {
       if (isUniqueViolation(err)) {
         throw new ConflictException({

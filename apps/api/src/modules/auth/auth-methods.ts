@@ -23,6 +23,22 @@ type MethodsEnv = Pick<
   'NODE_ENV' | 'SMS_PROVIDER' | 'EMAIL_PROVIDER' | 'WHATSAPP_PROVIDER' | 'WHATSAPP_BUSINESS_NUMBER'
 >;
 
+/**
+ * The methods of this deployment, read through its configuration — one place
+ * for the route, the new-device challenge and the SMS refusal (FEAT-024).
+ */
+export function authMethodsFrom(
+  get: <K extends keyof MethodsEnv>(key: K) => MethodsEnv[K],
+): AuthMethod[] {
+  return listAuthMethods({
+    NODE_ENV: get('NODE_ENV'),
+    SMS_PROVIDER: get('SMS_PROVIDER'),
+    EMAIL_PROVIDER: get('EMAIL_PROVIDER'),
+    WHATSAPP_PROVIDER: get('WHATSAPP_PROVIDER'),
+    WHATSAPP_BUSINESS_NUMBER: get('WHATSAPP_BUSINESS_NUMBER'),
+  });
+}
+
 export function listAuthMethods(env: MethodsEnv): AuthMethod[] {
   const devMock = env.NODE_ENV !== 'production';
   const whatsapp =

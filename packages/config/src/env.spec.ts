@@ -2,7 +2,12 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ConfigValidationError, apiEnvSecretIssues, loadApiEnv } from './env.js';
+import {
+  ConfigValidationError,
+  apiEnvConsistencyIssues,
+  apiEnvSecretIssues,
+  loadApiEnv,
+} from './env.js';
 import { PLATFORM_SETTINGS_DEFAULTS, LAUNCH_MARKET } from './constants.js';
 
 const baseEnv = {
@@ -243,7 +248,7 @@ describe('SPEC-008-01 — WhatsApp and switchable SMS configuration', () => {
   };
 
   // SPEC-008-01-SC04
-  it('SPEC-008-01-SC04 — production: SMS disabled needs WhatsApp Cloud; cloud needs all its variables', () => {
+  it('SPEC-008-01-SC04 — production: SMS disabled without WhatsApp Cloud (nor SMTP e-mail, SPEC-021-01 R1) is refused; cloud needs all its variables', () => {
     const prod = { ...baseEnv, NODE_ENV: 'production', SMS_PROVIDER: 'disabled' };
     expect(() => loadApiEnv(prod)).toThrowError(/SMS_PROVIDER/);
     const ok = loadApiEnv({ ...prod, ...cloud });
@@ -257,6 +262,55 @@ describe('SPEC-008-01 — WhatsApp and switchable SMS configuration', () => {
     const dev = loadApiEnv(baseEnv);
     expect(dev.WHATSAPP_PROVIDER).toBe('mock');
     expect(dev.SMS_PROVIDER).toBe('mock');
+  });
+});
+
+// FEAT-021 — docs/features/FEAT-021-equipe-connexion-email (SPEC-021-01): SMS can be
+// switched off in production as soon as another real login channel exists.
+describe('SPEC-021-01 — production starts with SMS off once another real login channel exists', () => {
+  const prodNoSms = { ...baseEnv, NODE_ENV: 'production', SMS_PROVIDER: 'disabled' };
+  const gmail = {
+    EMAIL_PROVIDER: 'smtp',
+    SMTP_HOST: 'smtp.gmail.com',
+    SMTP_USER: 'djafat@gmail.com',
+    SMTP_PASSWORD: 'abcdefghijklmnop',
+  };
+  const cloud = {
+    WHATSAPP_PROVIDER: 'cloud',
+    WHATSAPP_ACCESS_TOKEN: 'tok',
+    WHATSAPP_PHONE_NUMBER_ID: '100000000000001',
+    WHATSAPP_APP_SECRET: 'app-secret',
+    WHATSAPP_VERIFY_TOKEN: 'verify-me',
+    WHATSAPP_BUSINESS_NUMBER: '+23560000001',
+  };
+
+  // SPEC-021-01-SC01
+  it('SPEC-021-01-SC01 — SMS disabled, WhatsApp not linked, e-mail on SMTP: no inconsistency', () => {
+    const env = loadApiEnv({ ...prodNoSms, ...gmail });
+    expect(apiEnvConsistencyIssues(env)).toEqual([]);
+    expect(env.SMS_PROVIDER).toBe('disabled');
+    expect(env.WHATSAPP_PROVIDER).toBe('mock');
+    expect(env.EMAIL_PROVIDER).toBe('smtp');
+  });
+
+  // SPEC-021-01-SC02
+  it('SPEC-021-01-SC02 — no real channel: refused, naming SMS_PROVIDER=http, WHATSAPP_PROVIDER=cloud and EMAIL_PROVIDER=smtp', () => {
+    expect(() => loadApiEnv({ ...prodNoSms, EMAIL_PROVIDER: 'mock' })).toThrowError(
+      /SMS_PROVIDER=http.*WHATSAPP_PROVIDER=cloud.*EMAIL_PROVIDER=smtp/s,
+    );
+  });
+
+  // SPEC-021-01-SC03
+  it('SPEC-021-01-SC03 — SMS disabled, WhatsApp Cloud linked, e-mail on the mock: no inconsistency', () => {
+    const env = loadApiEnv({ ...prodNoSms, ...cloud, EMAIL_PROVIDER: 'mock' });
+    expect(apiEnvConsistencyIssues(env)).toEqual([]);
+  });
+
+  // SPEC-021-01-SC04
+  it('SPEC-021-01-SC04 — outside production, SMS disabled with WhatsApp and e-mail on mocks: no inconsistency', () => {
+    const env = loadApiEnv({ ...baseEnv, SMS_PROVIDER: 'disabled' });
+    expect(env.WHATSAPP_PROVIDER).toBe('mock');
+    expect(apiEnvConsistencyIssues(env)).toEqual([]);
   });
 });
 

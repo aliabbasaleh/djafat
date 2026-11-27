@@ -28,11 +28,22 @@ const problems = [];
 const formattable = changed.filter((f) => /\.(ts|tsx|js|jsx|mjs|cjs|json|md|yml|yaml)$/.test(f));
 if (formattable.length > 0) {
   const [cmd, pre] = tool(root, 'prettier');
-  const r = runTool(cmd, [...pre, '--check', '--ignore-unknown', ...formattable], {
-    cwd: root,
-    timeoutMs: 60_000,
-  });
-  if (!r.ok) problems.push(`prettier:\n${trim(r.output, 30)}`);
+  // One invocation per 40 files. A large change (a 375-file merge, say) puts
+  // every path in one argv and overflows the Windows command-line limit —
+  // "La ligne de commande est trop longue" — so this gate used to fail on the
+  // size of the change rather than on its formatting. Same check, same flags,
+  // same per-invocation timeout; only the batch size is bounded.
+  for (let i = 0; i < formattable.length; i += 40) {
+    const batch = formattable.slice(i, i + 40);
+    const r = runTool(cmd, [...pre, '--check', '--ignore-unknown', ...batch], {
+      cwd: root,
+      timeoutMs: 60_000,
+    });
+    if (!r.ok) {
+      problems.push(`prettier:\n${trim(r.output, 30)}`);
+      break; // the first failing batch is enough to report
+    }
+  }
 }
 for (const check of ['check-specs', 'check-hygiene', 'check-arch']) {
   const r = runTool(

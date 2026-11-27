@@ -1,0 +1,18 @@
+/* FEAT-022 (SPEC-022-05): shared by the pages of the four steps. */
+.fieldError {
+  margin: 0;
+  color: var(--djafat-color-feedback-danger, #b42318);
+  font-size: 0.9rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-3) * 1px);
+  max-width: 560px;
+}
+
+.pending {
+  margin: 0;
+  color: var(--djafat-color-text-secondary);
+}

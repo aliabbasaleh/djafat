@@ -1,7 +1,15 @@
-import { createApiClient, webLocksMutex } from '@djafat/sdk';
+import { createApiClient, djafatAppUrl, webLocksMutex, type DjafatApp } from '@djafat/sdk';
 import { clearSession, getAccessToken, getRefreshToken, updateTokens } from './auth-storage';
 
 const publicBaseUrl = process.env['NEXT_PUBLIC_API_BASE_URL'] ?? 'http://localhost:3001/v1';
+
+/**
+ * FEAT-022 (FEAT-022-Q15): the courier app and the restaurant console, found
+ * from the API's address (`api.<domain>` → `livreur.<domain>`, `resto.<domain>`).
+ */
+export function appUrl(app: DjafatApp): string | null {
+  return djafatAppUrl(publicBaseUrl, app);
+}
 /**
  * Server-rendered pages call the API directly (`API_INTERNAL_BASE_URL`), while
  * the browser may use a same-origin relative URL ("/v1") when the site and the

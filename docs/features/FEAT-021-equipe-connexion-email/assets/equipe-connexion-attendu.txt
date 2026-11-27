@@ -1,0 +1,37 @@
+FEAT-021-VIS02 — écrans de connexion de l'équipe ATTENDUS, 390x844 (mobile)
+Nature : attendu. Même disposition pour la console admin, la console
+restaurant et l'application livreur ; seul le titre change.
+
+ DJAFAT Restaurant       (« DJAFAT Admin », « DJAFAT Livreur »)
+ Connexion réservée aux comptes restaurant.
+
+  E-mail
+  [ vous@gmail.com                   ]
+  Mot de passe                   👁 Afficher
+  [ ••••••••                         ]
+
+  [           Se connecter           ]
+
+  Mot de passe oublié ?
+
+  ──── ou recevoir un code par téléphone ────
+  [   SMS    ]  [ WhatsApp ]
+    Bientôt       Bientôt
+    disponible    disponible
+
+ Appareil inconnu, après « Se connecter » :
+
+  Code envoyé à v•••@gmail.com
+  Code à 6 chiffres
+  [ 123456                           ]
+  [x] Se souvenir de cet appareil (30 jours)
+  [            Vérifier              ]
+  Renvoyer le code (dans 60 s)
+
+Notes :
+- Les mêmes règles que le site client (FEAT-020) : mot de passe, code par
+  e-mail sur un appareil inconnu, « Mot de passe oublié ? ».
+- SMS et WhatsApp sont grisés tant que le serveur ne les déclare pas actifs
+  (`/auth/methods`) ; ils redeviennent des boutons normaux sans changer le code.
+- Un compte sans le rôle de l'application garde le message actuel
+  (« Ce compte n'est rattaché à aucun restaurant DJAFAT. », etc.).

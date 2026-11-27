@@ -10,6 +10,212 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-054 — 2026-11-27 — the teammate's integration branch checked out; three roadmap lines restored, version 0.28.3
+
+**Trigger:** the user asked to commit and sync the teammate's work. **Range:** `origin/feat/connexion-integration`
+unchanged at `c12e590` (kcerha, reviewed in S-053); `origin/fix/login-method-icons` gone from GitHub. The main
+checkout now sits on a local `feat/connexion-integration` that tracks it. **Correction to S-053:** comparing
+`c12e590` with Git's own merge of the same parents (`git merge-tree --write-tree c6e5ac1 dab6e0f`) shows that
+resolving the `docs/ROADMAP.md` conflict also put back the pre-0.24.5 text of three lines that had merged cleanly
+from `main`: « E-mail réel » and « Gmail officiel de DJAFAT » un-ticked, and the MinIO line without its 23 Nov
+re-test of both registries. Every other file of the merge is Git's merge result exactly, apart from the batching
+described in S-053, and the version is the stack's 0.28.2. **Our own commits** (local, not pushed): `e9a2c76`, the
+S-053 record cherry-picked from the local `feat/whatsapp-gratuit`, where it was first committed (`f5417d5`); and
+`a4cfd23`, version 0.28.3, which restores the three lines from `main` word for word and adds the 0.28.3 journal line.
+**Removed:** `fix/login-method-icons` — PR #26 was closed unmerged on 2026-11-23 by the owner as superseded (its SVG
+icons are in FEAT-020's `apps/web/src/components/account/ChannelIcons.tsx`); its marker line is dropped. **Added /
+Fixed / New findings:** none. **Checked (RUN):** the batched pre-commit config on a real commit (`a4cfd23`, macOS):
+lint-staged read `lint-staged.config.cjs` and ran one Prettier call on the two quoted paths; `verify:fast` at
+`a4cfd23`: specs, hygiene, arch pass, the other four skipped (nothing uncommitted). **Not verified:** the ESLint
+batches in a real commit (no TypeScript file staged); Windows.
+
+---
+
+## S-053 — 2026-11-26 — teammate merge of the PR #33 stack into `main` (`feat/connexion-integration`)
+
+**New branch** `origin/feat/connexion-integration` by **kcerha**, one commit `c12e590` (2026-11-25): a merge
+of `origin/feat/inscription-restaurants` (`dab6e0f`, the PR #33 stack, reviewed in S-045 to S-052) into
+`main` (`c6e5ac1`, reviewed). No pull request yet. Against its two parents the merge brings four files.
+**Added:** `lint-staged.config.cjs` — the pre-commit commands leave `package.json` for a config that runs
+them in batches (Prettier 40 files, ESLint 25 per call), same commands and flags; written because a
+375-file merge made the type-aware ESLint run out of memory and passed the Windows command-line limit.
+**Changed:** `scripts/pipeline/hooks/stop.mjs` checks Prettier in batches of 40 (same flags and timeout per
+batch, stops at the first failing batch); `docs/ROADMAP.md` conflict resolved — the stack's 0.25.0 to
+0.28.2 rows with `main`'s 0.24.5 and 0.24.4 rows and their commits (`93252b8`, `631b433`), `main`'s
+wording of the « Comptes clients » row, the stack's FEAT-021 row. **Removed:** the `lint-staged` block of
+the root `package.json` (moved). **Fixed / New findings:** none (`CI-03` untouched by this commit).
+**Checked (RUN):** the config's functions, called on 60 paths, give 2 Prettier and 3 ESLint commands with
+quoted paths; one file gives the same two commands as before. **Not verified:** a real commit through the
+batched hook; Windows.
+
+---
+
+## S-052 — 2026-11-25 — favicons from the new icon, FEAT-022 decisions confirmed, version 0.28.2
+
+**Our own commit** `0a78bdc` on `feat/inscription-restaurants` (PR #33). **Changed:** the favicons of the site,
+the admin console and the restaurant console (`apps/*/src/app/icon.png`) now come from the new DJAFAT icon
+(orange « D » on white, 512 px, 9 KB); the user confirmed FEAT-022-Q18 to Q22 and Q25, recorded as decided
+(`clarifications.md`, SPEC-022-05 v5). **Checked:** the three running sites serve the new file
+(`/icon.png`, 9018 bytes); `verify:fast` clean. **Added / Removed / Fixed / New findings:** none.
+**Not verified:** how browsers render the new favicon at 16–32 px (not looked at).
+
+---
+
+## S-051 — 2026-11-25 — new brand images (logo, icon), version 0.28.1
+
+**Our own commit** `50a8469` on `feat/inscription-restaurants` (PR #33), the user's image changes in `djafat/`
+committed at their request: `logo.png` replaced (2023×777), `icon.png` added (1254×1254), the four old « D »
+icons and the five posters removed. **Checked:** no code or document uses the removed files (`git grep`); the
+apps' favicons (`apps/*/src/app/icon.png`) are separate and unchanged; `check:hygiene` clean. **Added / Removed:**
+the images above. **Fixed / Changed:** none. **New findings:** none. **Not verified:** nothing to run — images
+only. The main checkout now sits on `feat/inscription-restaurants` (the top of the PR stack).
+
+---
+
+## S-050 — 2026-11-25 — FEAT-022 part 3 (restaurants: four steps, decisions, changes after approval), version 0.28.0
+
+**Our own commits** `72d155d` to `4bebbc5` on `feat/inscription-restaurants` (above PR #32), described in
+`docs/features/FEAT-022-inscription-par-type-de-compte` (`review.md`, `progress.md`, `verification.md`,
+`pr.md`). **Added:** the restaurant console guides a signed-up restaurant in four steps (map point stored in
+PostGIS, hours and menu, logo and cover uploaded from the device, RCCM or NIF and ID photos, Mobile Money),
+then « Envoyer pour validation »; steps locked during the review except the menu; « Demandes à vérifier »
+opens and decides restaurants (approval re-checks the four steps); after an approval a new Mobile Money
+number or paper waits in `application_changes`, accepted with the step-up code; staff payouts read the
+approved number through a new port (`COURIER_PAYOUT_ACCOUNT_PORT`, no new module edge); « Mes gains » and
+« Mes papiers » in the courier app; admin « Quartiers » page; new dependency `leaflet` 1.9.4 in
+`apps/restaurant` (the customer site's version); no migration. **Fixed before any push (independent review,
+round 1):** two new findings — `SEC-09` (an owner could get another restaurant's public photo deleted) and
+`SEC-10` (a restaurant's staff member who registered a restaurant could reach the first one's papers) — plus
+dishes counted that customers never see, and « Papiers » withdrawing the other field's waiting change;
+round 2 (5 minor): the status frozen during the review, one restaurant per account also through
+`POST /restaurants` and admin role grants (`grantRole` now refuses a restaurant role at a second
+restaurant — a change to Bloc 9 role management); round 3: ready for PR, one note fixed (`70733f3`).
+**Verified:** `verify --full` at `70733f3` (see
+`verification.md`), 33 integration tests of the feature on a fresh database (plus the catalog and admin-role
+suites, 88 in all), a browser run (28 checks). **Not verified:** the map's tiles (no network access in the
+test browser), real e-mail delivery. `STOR-01`: restaurant photos now uploaded on the branch.
+**Merge condition:** after PR #32, together with it.
+
+---
+
+## S-049 — 2026-11-24 — FEAT-024 (checked inputs) and FEAT-022 part 4 (sign-up screens), version 0.27.0
+
+**Our own commits** `be136f8` to `5a3cf4a` on `feat/inscription-ecrans` (above PR #31), described in
+`docs/features/FEAT-024-saisies-verifiees` and `docs/features/FEAT-022-inscription-par-type-de-compte`
+(`review.md`, `progress.md`, `verification.md`, `pr.md`). **Added:** SMS login codes go only to a Chad
+mobile (a foreign number is offered WhatsApp when in service, or the e-mail; a fixed line 22… is
+refused), checked at the single SMS sending point; foreign numbers stay accepted for accounts; the number
+of an account cannot be a fixed line; Mobile Money is a Chad mobile; person names are letters only;
+« Vouliez-vous dire … ? » for a mistyped e-mail provider; « +235 » in front of every phone field (five
+apps). Sign-up by account type on the site and in the customer app (customer, courier, restaurant),
+welcome e-mail, footer links, « Pas encore de compte ? » on the team logins, a provisional terms page,
+« Devenir livreur » / « Inscrire mon restaurant » in « Mon profil » (`POST /me/roles/*`). **Fixed:** a
+malformed phone with a valid password crashed the registration schema (500 instead of 422, new finding
+AUTH-03, fixed on the branch); an admin can no longer decide their own courier application (403).
+**Verified:** `verify --full` at `83c65db` (no new failure, E2E unavailable), 25 integration tests of the
+features on a fresh database, a browser run (30 checks). Independent review in three rounds, ready for
+PR. **Not verified:** the customer app's new screens (no web build of `apps/mobile`); real e-mail
+delivery. **Merge condition:** together with FEAT-022 part 3 only (user's decision).
+
+---
+
+## S-048 — 2026-11-24 — FEAT-022 parts 1-2 reviewed, corrected, version 0.26.0; PR #29 becomes 0.24.6
+
+**Our own commits** `ad01d05` to the reports commit on `wip/feat-022-part1` (pushed as
+`feat/inscription-par-type`), described in `docs/features/FEAT-022-inscription-par-type-de-compte`
+(`review.md`, `progress.md`, `verification.md`). Independent review in two rounds. **Fixed:** a signed-up
+restaurant's owner could publish it without DJAFAT (blocking; now 409 `RESTAURANT_NOT_APPROVED`); photo
+uploads read a body only on their routes and for a valid access token; a full disk answers 507
+`STORAGE_FULL` without a leftover file; JPEGs lose what phones append after the image and keep only their
+orientation; same-name restaurant sign-ups no longer collide (rare residue noted); private photo links stay
+out of the logs; a switch to a bicycle asks before deleting vehicle photos. **Changed:** the nightly backup
+writes the photos archive under a temporary name and reports a missing volume; `restore-check.sh` requires
+every photo the restored database refers to (OPS-02 note). **Verified:** `verify --full` on the final code
+commit (see `verification.md`), 16 integration tests of the feature on a fresh database, a browser run (23
+checks, 15 screenshots). **Not verified:** a real phone (camera, gallery); `restore-check.sh` on the server.
+The first full run at `230d5eb` hit a pre-existing flaky assertion outside the feature (new finding TEST-06);
+the repeated run is the one reported.
+
+**Our merge** `262b8cf` on `ci/cheaper-runs` (PR #29): `main` merged in, version 0.24.6 (0.24.5 was taken
+by PR #30); documentation and version only. GitHub still refuses to start any job (billing).
+
+---
+
+## S-047 — 2026-11-23 — `main` 0.24.5 (FEAT-020 live, MinIO re-checked); FEAT-022 part 2 (local branch)
+
+**`main`, a teammate's commit** `93252b8` (kcerha), merged as PR #30 (`c6e5ac1`, by the repository owner),
+documentation only (`docs/ROADMAP.md`, `package.json`). **Changed:** version 0.24.5; the roadmap says FEAT-020
+runs on djafat.com with DJAFAT's real Gmail (`EMAIL_PROVIDER=smtp`, a real code received), and the MinIO image is
+still refused on quay.io and Docker Hub (re-tested 2026-11-23). Evidence: CLAIM for both; for the e-mail, our own
+registration request to `api.djafat.com` was accepted earlier the same day (LIVE) and the user confirmed the
+mailbox receives it — the receipt itself was not seen by us. Statuses: T-611 done in production (above
+evidence); OPS-01 note added. **Consequence:** PR #29 (`ci/cheaper-runs`) also carries 0.24.5 and must take
+0.24.6 before its merge; PR #28 and the FEAT-022 branch need `main` merged in (roadmap journal, version line).
+
+**Our own commits** `9b246ba` to `08c1ae3` on `wip/feat-022-part1` (not pushed), described in
+`docs/features/FEAT-022-inscription-par-type-de-compte/progress.md` (part 2). **Added:** the courier's
+application (`/couriers/me/application`: form, photos sent as the request body, submit with the missing items),
+the admin queue « Demandes à vérifier » (both tabs, courier detail, approve or refuse with a reason, decision
+e-mails, 5-minute photo links for admins only), the courier app's « Avant votre première course », the console
+pages. **Fixed on the way:** `AllExceptionsFilter` dropped an `HttpException`'s `details`; Helmet's same-origin
+resource policy hid API images from the consoles; console sub-pages sent full admins to the first entry (since
+0.23.0); the courier app's `BigButton` never said « disabled » in a browser. STOR-01 partly addressed (private
+photos; logos in part 3; product photos not planned). **Verified:** unit tests, 15 integration tests of
+`account-onboarding.int.spec.ts` on a fresh database, a browser run (18 checks). **Not verified:** the full
+`verify` (running), a real phone (camera, gallery), the independent review (running).
+
+---
+
+## S-046 — 2026-11-23 — FEAT-022 part 1: neighbourhoods, photos on disk, typed sign-up (local branch)
+
+Our own commits `dd1187c` to `5d68967` on `wip/feat-022-part1` (not pushed). **Added:** migration 0041
+(neighbourhoods, courier and restaurant applications, changes awaiting an admin — additive; existing couriers and
+restaurants get an approved application); `packages/core` onboarding rules (vehicles, 18-year minimum, checklists,
+place-name key); `GET /geo/neighbourhoods`, `/admin/neighbourhoods`; `FilesystemObjectStorage` behind
+`ObjectStoragePort`, `GET /files/:key` (private files only through a 5-minute HMAC link), an `uploads` volume in
+production, archived nightly; `POST /auth/register` typed (courier, restaurant) creating the courier or restaurant in
+the account's transaction through `common/ports`. **Changed:** a courier whose application is not approved cannot go
+online (409 `COURIER_NOT_APPROVED`); team-created couriers are unaffected. **Verified:** `verify:fast` all pass;
+integration on a fresh database 129/129 (7 new). **Not verified:** a real upload over HTTP (the upload routes come in
+part 2), the backup of the volume on the server. No new finding.
+
+---
+
+## S-045 — 2026-11-23 — FEAT-022 specs adjusted (docs only)
+
+Short entry (our own docs commits `8484208`, the next one): SPEC-022-01 v2 — the restaurant console and the courier app
+login screens open the matching sign-up form (the user: one scenario everywhere); SPEC-022-04 v2 — photo metadata
+stripped without re-encoding; SPEC-022-02 and 08 v2 — a taken phone number is said openly, as FEAT-020 does. No code,
+no new finding.
+
+---
+
+## S-044 — 2026-11-23 — FEAT-022 specs on `feat/inscription-par-type`; two branches followed
+
+Short entry (our own docs commits): `8a37b2e` (intake of FEAT-022: every criterion mapped to the code; nothing stores
+files yet — `ObjectStoragePort`'s adapter is a placeholder) and `b792d43` (nine specs, the user's decisions Q01 to Q06,
+the brief in four slices). No code. Branches now followed: `origin/feat/equipe-connexion-email` (`1ce673a`, PR #28,
+reviewed in S-043) and `origin/ci/cheaper-runs` (`d5c6500`, PR #29, reviewed in S-042 on that branch). No new
+finding.
+
+---
+
+## S-043 — 2026-11-23 — FEAT-020 on `main`; FEAT-021 team login, reviewed twice (0.25.0)
+
+Our own commits on `feat/equipe-connexion-email`, rebased onto `main` `038c723` (PR #27, FEAT-020). The rebase gave
+new hashes to commits already read: `d63658f` is the docs commit of S-038, `049a695` its sync; S-042 lives on the
+parallel branch `ci/cheaper-runs`. Read: `1f87e5c` and `7cf482a` (team login by e-mail and password in the admin
+console, the restaurant console and the courier app, through `packages/sdk/src/team-login.ts`; production may start
+with `SMS_PROVIDER=disabled` when `EMAIL_PROVIDER=smtp`; the SMS cut-over procedure), `6ca5b97` (the consoles'
+side margin at 390 px, a defect already on `main`), `d830024` and `3e3bc0d` (two independent reviews corrected:
+one role check for every way in, phone-code SDK methods, the pre-cut check FEAT-021-Q11), `ae07a59` and `2bf457c`
+(screenshots), `6ffb0d4` (0.25.0), and the PR content. Verified: `verify --full` on a fresh database, no new failure
+(e2e unavailable); the pre-cut query run read-only on the local database lists 13 seeded team accounts and none of
+the 5 with an e-mail and a password. No new finding; `AUTH-01` unchanged (no real SMS sender), but login no longer
+depends on it once SMS is switched off.
+
+---
+
 ## S-041 — 2026-11-23 — PR #27 merged without GitHub's checks (0.24.4)
 
 Short entry (our own docs commit `631b433`): version 0.24.4 records in `docs/ROADMAP.md` that PR #27 (FEAT-020) is
@@ -57,6 +263,14 @@ scanning had passed. No new finding.
 ### Not verified
 
 - The production server (no access from here); the « Mon profil » screen was checked by screenshot only.
+
+---
+
+## S-038 — 2026-11-22 — three features confirmed by the user (FEAT-021 to FEAT-023)
+
+Short entry (our own docs commit on `feat/equipe-connexion-email`): the user's requests of 2026-11-22, transcribed and
+confirmed — team login by e-mail and password with SMS off (T-614), sign-up by account type with validation (T-615),
+free WhatsApp login (T-616). No code yet; no new finding.
 
 ---
 

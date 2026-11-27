@@ -1,11 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { ApiClientError, accountErrorMessage, type MeProfile } from '@djafat/sdk';
+import {
+  ApiClientError,
+  accountErrorMessage,
+  emailSuggestionText,
+  emailTypoCheck,
+  fieldErrorsFromApi,
+  personNameError,
+  type MeProfile,
+} from '@djafat/sdk';
 import { Container, Heading, Text, Stack, cx } from '@djafat/ui';
-import { Alert, Button, Input } from '@/components/ui-client';
+import { Alert, Button, FieldSuggestion, Input } from '@/components/ui-client';
 import { api } from '@/lib/api';
 import {
   clearSession,
@@ -19,6 +27,8 @@ import { signOut } from '@/lib/session';
 import type { AuthMethods } from '@/components/account/LoginPanel';
 import { PasswordSection } from '@/components/account/PasswordSection';
 import { PhoneSection } from '@/components/account/PhoneSection';
+import { WorkSection } from '@/components/account/WorkSection';
+import { focusField } from '@/components/account/focus';
 import styles from './page.module.css';
 
 /**
@@ -31,13 +41,22 @@ export default function ProfilePage() {
   const router = useRouter();
   const [me, setMe] = useState<MeProfile | null>(null);
   const [name, setName] = useState('');
+  /** FEAT-024 (SPEC-024-03): the name's message, under the field. */
+  const [nameError, setNameError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
+  /** FEAT-024 (SPEC-024-04): the address already stopped once, and the suggestion shown. */
+  const [emailWarned, setEmailWarned] = useState<string | null>(null);
+  const [emailHint, setEmailHint] = useState<string | null>(null);
+  const nameForm = useRef<HTMLFormElement>(null);
+  const emailForm = useRef<HTMLFormElement>(null);
   /** FEAT-020 SPEC-020-12 R1: an account with a password gives it to change its e-mail. */
   const [emailPassword, setEmailPassword] = useState('');
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [methods, setMethods] = useState<AuthMethods | undefined>(undefined);
+  /** FEAT-022 (SPEC-022-08): `/profil?devenir=livreur | restaurant` opens that form. */
+  const [become, setBecome] = useState<'courier' | 'restaurant' | null>(null);
   const [message, setMessage] = useState<{
     tone: 'success' | 'danger' | 'info';
     text: string;
@@ -55,6 +74,11 @@ export default function ProfilePage() {
       }
     }
   }, [router]);
+
+  useEffect(() => {
+    const asked = new URLSearchParams(window.location.search).get('devenir');
+    setBecome(asked === 'livreur' ? 'courier' : asked === 'restaurant' ? 'restaurant' : null);
+  }, []);
 
   useEffect(() => {
     api.auth
@@ -82,21 +106,39 @@ export default function ProfilePage() {
   }
 
   async function saveName() {
-    setBusy(true);
     setMessage(null);
+    // SPEC-024-03: a person's name, letters only — checked before sending.
+    const why = personNameError(name);
+    setNameError(why);
+    if (why) {
+      focusField(nameForm.current, 'input');
+      return;
+    }
+    setBusy(true);
     try {
       const profile = await api.auth.updateName(name);
       setMe(profile);
       remember(profile);
       setMessage({ tone: 'success', text: 'Nom enregistré.' });
-    } catch {
-      setMessage({ tone: 'danger', text: 'Nom invalide (2 à 80 caractères).' });
+    } catch (err) {
+      const mapped = fieldErrorsFromApi(
+        err,
+        ['fullName'] as const,
+        "Le nom n'a pas pu être enregistré.",
+      );
+      setNameError(mapped.fields.fullName ?? null);
+      if (mapped.general) setMessage({ tone: 'danger', text: mapped.general });
     } finally {
       setBusy(false);
     }
   }
 
   async function sendEmailCode() {
+    // SPEC-024-04 R3, R4: a mistyped address stops the sending once.
+    const typo = emailTypoCheck(email, emailWarned);
+    setEmailWarned(typo.warned);
+    setEmailHint(typo.suggestion);
+    if (typo.suggestion) return;
     setBusy(true);
     setMessage(null);
     try {
@@ -173,6 +215,7 @@ export default function ProfilePage() {
 
         <section className={cx(styles['card'])}>
           <form
+            ref={nameForm}
             onSubmit={(e) => {
               e.preventDefault();
               void saveName();
@@ -183,7 +226,11 @@ export default function ProfilePage() {
                 label="Votre nom"
                 helpText="Affiché au livreur et au restaurant."
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setNameError(null);
+                }}
+                {...(nameError ? { error: nameError } : {})}
                 required
               />
               <Button type="submit" variant="secondary" disabled={busy}>
@@ -205,6 +252,7 @@ export default function ProfilePage() {
             </p>
           )}
           <form
+            ref={emailForm}
             onSubmit={(e) => {
               e.preventDefault();
               void (codeSent ? confirmEmail() : sendEmailCode());
@@ -216,9 +264,21 @@ export default function ProfilePage() {
                 type="email"
                 placeholder="vous@gmail.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setEmailHint(null);
+                }}
                 disabled={codeSent}
                 required
+              />
+              <FieldSuggestion
+                text={emailHint ? emailSuggestionText(emailHint) : null}
+                actionLabel="Oui, corriger"
+                onAction={() => {
+                  if (emailHint) setEmail(emailHint);
+                  setEmailHint(null);
+                  focusField(emailForm.current, 'input[type="email"]');
+                }}
               />
               {me.hasPassword && !codeSent && (
                 <Input
@@ -252,6 +312,16 @@ export default function ProfilePage() {
             </Stack>
           </form>
         </section>
+
+        <WorkSection
+          key={become ?? 'none'}
+          me={me}
+          initial={become}
+          onUpdated={setMe}
+          cardClassName={styles['card'] ?? ''}
+          labelClassName={styles['label'] ?? ''}
+          mutedClassName={styles['muted'] ?? ''}
+        />
 
         <PasswordSection
           me={me}

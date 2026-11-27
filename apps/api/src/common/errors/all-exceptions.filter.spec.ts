@@ -243,6 +243,32 @@ describe('AllExceptionsFilter — a malformed identifier is a 400, not a 500 (pi
     expect(other.getBody().error.code).toBe('INTERNAL');
   });
 
+  // FEAT-022: SPEC-022-06-SC02 answers « 409 APPLICATION_INCOMPLETE avec ["driving_licence"] ».
+  it('SPEC-022-06-SC02 — an HttpException keeps the details its thrower attached', () => {
+    const filter = new AllExceptionsFilter();
+    const { host, getBody, getStatus } = makeHost();
+    filter.catch(
+      new ConflictException({
+        code: 'APPLICATION_INCOMPLETE',
+        message: 'Il manque des éléments.',
+        details: { missing: ['driving_licence'] },
+      }),
+      host,
+    );
+    expect(getStatus()).toBe(409);
+    expect(getBody().error).toMatchObject({
+      code: 'APPLICATION_INCOMPLETE',
+      details: { missing: ['driving_licence'] },
+    });
+  });
+
+  it('an HttpException without details answers without the key', () => {
+    const filter = new AllExceptionsFilter();
+    const { host, getBody } = makeHost();
+    filter.catch(new NotFoundException({ code: 'NOT_FOUND', message: 'Nope.' }), host);
+    expect(getBody().error).not.toHaveProperty('details');
+  });
+
   // FEAT-020 review #8: a service-level field rule answers like a schema failure.
   it('a FieldValidationError maps to 422 VALIDATION_ERROR with its details per field', () => {
     const filter = new AllExceptionsFilter();

@@ -88,6 +88,9 @@ FEAT-020 remplace l'ancienne page `/connexion` qu'il modifiait.
 - **Compte créé par code, sans mot de passe** : avec une session volée, on peut encore déplacer
   l'e-mail puis poser un premier mot de passe ; le titulaire ne garde que la connexion par téléphone.
   Une décision reste à prendre (par exemple un code au numéro confirmé avant ces deux actions).
+  _(2026-11-23, FEAT-021-Q11 : pour l'équipe, le SMS n'est coupé qu'une fois que chaque compte
+  d'équipe a un e-mail vérifié et un mot de passe — requête de contrôle, `infra/deploy/README.md` §4 ;
+  pour les clients sans mot de passe, la décision reste ouverte, T-612.)_
 - Un envoi d'e-mail manqué (SMTP en panne) ne s'affiche plus : prévoir une alerte d'exploitation sur
   ce message du journal.
 - **Conflit attendu avec `fix/login-method-icons`** (0.23.6, non fusionnée) : `connexion/page.tsx`

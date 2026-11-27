@@ -1,0 +1,30 @@
+FEAT-022-VIS02 — apps/web /compte, inscription « Livreur », 390x844 (mobile)
+Nature : attendu. Champs choisis par l'utilisateur le 2026-11-22
+(question « Courier » : « Vehicle + neighbourhood »).
+
+  ← Changer de type                Livreur
+
+  Nom complet
+  [ Abakar Mahamat                   ]
+  Téléphone
+  [ 66 00 00 00                      ]
+  E-mail (votre identifiant)
+  [ vous@gmail.com                   ]
+  Mot de passe                   👁 Afficher
+  [ ••••••••                         ]
+  Confirmer le mot de passe
+  [ ••••••••                         ]
+  Véhicule
+  ( Moto ) ( Vélo ) ( Voiture ) ( À pied )
+  Quartier où vous travaillez
+  [ Moursal                        ▾ ]
+
+  [         Créer mon compte         ]
+
+ Après le code reçu par e-mail (étape de FEAT-020) :
+
+  ✅ Compte livreur créé
+  Pour recevoir des courses, complétez votre profil dans l'application
+  livreur : photo, pièce d'identité, permis, papiers du véhicule,
+  Mobile Money. DJAFAT vérifie, puis vous valide.
+  [   Ouvrir l'application livreur   ]

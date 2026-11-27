@@ -208,6 +208,28 @@ Merge them in that order, each only once its Linux and Windows checks are green.
 owner's review (the mobile app is their area), and the later ones wait with it; #18 to #22 can be
 re-stacked on #16 if needed. #19 also waits for DJAFAT's decision on the refund policy (`docs/37`).
 
+## 2e. The sign-up stack and the teammate's integration branch _(added 2026-11-27, sync S-054)_
+
+Open on GitHub on 2026-11-27, our own pull requests, each stacked on the one before except #29:
+
+| PR  | Branch                         | Base                          | Version          | Content                                                 |
+| --- | ------------------------------ | ----------------------------- | ---------------- | ------------------------------------------------------- |
+| #28 | `feat/equipe-connexion-email`  | `main`                        | 0.25.0           | FEAT-021, team login by e-mail and password             |
+| #31 | `feat/inscription-par-type`    | `feat/equipe-connexion-email` | 0.26.0           | FEAT-022 parts 1-2, courier application, admin requests |
+| #32 | `feat/inscription-ecrans`      | `feat/inscription-par-type`   | 0.27.0           | FEAT-024 checked inputs, FEAT-022 part 4 screens        |
+| #33 | `feat/inscription-restaurants` | `feat/inscription-ecrans`     | 0.28.0 to 0.28.2 | FEAT-022 part 3 restaurants, brand images, favicons     |
+| #29 | `ci/cheaper-runs`              | `main`                        | 0.24.6           | lighter CI on drafts and docs-only pull requests        |
+
+`origin/feat/connexion-integration` (kcerha, 2026-11-25, no pull request) is one merge, `c12e590`, of #33's head
+`dab6e0f` — hence #28, #31, #32 and #33 — into `main` `c6e5ac1` (0.24.5); it does not contain #29. Beyond its two
+parents it batches the pre-commit and stop-hook checks (sync S-053) and, in resolving `docs/ROADMAP.md`, had lost
+three lines of 0.24.5, restored in `a4cfd23` (0.28.3, sync S-054). Locally the branch also carries `e9a2c76` (the
+S-053 record) and `a4cfd23`; neither is pushed. A pull request from it into `main` would land the four stacked pull
+requests at once (their heads are ancestors of it); merge it only once its Linux and Windows checks are green.
+
+`fix/login-method-icons` (PR #26, the owner) was closed unmerged on 2026-11-23 as superseded: FEAT-020 carries its
+icons in `apps/web/src/components/account/ChannelIcons.tsx`. The branch is gone from GitHub (seen 2026-11-27).
+
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
 
 ### What it adds

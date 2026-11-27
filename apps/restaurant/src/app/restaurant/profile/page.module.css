@@ -10,19 +10,3 @@
     grid-template-columns: 1fr 1fr;
   }
 }
-
-.preview {
-  width: 72px;
-  height: 72px;
-  object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid var(--djafat-color-border-default);
-}
-
-.previewWide {
-  width: 160px;
-  height: 72px;
-  object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid var(--djafat-color-border-default);
-}

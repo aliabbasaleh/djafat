@@ -10,7 +10,7 @@ import {
   type RegisterResendInput,
   type RegisterVerifyInput,
 } from './dto/register.schema';
-import { RegistrationService } from './registration.service';
+import { RegistrationService, type RegistrationInput } from './registration.service';
 import { ReqMeta } from './request-meta.decorator';
 
 /**
@@ -29,7 +29,7 @@ export class RegistrationController {
     @Body(new ZodValidationPipe(RegisterSchema)) body: RegisterInput,
     @ReqMeta() meta: RequestMeta,
   ) {
-    return this.registration.request(body, meta.ip);
+    return this.registration.request(toRegistrationInput(body), meta.ip);
   }
 
   /** The right code: the account, a session and the remembered device's token. */
@@ -51,4 +51,38 @@ export class RegistrationController {
     await this.registration.resend(body.registrationId, meta.ip);
     return { status: 'sent' };
   }
+}
+
+/** FEAT-022: the request body, as the service's input (the account, plus the courier's or restaurant's fields). */
+function toRegistrationInput(body: RegisterInput): RegistrationInput {
+  const account = {
+    fullName: body.fullName,
+    phone: body.phone,
+    email: body.email,
+    password: body.password,
+  };
+  if (body.accountType === 'courier') {
+    return {
+      ...account,
+      signup: {
+        type: 'courier',
+        vehicle: body.vehicle,
+        birthDate: body.birthDate,
+        neighbourhoodId: body.neighbourhoodId ?? null,
+        neighbourhoodOther: body.neighbourhoodOther ?? null,
+      },
+    };
+  }
+  if (body.accountType === 'restaurant') {
+    return {
+      ...account,
+      signup: {
+        type: 'restaurant',
+        restaurantName: body.restaurantName,
+        neighbourhoodId: body.neighbourhoodId ?? null,
+        neighbourhoodOther: body.neighbourhoodOther ?? null,
+      },
+    };
+  }
+  return account;
 }

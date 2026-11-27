@@ -26,6 +26,13 @@ import { EmailChangeService } from './email-change.service';
 import { PasswordService } from './password.service';
 import { PhoneLinkService } from './phone-link.service';
 import { ReqMeta } from './request-meta.decorator';
+import {
+  CourierRoleSignupSchema,
+  RestaurantRoleSignupSchema,
+  type CourierRoleSignupInput,
+  type RestaurantRoleSignupInput,
+} from './dto/register.schema';
+import { RoleSignupService } from './role-signup.service';
 
 /**
  * `GET /v1/me` (docs/07 §"Auth") — lives in `auth`, not `users`: `users`
@@ -41,13 +48,15 @@ export class MeController {
     private readonly passwords: PasswordService,
     private readonly emailChange: EmailChangeService,
     private readonly phones: PhoneLinkService,
+    private readonly roleSignup: RoleSignupService,
   ) {}
 
   @Get()
   @RequireAuth()
   async getMe(@CurrentActor() actor: AuthenticatedActor) {
     const user = await this.users.getByIdOrThrow(actor.userId);
-    return this.users.toMeDto(user, actor.roles);
+    // The database's roles, not the token's (15 min): a role just added shows at once (SPEC-022-08 R3).
+    return this.users.toMeDto(user, await this.users.getRoles(actor.userId));
   }
 
   /** "Mon profil": set the name shown to the courier and the restaurant. */
@@ -58,7 +67,7 @@ export class MeController {
     @Body(new ZodValidationPipe(UpdateMeSchema)) body: UpdateMeInput,
   ) {
     const user = await this.users.updateFullName(actor.userId, body.fullName);
-    return this.users.toMeDto(user, actor.roles);
+    return this.users.toMeDto(user, await this.users.getRoles(actor.userId));
   }
 
   /** Add (or change) the account's email: sends a verification code to it (FEAT-007). */
@@ -129,6 +138,30 @@ export class MeController {
     @ReqMeta() meta: RequestMeta,
   ) {
     const user = await this.phones.verify(actor.userId, body.channel, body.code, meta);
-    return this.users.toMeDto(user, actor.roles);
+    return this.users.toMeDto(user, await this.users.getRoles(actor.userId));
+  }
+
+  /** FEAT-022 (SPEC-022-08): « Devenir livreur » — the same account becomes a courier. */
+  @Post('roles/courier')
+  @HttpCode(201)
+  @RequireAuth()
+  becomeCourier(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Body(new ZodValidationPipe(CourierRoleSignupSchema)) body: CourierRoleSignupInput,
+    @ReqMeta() meta: RequestMeta,
+  ) {
+    return this.roleSignup.becomeCourier(actor.userId, body, meta);
+  }
+
+  /** FEAT-022 (SPEC-022-08): « Inscrire mon restaurant » — the same account owns a restaurant. */
+  @Post('roles/restaurant')
+  @HttpCode(201)
+  @RequireAuth()
+  registerRestaurant(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Body(new ZodValidationPipe(RestaurantRoleSignupSchema)) body: RestaurantRoleSignupInput,
+    @ReqMeta() meta: RequestMeta,
+  ) {
+    return this.roleSignup.registerRestaurant(actor.userId, body, meta);
   }
 }

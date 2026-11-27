@@ -1,9 +1,17 @@
 import Constants from 'expo-constants';
-import { createApiClient, type RenewedTokens } from '@djafat/sdk';
+import { createApiClient, djafatAppUrl, type DjafatApp, type RenewedTokens } from '@djafat/sdk';
 
 const apiBaseUrl =
   (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl ??
   'http://localhost:3001/v1';
+
+/**
+ * FEAT-022 (FEAT-022-Q15): the site, the courier app and the restaurant
+ * console, found from the API's address (`api.<domain>` → `livreur.<domain>`…).
+ */
+export function appUrl(app: DjafatApp): string | null {
+  return djafatAppUrl(apiBaseUrl, app);
+}
 
 /** Same module-level mutable-token pattern as `apps/courier/lib/api.ts` (Bloc 11). */
 let currentAccessToken: string | null = null;

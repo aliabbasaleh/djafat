@@ -5,6 +5,7 @@ import { SettlementsController } from '../../payments/settlements.controller';
 import { PaymentsController } from '../../payments/payments.controller';
 import { AdminController } from '../../admin/admin.controller';
 import { AuthController } from '../auth.controller';
+import { ApplicationsAdminController } from '../../admin/applications-admin.controller';
 import { REQUIRE_STEP_UP_KEY } from '../decorators';
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
@@ -43,6 +44,24 @@ describe('StepUpGuard route order — RolesGuard/PermissionsGuard must run befor
     expect(permissionsIndex).toBeGreaterThan(-1);
     expect(rolesIndex).toBeLessThan(stepUpIndex);
     expect(permissionsIndex).toBeLessThan(stepUpIndex);
+  });
+
+  // FEAT-022 (SPEC-022-07 R6, FEAT-022-Q11): accepting a change after the approval.
+  it('applications.approveChange: a support or finance actor still gets 403, not 428', () => {
+    const order = guardOrder(ApplicationsAdminController.prototype.approveChange);
+    const stepUpIndex = order.indexOf('StepUpGuard');
+    const rolesIndex = order.indexOf('RolesGuard');
+    expect(stepUpIndex).toBeGreaterThan(-1);
+    expect(rolesIndex).toBeGreaterThan(-1);
+    expect(rolesIndex).toBeLessThan(stepUpIndex);
+    // Refusing a change, or deciding an application, needs no code.
+    for (const handler of [
+      ApplicationsAdminController.prototype.rejectChange,
+      ApplicationsAdminController.prototype.approve,
+      ApplicationsAdminController.prototype.reject,
+    ]) {
+      expect(guardOrder(handler)).not.toContain('StepUpGuard');
+    }
   });
 
   it('auth.mfaDisable: a wrong-role actor still gets 403, not 428 (no @RequirePermission on this route)', () => {

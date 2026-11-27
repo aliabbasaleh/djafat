@@ -115,7 +115,12 @@ mobile build, no browser test, and no worker integration test. Local hooks: comm
 messages, lint-staged on commit, gitleaks on push if installed — although that scan reads the
 staged changes, not the pushed commits, so it finds nothing ([`CI-02`](FINDINGS.md#ci-02)). On
 `main` the pre-commit ESLint step cannot run at all ([`CI-03`](FINDINGS.md#ci-03), updated
-2026-11-12, sync S-004).
+2026-11-12, sync S-004). On `feat/connexion-integration` (kcerha, not merged) the lint-staged
+commands leave `package.json` for `lint-staged.config.cjs`, which runs the same commands with the
+same flags in batches (Prettier 40 files, ESLint 25 per call), and the Claude Code stop hook checks
+Prettier in batches of 40 — so a very large commit (a 375-file merge) no longer exhausts memory or
+the Windows command-line limit _(updated 2026-11-26, sync S-053)_. A real commit through it passed on macOS
+(Markdown and JSON files; the ESLint batches and Windows not yet exercised) _(updated 2026-11-27, sync S-054)_.
 
 _(updated 2026-11-11, sync S-003)_ On pull requests `gitleaks-action` needs the run's
 `GITHUB_TOKEN`. `main`'s workflow does not pass it, so the job stops there before scanning. Both

@@ -6,9 +6,14 @@ import type { AuditService } from '../../common/audit/audit.service';
 import type { UsersService } from '../users/users.service';
 import type { RestaurantAvailabilityService } from './restaurant-availability.service';
 
-function prismaStub(restaurant: { status: string; ownerUserId: string | null } | null) {
+function prismaStub(
+  restaurant: { status: string; ownerUserId: string | null } | null,
+  // FEAT-022: a restaurant's application; none = created by the team (as before FEAT-022).
+  application: { status: string } | null = null,
+) {
   const state = restaurant ? { ...restaurant, id: 'r1', slug: 'r1-slug', name: 'R1' } : null;
-  return {
+  const client: Record<string, unknown> = {
+    restaurantApplication: { findUnique: vi.fn().mockResolvedValue(application) },
     restaurant: {
       findUnique: vi.fn().mockResolvedValue(state),
       findUniqueOrThrow: vi.fn().mockResolvedValue(state),
@@ -19,7 +24,11 @@ function prismaStub(restaurant: { status: string; ownerUserId: string | null } |
       create: vi.fn(),
     },
     city: { findUnique: vi.fn() },
-  } as unknown as PrismaService;
+    // FEAT-022 (part 3 review, #5): the application's lock, then the same client.
+    $executeRaw: vi.fn().mockResolvedValue(1),
+  };
+  client['$transaction'] = vi.fn((fn: (tx: unknown) => Promise<unknown>) => fn(client));
+  return client as unknown as PrismaService;
 }
 
 const auditStub = () => ({ log: vi.fn().mockResolvedValue(undefined) }) as unknown as AuditService;
@@ -39,12 +48,15 @@ const availabilityStub = (status: 'OPEN' | 'CLOSED' | 'PAUSED' | 'UNAVAILABLE' =
 function usersStub(
   membersOf: Set<string> = new Set(['owner-1:r1']),
   restaurantScope: string | null = null,
+  // FEAT-022 (review of part 3, R3-1): the restaurant the account owns by its role.
+  ownedScope: string | null = null,
 ) {
   return {
     isMemberOfRestaurant: vi.fn((userId: string, restaurantId: string) =>
       Promise.resolve(membersOf.has(`${userId}:${restaurantId}`)),
     ),
     getRestaurantScope: vi.fn().mockResolvedValue(restaurantScope),
+    getOwnedRestaurantScope: vi.fn().mockResolvedValue(ownedScope),
   } as unknown as UsersService;
 }
 
@@ -192,6 +204,257 @@ describe('update — status transition rules (docs/20 §6, §35)', () => {
   });
 });
 
+// FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte (review of parts 1-2, finding 1).
+describe('update — a restaurant that signed up opens only once DJAFAT approved it (SPEC-022-03 R3)', () => {
+  it.each(['active', 'paused'] as const)(
+    'SPEC-022-03-SC02 — its owner cannot set %s while the application is not approved (409), nothing changes',
+    async (status) => {
+      for (const pending of ['to_complete', 'pending_review', 'rejected']) {
+        const prisma = prismaStub({ status: 'draft', ownerUserId: 'owner-1' }, { status: pending });
+        const svc = new RestaurantsManagementService(
+          prisma,
+          auditStub(),
+          usersStub(new Set(['owner-1:r1'])),
+          availabilityStub(),
+        );
+        await expect(svc.update('owner-1', 'r1', { status }, false)).rejects.toMatchObject({
+          response: { code: 'RESTAURANT_NOT_APPROVED' },
+        });
+        expect(prisma.restaurant.update).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it('once approved, its owner pauses and reopens it as any restaurant', async () => {
+    const prisma = prismaStub({ status: 'active', ownerUserId: 'owner-1' }, { status: 'approved' });
+    const svc = new RestaurantsManagementService(
+      prisma,
+      auditStub(),
+      usersStub(new Set(['owner-1:r1'])),
+      availabilityStub(),
+    );
+    expect((await svc.update('owner-1', 'r1', { status: 'paused' }, false)).status).toBe('paused');
+    expect((await svc.update('owner-1', 'r1', { status: 'active' }, false)).status).toBe('active');
+  });
+
+  it('its owner can still rename it and keep it as a draft before the approval', async () => {
+    const prisma = prismaStub(
+      { status: 'draft', ownerUserId: 'owner-1' },
+      { status: 'to_complete' },
+    );
+    const svc = new RestaurantsManagementService(
+      prisma,
+      auditStub(),
+      usersStub(new Set(['owner-1:r1'])),
+      availabilityStub(),
+    );
+    await expect(
+      svc.update('owner-1', 'r1', { name: 'Chez Fatimé', status: 'draft' }, false),
+    ).resolves.toMatchObject({ name: 'Chez Fatimé', status: 'draft' });
+  });
+});
+
+// FEAT-022 part 3 — SPEC-022-05 R5.
+describe('update — while DJAFAT checks the application, steps 1 and 3 do not change (SPEC-022-05 R5)', () => {
+  it.each([{ addressText: 'Avenue Mobutu, Moursal' }])(
+    'SPEC-022-05 R5 — the owner cannot change %o (409 APPLICATION_LOCKED), nothing changes',
+    async (input) => {
+      const prisma = prismaStub(
+        { status: 'pending_review', ownerUserId: 'owner-1' },
+        { status: 'pending_review' },
+      );
+      const svc = new RestaurantsManagementService(
+        prisma,
+        auditStub(),
+        usersStub(new Set(['owner-1:r1'])),
+        availabilityStub(),
+      );
+      await expect(svc.update('owner-1', 'r1', input, false)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'APPLICATION_LOCKED' },
+      });
+      expect(prisma.restaurant.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('the description still changes; rejected, the address changes again; the team is never locked', async () => {
+    const pending = prismaStub(
+      { status: 'pending_review', ownerUserId: 'owner-1' },
+      { status: 'pending_review' },
+    );
+    const owner = new RestaurantsManagementService(
+      pending,
+      auditStub(),
+      usersStub(new Set(['owner-1:r1'])),
+      availabilityStub(),
+    );
+    await expect(
+      owner.update('owner-1', 'r1', { description: 'Grillades et jus frais' }, false),
+    ).resolves.toBeDefined();
+    await expect(
+      owner.update('admin-1', 'r1', { addressText: 'Avenue Mobutu' }, true),
+    ).resolves.toBeDefined();
+
+    const rejected = prismaStub(
+      { status: 'draft', ownerUserId: 'owner-1' },
+      { status: 'rejected' },
+    );
+    const corrected = new RestaurantsManagementService(
+      rejected,
+      auditStub(),
+      usersStub(new Set(['owner-1:r1'])),
+      availabilityStub(),
+    );
+    await expect(
+      corrected.update('owner-1', 'r1', { addressText: 'Avenue Mobutu' }, false),
+    ).resolves.toBeDefined();
+  });
+});
+
+// FEAT-022 part 3 review, round 2 (R2-1) — SPEC-022-05 R5.
+describe('update — during the review the status follows the application (SPEC-022-05 R5)', () => {
+  it('the owner cannot set « draft » while DJAFAT checks the application (409 APPLICATION_LOCKED), nothing changes', async () => {
+    const prisma = prismaStub(
+      { status: 'pending_review', ownerUserId: 'owner-1' },
+      { status: 'pending_review' },
+    );
+    const svc = new RestaurantsManagementService(
+      prisma,
+      auditStub(),
+      usersStub(new Set(['owner-1:r1'])),
+      availabilityStub(),
+    );
+    await expect(svc.update('owner-1', 'r1', { status: 'draft' }, false)).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'APPLICATION_LOCKED' },
+    });
+    expect(prisma.restaurant.update).not.toHaveBeenCalled();
+  });
+});
+
+// FEAT-022 part 3 review, round 2 (R2-2) — FEAT-022-Q06, Q20.
+describe('create — an owner has one restaurant, and types no photo address', () => {
+  function createStub(owned: number) {
+    const created: unknown[] = [];
+    const client: Record<string, unknown> = {
+      city: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'city-1',
+          countryId: 'td',
+          country: { currency: 'XAF' },
+        }),
+      },
+      restaurant: {
+        findUnique: vi.fn().mockResolvedValue(null), // the slug is free
+        count: vi.fn().mockResolvedValue(owned),
+        create: vi.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
+          created.push(data);
+          return Promise.resolve({ id: 'r-new', ...data });
+        }),
+      },
+      $executeRaw: vi.fn().mockResolvedValue(1),
+    };
+    client['$transaction'] = vi.fn((fn: (tx: unknown) => Promise<unknown>) => fn(client));
+    return { prisma: client as unknown as PrismaService, created };
+  }
+  const input = { cityId: 'city-1', name: 'Chez Halimé' };
+
+  it('a first restaurant is created (draft); a second one is refused (409 ROLE_ALREADY_HELD)', async () => {
+    const first = createStub(0);
+    const svc = new RestaurantsManagementService(
+      first.prisma,
+      auditStub(),
+      usersStub(),
+      availabilityStub(),
+    );
+    await expect(svc.create('owner-1', input)).resolves.toMatchObject({ status: 'draft' });
+
+    const second = createStub(1);
+    const again = new RestaurantsManagementService(
+      second.prisma,
+      auditStub(),
+      usersStub(),
+      availabilityStub(),
+    );
+    await expect(again.create('owner-1', input)).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'ROLE_ALREADY_HELD' },
+    });
+    expect(second.created).toEqual([]);
+  });
+
+  it('review note R3-1 — the owner of a restaurant created by the team (owner by role only) creates no second one', async () => {
+    const stub = createStub(0); // `ownerUserId` names the admin who created it
+    const svc = new RestaurantsManagementService(
+      stub.prisma,
+      auditStub(),
+      usersStub(new Set(), null, 'r-team'),
+      availabilityStub(),
+    );
+    await expect(svc.create('owner-1', input)).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'ROLE_ALREADY_HELD' },
+    });
+    expect(stub.created).toEqual([]);
+  });
+
+  it('an owner sending a logo address is refused (403); the team creates without limit', async () => {
+    const stub = createStub(3);
+    const svc = new RestaurantsManagementService(
+      stub.prisma,
+      auditStub(),
+      usersStub(),
+      availabilityStub(),
+    );
+    await expect(
+      svc.create('owner-1', { ...input, logoUrl: 'https://cdn.example.com/logo.png' }),
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      svc.create('admin-1', { ...input, logoUrl: 'https://cdn.example.com/logo.png' }, true),
+    ).resolves.toMatchObject({ id: 'r-new' });
+  });
+});
+
+// FEAT-022 part 3 review, #1 — SPEC-022-05 R1 v2, FEAT-022-Q20.
+describe('update — an owner never types the logo or cover address (FEAT-022-Q20)', () => {
+  it.each([
+    { logoUrl: 'http://api.test/v1/files/public-00000000-0000-4000-8000-0000000000ff.jpg' },
+    { coverUrl: 'https://cdn.example.com/cover.png' },
+  ])(
+    'an owner sending %o is refused (403), whatever the application’s state; nothing changes',
+    async (input) => {
+      for (const application of [null, { status: 'to_complete' }, { status: 'approved' }]) {
+        const prisma = prismaStub({ status: 'active', ownerUserId: 'owner-1' }, application);
+        const svc = new RestaurantsManagementService(
+          prisma,
+          auditStub(),
+          usersStub(new Set(['owner-1:r1'])),
+          availabilityStub(),
+        );
+        await expect(svc.update('owner-1', 'r1', input, false)).rejects.toMatchObject({
+          status: 403,
+          response: { code: 'FORBIDDEN' },
+        });
+        expect(prisma.restaurant.update).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it('the team still sets a logo address (admin tier)', async () => {
+    const prisma = prismaStub({ status: 'active', ownerUserId: 'owner-1' });
+    const svc = new RestaurantsManagementService(
+      prisma,
+      auditStub(),
+      usersStub(new Set()),
+      availabilityStub(),
+    );
+    await expect(
+      svc.update('admin-1', 'r1', { logoUrl: 'https://cdn.example.com/logo.png' }, true),
+    ).resolves.toBeDefined();
+    expect(prisma.restaurant.update).toHaveBeenCalled();
+  });
+});
+
 describe('listForAdmin (Bloc 9, docs/30 §admin-api)', () => {
   function listPrismaStub(
     rows: Array<{
@@ -306,15 +569,21 @@ describe('getMine / replaceHours (Bloc 10, docs/33 §profile, §hours)', () => {
       city: { timezone: string };
       hours: Array<{ weekday: number; opensMinutes: number; closesMinutes: number }>;
     } | null,
+    // FEAT-022: the restaurant's application; none = created by the team (as before FEAT-022).
+    application: { status: string } | null = null,
   ) {
     const deleteMany = vi.fn().mockResolvedValue({ count: 0 });
     const createMany = vi.fn().mockResolvedValue({ count: 0 });
+    const client: Record<string, unknown> = {
+      restaurant: { findUniqueOrThrow: vi.fn().mockResolvedValue(restaurant) },
+      restaurantApplication: { findUnique: vi.fn().mockResolvedValue(application) },
+      restaurantHours: { deleteMany, createMany },
+      // FEAT-022 (part 3 review, #5): one interactive transaction under the application's lock.
+      $executeRaw: vi.fn().mockResolvedValue(1),
+    };
+    client['$transaction'] = vi.fn((fn: (tx: unknown) => Promise<unknown>) => fn(client));
     return {
-      prisma: {
-        restaurant: { findUniqueOrThrow: vi.fn().mockResolvedValue(restaurant) },
-        restaurantHours: { deleteMany, createMany },
-        $transaction: vi.fn((ops: unknown[]) => Promise.all(ops)),
-      } as unknown as PrismaService,
+      prisma: client as unknown as PrismaService,
       deleteMany,
       createMany,
     };
@@ -378,6 +647,23 @@ describe('getMine / replaceHours (Bloc 10, docs/33 §profile, §hours)', () => {
     expect(createMany).toHaveBeenCalledWith({
       data: hours.map((h) => ({ restaurantId: 'r1', ...h })),
     });
+  });
+
+  // FEAT-022 — SPEC-022-05 R5 (part 3)
+  it('SPEC-022-05 R5 — while DJAFAT checks the application, the hours do not change (409 APPLICATION_LOCKED)', async () => {
+    const { prisma, deleteMany } = profilePrismaStub(null, { status: 'pending_review' });
+    const svc = new RestaurantsManagementService(
+      prisma,
+      auditStub(),
+      usersStub(new Set(), 'r1'),
+      availabilityStub(),
+    );
+    await expect(
+      svc.replaceHours('owner-1', {
+        hours: [{ weekday: 1, opensMinutes: 480, closesMinutes: 1320 }],
+      }),
+    ).rejects.toMatchObject({ status: 409, response: { code: 'APPLICATION_LOCKED' } });
+    expect(deleteMany).not.toHaveBeenCalled();
   });
 
   it('replaceHours refuses an actor with no restaurant scope', async () => {

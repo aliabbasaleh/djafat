@@ -7,6 +7,7 @@ import { ApiClientError } from '@djafat/sdk';
 import { Screen } from '../../components/Screen';
 import { BigButton } from '../../components/BigButton';
 import { Badge } from '../../components/Badge';
+import { MobileMoneyCard } from '../../components/MobileMoneyCard';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 import { formatMoney } from '../../lib/format';
@@ -69,7 +70,7 @@ export default function EarningsScreen() {
     try {
       const p = await api.courier.payouts.request();
       setMessage(
-        `Retrait de ${formatMoney(p.requested)} demandé : DJAFAT l'envoie sur votre Airtel Money.`,
+        `Retrait de ${formatMoney(p.requested)} demandé : DJAFAT l'envoie sur votre Mobile Money.`,
       );
       await load();
     } catch (err) {
@@ -149,13 +150,16 @@ export default function EarningsScreen() {
                   disabled={net < MIN_WITHDRAWAL}
                 />
                 <Text style={styles.note}>
-                  Sur votre Airtel Money, dès 2 000 FCFA ; frais Airtel à votre charge. Sinon,
-                  versement automatique chaque lundi, sans frais.
+                  Sur votre Mobile Money, dès 2 000 FCFA ; frais de l’opérateur à votre charge.
+                  Sinon, versement automatique chaque lundi, sans frais.
                 </Text>
               </>
             )}
             {message && <Text style={styles.note}>{message}</Text>}
           </View>
+
+          {/* FEAT-022 (SPEC-022-07 R6): where the earnings go, and a new number for DJAFAT. */}
+          <MobileMoneyCard />
 
           <Text style={styles.section}>Mes courses</Text>
           {days.length === 0 && (

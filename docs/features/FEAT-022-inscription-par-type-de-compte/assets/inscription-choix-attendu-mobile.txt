@@ -1,0 +1,32 @@
+FEAT-022-VIS01 — apps/web /compte, onglet « Créer un compte », étape 1, 390x844 (mobile)
+Nature : attendu. Choix demandé par l'utilisateur le 2026-11-22 (« when you
+click on register, it's going to ask you which account do you need to
+register »).
+
+ DJAFAT                      [👤 Compte]
+ ───────────────────────────────────────
+  Mon compte
+
+    Se connecter    [ Créer un compte ]
+                    ══════════════════
+
+  Quel compte voulez-vous créer ?
+
+  ┌─────────────────────────────────┐
+  │ 🍽  Client                       │
+  │     Commander des repas          │
+  └─────────────────────────────────┘
+  ┌─────────────────────────────────┐
+  │ 🛵  Livreur                      │
+  │     Livrer des commandes, gagner │
+  └─────────────────────────────────┘
+  ┌─────────────────────────────────┐
+  │ 🏪  Restaurant                   │
+  │     Vendre vos plats sur DJAFAT  │
+  └─────────────────────────────────┘
+
+Notes :
+- Un choix ouvre le formulaire correspondant ; « ← Changer de type » revient ici.
+- Les liens du pied de page « Devenir livreur » et « Devenir restaurant »
+  (aujourd'hui « Bientôt ») ouvrent directement le bon formulaire.
+- Même écran dans l'application client (« Mon compte »).
