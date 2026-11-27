@@ -104,3 +104,152 @@ describe('SPEC-020-01 — account notices without a code', () => {
     expect(text).toContain('contactez DJAFAT');
   });
 });
+
+// FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte (SPEC-022-07 R5).
+describe('SPEC-022-07 — the e-mails of a decision', () => {
+  it('SPEC-022-07-SC03 — a refused courier reads the reason and how to send again', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'application_rejected',
+      to: 'abakar@example.td',
+      applicant: { type: 'courier' },
+      reason: 'La photo du permis est floue.',
+    });
+    expect(subject).toBe('Votre demande de livreur DJAFAT est refusée');
+    expect(text).toContain('Motif : La photo du permis est floue.');
+    expect(text).toContain('« Envoyer pour validation »');
+  });
+
+  it('SPEC-022-07-SC03 — an approved courier is told to go online', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'application_approved',
+      to: 'abakar@example.td',
+      applicant: { type: 'courier' },
+    });
+    expect(subject).toBe('Votre compte livreur DJAFAT est validé');
+    expect(text).toContain('« En ligne »');
+  });
+
+  it('SPEC-022-07 R5 — « Votre restaurant est validé », named, now visible to customers', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'application_approved',
+      to: 'fatime@example.td',
+      applicant: { type: 'restaurant', restaurantName: 'Chez Fatimé' },
+    });
+    expect(subject).toBe('Votre restaurant « Chez Fatimé » est validé');
+    expect(text).toContain('visible des clients');
+  });
+
+  it('a refused restaurant reads the reason and where to correct it', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'application_rejected',
+      to: 'fatime@example.td',
+      applicant: { type: 'restaurant', restaurantName: 'Chez Fatimé' },
+      reason: 'Le numéro RCCM ne correspond pas à la photo.',
+    });
+    expect(subject).toBe('Le dossier de « Chez Fatimé » est refusé');
+    expect(text).toContain('Motif : Le numéro RCCM ne correspond pas à la photo.');
+    expect(text).toContain('console restaurant');
+  });
+});
+
+// FEAT-022 part 3 — SPEC-022-07 R5, R6: a change after the approval.
+describe('SPEC-022-07 R6 — the e-mails of a change after the approval', () => {
+  it('SPEC-022-07-SC05 — accepted: the next earnings go to the new number', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'change_decided',
+      to: 'abakar@example.td',
+      applicant: { type: 'courier' },
+      topic: 'mobile_money',
+      status: 'approved',
+    });
+    expect(subject).toBe('Votre nouveau numéro Mobile Money est accepté');
+    expect(text).toContain('DJAFAT a accepté le nouveau numéro Mobile Money.');
+    expect(text).toContain('Vos prochains gains y seront envoyés.');
+  });
+
+  it('refused: the reason, and the approved number keeps being paid', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'change_decided',
+      to: 'fatime@example.td',
+      applicant: { type: 'restaurant', restaurantName: 'Chez Fatimé' },
+      topic: 'mobile_money',
+      status: 'rejected',
+      reason: "Ce numéro n'est pas au nom du restaurant.",
+    });
+    expect(subject).toBe("Votre nouveau numéro Mobile Money n'est pas accepté");
+    expect(text).toContain(
+      "DJAFAT n'a pas accepté le nouveau numéro Mobile Money de « Chez Fatimé ».",
+    );
+    expect(text).toContain("Motif : Ce numéro n'est pas au nom du restaurant.");
+    expect(text).toContain('Les paiements continuent vers le numéro déjà validé.');
+    expect(text).toContain('console restaurant');
+  });
+
+  it('a new paper: named, and where to send another one', () => {
+    const accepted = accountNoticeMessage({
+      kind: 'change_decided',
+      to: 'abakar@example.td',
+      applicant: { type: 'courier' },
+      topic: 'driving_licence',
+      status: 'approved',
+    });
+    expect(accepted.subject).toBe('Votre nouveau papier est accepté');
+    expect(accepted.text).toContain('DJAFAT a accepté la nouvelle photo du permis.');
+    expect(accepted.text).toContain("Elle remplace l'ancienne dans votre dossier.");
+
+    const refused = accountNoticeMessage({
+      kind: 'change_decided',
+      to: 'abakar@example.td',
+      applicant: { type: 'courier' },
+      topic: 'insurance',
+      status: 'rejected',
+      reason: "L'assurance a expiré.",
+    });
+    expect(refused.subject).toBe("Votre nouveau papier n'est pas accepté");
+    expect(refused.text).toContain("la nouvelle photo de l'assurance");
+    expect(refused.text).toContain('Le papier déjà validé reste dans votre dossier.');
+    expect(refused.text).toContain("l'application DJAFAT Livreur");
+  });
+});
+
+// FEAT-022 — SPEC-022-02 R8, SPEC-022-03 R6 (FEAT-022-Q13).
+describe('SPEC-022-02 R8, SPEC-022-03 R6 — « Bienvenue sur DJAFAT »', () => {
+  it('SPEC-022-02-SC07 — the courier: the items to complete in the courier app, then « Envoyer pour validation »', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'welcome',
+      to: 'awa@example.td',
+      applicant: { type: 'courier' },
+    });
+    expect(subject).toBe('Bienvenue sur DJAFAT : votre compte livreur est créé');
+    for (const item of [
+      'DJAFAT Livreur',
+      'photo de votre visage',
+      "pièce d'identité",
+      'permis et les papiers du véhicule',
+      'Mobile Money',
+      "contact en cas d'urgence",
+      '« Envoyer pour validation »',
+    ]) {
+      expect(text).toContain(item);
+    }
+  });
+
+  it('SPEC-022-03-SC06 — the restaurant: not visible yet, the four steps of the console', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'welcome',
+      to: 'awa@example.td',
+      applicant: { type: 'restaurant', restaurantName: 'Chez Fatimé' },
+    });
+    expect(subject).toBe('Bienvenue sur DJAFAT : « Chez Fatimé » est inscrit');
+    expect(text).toContain("Il n'est pas encore visible des clients.");
+    for (const step of [
+      '1. Emplacement',
+      '2. Horaires et menu',
+      '3. Logo et photo de couverture',
+      '4. Papiers',
+      '« Envoyer pour validation »',
+    ]) {
+      expect(text).toContain(step);
+    }
+  });
+});

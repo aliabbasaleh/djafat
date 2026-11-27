@@ -1,0 +1,31 @@
+.map {
+  width: 100%;
+  height: 360px;
+  border-radius: 12px;
+  border: 1px solid var(--djafat-color-border-default);
+  overflow: hidden;
+}
+
+.pin {
+  font-size: 32px;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+}
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-2) * 1px);
+  align-items: flex-start;
+}
+
+.centre {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--djafat-color-text-link, #0b57d0);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}

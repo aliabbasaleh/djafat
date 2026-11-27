@@ -5,6 +5,9 @@ import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import {
   ApiClientError,
+  DIAL_CODE,
+  phoneFieldShowsDialCode,
+  phoneForSending,
   type Address,
   type AddressInput,
   type Landmark,
@@ -71,7 +74,8 @@ const RELATIONS: ReadonlyArray<[LandmarkRelation, string]> = [
 function toInput(values: FormValues, editing: boolean): AddressInput {
   const input: { -readonly [K in keyof AddressInput]?: AddressInput[K] } = {};
   const label = values.label.trim();
-  const recipientPhone = values.recipientPhone.trim();
+  // FEAT-024: the field shows « +235 »; 8 digits typed leave in international format.
+  const recipientPhone = phoneForSending(values.recipientPhone);
   const quartier = values.quartier.trim();
   const street = values.street.trim();
   const landmark = values.landmark.trim();
@@ -389,7 +393,10 @@ export default function AdressesPage() {
               <Input
                 label="Téléphone du destinataire"
                 type="tel"
-                placeholder="+23566000000"
+                placeholder="66 12 34 56"
+                {...(phoneFieldShowsDialCode(values.recipientPhone)
+                  ? { leadingText: DIAL_CODE }
+                  : {})}
                 value={values.recipientPhone}
                 onChange={(e) => setValues((v) => ({ ...v, recipientPhone: e.target.value }))}
               />

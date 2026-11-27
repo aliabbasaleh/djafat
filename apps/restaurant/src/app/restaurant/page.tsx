@@ -14,9 +14,11 @@ import {
   Greeting,
   cx,
 } from '@djafat/ui';
-import { Button } from '@/components/ui-client';
+import { Alert, Button } from '@/components/ui-client';
+import { ApplicationSteps } from '@/components/ApplicationSteps';
 import { OrderBoard } from '@/components/OrderBoard';
 import { api } from '@/lib/api';
+import { useRestaurantApplication } from '@/lib/application';
 import { clearSession, getStoredUser } from '@/lib/auth-storage';
 import { useRoomRealtime } from '@/lib/realtime';
 import { playNewOrderChime, primeSound } from '@/lib/sound';
@@ -33,6 +35,65 @@ function readSoundPref(): boolean {
   }
 }
 
+/** FEAT-022 (SPEC-022-05 R4): « ✅ Validé » shows until its owner closes it, once per restaurant. */
+const VALIDATED_SEEN_KEY = 'djafat.restaurant.validated-seen';
+
+function validatedSeen(restaurantId: string): boolean {
+  try {
+    return window.localStorage.getItem(`${VALIDATED_SEEN_KEY}.${restaurantId}`) === '1';
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * The console's home (FEAT-022, SPEC-022-05): a restaurant that signed up and
+ * is not validated yet sees its four steps (FEAT-022-VIS04); once validated —
+ * or created by the team, with no application — the order board.
+ */
+export default function RestaurantHome() {
+  const { application, setApplication } = useRestaurantApplication();
+  const [showValidated, setShowValidated] = useState(false);
+
+  useEffect(() => {
+    if (application?.status === 'approved') {
+      setShowValidated(!validatedSeen(application.restaurantId));
+    }
+  }, [application]);
+
+  if (application === undefined) {
+    return (
+      <Stack gap="sm" aria-busy="true" aria-label="Chargement de l'accueil">
+        <Skeleton height={40} />
+        <Skeleton height={240} radius="8px" />
+      </Stack>
+    );
+  }
+  if (application && application.status !== 'approved') {
+    return <ApplicationSteps application={application} onChange={setApplication} />;
+  }
+  return (
+    <Stack gap="lg">
+      {application && showValidated && (
+        <Alert
+          tone="success"
+          onDismiss={() => {
+            setShowValidated(false);
+            try {
+              window.localStorage.setItem(`${VALIDATED_SEEN_KEY}.${application.restaurantId}`, '1');
+            } catch {
+              // Best effort: it shows again next time.
+            }
+          }}
+        >
+          ✅ Validé : votre restaurant est visible des clients.
+        </Alert>
+      )}
+      <OrderBoardPage />
+    </Stack>
+  );
+}
+
 /**
  * The kitchen's order board — the restaurant app's home screen (Bloc 10,
  * docs/33 §order-board). Realtime via `restaurant:orders:{id}` (Bloc 7) is a
@@ -40,7 +101,7 @@ function readSoundPref(): boolean {
  * comment) — this page's `load()` is always what actually renders, so a
  * missed/out-of-order event can never show a stale or impossible board.
  */
-export default function OrderBoardPage() {
+function OrderBoardPage() {
   const router = useRouter();
   const [state, setState] = useState<LoadState>('loading');
   const [restaurantId, setRestaurantId] = useState<string | null>(null);

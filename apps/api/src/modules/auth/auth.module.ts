@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { UsersModule } from '../users/users.module';
+import { GeoModule } from '../geo/geo.module';
 import { AuthController } from './auth.controller';
 import { MeController } from './me.controller';
 import { AuthService } from './auth.service';
@@ -40,6 +41,7 @@ import { PasswordService } from './password.service';
 import { PasswordController } from './password.controller';
 import { TrustedDeviceService } from './trusted-device.service';
 import { PhoneLinkService } from './phone-link.service';
+import { RoleSignupService } from './role-signup.service';
 
 /**
  * Identity & Access (Bloc 1, docs/19). Depends only on `users` (docs/19 §43
@@ -50,7 +52,7 @@ import { PhoneLinkService } from './phone-link.service';
  * isn't enough (e.g. a controller resolving an ownership check manually).
  */
 @Module({
-  imports: [UsersModule],
+  imports: [UsersModule, GeoModule],
   controllers: [
     AuthController,
     MeController,
@@ -78,6 +80,7 @@ import { PhoneLinkService } from './phone-link.service';
     EmailChangeService,
     TrustedDeviceService,
     PhoneLinkService,
+    RoleSignupService, // FEAT-022 (SPEC-022-08)
     // FEAT-020 (SPEC-020-01 R6): notices without a code, same choice as the codes.
     {
       provide: ACCOUNT_NOTICE_PORT,
@@ -125,6 +128,13 @@ import { PhoneLinkService } from './phone-link.service';
       inject: [AppConfigService, RedisService],
     },
   ],
-  exports: [ActorResolverService, SessionService, TokenService, WhatsappTextReplyService],
+  // FEAT-022: `admin` e-mails DJAFAT's decision on an application through the same notices.
+  exports: [
+    ActorResolverService,
+    SessionService,
+    TokenService,
+    WhatsappTextReplyService,
+    ACCOUNT_NOTICE_PORT,
+  ],
 })
 export class AuthModule {}

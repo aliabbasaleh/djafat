@@ -16,6 +16,7 @@ export * from './delivery/earnings-period.js';
 export * from './trust/cod-trust.js';
 export * from './geo/distance.js';
 export * from './geo/learned-point.js';
+export * from './geo/place-name.js';
 
 export * from './mfa/totp.js';
 
@@ -23,9 +24,18 @@ export * from './auth/rotation-policy.js';
 export * from './auth/otp-policy.js';
 export * from './auth/password-policy.js';
 
+export * from './onboarding/courier-signup.js';
+export * from './onboarding/application-checklists.js';
+export * from './onboarding/application-status.js';
+
 export * from './catalog/restaurant-availability.js';
 export * from './catalog/product-option-validator.js';
 
 export * from './cart/cart-pricing.js';
 
 export * from './phone/normalize-phone.js';
+export * from './phone/mask-phone.js';
+export * from './phone/phone-kind.js';
+
+export * from './identity/person-name.js';
+export * from './identity/email-typo.js';

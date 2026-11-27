@@ -16,6 +16,7 @@ export * from './buttons/ButtonGroup.js';
 
 // Form
 export * from './form/Input.js';
+export * from './form/FieldSuggestion.js';
 export * from './form/SearchInput.js';
 export * from './form/Select.js';
 export * from './form/Checkbox.js';

@@ -29,19 +29,22 @@ Validation : `pnpm check:specs`. Matrice de traçabilité :
 `node scripts/pipeline/check-specs.mjs --matrix FEAT-NNN`. Processus complet :
 [`docs/pipeline/README.md`](../pipeline/README.md).
 
-| Feature                                                        | Domaine   | Statut                                                                                                               |
-| -------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------- |
-| [FEAT-001](FEAT-001-restaurant-closed-order-guard/feature.md)  | commande  | done — validation rétrospective                                                                                      |
-| [FEAT-002](FEAT-002-mock-provider-production-lock/feature.md)  | paiement  | done — `mock` inutilisable en production                                                                             |
-| [FEAT-003](FEAT-003-prepaid-scratch-card-topup/feature.md)     | paiement  | **en pause** — brouillon, 8 questions produit en attente                                                             |
-| [FEAT-004](FEAT-004-server-side-logout/feature.md)             | auth      | done — déconnexion révoquée côté serveur                                                                             |
-| [FEAT-005](FEAT-005-chad-friendly-phone-input/feature.md)      | auth      | done — numéros saisis à la tchadienne                                                                                |
-| [FEAT-006](FEAT-006-real-sms-otp-delivery/feature.md)          | auth      | done — passerelle SMS réelle (à brancher quand il y aura un budget)                                                  |
-| [FEAT-007](FEAT-007-email-login/feature.md)                    | auth      | done — e-mail vérifié et connexion par code e-mail                                                                   |
-| [FEAT-008](FEAT-008-whatsapp-login/feature.md)                 | auth      | done — code de connexion par WhatsApp, SMS désactivable                                                              |
-| [FEAT-009](FEAT-009-mobile-money-transfer-matching/feature.md) | paiement  | done — espèces réparées ; Airtel/Tigo vérifiés par numéro de transaction                                             |
-| [FEAT-010](FEAT-010-courier-cash-control/feature.md)           | livraison | done — plafond d'espèces par livreur, reversements Airtel                                                            |
-| [FEAT-020](FEAT-020-compte-email-mot-de-passe/feature.md)      | auth      | done — comptes clients par e-mail et mot de passe, code par e-mail (FEAT-019 réservé au connecteur API Airtel Money) |
+| Feature                                                        | Domaine                        | Statut                                                                                                                                                  |
+| -------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [FEAT-001](FEAT-001-restaurant-closed-order-guard/feature.md)  | commande                       | done — validation rétrospective                                                                                                                         |
+| [FEAT-002](FEAT-002-mock-provider-production-lock/feature.md)  | paiement                       | done — `mock` inutilisable en production                                                                                                                |
+| [FEAT-003](FEAT-003-prepaid-scratch-card-topup/feature.md)     | paiement                       | **en pause** — brouillon, 8 questions produit en attente                                                                                                |
+| [FEAT-004](FEAT-004-server-side-logout/feature.md)             | auth                           | done — déconnexion révoquée côté serveur                                                                                                                |
+| [FEAT-005](FEAT-005-chad-friendly-phone-input/feature.md)      | auth                           | done — numéros saisis à la tchadienne                                                                                                                   |
+| [FEAT-006](FEAT-006-real-sms-otp-delivery/feature.md)          | auth                           | done — passerelle SMS réelle (à brancher quand il y aura un budget)                                                                                     |
+| [FEAT-007](FEAT-007-email-login/feature.md)                    | auth                           | done — e-mail vérifié et connexion par code e-mail                                                                                                      |
+| [FEAT-008](FEAT-008-whatsapp-login/feature.md)                 | auth                           | done — code de connexion par WhatsApp, SMS désactivable                                                                                                 |
+| [FEAT-009](FEAT-009-mobile-money-transfer-matching/feature.md) | paiement                       | done — espèces réparées ; Airtel/Tigo vérifiés par numéro de transaction                                                                                |
+| [FEAT-010](FEAT-010-courier-cash-control/feature.md)           | livraison                      | done — plafond d'espèces par livreur, reversements Airtel                                                                                               |
+| [FEAT-020](FEAT-020-compte-email-mot-de-passe/feature.md)      | auth                           | done — comptes clients par e-mail et mot de passe, code par e-mail (FEAT-019 réservé au connecteur API Airtel Money)                                    |
+| [FEAT-021](FEAT-021-equipe-connexion-email/feature.md)         | auth                           | implémentée et revue, PR à ouvrir — l'équipe (admin, restaurants, livreurs) se connecte par e-mail et mot de passe ; SMS coupé tant qu'il n'a pas d'API |
+| [FEAT-022](FEAT-022-inscription-par-type-de-compte/feature.md) | auth, catalog, couriers, admin | confirmée, specs à écrire — inscription client, livreur ou restaurant, profil complété dans son application, validation par DJAFAT                      |
+| [FEAT-023](FEAT-023-whatsapp-gratuit/feature.md)               | auth                           | confirmée, specs à écrire — connexion WhatsApp gratuite : le client envoie le code, DJAFAT n'envoie rien                                                |
 
 ## Paiement — en pause (2026-11-06)
 

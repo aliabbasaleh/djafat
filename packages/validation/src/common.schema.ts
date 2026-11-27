@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { normalizePhone, type PhoneMarket } from '@djafat/core';
+import {
+  PERSON_NAME_MESSAGES,
+  checkPersonName,
+  phoneInputMessage,
+  readPhoneInput,
+  type PersonNameRefusal,
+  type PhoneMarket,
+  type PhoneUse,
+} from '@djafat/core';
 
 /** E.164 phone number (the identity primitive — docs/01). */
 export const PhoneSchema = z
@@ -54,15 +62,34 @@ export type AddressInput = z.infer<typeof AddressInputSchema>;
  * Phone INPUT as people type it (FEAT-005): spaces, dashes, 00 prefix, Arabic
  * digits, national format of the given market. Output is always E.164, so
  * services, rate limits and accounts see one canonical number.
+ *
+ * FEAT-024 (SPEC-024-02): `use` says what the number is for — `contact` (a
+ * number to call: any valid number, the FEAT-005 behaviour), `account` (no
+ * fixed line: no code could reach it), `mobile_money` (a mobile of the market
+ * only). The refusal is the same message the screens show.
  */
-export function makePhoneInputSchema(market: PhoneMarket) {
-  const national = market.nationalNumberLength;
+export function makePhoneInputSchema(market: PhoneMarket, use: PhoneUse = 'contact') {
   return z.string().transform((raw, ctx) => {
-    const result = normalizePhone(raw, market);
+    const result = readPhoneInput(raw, market, use);
     if (result.ok) return result.e164;
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: phoneInputMessage(result.reason, use) });
+    return z.NEVER;
+  });
+}
+
+/**
+ * The name of a person (FEAT-024, SPEC-024-03): letters, spaces, ' and -, at
+ * least two letters, trimmed and inner spaces collapsed. A form may keep its
+ * own words for a missing or too long name (`messages`); the refusal of
+ * digits and signs is the same everywhere.
+ */
+export function makePersonNameSchema(messages: Partial<Record<PersonNameRefusal, string>> = {}) {
+  return z.string().transform((raw, ctx) => {
+    const result = checkPersonName(raw);
+    if (result.ok) return result.name;
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: `numéro invalide : ${national} chiffres (ex. 66 12 34 56) ou format international (${market.dialCode}…)`,
+      message: messages[result.reason] ?? PERSON_NAME_MESSAGES[result.reason],
     });
     return z.NEVER;
   });

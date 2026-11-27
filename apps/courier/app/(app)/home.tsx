@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { tokens } from '@djafat/tokens';
-import type { CourierProfile, Delivery, DeliveryOffer } from '@djafat/sdk';
+import type { CourierApplication, CourierProfile, Delivery, DeliveryOffer } from '@djafat/sdk';
 import { ApiClientError } from '@djafat/sdk';
 import { Screen } from '../../components/Screen';
 import { BigButton } from '../../components/BigButton';
@@ -15,6 +15,19 @@ import { newIdempotencyKey } from '../../lib/idempotency';
 import { secondsRemaining, formatCountdown, formatMoney } from '../../lib/format';
 
 type LoadState = 'loading' | 'ready' | 'error';
+
+/**
+ * FEAT-022 (SPEC-022-06 R5): a courier who signed up has an application and
+ * waits for DJAFAT; one created by the team has none and works as before.
+ */
+async function applicationOrNone(): Promise<CourierApplication | null> {
+  try {
+    return await api.courier.application.get();
+  } catch (err) {
+    if (err instanceof ApiClientError && err.code === 'APPLICATION_NOT_FOUND') return null;
+    throw err;
+  }
+}
 
 function salutation(): string {
   const hour = new Date().getHours();
@@ -45,11 +58,16 @@ export default function HomeScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [p, offers, active] = await Promise.all([
+      const [p, offers, active, application] = await Promise.all([
         api.courier.getProfile(),
         api.courier.offers.list(),
         api.courier.deliveries.listActive(),
+        applicationOrNone(),
       ]);
+      if (application && application.status !== 'approved') {
+        router.replace('/(app)/onboarding');
+        return;
+      }
       setProfile(p);
       setOffer(offers[0] ?? null);
       setActiveDelivery(active[0] ?? null);
@@ -62,7 +80,7 @@ export default function HomeScreen() {
       setState('error');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- PRE-EXISTING (FU-REACT-01): `signOut` is read stale; adding it changes the callback identity, review separately.
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     void load();
@@ -206,6 +224,12 @@ export default function HomeScreen() {
 
       <View style={styles.footerLinks}>
         <BigButton label="Gains" variant="ghost" onPress={() => router.push('/(app)/earnings')} />
+        {/* FEAT-022 (SPEC-022-07 R6): replace a paper once validated. */}
+        <BigButton
+          label="Mes papiers"
+          variant="ghost"
+          onPress={() => router.push('/(app)/papers')}
+        />
       </View>
     </Screen>
   );

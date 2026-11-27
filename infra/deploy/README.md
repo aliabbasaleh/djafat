@@ -121,9 +121,9 @@ migrations appliquées et (mode démo) les données de démonstration ajoutées.
   À chaque installation, la base reçoit ses **données de référence** (rôles,
   permissions, comptes du grand livre, réglages ; jamais de compte de test, et
   un réglage changé sur le serveur n'est jamais remis à sa valeur par défaut).
-  **Premier administrateur** _(ajouté le 18 nov. 2026)_ : la personne se
-  connecte une fois sur le site avec son numéro (cela crée son compte), puis,
-  depuis `infra/deploy` :
+  **Premier administrateur** _(ajouté le 18 nov. 2026, mis à jour le 23 nov.)_ : la
+  personne crée son compte sur le site (nom, numéro, e-mail et mot de passe) — ou, tant
+  que le SMS marche, s'y connecte une fois avec son numéro —, puis, depuis `infra/deploy` :
 
   ```bash
   docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm migrate node_modules/.bin/tsx prisma/create-super-admin.ts +235XXXXXXXX
@@ -133,6 +133,52 @@ migrations appliquées et (mode démo) les données de démonstration ajoutées.
   puis donne les autres rôles depuis la console. Les comptes de démonstration
   (numéros publiés, dont un super_admin) ne sont **jamais** créés hors mode démo :
   le script de démo refuse de tourner en production sans `SEED_DEMO=1`.
+
+### Couper le SMS : tout le monde se connecte par e-mail _(ajouté le 22 nov. 2026, FEAT-021)_
+
+Tant que DJAFAT n'a pas de passerelle SMS, le SMS est coupé : clients, administrateurs,
+restaurants et livreurs se connectent par **e-mail et mot de passe** (un code par e-mail sur un
+appareil inconnu). Les boutons SMS et WhatsApp s'affichent « Bientôt disponible » et s'allument
+seuls le jour où leurs réglages sont remplis. **Dans cet ordre**, sinon quelqu'un reste dehors :
+
+1. **L'e-mail marche.** Dans `.env.prod` : `EMAIL_PROVIDER=smtp`, `SMTP_HOST=smtp.gmail.com`,
+   `SMTP_PORT=465`, `SMTP_USER=` l'adresse Gmail de DJAFAT, `SMTP_PASSWORD=` son **mot de passe
+   d'application** (sans espaces, ou entre guillemets), `EMAIL_FROM` **vide** (les clients voient
+   alors « DJAFAT »). Relancer, puis créer un compte de test sur le site : le code doit arriver.
+2. **Chaque membre de l'équipe a un e-mail vérifié et un mot de passe.** Tant que le code
+   téléphone marche encore (boîte de test ci-dessus), il se connecte sur le site, ajoute et
+   confirme son e-mail dans « Mon profil », puis y définit son mot de passe. Si son e-mail est
+   déjà vérifié, « Mot de passe oublié ? » dans son application suffit. **Contrôle avant
+   l'étape 3** _(ajouté le 23 nov. 2026, FEAT-021-Q11)_, en lecture seule depuis `infra/deploy` :
+   la requête doit ne renvoyer **aucune ligne**.
+
+   ```bash
+   docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T postgres \
+     psql -U djafat -d djafat -c "BEGIN READ ONLY; SELECT u.id, u.full_name, string_agg(r.role, ', ' ORDER BY r.role) AS roles, u.email_verified_at IS NOT NULL AS email_ok, u.password_hash IS NOT NULL AS mot_de_passe_ok FROM users u JOIN user_roles r ON r.user_id = u.id WHERE r.role <> 'customer' AND u.status = 'active' AND (u.email_verified_at IS NULL OR u.password_hash IS NULL) GROUP BY u.id ORDER BY u.full_name; COMMIT;"
+   ```
+
+   Chaque ligne est un compte d'équipe qui serait **bloqué** (sans e-mail vérifié, il ne peut plus
+   se connecter) ou **exposé** (sans mot de passe, une session volée suffirait pour changer son
+   e-mail puis poser un premier mot de passe). Tant qu'il reste une ligne, ne pas couper le SMS.
+   Après la coupure aussi : relancer cette requête après chaque rôle d'équipe accordé ou compte
+   réactivé depuis la console ; un compte d'équipe suspendu doit avoir un e-mail vérifié et un mot
+   de passe avant d'être réactivé.
+
+3. **Couper le SMS.** Dans `.env.prod` : `SMS_PROVIDER=disabled`, et mettre en commentaire (`#`
+   en début de ligne) `SMS_HTTP_URL` et `SMS_HTTP_API_KEY`, sans les effacer : le retour en
+   arrière en a besoin. La boîte de test (`mock-sms`) ne sert plus.
+4. **Relancer** l'API (`docker compose --env-file .env.prod -f docker-compose.prod.yml up -d api`).
+   Elle refuse de démarrer s'il ne reste aucun canal réel (SMS, WhatsApp ou e-mail) : c'est voulu.
+5. **Contrôler** : `curl -s https://api.<domaine>/v1/auth/methods` répond `"sms"` et
+   `"whatsapp"` avec `"available":false`, `"email"` avec `"available":true` ; puis se connecter
+   par e-mail et mot de passe à la console admin, à la console restaurant et à l'application
+   livreur.
+
+**Retour en arrière** : remettre `SMS_PROVIDER=http`, retirer le `#` devant `SMS_HTTP_URL` (en
+mode démo : `http://mock-sms:4020/send`, la boîte de test, qui tourne avec `--profile demo`) et
+devant `SMS_HTTP_API_KEY` (vide en mode démo), puis relancer l'API comme à l'étape 4.
+**Le jour où une vraie passerelle SMS existe** : `SMS_PROVIDER=http` avec ses réglages
+(`docs/39-comptes-externes.md` §1), sans changer le code.
 
 ## 5. Au quotidien
 
@@ -175,4 +221,22 @@ _(Ajouté le 18 nov. 2026.)_ Deux scripts, à programmer avec `crontab -e` sur l
 - `healthcheck.sh` : sites, API, conteneurs, disque, âge de la sauvegarde, dernier test de
   restauration ; alerte `ALERT_NTFY_URL` (dans `.env.prod`) quand l'état change.
 - `restore-check.sh` : restaure la dernière sauvegarde dans une base à part, la vérifie, puis la
-  supprime. La base en service n'est jamais modifiée.
+  supprime. La base en service n'est jamais modifiée. _(FEAT-022)_ Il vérifie aussi que chaque
+  photo citée par la base restaurée est dans l'archive `uploads-*.tar.gz` de la même nuit, et
+  échoue sinon ; `backup.sh` écrit « files backup FAILED » si le volume des photos n'est pas monté.
+
+### Photos des dossiers (FEAT-022) sur un serveur déjà installé
+
+_(Ajouté le 23 nov. 2026.)_ Les photos des livreurs et des restaurants sont sur le disque du
+serveur (volume `uploads`, monté sur `/data/uploads` par `docker-compose.prod.yml`) et entrent dans
+la sauvegarde de la nuit. `gen-secrets.sh` ne réécrit jamais un `.env.prod` existant : sur un serveur
+déjà installé, ajouter à la main dans `.env.prod`, avant `./install.sh` :
+
+```bash
+FILE_URL_SECRET=$(openssl rand -hex 32)   # coller la valeur obtenue, pas la commande
+```
+
+Sans cette ligne, les liens de 5 minutes des photos privées sont signés avec une clé tirée de
+`JWT_ACCESS_SECRET` : ça marche, mais changer ce secret-là invaliderait aussi les liens. Rien
+d'autre à régler : `OBJECT_STORAGE_DRIVER` vaut `filesystem` par défaut et le dossier est fixé par
+le fichier compose.

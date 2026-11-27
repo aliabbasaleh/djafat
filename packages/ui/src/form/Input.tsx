@@ -13,6 +13,11 @@ export interface InputProps
   readonly helpText?: string;
   readonly error?: string;
   readonly className?: string;
+  /**
+   * A fixed text in front of the box, not typed (FEAT-024: « +235 » before a
+   * phone number). Announced with the field, after « indicatif ».
+   */
+  readonly leadingText?: string;
 }
 
 /** A labelled text input. `label` is mandatory — a placeholder is never an acceptable substitute for one. */
@@ -22,24 +27,43 @@ export function Input({
   helpText,
   error,
   className,
+  leadingText,
+  'aria-describedby': describedBy,
   ...rest
 }: InputProps) {
   const id = useId();
+  const labelId = `${id}-label`;
+  const leadingId = leadingText ? `${id}-leading` : undefined;
   const helpId = helpText ? `${id}-help` : undefined;
   const errorId = error ? `${id}-error` : undefined;
+  const control = (
+    <input
+      id={id}
+      className={cx(styles['control'], error && styles['invalid'], className)}
+      aria-invalid={error ? true : undefined}
+      // FEAT-024 (SPEC-024-02 « UI »): « +235 » is part of the field's name.
+      aria-labelledby={leadingId ? `${labelId} ${leadingId}` : undefined}
+      aria-describedby={cx(describedBy, helpId, errorId) || undefined}
+      {...rest}
+    />
+  );
 
   return (
     <div className={styles['field']}>
-      <Label htmlFor={id} style={hideLabel ? visuallyHiddenStyle : undefined}>
+      <Label id={labelId} htmlFor={id} style={hideLabel ? visuallyHiddenStyle : undefined}>
         {label}
       </Label>
-      <input
-        id={id}
-        className={cx(styles['control'], error && styles['invalid'], className)}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={cx(helpId, errorId) || undefined}
-        {...rest}
-      />
+      {leadingText ? (
+        <div className={styles['affixed']}>
+          <span id={leadingId} className={styles['leading']}>
+            <span style={visuallyHiddenStyle}>{`, indicatif ${leadingText}`}</span>
+            <span aria-hidden="true">{leadingText}</span>
+          </span>
+          {control}
+        </div>
+      ) : (
+        control
+      )}
       {helpText && !error && (
         <p id={helpId} className={styles['helpText']}>
           {helpText}

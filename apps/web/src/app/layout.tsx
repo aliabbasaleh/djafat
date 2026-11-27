@@ -54,14 +54,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {
               title: 'Partenaires',
               items: [
-                { label: 'Devenir livreur', soon: true },
-                { label: 'Devenir restaurant', soon: true },
+                // FEAT-022 (SPEC-022-01 R4): straight to the right sign-up form.
+                { label: 'Devenir livreur', href: '/compte?inscription=livreur' },
+                { label: 'Devenir restaurant', href: '/compte?inscription=restaurant' },
               ],
             },
             {
               title: 'Légal',
               items: [
-                { label: 'Conditions générales', soon: true },
+                { label: "Conditions d'utilisation", href: '/conditions' },
                 { label: 'Confidentialité', soon: true },
                 { label: 'Contact', soon: true },
               ],

@@ -9,5 +9,11 @@
 3f5d5ad5352a75fffd2827f51a8d11de8d452df8 HEAD
 038c723f5820665c9f9be17a222a7eeedcfab086 origin/main
 628dce4228b633d57f07d04db6991c7626005922 origin/fix/login-method-icons
+# Last sync: S-054 (2026-11-27)
+a4cfd23cbff5eb0b92e2e06f89a296d807d15fa7 HEAD
+1ce673a6a350da7992f4a44c78b4fafa030d5aab origin/feat/equipe-connexion-email
+262b8cfb7d8b4d67584d6b5bca64d8eb217eb726 origin/ci/cheaper-runs
+c6e5ac10237499db23446f09bd2f20d952d5dea2 origin/main
 9058e335a90a3ed6ba89b94ec5b6bec7cf236bd1 origin/claude/compassionate-franklin-k23vcj
 92e8d52553cb3630060202d7fa02d21a6e38f55b origin/fix/payment-reliability-backlog
+c12e590c9e9da5b7d84141ee8bac1f5bd400021d origin/feat/connexion-integration

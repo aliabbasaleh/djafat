@@ -53,7 +53,16 @@ export type AuditAction =
   | 'ORDER_PLACED_BY_PHONE'
   | 'ORDER_PLACED_BY_MESSAGE'
   // PAY-04: operations sent an automatic refund by hand (merchant wallets).
-  | 'REFUND_COMPLETED_BY_HAND';
+  | 'REFUND_COMPLETED_BY_HAND'
+  // FEAT-022 — sign-up by account type, validated by DJAFAT (SPEC-022-06, SPEC-022-07).
+  | 'APPLICATION_SUBMITTED'
+  | 'APPLICATION_APPROVED'
+  | 'APPLICATION_REJECTED'
+  // FEAT-022 — a change after the approval, decided by an admin (SPEC-022-07 R6).
+  | 'CHANGE_APPROVED'
+  | 'CHANGE_REJECTED'
+  // FEAT-022 — a signed-in customer became a courier or a restaurant (SPEC-022-08).
+  | 'ROLE_SELF_SIGNUP';
 
 export interface AuditLogEntry {
   readonly actorUserId?: string | null;

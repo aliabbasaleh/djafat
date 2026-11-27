@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { HttpException, Logger } from '@nestjs/common';
 import type { OtpDeliveryPort } from '@djafat/types';
+import { LAUNCH_MARKET } from '@djafat/config';
+import { LAUNCH_PHONE_MARKET } from '@djafat/core';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { PlatformService } from '../platform/platform.service';
 import type { RateLimiterService } from '../../common/rate-limit/rate-limiter.service';
@@ -79,5 +81,122 @@ describe('requestCodeIfOwned — the same path for any address', () => {
       });
       expect(spies.send).not.toHaveBeenCalled();
     }
+  });
+});
+
+// FEAT-024 — docs/features/FEAT-024-saisies-verifiees (SPEC-024-01): an SMS code
+// goes to a Chad mobile only; a foreign number gets WhatsApp or the e-mail.
+
+function smsService(env: Record<string, string | undefined> = {}) {
+  const settings: Record<string, string | undefined> = {
+    NODE_ENV: 'production',
+    SMS_PROVIDER: 'http',
+    EMAIL_PROVIDER: 'smtp',
+    WHATSAPP_PROVIDER: 'mock',
+    WHATSAPP_BUSINESS_NUMBER: undefined,
+    OTP_HASH_SECRET: 'x'.repeat(32),
+    ...env,
+  };
+  const create = vi.fn().mockResolvedValue({});
+  const sms = { send: vi.fn().mockResolvedValue(undefined) };
+  const otp = new OtpService(
+    { otpCode: { create } } as unknown as PrismaService,
+    { getOtpTtlSeconds: () => Promise.resolve(300) } as unknown as PlatformService,
+    {} as RateLimiterService,
+    { log: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService,
+    { get: (key: string) => settings[key] } as unknown as AppConfigService,
+    sms as unknown as OtpDeliveryPort,
+    {} as OtpDeliveryPort,
+    {} as OtpDeliveryPort,
+  );
+  const spies = {
+    ip: vi.spyOn(otp, 'consumeIpBudget').mockResolvedValue(undefined),
+    target: vi.spyOn(otp, 'consumeTargetBudget').mockResolvedValue(undefined),
+    lock: vi.spyOn(otp, 'assertNotLocked').mockResolvedValue(undefined),
+  };
+  return { otp, create, sms, spies };
+}
+
+describe('SPEC-024-01 — SMS: Chad mobiles only', () => {
+  it('SPEC-024-01-SC01 — a foreign number gets no SMS; the e-mail is offered; nothing stored nor counted', async () => {
+    const { otp, create, sms, spies } = smsService();
+    await expect(
+      otp.requestCode({ channel: 'sms', target: '+33612345678' }, 'login', '10.0.0.1'),
+    ).rejects.toMatchObject({
+      status: 422,
+      response: {
+        code: 'SMS_FOREIGN_NUMBER',
+        message:
+          "Le code par SMS n'est envoyé qu'aux numéros du Tchad. Avec un numéro étranger, recevez le code par e-mail.",
+      },
+    });
+    expect(spies.ip).not.toHaveBeenCalled();
+    expect(spies.target).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    expect(sms.send).not.toHaveBeenCalled();
+  });
+
+  it('SPEC-024-01-SC02 — with WhatsApp in service, the message offers it', async () => {
+    const { otp } = smsService({
+      WHATSAPP_PROVIDER: 'cloud',
+      WHATSAPP_BUSINESS_NUMBER: '+23560000001',
+    });
+    await expect(
+      otp.requestCode({ channel: 'sms', target: '+33612345678' }, 'login', null),
+    ).rejects.toMatchObject({
+      response: {
+        message:
+          "Le code par SMS n'est envoyé qu'aux numéros du Tchad. Avec un numéro étranger, recevez le code par WhatsApp ou par e-mail.",
+      },
+    });
+  });
+
+  it('SPEC-024-01-SC03 — a Chad fixed line gets no SMS', async () => {
+    const { otp, create, sms } = smsService();
+    await expect(
+      otp.requestCode({ channel: 'sms', target: '+23522512345' }, 'login', null),
+    ).rejects.toMatchObject({
+      status: 422,
+      response: {
+        code: 'PHONE_FIXED_LINE',
+        message: 'Ce numéro est un fixe : indiquez un numéro de portable (ex. 66 12 34 56).',
+      },
+    });
+    expect(create).not.toHaveBeenCalled();
+    expect(sms.send).not.toHaveBeenCalled();
+  });
+
+  it('SPEC-024-01-SC04 — a Chad mobile gets its SMS as before', async () => {
+    const { otp, create, sms } = smsService();
+    await otp.requestCode({ channel: 'sms', target: '+23566123456' }, 'login', '10.0.0.1');
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(sms.send).toHaveBeenCalledWith(expect.objectContaining({ to: '+23566123456' }));
+  });
+
+  it('SPEC-024-01 « Erreurs et cas limites » — SMS switched off: a foreign number still hears why; a Chad mobile keeps the 503', async () => {
+    const { otp } = smsService({ SMS_PROVIDER: 'disabled' });
+    await expect(
+      otp.requestCode({ channel: 'sms', target: '+33612345678' }, 'login', null),
+    ).rejects.toMatchObject({ status: 422, response: { code: 'SMS_FOREIGN_NUMBER' } });
+    await expect(
+      otp.requestCode({ channel: 'sms', target: '+23566123456' }, 'login', null),
+    ).rejects.toMatchObject({ status: 503, response: { code: 'SMS_UNAVAILABLE' } });
+  });
+
+  it('SPEC-024-02 « Contrats » — the screens’ phone plan is the server’s', () => {
+    expect(LAUNCH_PHONE_MARKET).toEqual({
+      dialCode: LAUNCH_MARKET.dialCode,
+      nationalNumberLength: LAUNCH_MARKET.nationalNumberLength,
+      fixedLinePrefixes: LAUNCH_MARKET.fixedLinePrefixes,
+    });
+  });
+
+  it('SPEC-024-01 R7 — WhatsApp has no country rule', async () => {
+    const whatsapp = { send: vi.fn().mockResolvedValue(undefined) };
+    const { otp } = smsService();
+    (otp as unknown as { whatsappDelivery: OtpDeliveryPort }).whatsappDelivery =
+      whatsapp as unknown as OtpDeliveryPort;
+    await otp.requestCode({ channel: 'whatsapp', target: '+33612345678' }, 'login', null);
+    expect(whatsapp.send).toHaveBeenCalledWith(expect.objectContaining({ to: '+33612345678' }));
   });
 });

@@ -30,9 +30,23 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'com.djafat.courier',
-    permissions: ['ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION'],
+    permissions: ['ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION', 'CAMERA'],
   },
-  plugins: ['expo-router'],
+  plugins: [
+    'expo-router',
+    // FEAT-022 (SPEC-022-06 R2): the papers of the courier's application, taken
+    // with the camera or picked from the gallery.
+    [
+      'expo-image-picker',
+      {
+        photosPermission:
+          'DJAFAT Livreur utilise vos photos pour votre dossier : visage, pièce d’identité, permis et papiers du véhicule.',
+        cameraPermission:
+          'DJAFAT Livreur utilise l’appareil photo pour photographier votre visage et vos papiers.',
+        microphonePermission: false,
+      },
+    ],
+  ],
   extra: {
     apiBaseUrl: process.env['EXPO_PUBLIC_API_BASE_URL'] ?? 'http://localhost:3001/v1',
     router: { origin: false },

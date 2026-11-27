@@ -2,8 +2,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { tokens } from '@djafat/tokens';
-import { ApiClientError, type Address } from '@djafat/sdk';
+import {
+  ApiClientError,
+  DIAL_CODE,
+  phoneFieldShowsDialCode,
+  phoneForSending,
+  type Address,
+} from '@djafat/sdk';
 import { Screen } from '../../components/Screen';
+import { Field } from '../../components/account/Field';
 import { Button } from '../../components/Button';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
@@ -61,7 +68,8 @@ export default function AddressesScreen() {
         ...(quartier.trim() ? { quartier: quartier.trim() } : {}),
         ...(street.trim() ? { street: street.trim() } : {}),
         ...(landmark.trim() ? { landmark: landmark.trim() } : {}),
-        ...(recipientPhone.trim() ? { recipientPhone: recipientPhone.trim() } : {}),
+        // FEAT-024: the field shows « +235 »; 8 digits typed leave in international format.
+        ...(recipientPhone.trim() ? { recipientPhone: phoneForSending(recipientPhone) } : {}),
       });
       setLabel('');
       setQuartier('');
@@ -170,13 +178,13 @@ export default function AddressesScreen() {
             placeholder="Repère (ex. près de la pharmacie)"
             placeholderTextColor={tokens.color.text.muted}
           />
-          <TextInput
-            style={styles.input}
+          <Field
+            label="Téléphone du destinataire"
             value={recipientPhone}
             onChangeText={setRecipientPhone}
-            placeholder="Téléphone du destinataire"
-            placeholderTextColor={tokens.color.text.muted}
+            placeholder="66 12 34 56"
             keyboardType="phone-pad"
+            leadingText={phoneFieldShowsDialCode(recipientPhone) ? DIAL_CODE : undefined}
           />
           <Button label="Enregistrer" fullWidth loading={saving} onPress={() => void submit()} />
           <Button label="Annuler" variant="ghost" fullWidth onPress={() => setShowForm(false)} />

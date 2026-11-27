@@ -323,6 +323,22 @@ describe('SPEC-020-04 — log in with email and password, a code on a new device
     ).rejects.toMatchObject({ status: 409, response: { code: 'PHONE_NOT_CONFIRMED' } });
   });
 
+  // FEAT-024 — SPEC-024-01-SC05 (the refusal of the SMS itself: otp.service.spec.ts, SC01)
+  it('SPEC-024-01-SC05 — a confirmed foreign or fixed number: the e-mail is offered, not the SMS', async () => {
+    const smsOn = fakeConfig({ SMS_PROVIDER: 'http' });
+    for (const phone of ['+33612345678', '+23522512345']) {
+      const t = build([account({ passwordHash: HASH, phone, phoneVerifiedAt: new Date() })], smsOn);
+      const res = await t.service.login({ email: EMAIL, password: PASSWORD }, META);
+      if (res.status !== 'code_required') throw new Error('expected a challenge');
+      expect(res.channels, phone).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'email', available: true }),
+          { id: 'sms', available: false },
+        ]),
+      );
+    }
+  });
+
   it('SPEC-020-04-SC10 — WhatsApp verifies with the code DJAFAT replied to the confirmed number', async () => {
     const t = build(
       [account({ passwordHash: HASH, phone: '+23566123456', phoneVerifiedAt: new Date() })],

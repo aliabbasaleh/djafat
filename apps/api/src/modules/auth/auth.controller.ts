@@ -5,7 +5,7 @@ import { MFA_ENROLLABLE_ROLES, type AuthenticatedActor } from '@djafat/types';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { AppConfigService } from '../../common/config/config.service';
 import { AuthService, type RequestMeta } from './auth.service';
-import { listAuthMethods } from './auth-methods';
+import { authMethodsFrom } from './auth-methods';
 import { CurrentActor } from './current-actor.decorator';
 import { RequireAuth, RequireRole, RequireStepUp } from './decorators';
 import {
@@ -41,15 +41,7 @@ export class AuthController {
   /** Login methods available on this deployment (FEAT-008, SPEC-008-01). */
   @Get('methods')
   methods() {
-    return {
-      methods: listAuthMethods({
-        NODE_ENV: this.config.get('NODE_ENV'),
-        SMS_PROVIDER: this.config.get('SMS_PROVIDER'),
-        EMAIL_PROVIDER: this.config.get('EMAIL_PROVIDER'),
-        WHATSAPP_PROVIDER: this.config.get('WHATSAPP_PROVIDER'),
-        WHATSAPP_BUSINESS_NUMBER: this.config.get('WHATSAPP_BUSINESS_NUMBER'),
-      }),
-    };
+    return { methods: authMethodsFrom((key) => this.config.get(key)) };
   }
 
   /** WhatsApp login: the code DJAFAT replied in the customer's chat (FEAT-008, SPEC-008-03). */

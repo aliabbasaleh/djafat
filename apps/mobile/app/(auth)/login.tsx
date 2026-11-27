@@ -33,13 +33,18 @@ export default function AccountScreen() {
       .catch(() => setMethods(null));
   }, []);
 
-  async function onSignedIn(result: SignedIn) {
+  /** The session, kept at once — a new courier or restaurant reads « what next » first (SPEC-022-02 R4, R6). */
+  async function keepSession(result: SignedIn) {
     if (result.deviceToken) await saveDeviceToken(result.deviceToken);
     await signIn({
       access: result.access,
       refresh: result.refresh,
       user: { id: result.user.id, phone: result.user.phone, fullName: result.user.fullName },
     });
+  }
+
+  async function onSignedIn(result: SignedIn) {
+    await keepSession(result);
     // `redirect` comes from the URL, so it cannot be typed statically.
     router.replace(afterLoginRoute(redirect) as Href);
   }
@@ -78,7 +83,12 @@ export default function AccountScreen() {
       {tab === 'connexion' ? (
         <LoginForm methods={methods ?? null} onSignedIn={onSignedIn} />
       ) : (
-        <RegisterForm onSignedIn={onSignedIn} onGoToLogin={() => setTab('connexion')} />
+        <RegisterForm
+          onSignedIn={onSignedIn}
+          onSignedUp={keepSession}
+          onContinue={() => router.replace(afterLoginRoute(redirect) as Href)}
+          onGoToLogin={() => setTab('connexion')}
+        />
       )}
     </Screen>
   );

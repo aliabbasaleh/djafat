@@ -25,7 +25,11 @@ type Row = {
 const unique = () =>
   new Prisma.PrismaClientKnownRequestError('unique', { code: 'P2002', clientVersion: 'test' });
 
-function harness(balances: Record<string, { available: bigint; cash: bigint }>) {
+function harness(
+  balances: Record<string, { available: bigint; cash: bigint }>,
+  // FEAT-022 (SPEC-022-07 R6): the Mobile Money numbers DJAFAT approved.
+  approved: Record<string, { provider: 'airtel' | 'moov'; number: string }> = {},
+) {
   const rows: Row[] = [];
   let n = 0;
   const courierPayout = {
@@ -108,6 +112,12 @@ function harness(balances: Record<string, { available: bigint; cash: bigint }>) 
     getById: vi.fn(async () => ({ fullName: 'Livreur Test', phone: '+23566000002' })),
   };
   const events = { emit: vi.fn() };
+  const payoutAccounts = {
+    approvedPayoutAccounts: vi.fn(
+      async (ids: readonly string[]) =>
+        new Map(ids.flatMap((id) => (approved[id] ? [[id, approved[id]] as const] : []))),
+    ),
+  };
   const service = new CourierPayoutsService(
     prisma as never,
     ledger as never,
@@ -115,8 +125,9 @@ function harness(balances: Record<string, { available: bigint; cash: bigint }>) 
     platform as never,
     users as never,
     events as never,
+    payoutAccounts,
   );
-  return { service, rows, posted, events };
+  return { service, rows, posted, events, payoutAccounts };
 }
 
 describe('SPEC-014-02 — courier withdrawals and payouts', () => {
@@ -203,5 +214,23 @@ describe('SPEC-014-02 — courier withdrawals and payouts', () => {
       ['PSP_FEE_EXPENSE', 'debit', 150n],
       ['PSP_CLEARING', 'credit', 5_150n],
     ]);
+  });
+
+  // FEAT-022 — docs/features/FEAT-022-inscription-par-type-de-compte (SPEC-022-07 R6).
+  it('SPEC-022-07-SC05 — staff send the earnings to the approved Mobile Money number; a courier created by the team keeps the account phone', async () => {
+    const h = harness(
+      { c1: { available: 5_000n, cash: 0n }, c2: { available: 4_000n, cash: 0n } },
+      { c1: { provider: 'airtel', number: '+23566000001' } },
+    );
+    await h.service.requestOnDemand('c1');
+    await h.service.requestOnDemand('c2');
+
+    const list = await h.service.listForStaff('requested');
+
+    expect(list.map((p) => [p.courier.id, p.courier.mobileMoney, p.courier.phone])).toEqual([
+      ['c1', { provider: 'airtel', number: '+23566000001' }, '+23566000002'],
+      ['c2', null, '+23566000002'],
+    ]);
+    expect(h.payoutAccounts.approvedPayoutAccounts).toHaveBeenCalledWith(['c1', 'c2']);
   });
 });

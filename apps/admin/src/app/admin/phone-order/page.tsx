@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ApiClientError,
+  DIAL_CODE,
+  phoneFieldShowsDialCode,
   type MenuCategoryWithProducts,
   type Order,
   type ProductDetail,
@@ -268,6 +270,7 @@ export default function PhoneOrderPage() {
             label="Numéro de téléphone"
             inputMode="tel"
             placeholder="66 12 34 56"
+            {...(phoneFieldShowsDialCode(phone) ? { leadingText: DIAL_CODE } : {})}
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
           />

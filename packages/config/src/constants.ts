@@ -13,6 +13,11 @@ export const LAUNCH_MARKET = {
   dialCode: '+235',
   /** Digits of a national number ("66 12 34 56"), used to normalise phone input — FEAT-005. */
   nationalNumberLength: 8,
+  /**
+   * FEAT-024: how fixed lines begin (plan of 2010: fixed 22…, mobiles 6, 7, 9).
+   * A fixed line receives neither SMS nor WhatsApp: refused for an account and a code.
+   */
+  fixedLinePrefixes: ['22'],
   citySlug: 'ndjamena',
   cityName: "N'Djamena",
 } as const;
