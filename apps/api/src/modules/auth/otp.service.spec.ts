@@ -144,7 +144,7 @@ describe('SPEC-024-01 — SMS: Chad mobiles only', () => {
     ).rejects.toMatchObject({
       response: {
         message:
-          "Le code par SMS n'est envoyé qu'aux numéros du Tchad. Avec un numéro étranger, recevez le code par WhatsApp ou par e-mail.",
+          "Le code par SMS n'est envoyé qu'aux numéros du Tchad. Avec un numéro étranger, connectez-vous par WhatsApp ou recevez le code par e-mail.",
       },
     });
   });

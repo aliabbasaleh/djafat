@@ -8,6 +8,7 @@ import {
   teamResetPassword,
   teamVerifyCode,
   teamVerifyPhoneCode,
+  teamWhatsappSignIn,
   type TeamSessionKeeper,
 } from './team-login.js';
 
@@ -109,11 +110,8 @@ describe('SPEC-021-02 — team apps login rules', () => {
       { channel: 'sms', phone: PHONE, code: '123456' },
       keeper,
     );
-    const whatsapp = await teamVerifyPhoneCode(
-      { verifyPhoneLoginCode: async () => customer },
-      { channel: 'whatsapp', phone: PHONE, code: '123456' },
-      keeper,
-    );
+    // FEAT-023 (SPEC-021-02 v3): the session a WhatsApp wait ends with — SPEC-023-07-SC02.
+    const whatsapp = await teamWhatsappSignIn({ status: 'signed_in', ...customer }, keeper);
 
     expect([login, code, reset, sms, whatsapp]).toEqual([
       { kind: 'denied' },
@@ -154,7 +152,7 @@ describe('SPEC-021-02 — team apps login rules', () => {
     const courier = keeperFor('courier');
     const kept = await teamVerifyPhoneCode(
       auth,
-      { channel: 'whatsapp', phone: PHONE, code: '654321' },
+      { channel: 'sms', phone: PHONE, code: '654321' },
       courier.keeper,
     );
     expect(kept).toBe('signed_in');
@@ -162,11 +160,12 @@ describe('SPEC-021-02 — team apps login rules', () => {
     expect(courier.saveDeviceToken).not.toHaveBeenCalled(); // a phone code remembers no device
     expect(courier.clearSession).not.toHaveBeenCalled();
 
-    // The existing phone-login contracts (SMS login since Bloc 1, FEAT-008 WhatsApp).
+    // The SMS login contract (since Bloc 1). WhatsApp sends no code any more (FEAT-023):
+    // its wait and role check are SPEC-023-07-SC01 and SC02 below.
     expect(posts).toEqual([
       { path: '/auth/otp/request', body: { phone: PHONE, purpose: 'login' } },
       { path: '/auth/otp/verify', body: { phone: PHONE, code: '123456', purpose: 'login' } },
-      { path: '/auth/whatsapp/verify', body: { phone: PHONE, code: '654321' } },
+      { path: '/auth/otp/verify', body: { phone: PHONE, code: '654321', purpose: 'login' } },
     ]);
   });
 
@@ -275,5 +274,29 @@ describe('SPEC-021-02 — team apps login rules', () => {
     });
     expect(outcome).toEqual({ kind: 'signed_in' });
     expect(saveSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+// FEAT-023 — docs/features/FEAT-023-whatsapp-gratuit (SPEC-023-07).
+describe('SPEC-023-07 — WhatsApp in the team apps’ login', () => {
+  // SPEC-023-07-SC01
+  it('SPEC-023-07-SC01 — the session a WhatsApp wait ends with is kept for an account with the role, as any login', async () => {
+    const { keeper, saveSession, saveDeviceToken } = keeperFor('restaurant_owner');
+    const owner = signedIn(['restaurant_owner']);
+    await expect(teamWhatsappSignIn({ status: 'signed_in', ...owner }, keeper)).resolves.toBe(
+      'signed_in',
+    );
+    expect(saveSession).toHaveBeenCalledWith(owner); // the session itself, without `status`
+    expect(saveDeviceToken).not.toHaveBeenCalled(); // a code alone remembers no device
+  });
+
+  // SPEC-023-07-SC02
+  it('SPEC-023-07-SC02 — without the role: the console’s refusal, nothing kept', async () => {
+    const { keeper, saveSession, clearSession } = keeperFor('admin', { clearsOnRefusal: true });
+    await expect(
+      teamWhatsappSignIn({ status: 'signed_in', ...signedIn(['customer']) }, keeper),
+    ).resolves.toBe('denied');
+    expect(saveSession).not.toHaveBeenCalled();
+    expect(clearSession).toHaveBeenCalledTimes(1);
   });
 });

@@ -240,7 +240,12 @@ describe('FEAT-023 — free WhatsApp login on PostgreSQL and Redis', () => {
     await status(right.token).expect(200, { status: 'confirmed' });
     const after = await request(server).get('/v1/me').set(auth).expect(200);
     expect(after.body).toMatchObject({ phoneVerified: true });
-    await request(server).post('/v1/me/phone/whatsapp').set(auth).send({}).expect(409);
+    const again = await request(server)
+      .post('/v1/me/phone/whatsapp')
+      .set(auth)
+      .send({})
+      .expect(409);
+    expect(again.body).toMatchObject({ error: { code: 'PHONE_ALREADY_CONFIRMED' } });
   });
 
   // SPEC-023-03-SC04

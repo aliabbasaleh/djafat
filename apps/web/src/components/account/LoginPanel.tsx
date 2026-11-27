@@ -24,9 +24,10 @@ import { ChannelRow } from './ChannelRow';
 import { focusField } from './focus';
 import { CodeStep } from './CodeStep';
 import { PasswordField } from './PasswordField';
+import { WhatsappStep } from './WhatsappStep';
 import styles from './account.module.css';
 
-export type AuthMethods = ReadonlyArray<{ id: string; available: boolean; link?: string }> | null;
+export type AuthMethods = ReadonlyArray<{ id: string; available: boolean }> | null;
 
 type View =
   | { readonly kind: 'password' }
@@ -37,12 +38,16 @@ type View =
       readonly channel: CodeChannelId;
     }
   | { readonly kind: 'email-code'; readonly sent: boolean }
-  | { readonly kind: 'phone-code'; readonly channel: 'sms' | 'whatsapp'; readonly sent: boolean }
+  | { readonly kind: 'phone-code'; readonly sent: boolean }
+  /** FEAT-023: the code to SEND on WhatsApp (FEAT-023-VIS02). */
+  | { readonly kind: 'whatsapp' }
   | { readonly kind: 'forgot'; readonly sent: boolean };
 
 interface LoginPanelProps {
   readonly methods: AuthMethods;
   readonly onSignedIn: (result: SignedIn) => void;
+  /** FEAT-023 (SPEC-023-05 R4): « Créer un compte » with the number that wrote on WhatsApp. */
+  readonly onCreateAccount?: (phone: string) => void;
 }
 
 /** What the server's code validity is by default (`otp_ttl_seconds`), as FEAT-020-VIS03 shows it. */
@@ -52,9 +57,10 @@ const VALIDITY = 'valable 5 min';
  * « Se connecter » (FEAT-020, SPEC-020-07 R1-R2, SPEC-020-10): e-mail and
  * password, the code of a new device, « Mot de passe oublié ? », and a code
  * alone by e-mail, WhatsApp or SMS — the last two only when the server offers
- * them (« Bientôt disponible » otherwise).
+ * them (« Bientôt disponible » otherwise). By WhatsApp the customer SENDS the
+ * code shown on screen (FEAT-023, SPEC-023-05).
  */
-export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
+export function LoginPanel({ methods, onSignedIn, onCreateAccount }: LoginPanelProps) {
   const [view, setView] = useState<View>({ kind: 'password' });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -76,7 +82,6 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
   /** The form on screen: the focus goes back to its field after a check (review FEAT-024 #1). */
   const form = useRef<HTMLFormElement>(null);
 
-  const whatsappLink = methods?.find((m) => m.id === 'whatsapp')?.link;
   const whatsappAvailable = Boolean(methods?.find((m) => m.id === 'whatsapp')?.available);
 
   /** SPEC-024-04 R3, R4: true when the sending stops once to suggest a fixed address. */
@@ -145,26 +150,33 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
 
   function chooseCodeChannel(button: ChannelButton) {
     if (button.id === 'email') go({ kind: 'email-code', sent: false });
-    else go({ kind: 'phone-code', channel: button.id, sent: false });
+    else if (button.id === 'whatsapp') go({ kind: 'whatsapp' });
+    else go({ kind: 'phone-code', sent: false });
   }
 
   // ── a new device: the code of the password login ──────────────────────
   if (view.kind === 'device') {
-    const current = view.channels.find((c) => c.id === view.channel);
+    // FEAT-023 (SPEC-023-05 R6): by WhatsApp the customer sends a code for this login.
+    if (view.channel === 'whatsapp') {
+      return (
+        <WhatsappStep
+          purpose="login"
+          start={() => api.auth.startWhatsapp({ challengeId: view.challengeId })}
+          remember={{ checked: remember, onChange: setRemember }}
+          onSignedIn={onSignedIn}
+          backLabel="Recevoir le code par e-mail"
+          onBack={() => setView({ ...view, channel: 'email' })}
+        />
+      );
+    }
+    const channel = view.channel;
+    const current = view.channels.find((c) => c.id === channel);
     const usable = channelButtons(view.channels);
     const several = usable.filter((b) => b.enabled).length > 1;
-    const openWhatsapp = () => {
-      const link = view.channels.find((c) => c.id === 'whatsapp')?.link;
-      if (link) window.open(link, '_blank', 'noopener');
-    };
     return (
       <CodeStep
-        title={view.channel === 'email' ? 'Vérifiez votre e-mail' : 'Nouvel appareil'}
-        intro={
-          view.channel === 'whatsapp'
-            ? 'Envoyez « Code DJAFAT » sur WhatsApp depuis votre numéro, puis entrez le code reçu en réponse.'
-            : `Nouvel appareil : entrez le code à 6 chiffres envoyé à ${current?.destination ?? 'votre adresse'} (${VALIDITY}).`
-        }
+        title={channel === 'email' ? 'Vérifiez votre e-mail' : 'Nouvel appareil'}
+        intro={`Nouvel appareil : entrez le code à 6 chiffres envoyé à ${current?.destination ?? 'votre adresse'} (${VALIDITY}).`}
         busy={busy}
         error={error}
         remember={{ checked: remember, onChange: setRemember }}
@@ -173,14 +185,18 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
             <ChannelRow
               buttons={usable}
               label="Recevoir le code par"
-              selected={view.channel}
-              onSelect={(b) =>
+              selected={channel}
+              onSelect={(b) => {
+                const next = b.id;
+                if (next === 'whatsapp') {
+                  setView({ ...view, channel: 'whatsapp' });
+                  return;
+                }
                 void run("Impossible d'envoyer le code.", async () => {
-                  if (b.id === 'whatsapp') openWhatsapp();
-                  else await api.auth.sendLoginCode(view.challengeId, b.id);
-                  setView({ ...view, channel: b.id });
-                })
-              }
+                  await api.auth.sendLoginCode(view.challengeId, next);
+                  setView({ ...view, channel: next });
+                });
+              }}
             />
           ) : null
         }
@@ -189,7 +205,7 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
             onSignedIn(
               await api.auth.verifyLoginCode({
                 challengeId: view.challengeId,
-                channel: view.channel,
+                channel,
                 code,
                 rememberDevice: remember,
               }),
@@ -198,10 +214,23 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
         }
         onResend={() =>
           run("Impossible d'envoyer le code.", async () => {
-            if (view.channel === 'whatsapp') openWhatsapp();
-            else await api.auth.sendLoginCode(view.challengeId, view.channel);
+            await api.auth.sendLoginCode(view.challengeId, channel);
           })
         }
+        onBack={() => go({ kind: 'password' })}
+      />
+    );
+  }
+
+  // ── a code to send on WhatsApp (FEAT-023, SPEC-023-05) ─────────────────
+  if (view.kind === 'whatsapp') {
+    return (
+      <WhatsappStep
+        purpose="login"
+        start={() => api.auth.startWhatsapp()}
+        onSignedIn={onSignedIn}
+        {...(onCreateAccount ? { onCreateAccount } : {})}
+        onEmailLogin={() => go({ kind: 'password' })}
         onBack={() => go({ kind: 'password' })}
       />
     );
@@ -230,39 +259,29 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
     );
   }
 
-  // ── a code alone, by SMS or WhatsApp (FEAT-006, FEAT-008) ─────────────
+  // ── a code alone, by SMS (FEAT-006) ───────────────────────────────────
   if (view.kind === 'phone-code' && view.sent) {
-    const byWhatsapp = view.channel === 'whatsapp';
     return (
       <CodeStep
-        title={byWhatsapp ? 'Code WhatsApp' : 'Vérifiez vos SMS'}
-        intro={
-          byWhatsapp
-            ? 'Envoyez « Code DJAFAT » sur WhatsApp, puis entrez le code reçu en réponse.'
-            : `Entrez le code à 6 chiffres envoyé au ${phone} (${VALIDITY}).`
-        }
+        title="Vérifiez vos SMS"
+        intro={`Entrez le code à 6 chiffres envoyé au ${phone} (${VALIDITY}).`}
         busy={busy}
         error={error}
         onSubmit={(code) =>
           void run('Code invalide ou expiré.', async () => {
-            const result = byWhatsapp
-              ? await api.http.post<SignedIn>('/auth/whatsapp/verify', { body: { phone, code } })
-              : await api.http.post<SignedIn>('/auth/otp/verify', {
-                  body: { phone, code, purpose: 'login' },
-                });
-            onSignedIn(result);
+            onSignedIn(
+              await api.http.post<SignedIn>('/auth/otp/verify', {
+                body: { phone, code, purpose: 'login' },
+              }),
+            );
           })
         }
         onResend={() =>
           run("Impossible d'envoyer le code.", async () => {
-            if (byWhatsapp) {
-              if (whatsappLink) window.open(whatsappLink, '_blank', 'noopener');
-            } else {
-              await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
-            }
+            await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
           })
         }
-        onBack={() => go({ kind: 'phone-code', channel: view.channel, sent: false })}
+        onBack={() => go({ kind: 'phone-code', sent: false })}
       />
     );
   }
@@ -381,7 +400,6 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
   }
 
   if (view.kind === 'phone-code') {
-    const byWhatsapp = view.channel === 'whatsapp';
     return (
       <form
         ref={form}
@@ -389,7 +407,7 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
         onSubmit={(e) => {
           e.preventDefault();
           // SPEC-024-01 R8: no SMS to a foreign number or a fixed line — nothing is sent.
-          const why = byWhatsapp ? null : smsPhoneError(phone, whatsappAvailable);
+          const why = smsPhoneError(phone, whatsappAvailable);
           setPhoneError(why);
           if (why) {
             focusField(form.current, 'input[type="tel"]');
@@ -398,24 +416,15 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
           void run(
             "Impossible d'envoyer le code. Vérifiez le numéro (ex. 66 12 34 56).",
             async () => {
-              if (byWhatsapp) {
-                // The customer writes to DJAFAT on WhatsApp; DJAFAT replies with the code (FEAT-008).
-                if (whatsappLink) window.open(whatsappLink, '_blank', 'noopener');
-              } else {
-                await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
-              }
+              await api.http.post('/auth/otp/request', { body: { phone, purpose: 'login' } });
               setView({ ...view, sent: true });
             },
           );
         }}
       >
         <Stack gap="xs">
-          <Heading level={2}>{byWhatsapp ? 'Code par WhatsApp' : 'Code par SMS'}</Heading>
-          <Text tone="secondary">
-            {byWhatsapp
-              ? 'Gratuit : vous écrivez à DJAFAT sur WhatsApp et recevez votre code en réponse.'
-              : 'Recevez un code de connexion par SMS.'}
-          </Text>
+          <Heading level={2}>Code par SMS</Heading>
+          <Text tone="secondary">Recevez un code de connexion par SMS.</Text>
         </Stack>
         {error && <Alert tone="danger">{error}</Alert>}
         <Input
@@ -434,7 +443,7 @@ export function LoginPanel({ methods, onSignedIn }: LoginPanelProps) {
           required
         />
         <Button type="submit" loading={busy} fullWidth>
-          {byWhatsapp ? 'Recevoir mon code sur WhatsApp' : 'Envoyer le code'}
+          Envoyer le code
         </Button>
         <Button type="button" variant="ghost" fullWidth onClick={() => go({ kind: 'password' })}>
           Retour

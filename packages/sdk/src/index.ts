@@ -13,6 +13,7 @@ export * from './http.js';
 export * from './auth.js';
 export * from './account-form.js';
 export * from './team-login.js';
+export * from './whatsapp-login.js';
 export * from './app-links.js';
 export * from './catalog.js';
 export * from './payments.js';

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ndjamenaDate } from '@djafat/core';
-import type { SignedIn } from '@djafat/sdk';
+import { WHATSAPP_TEXT, afterSignup, whatsappForeignIntro, type SignedIn } from '@djafat/sdk';
+import { Text } from '@djafat/ui';
 import { Alert, Button, Checkbox, FieldSuggestion, Input, Radio } from '@/components/ui-client';
 import { api } from '@/lib/api';
 import {
@@ -36,6 +37,7 @@ import { CodeStep } from './CodeStep';
 import { NeighbourhoodField, type NeighbourhoodOption } from './NeighbourhoodField';
 import { PasswordField } from './PasswordField';
 import { SignupDone } from './SignupDone';
+import { WhatsappStep } from './WhatsappStep';
 import styles from './account.module.css';
 
 interface RegisterPanelProps {
@@ -47,6 +49,10 @@ interface RegisterPanelProps {
   readonly onGoToLogin: () => void;
   /** `?inscription=livreur | restaurant | client` (SPEC-022-01 R4). */
   readonly initialType?: string | null;
+  /** FEAT-023 (SPEC-023-05 R4): the number that wrote on WhatsApp, already filled in. */
+  readonly initialPhone?: string | null;
+  /** `GET /auth/methods`: WhatsApp in service decides the step after the code (SPEC-023-06 R3). */
+  readonly methods?: ReadonlyArray<{ id: string; available: boolean }> | null;
 }
 
 type Field =
@@ -91,10 +97,14 @@ export function RegisterPanel({
   onSignedUp,
   onGoToLogin,
   initialType,
+  initialPhone,
+  methods,
 }: RegisterPanelProps) {
   const [flow, setFlow] = useState<SignupFlow<RegisterFormValues>>(() =>
-    startSignup(initialType, EMPTY),
+    startSignup(initialType, { ...EMPTY, phone: initialPhone ?? '' }),
   );
+  /** FEAT-023 (SPEC-023-06 R3): the session of a foreign number, waiting for its WhatsApp step. */
+  const [confirming, setConfirming] = useState<SignedIn | null>(null);
   const [courier, setCourier] = useState<CourierFieldValues>(EMPTY_COURIER);
   const [restaurant, setRestaurant] = useState<RestaurantFieldValues>(EMPTY_RESTAURANT);
   const [neighbourhoods, setNeighbourhoods] = useState<NeighbourhoodOption[] | null>(null);
@@ -206,7 +216,33 @@ export function RegisterPanel({
     }
   }
 
+  /** SPEC-023-06 R4: the end of today's sign-up — the customer leaves, the others see « et maintenant ? ». */
+  function finishSignup(result: SignedIn) {
+    if (type === 'courier' || type === 'restaurant') {
+      onSignedUp(result);
+      setDone({ type, name: restaurant.restaurantName.trim() });
+    } else {
+      onSignedIn(result);
+    }
+  }
+
   if (done) return <SignupDone type={done.type} restaurantName={done.name} />;
+
+  // FEAT-023 (SPEC-023-06 R3, FEAT-023-VIS03): a foreign number confirms itself by WhatsApp, or later.
+  if (confirming) {
+    return (
+      <WhatsappStep
+        purpose="confirm"
+        before={<p className={styles['stepDone']}>{WHATSAPP_TEXT.accountCreated}</p>}
+        intro={<Text tone="secondary">{whatsappForeignIntro(confirming.user.phone)}</Text>}
+        start={() => api.auth.startPhoneWhatsapp()}
+        accountPhone={confirming.user.phone}
+        onConfirmed={() => finishSignup(confirming)}
+        backLabel={WHATSAPP_TEXT.later}
+        onBack={() => finishSignup(confirming)}
+      />
+    );
+  }
 
   if (registration) {
     return (
@@ -222,11 +258,16 @@ export function RegisterPanel({
             setBusy(true);
             try {
               const result = await api.auth.verifyRegistration(registration.id, code);
-              if (type === 'courier' || type === 'restaurant') {
-                onSignedUp(result);
-                setDone({ type, name: restaurant.restaurantName.trim() });
+              const next = afterSignup({
+                type: type ?? 'customer',
+                phone: result.user.phone,
+                methods,
+              });
+              if (next === 'whatsapp_confirm') {
+                onSignedUp(result); // the session first: the confirmation is a signed-in route (R6)
+                setConfirming(result);
               } else {
-                onSignedIn(result);
+                finishSignup(result);
               }
             } catch (err) {
               setGeneral(accountErrorMessage(err, 'Code invalide ou expiré.'));

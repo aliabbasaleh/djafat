@@ -1,16 +1,7 @@
 ---
 feature: FEAT-023
-specs:
-  [
-    SPEC-023-01@1,
-    SPEC-023-02@1,
-    SPEC-023-03@1,
-    SPEC-023-04@1,
-    SPEC-023-05@1,
-    SPEC-023-06@1,
-    SPEC-023-07@1,
-    SPEC-023-08@1,
-  ]
+# prettier-ignore
+specs: [SPEC-023-01@1, SPEC-023-02@1, SPEC-023-03@1, SPEC-023-04@1, SPEC-023-05@1, SPEC-023-06@1, SPEC-023-07@1, SPEC-023-08@1]
 ---
 
 # FEAT-023 — Brief d'exécution

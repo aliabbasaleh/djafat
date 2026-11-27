@@ -74,15 +74,40 @@ describe('FEAT-020 — account routes of the SDK', () => {
     expect(calls[0]?.body).toEqual({ challengeId: 'c-1', channel: 'sms' });
   });
 
-  it('« Mon profil »: change the password (PUT), confirm the number', async () => {
+  it('« Mon profil »: change the password (PUT), confirm the number by SMS or WhatsApp', async () => {
     const { api, calls } = recordingApi();
     await api.auth.changePassword({ currentPassword: 'a', newPassword: 'b' });
     await api.auth.requestPhoneCode();
-    await api.auth.verifyPhone('whatsapp', '123456');
+    await api.auth.verifyPhone('123456');
+    await api.auth.startPhoneWhatsapp(); // FEAT-023: a code to SEND (SPEC-023-06)
     expect(calls).toEqual([
       { method: 'PUT', path: '/me/password', body: { currentPassword: 'a', newPassword: 'b' } },
       { method: 'POST', path: '/me/phone/request', body: { channel: 'sms' } },
-      { method: 'POST', path: '/me/phone/verify', body: { channel: 'whatsapp', code: '123456' } },
+      { method: 'POST', path: '/me/phone/verify', body: { channel: 'sms', code: '123456' } },
+      { method: 'POST', path: '/me/phone/whatsapp', body: {} },
+    ]);
+  });
+
+  // SPEC-023-05-SC05: the new device's WhatsApp code, and « Se souvenir de cet appareil ».
+  it('SPEC-023-05-SC05 — WhatsApp: a code to send (with the pending login), then the wait with rememberDevice', async () => {
+    const { api, calls } = recordingApi();
+    await api.auth.startWhatsapp();
+    await api.auth.startWhatsapp({ challengeId: 'c-1' });
+    await api.auth.whatsappStatus({ token: 't'.repeat(43), rememberDevice: true });
+    await api.auth.whatsappStatus({ token: 't'.repeat(43) });
+    expect(calls).toEqual([
+      { method: 'POST', path: '/auth/whatsapp/start', body: {} },
+      { method: 'POST', path: '/auth/whatsapp/start', body: { challengeId: 'c-1' } },
+      {
+        method: 'POST',
+        path: '/auth/whatsapp/status',
+        body: { token: 't'.repeat(43), rememberDevice: true },
+      },
+      {
+        method: 'POST',
+        path: '/auth/whatsapp/status',
+        body: { token: 't'.repeat(43), rememberDevice: false },
+      },
     ]);
   });
 });

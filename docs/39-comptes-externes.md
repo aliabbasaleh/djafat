@@ -71,17 +71,77 @@ Un portefeuille absent de cette liste n'est jamais proposé aux clients.
 automatiquement ; puis une annulation de cette commande : le remboursement apparaît dans
 « Remboursements » de la console (à renvoyer à la main tant qu'il n'y a pas d'API, `docs/37`).
 
-## 3. Les autres comptes déjà listés
+## 3. WhatsApp pour les connexions (FEAT-023)
 
-La feuille de route (`docs/ROADMAP.md`, « Ce qui reste à faire ») liste aussi WhatsApp Business,
-l'envoi d'e-mails (SMTP) et le stockage des photos. Le code des deux premiers existe et reste
-désactivé en production tant que les comptes manquent.
+**Aujourd'hui** : WhatsApp est grisé « Bientôt disponible » partout. Le code est prêt : l'écran
+affiche un code, le client l'**envoie** sur WhatsApp au numéro de DJAFAT, et l'écran se connecte
+tout seul. **DJAFAT n'envoie aucun message** pour une connexion : Meta ne facture que les messages
+envoyés par une entreprise (depuis le 1er octobre 2026, chacun est payant), donc les connexions ne
+coûtent rien, quel que soit leur nombre. Après chaque connexion par WhatsApp, le client reçoit un
+**e-mail** gratuit « Nouvelle connexion par WhatsApp ».
+
+**Ce qu'il faut obtenir** (DJAFAT) :
+
+1. Un compte **Meta Business** au nom de DJAFAT (business.facebook.com), vérifié si Meta le
+   demande.
+2. Un **numéro de téléphone** pour WhatsApp — voir les deux choix ci-dessous.
+3. Une **application Meta** (developers.facebook.com) avec le produit **WhatsApp**, reliée à ce
+   compte et à ce numéro, et un **utilisateur système** avec un jeton d'accès permanent.
+
+**Quel numéro relier ?** Le code marche avec n'importe quel numéro ; c'est un choix de DJAFAT :
+
+| Choix                                                     | Ce qui change                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A. Un second numéro**, pour les connexions seulement    | Le 66 86 89 73 reste dans l'application WhatsApp Business pour les commandes, comme aujourd'hui (réglage du site `NEXT_PUBLIC_DJAFAT_ORDER_NUMBER`). Les connexions vont au second numéro (`WHATSAPP_BUSINESS_NUMBER`) : rien n'est facturé. Seul cas payant : quelqu'un qui enverrait une commande « DJF1 … » à ce numéro-là reçoit une réponse automatique.                                      |
+| **B. Le numéro des commandes** 66 86 89 73, pour les deux | Un seul numéro à faire connaître. Mais un numéro relié à l'API ne sert plus, en principe, dans l'application WhatsApp Business (sauf « coexistence », si Meta la propose au Tchad). Les commandes par WhatsApp sont alors passées automatiquement (FEAT-017), et **chaque réponse** (numéro de commande, total, code pour le livreur) **est un message payant**. Les connexions restent gratuites. |
+
+**Brancher le webhook** (page WhatsApp > Configuration de l'application Meta) :
+
+- URL de rappel : `https://api.<domaine>/v1/auth/whatsapp/webhook` ;
+- jeton de vérification : une valeur au hasard (par exemple `openssl rand -hex 24`), la même que
+  `WHATSAPP_VERIFY_TOKEN` ;
+- s'abonner au champ **`messages`**. Meta signe chaque envoi avec la clé secrète de l'application ;
+  l'API refuse un envoi mal signé.
+
+**Où le configurer** : dans `.env.prod` sur le serveur (jamais dans Git ni dans un document), puis
+relancer `install.sh` :
+
+```bash
+WHATSAPP_PROVIDER=cloud
+WHATSAPP_BUSINESS_NUMBER=+235…        # le numéro relié, au format international
+WHATSAPP_PHONE_NUMBER_ID=…            # « ID du numéro de téléphone » dans Meta (pas le numéro)
+WHATSAPP_APP_SECRET=…                 # « Clé secrète » de l'application (Paramètres > Général)
+WHATSAPP_VERIFY_TOKEN=…               # le jeton choisi pour le webhook
+WHATSAPP_ACCESS_TOKEN=…               # le jeton de l'utilisateur système
+```
+
+L'API refuse de démarrer avec `WHATSAPP_PROVIDER=cloud` s'il manque une de ces valeurs : c'est
+voulu. Les connexions n'envoient rien ; le jeton d'accès sert seulement aux réponses des
+commandes par WhatsApp (choix B).
+
+**À vérifier** :
+
+1. Le site, l'application client et les applications d'équipe montrent WhatsApp **sans**
+   « Bientôt disponible ».
+2. Depuis un téléphone dont le numéro est confirmé sur un compte : « Se connecter » → WhatsApp →
+   « Ouvrir WhatsApp » → envoyer le message → la page se connecte ; l'e-mail « Nouvelle connexion
+   par WhatsApp » arrive.
+3. Depuis un numéro sans compte : la page dit « Ce numéro n'est confirmé sur aucun compte » et
+   propose « Créer un compte ».
+4. Dans la facturation WhatsApp de Meta : **aucun message envoyé par DJAFAT** pour ces connexions.
+
+## 4. Les autres comptes déjà listés
+
+La feuille de route (`docs/ROADMAP.md`, « Ce qui reste à faire ») liste aussi l'envoi d'e-mails
+(SMTP) et le stockage des photos. Le code existe et reste désactivé en production tant que les
+comptes manquent.
 
 ## Qui fait quoi
 
 | Étape                                                   | Qui                       |
 | ------------------------------------------------------- | ------------------------- |
 | Choisir la passerelle SMS, ouvrir les comptes marchands | DJAFAT (direction)        |
+| Ouvrir le compte Meta, choisir le numéro WhatsApp       | DJAFAT (direction)        |
 | Fournir les pièces de la société aux opérateurs         | DJAFAT                    |
 | Écrire un adaptateur si l'API SMS a un autre format     | Équipe technique          |
 | Renseigner `.env.prod` et relancer `install.sh`         | Équipe technique, serveur |

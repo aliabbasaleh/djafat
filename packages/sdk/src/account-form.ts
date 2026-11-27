@@ -212,6 +212,8 @@ export function accountErrorMessage(err: unknown, fallback: string): string {
       return "Le SMS n'est pas disponible pour le moment.";
     case 'WHATSAPP_UNAVAILABLE':
       return "WhatsApp n'est pas disponible pour le moment.";
+    case 'PHONE_ALREADY_CONFIRMED':
+      return 'Votre numéro est déjà confirmé.';
     case 'CURRENT_PASSWORD_INCORRECT':
       return 'Mot de passe actuel incorrect.';
     case 'EMAIL_REQUIRED':
@@ -282,7 +284,6 @@ export interface ChannelButton {
   readonly enabled: boolean;
   /** « Bientôt disponible » for a channel the server does not offer yet (FEAT-020-Q05). */
   readonly note: string | null;
-  readonly link?: string;
 }
 
 const CHANNEL_ORDER: readonly CodeChannelId[] = ['email', 'whatsapp', 'sms'];
@@ -299,7 +300,7 @@ export const COMING_SOON = 'Bientôt disponible';
  * failed (`null`), only the e-mail is offered.
  */
 export function channelButtons(
-  methods: ReadonlyArray<{ id: string; available: boolean; link?: string }> | null,
+  methods: ReadonlyArray<{ id: string; available: boolean }> | null,
 ): ChannelButton[] {
   if (methods === null) {
     return [{ id: 'email', ...CHANNEL_FACE.email, enabled: true, note: null }];
@@ -307,13 +308,7 @@ export function channelButtons(
   return CHANNEL_ORDER.map((id) => {
     const method = methods.find((m) => m.id === id);
     const enabled = Boolean(method?.available);
-    return {
-      id,
-      ...CHANNEL_FACE[id],
-      enabled,
-      note: enabled ? null : COMING_SOON,
-      ...(enabled && method?.link ? { link: method.link } : {}),
-    };
+    return { id, ...CHANNEL_FACE[id], enabled, note: enabled ? null : COMING_SOON };
   });
 }
 
@@ -342,7 +337,7 @@ export const SMS_CHAD_ONLY = 'SMS : numéros du Tchad seulement';
  */
 export function phoneSectionState(
   me: Pick<MeProfile, 'phoneVerified'> & { readonly phone?: string | null },
-  methods: ReadonlyArray<{ id: string; available: boolean; link?: string }> | null,
+  methods: ReadonlyArray<{ id: string; available: boolean }> | null,
 ): PhoneSectionState {
   const buttons = channelButtons(methods ?? []);
   const pick = (id: CodeChannelId): ChannelButton =>

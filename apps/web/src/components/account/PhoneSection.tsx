@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { accountErrorMessage, phoneSectionState, type ChannelButton } from '@/lib/account';
 import type { AuthMethods } from './LoginPanel';
 import { ChannelRow } from './ChannelRow';
+import { WhatsappStep } from './WhatsappStep';
 
 interface PhoneSectionProps {
   readonly me: MeProfile;
@@ -23,8 +24,9 @@ interface PhoneSectionProps {
 /**
  * « Mon profil » → « Téléphone » (FEAT-020, SPEC-020-09 R3-R4): the number and
  * whether it is confirmed. Confirming it — by SMS, or by WhatsApp (the
- * customer writes « Code DJAFAT » first) — lets phone codes open this account.
- * A channel the server does not offer yet says « Bientôt disponible ».
+ * customer SENDS a code from this number, FEAT-023, SPEC-023-06) — lets phone
+ * codes and WhatsApp messages open this account. A channel the server does
+ * not offer yet says « Bientôt disponible ».
  */
 export function PhoneSection(props: PhoneSectionProps) {
   const { me } = props;
@@ -37,7 +39,6 @@ export function PhoneSection(props: PhoneSectionProps) {
   async function start(button: ChannelButton) {
     setError(null);
     if (button.id === 'whatsapp') {
-      if (button.link) window.open(button.link, '_blank', 'noopener');
       setChannel('whatsapp');
       return;
     }
@@ -53,11 +54,11 @@ export function PhoneSection(props: PhoneSectionProps) {
   }
 
   async function verify() {
-    if (!channel) return;
+    if (channel !== 'sms') return;
     setError(null);
     setBusy(true);
     try {
-      const profile = await api.auth.verifyPhone(channel, code.trim());
+      const profile = await api.auth.verifyPhone(code.trim());
       setChannel(null);
       setCode('');
       props.onUpdated(profile);
@@ -101,7 +102,22 @@ export function PhoneSection(props: PhoneSectionProps) {
             Confirmez votre numéro pour vous connecter aussi avec un code WhatsApp ou SMS.
           </p>
           {error && <Alert tone="danger">{error}</Alert>}
-          {channel === null ? (
+          {channel === 'whatsapp' ? (
+            <WhatsappStep
+              purpose="confirm"
+              start={() => api.auth.startPhoneWhatsapp()}
+              accountPhone={me.phone}
+              onConfirmed={() => {
+                setChannel(null);
+                void api.auth
+                  .me()
+                  .then(props.onUpdated)
+                  .catch(() => setError('Numéro confirmé : rechargez la page pour le voir.'));
+              }}
+              backLabel="Retour"
+              onBack={() => setChannel(null)}
+            />
+          ) : channel === null ? (
             <ChannelRow
               buttons={[
                 { ...state.whatsapp, label: 'Confirmer par WhatsApp' },
@@ -119,11 +135,7 @@ export function PhoneSection(props: PhoneSectionProps) {
             >
               <Stack gap="sm">
                 <Input
-                  label={
-                    channel === 'whatsapp'
-                      ? 'Code reçu sur WhatsApp (après « Code DJAFAT »)'
-                      : 'Code reçu par SMS'
-                  }
+                  label="Code reçu par SMS"
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   placeholder="123456"

@@ -1,7 +1,7 @@
 ---
 feature: FEAT-024
 # prettier-ignore
-specs: [SPEC-024-01@1, SPEC-024-02@1, SPEC-024-03@2, SPEC-024-04@3]
+specs: [SPEC-024-01@2, SPEC-024-02@1, SPEC-024-03@2, SPEC-024-04@3]
 ---
 
 # FEAT-024 — Brief d'exécution
@@ -51,7 +51,7 @@ aucune nouvelle arête entre modules, aucune migration.
 | Scénario         | Niveau       | Fichier de test                                                        | Oracle (ce que la spec exige)                                                                                                         |
 | ---------------- | ------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | SPEC-024-01-SC01 | application  | `apps/api/src/modules/auth/otp.service.spec.ts`                        | « 422 `SMS_FOREIGN_NUMBER` avec « … recevez le code par e-mail. » ; aucun code n'est enregistré, aucun SMS ne part, le compteur… »    |
-| SPEC-024-01-SC02 | application  | `apps/api/src/modules/auth/otp.service.spec.ts`                        | « le message dit « … recevez le code par WhatsApp ou par e-mail. » »                                                                  |
+| SPEC-024-01-SC02 | application  | `apps/api/src/modules/auth/otp.service.spec.ts`                        | « le message dit « … connectez-vous par WhatsApp ou recevez le code par e-mail. » » (v2)                                              |
 | SPEC-024-01-SC03 | application  | `apps/api/src/modules/auth/otp.service.spec.ts`                        | « 422 `PHONE_FIXED_LINE` avec « Ce numéro est un fixe : indiquez un numéro de portable (ex. 66 12 34 56). » ; rien n'est enregistré » |
 | SPEC-024-01-SC04 | application  | `apps/api/src/modules/auth/otp.service.spec.ts`                        | « le code part par SMS vers `+23566123456`, comme aujourd'hui »                                                                       |
 | SPEC-024-01-SC05 | application  | `apps/api/src/modules/auth/password.service.spec.ts`                   | « la liste des moyens propose l'e-mail mais pas le SMS ; la demande de SMS reçoit 422 `SMS_FOREIGN_NUMBER` »                          |

@@ -47,7 +47,7 @@ describe('SPEC-024-01 R8 — the screen stops an SMS that could not leave', () =
       "Le code par SMS n'est envoyé qu'aux numéros du Tchad. Avec un numéro étranger, recevez le code par e-mail.",
     );
     expect(smsPhoneError('+33 6 12 34 56 78', true)).toBe(
-      "Le code par SMS n'est envoyé qu'aux numéros du Tchad. Avec un numéro étranger, recevez le code par WhatsApp ou par e-mail.",
+      "Le code par SMS n'est envoyé qu'aux numéros du Tchad. Avec un numéro étranger, connectez-vous par WhatsApp ou recevez le code par e-mail.",
     );
     expect(smsPhoneError('22 51 23 45', true)).toBe(
       'Ce numéro est un fixe : indiquez un numéro de portable (ex. 66 12 34 56).',
@@ -60,7 +60,7 @@ describe('SPEC-024-01 R8 — the screen stops an SMS that could not leave', () =
       status: 422,
       code: 'SMS_FOREIGN_NUMBER',
       message:
-        "Le code par SMS n'est envoyé qu'aux numéros du Tchad. Avec un numéro étranger, recevez le code par WhatsApp ou par e-mail.",
+        "Le code par SMS n'est envoyé qu'aux numéros du Tchad. Avec un numéro étranger, connectez-vous par WhatsApp ou recevez le code par e-mail.",
     });
     expect(fieldErrorsFromApi(refusal, ['phone'], 'x').fields.phone).toBe(refusal.message);
     expect(

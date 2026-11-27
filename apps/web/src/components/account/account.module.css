@@ -204,3 +204,32 @@
   outline: 2px solid var(--djafat-color-focus-ring);
   outline-offset: 2px;
 }
+
+/* FEAT-023 — the free WhatsApp view (FEAT-023-VIS02, VIS03). */
+.whatsappSteps {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-3) * 1px);
+  margin: 0;
+  padding-left: 1.25em;
+  color: var(--djafat-color-text-primary);
+}
+.whatsappMessage {
+  display: block;
+  margin-top: calc(var(--djafat-space-2) * 1px);
+  padding: calc(var(--djafat-space-3) * 1px);
+  border-left: 4px solid var(--djafat-color-brand-primary);
+  border-radius: calc(var(--djafat-radius-sm) * 1px);
+  background: var(--djafat-color-bg-surface-alt);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.whatsappWaiting {
+  margin: 0;
+  color: var(--djafat-color-text-secondary);
+}
+.stepDone {
+  margin: 0;
+  color: var(--djafat-color-state-success);
+  font-weight: 700;
+}

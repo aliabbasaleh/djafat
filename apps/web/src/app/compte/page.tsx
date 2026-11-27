@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { SignedIn } from '@djafat/sdk';
+import { phoneFieldValue, type SignedIn } from '@djafat/sdk';
 import { Container, Heading, Stack, cx } from '@djafat/ui';
 import { Tabs } from '@/components/ui-client';
 import { LoginPanel, type AuthMethods } from '@/components/account/LoginPanel';
@@ -41,6 +41,8 @@ function Compte() {
   );
   // undefined while loading, null when the call failed (only the e-mail is offered then).
   const [methods, setMethods] = useState<AuthMethods | undefined>(undefined);
+  /** FEAT-023 (SPEC-023-05 R4): « Créer un compte » after WhatsApp, the number that wrote filled in. */
+  const [prefillPhone, setPrefillPhone] = useState<string | null>(null);
 
   // Only on arrival: a sign-up that just opened a session stays on its « what next » screen.
   const arrived = useRef(false);
@@ -95,13 +97,22 @@ function Compte() {
         />
         <div role="tabpanel" id={`tabpanel-${tab}`} aria-labelledby={`tab-${tab}`}>
           {tab === 'connexion' ? (
-            <LoginPanel methods={methods ?? null} onSignedIn={onSignedIn} />
+            <LoginPanel
+              methods={methods ?? null}
+              onSignedIn={onSignedIn}
+              onCreateAccount={(phone) => {
+                setPrefillPhone(phoneFieldValue(phone));
+                setTab('inscription');
+              }}
+            />
           ) : (
             <RegisterPanel
               onSignedIn={onSignedIn}
               onSignedUp={keepSession}
               onGoToLogin={() => setTab('connexion')}
-              initialType={signupType}
+              initialType={prefillPhone ? 'client' : signupType}
+              initialPhone={prefillPhone}
+              methods={methods ?? null}
             />
           )}
         </div>
