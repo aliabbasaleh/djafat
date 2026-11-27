@@ -3,13 +3,13 @@
 **The single source of truth for where DJAFAT stands.** Update it with every meaningful change
 (rules in [`README.md`](README.md)). Details live in the linked documents; this page points.
 
-|                        |                                                                                                                                                                                                                        |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Last updated**       | 2026-11-21                                                                                                                                                                                                             |
-| **Branch described**   | `main` @ `afaa7c2` (DJAFAT 0.23.4) — pull requests #13 to #24 merged on 2026-11-18 _(sync S-034)_                                                                                                                      |
-| **Evidence collected** | 2026-11-10 for the old `main`; 2026-11-13 end-to-end run of the code now on `main`; hosted CI                                                                                                                          |
-| **Last synced**        | S-053, 2026-11-26 — `main` is `c6e5ac1` (0.24.5). Open: PR #29, #28, #31, #32 and #33 (0.28.2); `feat/connexion-integration` (kcerha) merges that stack into `main`, no PR yet. GitHub's checks do not start (billing) |
-| **Updated by**         | Initial full audit; syncs S-001 to S-034                                                                                                                                                                               |
+|                        |                                                                                                                                                                                                                                                                            |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Last updated**       | 2026-11-21                                                                                                                                                                                                                                                                 |
+| **Branch described**   | `main` @ `afaa7c2` (DJAFAT 0.23.4) — pull requests #13 to #24 merged on 2026-11-18 _(sync S-034)_                                                                                                                                                                          |
+| **Evidence collected** | 2026-11-10 for the old `main`; 2026-11-13 end-to-end run of the code now on `main`; hosted CI                                                                                                                                                                              |
+| **Last synced**        | S-054, 2026-11-27 — `main` is `c6e5ac1` (0.24.5). Open: PR #29, #28, #31, #32 and #33 (0.28.2); `feat/connexion-integration` (kcerha, no PR yet) merges that stack into `main`; checked out here at 0.28.3 (`a4cfd23`, not pushed). GitHub's checks do not start (billing) |
+| **Updated by**         | Initial full audit; syncs S-001 to S-034                                                                                                                                                                                                                                   |
 
 ---
 

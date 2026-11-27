@@ -10,6 +10,27 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-054 — 2026-11-27 — the teammate's integration branch checked out; three roadmap lines restored, version 0.28.3
+
+**Trigger:** the user asked to commit and sync the teammate's work. **Range:** `origin/feat/connexion-integration`
+unchanged at `c12e590` (kcerha, reviewed in S-053); `origin/fix/login-method-icons` gone from GitHub. The main
+checkout now sits on a local `feat/connexion-integration` that tracks it. **Correction to S-053:** comparing
+`c12e590` with Git's own merge of the same parents (`git merge-tree --write-tree c6e5ac1 dab6e0f`) shows that
+resolving the `docs/ROADMAP.md` conflict also put back the pre-0.24.5 text of three lines that had merged cleanly
+from `main`: « E-mail réel » and « Gmail officiel de DJAFAT » un-ticked, and the MinIO line without its 23 Nov
+re-test of both registries. Every other file of the merge is Git's merge result exactly, apart from the batching
+described in S-053, and the version is the stack's 0.28.2. **Our own commits** (local, not pushed): `e9a2c76`, the
+S-053 record cherry-picked from the local `feat/whatsapp-gratuit`, where it was first committed (`f5417d5`); and
+`a4cfd23`, version 0.28.3, which restores the three lines from `main` word for word and adds the 0.28.3 journal line.
+**Removed:** `fix/login-method-icons` — PR #26 was closed unmerged on 2026-11-23 by the owner as superseded (its SVG
+icons are in FEAT-020's `apps/web/src/components/account/ChannelIcons.tsx`); its marker line is dropped. **Added /
+Fixed / New findings:** none. **Checked (RUN):** the batched pre-commit config on a real commit (`a4cfd23`, macOS):
+lint-staged read `lint-staged.config.cjs` and ran one Prettier call on the two quoted paths; `verify:fast` at
+`a4cfd23`: specs, hygiene, arch pass, the other four skipped (nothing uncommitted). **Not verified:** the ESLint
+batches in a real commit (no TypeScript file staged); Windows.
+
+---
+
 ## S-053 — 2026-11-26 — teammate merge of the PR #33 stack into `main` (`feat/connexion-integration`)
 
 **New branch** `origin/feat/connexion-integration` by **kcerha**, one commit `c12e590` (2026-11-25): a merge

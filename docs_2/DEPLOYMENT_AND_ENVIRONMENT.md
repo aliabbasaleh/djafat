@@ -119,7 +119,8 @@ staged changes, not the pushed commits, so it finds nothing ([`CI-02`](FINDINGS.
 commands leave `package.json` for `lint-staged.config.cjs`, which runs the same commands with the
 same flags in batches (Prettier 40 files, ESLint 25 per call), and the Claude Code stop hook checks
 Prettier in batches of 40 — so a very large commit (a 375-file merge) no longer exhausts memory or
-the Windows command-line limit _(updated 2026-11-26, sync S-053)_.
+the Windows command-line limit _(updated 2026-11-26, sync S-053)_. A real commit through it passed on macOS
+(Markdown and JSON files; the ESLint batches and Windows not yet exercised) _(updated 2026-11-27, sync S-054)_.
 
 _(updated 2026-11-11, sync S-003)_ On pull requests `gitleaks-action` needs the run's
 `GITHUB_TOKEN`. `main`'s workflow does not pass it, so the job stops there before scanning. Both

@@ -8,6 +8,16 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-27 — Sync S-054: the integration branch checked out, three roadmap lines restored, 0.28.3
+
+The main checkout follows the teammate's `feat/connexion-integration`. Its merge had put back the pre-0.24.5 text of
+three `docs/ROADMAP.md` lines (real e-mail in production, DJAFAT Gmail, MinIO re-test); `a4cfd23` (0.28.3) restores
+them from `main`. `fix/login-method-icons` is gone (PR #26 closed as superseded by FEAT-020). Verification: a real
+commit through the batched pre-commit config (RUN, macOS); `verify:fast` clean. Learned: compare a teammate's merge
+with `git merge-tree` of its parents — a conflict resolution can also undo lines that merged cleanly.
+
+---
+
 ## 2026-11-26 — Sync S-053: teammate merge of the PR #33 stack into `main`
 
 `feat/connexion-integration` (kcerha) merges our stack into `main`, with the pre-commit commands batched
