@@ -33,9 +33,27 @@ export function RestaurantCard({
   className,
 }: RestaurantCardProps) {
   return (
-    <Link href={href} className={cx(styles['restaurantCard'], className)}>
+    <Link
+      href={href}
+      className={cx(styles['restaurantCard'], status !== 'OPEN' && styles['cardClosed'], className)}
+    >
       <div className={styles['imageWrap']}>
-        {imageUrl ? (
+        {/*
+          Always rendered, underneath the photo rather than instead of it: a
+          card whose image is merely SLOW or BROKEN (flaky mobile network, dead
+          upstream) would otherwise be an empty rectangle. `next/image` is
+          absolutely positioned by `fill`, so it simply covers this once it
+          decodes — no JS, no onError handler, nothing to ship to a low-end
+          device.
+        */}
+        <div
+          className={styles['imageFallback']}
+          style={{ background: imageColor }}
+          aria-hidden="true"
+        >
+          {name}
+        </div>
+        {imageUrl && (
           // Decorative: the name is already rendered as text right below.
           <Image
             src={imageUrl}
@@ -45,14 +63,6 @@ export function RestaurantCard({
             className={styles['image']}
             loading="lazy"
           />
-        ) : (
-          <div
-            className={styles['imageFallback']}
-            style={{ background: imageColor }}
-            aria-hidden="true"
-          >
-            {name}
-          </div>
         )}
         <div className={styles['badgeWrap']}>
           <RestaurantStatusBadge status={status} />

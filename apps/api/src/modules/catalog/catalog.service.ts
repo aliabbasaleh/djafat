@@ -543,6 +543,7 @@ function toSortable(
     prepTimeMin: row.prep_time_min,
     name: row.name,
     createdAt: row.created_at,
+    availability: row.availability,
     row,
   };
 }
