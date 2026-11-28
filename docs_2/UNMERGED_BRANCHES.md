@@ -243,6 +243,10 @@ deleted. #29 is brought up to date with `main` as 0.28.4 (`e245d2c`).
 _(updated 2026-11-28, sync S-056)_ The repository is private again and GitHub refuses #29's checks; at the user's
 decision #29 stays open until they can run.
 
+_(updated 2026-11-28, sync S-057)_ **#29 merged.** The repository is public again; #29's checks were re-run, all green
+on Linux and Windows, and it went in as `982cdf2`; its branch is deleted. No pull request of ours is open; the only
+other branch on GitHub is the owner's `fix/payment-reliability-backlog` (§2).
+
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007); branch deleted on 2026-11-28 (sync S-056)
 
 ### What it adds

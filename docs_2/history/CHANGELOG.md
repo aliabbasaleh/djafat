@@ -8,6 +8,14 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-28 — Sync S-057: PR #29 merged (0.28.4); follow-up 0.28.5
+
+With the repository public again, PR #29's checks were re-run and all passed on Linux and Windows; it is merged
+(`982cdf2`) and its branch deleted. Every pull request of the sign-up stack and the CI change is now in `main`.
+Verification: GitHub's checks on `1d6858c`; `main`'s push runs on `982cdf2`.
+
+---
+
 ## 2026-11-28 — Sync S-056: repository private again; PR #29 left open; a merged branch deleted
 
 GitHub refuses #29's checks again (repository private, billing). At the user's decision #29 waits until they can run,
