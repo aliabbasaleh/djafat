@@ -10,6 +10,19 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-059 — 2026-11-28 — PR #36 merged: free WhatsApp login (FEAT-023) and the `FE-08` fix on `main` (0.29.0)
+
+**Trigger:** our PR #36 (`feat/whatsapp-gratuit`), recorded in S-058, merged. Its checks on `28a5e3a`: lint,
+typecheck, test and build on Linux, integration (PostgreSQL + Redis), local setup on Windows, gitleaks, pnpm audit
+and both scope jobs green; the docs-only job skipped as designed. Merged with a merge commit, `4ff5a34`, whose tree is
+the branch's (`28a5e3a`): nothing beyond what S-058 reviewed. The branch is deleted. `main` is DJAFAT 0.29.0; its push
+runs on `4ff5a34`: CI and Security green. **Fixed on `main`:** `FE-08` (the fix verified on the branch, identical code). **Added /
+Removed:** as in S-058. **New findings:** none. **Marker:** `origin/feat/whatsapp-gratuit` removed (branch deleted);
+`HEAD` and `origin/main` moved to `4ff5a34`. Not deployed to the server; WhatsApp stays off in production until the
+Meta account exists.
+
+---
+
 ## S-058 — 2026-11-28 — our FEAT-023 (free WhatsApp login, 0.29.0) on `feat/whatsapp-gratuit`; pull request opened
 
 **Trigger:** our own commits outside `docs_2/` — the FEAT-023 branch, rebased onto `main` `413bedc` — and the pull

@@ -8,6 +8,14 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-28 — Sync S-059: PR #36 merged — FEAT-023 and the `FE-08` fix on `main` (0.29.0)
+
+PR #36 went in as `4ff5a34` with every check green on Linux and Windows; its branch is deleted. `main` now has the
+free WhatsApp login (off in production until the Meta account exists) and the fix for uploaded restaurant photos
+(`FE-08`, resolved on `main`). Verification: GitHub's checks on `28a5e3a`; `main`'s push runs on `4ff5a34`: CI and Security green.
+
+---
+
 ## 2026-11-28 — Sync S-058: free WhatsApp login (FEAT-023, 0.29.0) in a pull request; `FE-08` found and fixed
 
 FEAT-023 replaces FEAT-008's paid reply: the customer sends the code shown on screen from WhatsApp, the screen signs

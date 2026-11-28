@@ -77,7 +77,7 @@ behind login runs in the browser.
 - `typedRoutes` is enabled but never checked ([`FE-07`](../FINDINGS.md#fe-07)) _(added 2026-11-12,
   sync S-004)_.
 - An uploaded restaurant logo or cover broke the home page: `next/image` allowed only `placehold.co`
-  ([`FE-08`](../FINDINGS.md#fe-08)); fixed on `feat/whatsapp-gratuit` _(added 2026-11-28, sync S-058)_.
+  ([`FE-08`](../FINDINGS.md#fe-08)); fixed on `main` by PR #36 _(added 2026-11-28, sync S-058; updated sync S-059)_.
 - Interface review: [`../UI_UX_AUDIT.md`](../UI_UX_AUDIT.md) §2.
 
 ## 4. Outstanding tasks

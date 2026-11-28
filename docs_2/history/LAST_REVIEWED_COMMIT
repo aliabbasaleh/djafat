@@ -5,8 +5,7 @@
 # Change these lines ONLY as the last step of an incremental audit sync (docs_2/README.md §3),
 # and name the sync below.
 # Commits that change only docs_2/ are never reported, so recording a review is silent.
-# Last sync: S-058 (2026-11-28)
-2dd7a1cba18adfa48978778f1520acba5a9be3bc HEAD
-413bedc33c954a890ac85a8f52fe8ba4765d12de origin/main
-2dd7a1cba18adfa48978778f1520acba5a9be3bc origin/feat/whatsapp-gratuit
+# Last sync: S-059 (2026-11-28)
+4ff5a34fb52e1390da185fe8571aaf95211509c2 HEAD
+4ff5a34fb52e1390da185fe8571aaf95211509c2 origin/main
 92e8d52553cb3630060202d7fa02d21a6e38f55b origin/fix/payment-reliability-backlog

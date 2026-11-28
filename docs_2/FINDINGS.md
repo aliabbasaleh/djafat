@@ -12,6 +12,7 @@ these IDs instead of repeating the detail.
 - **Counts:** 3 Critical · 11 High · 22 Medium · 13 Low = 49 open findings, plus 22 resolved
   _(updated 2026-11-27, sync S-055: `CI-03` resolved on `main`; new `TEST-07`)_
   _(updated 2026-11-18, sync S-034: `TEST-05`, `ADM-01`, `ADM-02`, `ORD-01`, `PAY-04`, `ORD-02`, `ADM-03`, `SEC-02` and `OPS-05` resolved on `main`)_
+  _(updated 2026-11-28, sync S-059: `FE-08` resolved on `main`, PR #36 merged as `4ff5a34`)_
   _(updated 2026-11-28, sync S-058: new `FE-08`, on `main` since the sign-up stack, fixed on `feat/whatsapp-gratuit` — open until that pull request is merged)_
   _(updated 2026-11-25, sync S-050: new `SEC-09` and `SEC-10`, found by review and fixed on `feat/inscription-restaurants` before any merge — never on `main`, not counted as open)_
   _(updated 2026-11-18, sync S-030: new `OPS-06`; sync S-032: `TEST-04` and `DOC-03` resolved on `main`)_
@@ -1369,8 +1370,8 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### FE-08
 
-**An uploaded restaurant photo breaks the site's home page** · Broken · Medium · RUN · Status: Open on `main`, fixed on
-`feat/whatsapp-gratuit` (`c7259e6`, `12a14f9`) _(added 2026-11-28, sync S-058)_
+**An uploaded restaurant photo breaks the site's home page** · Broken · Medium · RUN · Status: Resolved on `main` (PR #36,
+`4ff5a34`) _(updated 2026-11-28, sync S-059)_; fixed on the branch as `c7259e6`, `12a14f9` _(added 2026-11-28, sync S-058)_
 
 - **Where:** `apps/web/next.config.mjs` (`images.remotePatterns` allowed only `placehold.co`);
   `infra/deploy/next.Dockerfile` (the runtime stage had no `NEXT_PUBLIC_API_BASE_URL`).

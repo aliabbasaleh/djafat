@@ -251,6 +251,10 @@ _(updated 2026-11-28, sync S-058)_ PR #35 (S-057's record, 0.28.5) merged as `41
 `feat/whatsapp-gratuit` → `main` — FEAT-023, free WhatsApp login (0.29.0), with the `FE-08` fix; rebased onto
 `413bedc`. It waits for its checks on Linux and Windows.
 
+_(updated 2026-11-28, sync S-059)_ **#36 merged.** Every check green on Linux and Windows; it went in as `4ff5a34` and its branch is
+deleted. No pull request of ours is open; the only other branch on GitHub is the owner's
+`fix/payment-reliability-backlog` (§2).
+
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007); branch deleted on 2026-11-28 (sync S-056)
 
 ### What it adds
