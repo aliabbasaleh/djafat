@@ -386,7 +386,7 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-407 · Let the pre-commit hook run ESLint
 
-- **Area:** root `package.json`, `.husky/pre-commit` · **Priority:** Low · **Status:** Not started
+- **Area:** root `package.json`, `.husky/pre-commit` · **Priority:** Low · **Status:** Done — see `COMPLETED_TASKS.md` _(updated 2026-11-27, sync S-055)_
 - **Why:** [`CI-03`](../FINDINGS.md#ci-03) · **Depends on:** — (done on `claude/compassionate-franklin-k23vcj`: `eslint` 9.17.0 in the root `devDependencies`) _(added 2026-11-12, sync S-004)_
 - **Done when:** committing a staged `.ts` file runs `eslint --fix` from the hook without extra setup.
 - **Test:** on a fresh clone, commit a file with a lint error; the hook refuses it with ESLint's message, not ENOENT.
@@ -516,17 +516,35 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Area:** `apps/admin`, `apps/restaurant`, `apps/courier`, `packages/config`, `auth` · **Priority:** High · **Why:** the user's decision of 2026-11-22 to switch SMS off until DJAFAT has an API (codes today land in a test box on the server); the three team apps only accept a phone code (`docs/features/FEAT-021-equipe-connexion-email`) · **Status:** Implemented and reviewed twice on `feat/equipe-connexion-email` (0.25.0), verified locally (unit, browser screenshots, full verify) — pull request to merge; then switch SMS off on the server (`infra/deploy/README.md` §4) _(updated 2026-11-23, sync S-043)_
 - **Done when:** the three team apps log in by e-mail and password (code by e-mail on a new device); the API starts in production with `SMS_PROVIDER=disabled` when e-mail is configured; the server runs with SMS off.
 - **Test:** the FEAT-021 specs' tests; on the server, log in to each app with an e-mail and password.
+- **Progress** _(updated 2026-11-27, sync S-055)_: on `main` through PR #34 (`e93536b`); the three team apps log in by
+  e-mail and password in a browser (TESTING §5); the server part (deploy, SMS off) is still to do.
 
 ### T-615 · Sign-up as customer, courier or restaurant, validated by DJAFAT (FEAT-022) _(added 2026-11-22, sync S-038)_
 
 - **Area:** `auth`, `users`, `catalog`, `couriers`, `admin`, `notifications`, the four front ends · **Priority:** High · **Why:** the user's request of 2026-11-22 (`docs/features/FEAT-022-inscription-par-type-de-compte`) · **Status:** Confirmed by the user, specs to write; needs T-614
 - **Done when:** a courier and a restaurant sign up on their own, complete their profile in their app, and only work after an admin approves them; document photos are private.
 - **Test:** the FEAT-022 specs' tests.
+- **Progress** _(updated 2026-11-27, sync S-055)_: on `main` through PR #34 (`e93536b`); courier and restaurant
+  sign-up and sign-in verified in a browser (TESTING §5); not deployed to the server yet.
 
 ### T-616 · Free WhatsApp login: the customer sends the code (FEAT-023) _(added 2026-11-22, sync S-038)_
 
 - **Area:** `auth` (WhatsApp webhook), web and mobile login · **Priority:** Medium · **Why:** Meta charges every business-sent message since 2026-10-01, including FEAT-008's reply with the code; customer-sent messages stay free (`docs/features/FEAT-023-whatsapp-gratuit`) · **Status:** Confirmed by the user, specs to write; switched on only once DJAFAT's number is on Meta's WhatsApp Cloud API
 - **Done when:** a customer logs in by sending the displayed code from WhatsApp, and DJAFAT sends no WhatsApp message.
 - **Test:** the FEAT-023 specs' tests.
+
+### T-617 · Let `verify --full` build the web apps with `.env` exported _(added 2026-11-27, sync S-055)_
+
+- **Area:** `scripts/pipeline/verify.mjs`, CLAUDE.md · **Priority:** Low · **Why:** [`TEST-07`](../FINDINGS.md#test-07) · **Status:** Not started
+- **Done when:** the documented full verification (export `.env`, then `pnpm verify --full`) reports `build` 16/16.
+- **Test:** `set -a; . ./.env; set +a; pnpm verify --full` on a clean checkout.
+
+### T-618 · Make the delivery-code test independent of a chance digit match _(added 2026-11-28, sync S-055)_
+
+- **Area:** `apps/api/src/modules/deliveries/delivery-code-retrieval.spec.ts` · **Priority:** Medium · **Why:** [`TEST-06`](../FINDINGS.md#test-06), which failed PR #29's CI run on 2026-11-27 · **Status:** Not started
+- **Done when:** the test asserts what it means (the stored value is a 64-character hash and the reference an
+  encrypted triple, neither equal to the code) without searching the hash for the code's digits, reviewed as a test
+  correction on its own pull request.
+- **Test:** 5,000 runs of that spec without a failure.
 
 Last updated: 2026-11-23 (sync S-043)

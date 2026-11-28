@@ -8,6 +8,25 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-28 — Sync S-056: repository private again; PR #29 left open; a merged branch deleted
+
+GitHub refuses #29's checks again (repository private, billing). At the user's decision #29 waits until they can run,
+and `claude/compassionate-franklin-k23vcj`, already in `main`, is deleted. Nothing verified beyond the GitHub state.
+
+---
+
+## 2026-11-27 — Sync S-055: the sign-up stack in `main` (PR #34, 0.28.3); PR #29 updated (0.28.4)
+
+The repository is public, so GitHub's checks run again: PR #34 (the teammate's integration branch) merged with its
+five checks green; #28 marked merged, #31 to #33 closed, their branches deleted; PR #29 brought up to date as
+0.28.4. Verification: `verify --full` on a separate database (all pass but a `build` failure caused by
+`NODE_ENV=development`, `TEST-07`), and the sign-up and sign-in of customers, couriers, restaurants and admins in a
+real browser, 31/31. `CI-03` resolved, T-407 done. Learned: a fresh worktree needs `pnpm install` and the workspace
+packages built before the type-aware pre-commit ESLint means anything. PR #29's first CI run hit the known flake
+`TEST-06` (same code and hash as on 2026-11-24); task T-618 added, the run repeated without touching the test.
+
+---
+
 ## 2026-11-27 — Sync S-054: the integration branch checked out, three roadmap lines restored, 0.28.3
 
 The main checkout follows the teammate's `feat/connexion-integration`. Its merge had put back the pre-0.24.5 text of
@@ -123,6 +142,21 @@ e2e unavailable); 15 execution screenshots opened; the pre-cut query on the loca
 FEAT-021-Q11 — SMS is switched off only once every active team account has a verified e-mail and a password; a
 step-up code on e-mail and password changes for MFA roles is deferred (T-612). **Not verified:** a GitHub run (no
 job starts until billing is fixed), the cut-over on the server.
+
+---
+
+## 2026-11-23 — Sync S-042: PR #27 merged; CI that spends fewer Actions minutes (0.24.5)
+
+**Changed:** `main` is `038c723` (PR #27 merged, FEAT-020). Branch `ci/cheaper-runs`, at the user's request (« make CI
+cheaper »): a `scope` job decides which jobs a run needs — every check on `main` and on a manual run, nothing heavy on
+a draft pull request (« Ready for review » runs them), only `format:check` and `check:specs` when the whole pull
+request is documentation (the root version bump included). It judges the whole pull request, never the last push
+alone, so code is always tested before merge. Security cancels a superseded pull-request run.
+`docs/TRAVAILLER-EN-LOCAL.md` asks teammates to open pull requests as drafts and to group their pushes.
+
+**Verified:** `scripts/pipeline/test/ci-scope.test.mjs` (7 tests, one runs the script on a real git history),
+`pnpm check:pipeline` 78/78, `verify:fast` all pass. **Not verified:** a real GitHub run — none starts until billing is
+fixed.
 
 ---
 

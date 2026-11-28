@@ -208,7 +208,13 @@ Merge them in that order, each only once its Linux and Windows checks are green.
 owner's review (the mobile app is their area), and the later ones wait with it; #18 to #22 can be
 re-stacked on #16 if needed. #19 also waits for DJAFAT's decision on the refund policy (`docs/37`).
 
-## 2e. The sign-up stack and the teammate's integration branch _(added 2026-11-27, sync S-054)_
+## 2e. `feat/compte-email-password`, pull request #27 _(added 2026-11-23, sync S-042)_ — merged into `main` on 2026-11-23 (`038c723`)
+
+FEAT-020 (customer accounts by e-mail and password, 0.24.0 to 0.24.4). Merged at the user's request **without
+GitHub's checks**: the owner account's Actions minutes for the month are used up, so no job started (S-041). The
+remote branch is deleted.
+
+## 2f. The sign-up stack and the teammate's integration branch _(added 2026-11-27, sync S-054)_
 
 Open on GitHub on 2026-11-27, our own pull requests, each stacked on the one before except #29:
 
@@ -230,7 +236,14 @@ requests at once (their heads are ancestors of it); merge it only once its Linux
 `fix/login-method-icons` (PR #26, the owner) was closed unmerged on 2026-11-23 as superseded: FEAT-020 carries its
 icons in `apps/web/src/components/account/ChannelIcons.tsx`. The branch is gone from GitHub (seen 2026-11-27).
 
-## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
+_(updated 2026-11-27, sync S-055)_ **Merged.** PR #34 (`feat/connexion-integration` → `main`, five checks green) went in
+as `e93536b`. GitHub marked #28 merged; #31, #32 and #33 are closed with a pointer to #34; the five branches are
+deleted. #29 is brought up to date with `main` as 0.28.4 (`e245d2c`).
+
+_(updated 2026-11-28, sync S-056)_ The repository is private again and GitHub refuses #29's checks; at the user's
+decision #29 stays open until they can run.
+
+## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007); branch deleted on 2026-11-28 (sync S-056)
 
 ### What it adds
 

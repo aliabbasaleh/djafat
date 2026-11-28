@@ -7,6 +7,12 @@ on:
   schedule:
     - cron: '0 4 * * 1' # weekly, Monday 04:00 UTC
 
+# A newer push to the same pull request replaces the run still going (it
+# scans that newer state anyway). Runs on main are never cancelled.
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   gitleaks:
     name: gitleaks (secret scanning)

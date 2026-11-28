@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+    # ready_for_review: a draft runs its checks when it is marked ready.
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -14,8 +16,31 @@ env:
   NEXT_TELEMETRY_DISABLED: 1
 
 jobs:
+  # Which jobs this run needs (scripts/pipeline/ci-scope.mjs): every check on
+  # main; on a pull request, nothing heavy while it is a draft, and only the
+  # docs checks when the whole pull request is documentation. Saves Actions
+  # minutes (the private repository ran out of them on 2026-11-23).
+  scope:
+    name: scope
+    runs-on: ubuntu-latest
+    outputs:
+      heavy: ${{ steps.scope.outputs.heavy }}
+      docs: ${{ steps.scope.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/pipeline/ci-scope.mjs
+
   check:
     name: lint · typecheck · test · build
+    needs: scope
+    if: needs.scope.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,8 +89,32 @@ jobs:
       - name: Build
         run: pnpm build
 
+  # A pull request that only changes documentation: the checks that can
+  # find something in it (Prettier on Markdown, spec structure and links).
+  docs:
+    name: docs (format · specs)
+    needs: scope
+    if: needs.scope.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format check
+        run: pnpm format:check
+      - name: Spec & traceability check
+        run: pnpm check:specs
+
   integration:
     name: integration (postgres + redis)
+    needs: scope
+    if: needs.scope.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:

@@ -121,6 +121,11 @@ same flags in batches (Prettier 40 files, ESLint 25 per call), and the Claude Co
 Prettier in batches of 40 — so a very large commit (a 375-file merge) no longer exhausts memory or
 the Windows command-line limit _(updated 2026-11-26, sync S-053)_. A real commit through it passed on macOS
 (Markdown and JSON files; the ESLint batches and Windows not yet exercised) _(updated 2026-11-27, sync S-054)_.
+On a real 379-file merge (`main` into `ci/cheaper-runs`) the hook then ran 9 ESLint and 8 Prettier batches and passed
+in 32 s. In a fresh worktree it first failed with hundreds of type errors: the type-aware ESLint needs the workspace
+packages built (`pnpm exec turbo run build --filter='./packages/*'`) and `pnpm install` run again after a merge that
+brings new dependencies. `next build` must run with `NODE_ENV=production` ([`TEST-07`](FINDINGS.md#test-07))
+_(updated 2026-11-27, sync S-055)_.
 
 _(updated 2026-11-11, sync S-003)_ On pull requests `gitleaks-action` needs the run's
 `GITHUB_TOKEN`. `main`'s workflow does not pass it, so the job stops there before scanning. Both

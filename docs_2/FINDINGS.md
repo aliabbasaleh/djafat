@@ -9,7 +9,8 @@ these IDs instead of repeating the detail.
   their production builds, HTTP scenarios with `curl`, the three web apps in headless Chrome, and
   the hosted CI logs. Environment details: [`TESTING_AND_QUALITY_ASSURANCE.md`](TESTING_AND_QUALITY_ASSURANCE.md) §1.
 - **Vocabulary:** classification and evidence levels are defined in [`README.md`](README.md).
-- **Counts:** 3 Critical · 11 High · 22 Medium · 13 Low = 49 open findings, plus 21 resolved
+- **Counts:** 3 Critical · 11 High · 22 Medium · 13 Low = 49 open findings, plus 22 resolved
+  _(updated 2026-11-27, sync S-055: `CI-03` resolved on `main`; new `TEST-07`)_
   _(updated 2026-11-18, sync S-034: `TEST-05`, `ADM-01`, `ADM-02`, `ORD-01`, `PAY-04`, `ORD-02`, `ADM-03`, `SEC-02` and `OPS-05` resolved on `main`)_
   _(updated 2026-11-25, sync S-050: new `SEC-09` and `SEC-10`, found by review and fixed on `feat/inscription-restaurants` before any merge — never on `main`, not counted as open)_
   _(updated 2026-11-18, sync S-030: new `OPS-06`; sync S-032: `TEST-04` and `DOC-03` resolved on `main`)_
@@ -105,6 +106,7 @@ verified.
 | [PAY-09](#pay-09)     | Payment idempotency scope is global; attempt counter never moves                            | Needs Improvement   | Low      | CODE     |
 | [TEST-05](#test-05)   | The mobile typecheck is silenced by a known-failure entry                                   | Needs Improvement   | Low      | CODE     |
 | [TEST-06](#test-06)   | A delivery-code unit test fails about once in a thousand runs                               | Needs Improvement   | Low      | RUN      |
+| [TEST-07](#test-07)   | `verify --full` fails the web builds when `.env` is exported                                | Broken              | Low      | RUN      |
 
 ---
 
@@ -1407,7 +1409,9 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### CI-03
 
-**The pre-commit hook cannot run ESLint on `main`** · Broken · Low · RUN — `lint-staged` runs `eslint --fix` on staged code files from the repository root, but `eslint` is not a root dependency, and pnpm's isolated layout puts no `eslint` in the root `node_modules/.bin`. Any commit that touches a `.ts`, `.tsx`, `.js`, `.mjs` or `.cjs` file is refused with "eslint … failed without output (ENOENT)". This was seen on 2026-11-12 while committing pull request #3, so such commits on `main` must have been made without the hook. The root `eslint.config.mjs` itself works: with the workspace's ESLint 9.17.0 put on `PATH`, the hook ran in full. Fix: add `eslint` 9.17.0 to the root `devDependencies`, as `claude/compassionate-franklin-k23vcj` already does (T-407). Found in sync S-004.
+**The pre-commit hook cannot run ESLint on `main`** · Broken · Low · RUN · Status: Resolved on `main` _(updated 2026-11-27, sync S-055)_ — `lint-staged` runs `eslint --fix` on staged code files from the repository root, but `eslint` is not a root dependency, and pnpm's isolated layout puts no `eslint` in the root `node_modules/.bin`. Any commit that touches a `.ts`, `.tsx`, `.js`, `.mjs` or `.cjs` file is refused with "eslint … failed without output (ENOENT)". This was seen on 2026-11-12 while committing pull request #3, so such commits on `main` must have been made without the hook. The root `eslint.config.mjs` itself works: with the workspace's ESLint 9.17.0 put on `PATH`, the hook ran in full. Fix: add `eslint` 9.17.0 to the root `devDependencies`, as `claude/compassionate-franklin-k23vcj` already does (T-407). Found in sync S-004. **Resolved:** the root `devDependencies` carry `eslint` 9.17.0 since
+`b495b86`, on `main` with PR #1 (`46d8cae`, 2026-11-13); verified on 2026-11-27 by a 379-file merge commit through the
+hook in a fresh worktree, with no extra `PATH` (9 ESLint batches of `lint-staged.config.cjs`).
 
 ### FE-07
 
@@ -1435,6 +1439,27 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 - **Fix:** assert what the test means — the stored value is a hash (64 hex characters) and never the code —
   instead of searching the hash for the code's digits; keep the check on the encrypted reference.
 - **Verify:** the spec passes repeatedly (e.g. 5,000 runs of that test) without a failure.
+- **Seen in CI** _(updated 2026-11-28, sync S-055)_: PR #29's Linux job (run `46023953698`, 2026-11-27) failed on this
+  assertion alone, 1 of 1,226 unit tests, with the identical pair — code « 6731 », hash `9579fed16c7fe6731713…`. The
+  stored value is a keyed hash of the code with the test's fixed key, so the test fails whenever the random draw lands
+  on one of the few codes (about 1 in 1,000) whose hash happens to contain their own digits. Now that GitHub's checks
+  run again, it can block a merge; the remedy until T-618 is a fresh run, never a change to the expected value.
+
+### TEST-07
+
+**`verify --full` fails the three web builds when `.env` is exported** · Broken · Low · RUN · Status: Open _(added 2026-11-27, sync S-055)_
+
+- **Where:** `.env.example:10` (`NODE_ENV=development`), the `build` step of `scripts/pipeline/verify.mjs`, and the
+  route CLAUDE.md gives to the integration step (export `.env`, then `test:int`).
+- **Observed:** `verify --full` at `b12a118` with `.env` exported: the `@djafat/web`, `@djafat/admin` and
+  `@djafat/restaurant` builds stop while prerendering `/404` with « `<Html>` should not be imported outside of
+  pages/\_document », Next.js's symptom of a build under a non-production `NODE_ENV`. The same builds pass with
+  `NODE_ENV=production` (9/9 tasks).
+- **Why it matters:** a red "NEW failure" without any defect, exactly when someone follows the documented route to
+  the full verification.
+- **Fix:** run the `build` step of `verify.mjs` with `NODE_ENV=production` (or without `NODE_ENV`), or document
+  exporting only the database and Redis variables for `test:int`.
+- **Verify:** `set -a; . ./.env; set +a; pnpm verify --full` reports `build` 16/16.
 
 ---
 

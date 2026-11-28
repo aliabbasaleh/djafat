@@ -7,6 +7,8 @@ name: Windows
 
 on:
   pull_request:
+    # ready_for_review: a draft runs its checks when it is marked ready.
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 concurrency:
@@ -18,8 +20,31 @@ env:
   NEXT_TELEMETRY_DISABLED: 1
 
 jobs:
+  # Which jobs this run needs (scripts/pipeline/ci-scope.mjs): every check on
+  # a manual run; on a pull request, nothing heavy while it is a draft, and only the
+  # docs checks when the whole pull request is documentation. Saves Actions
+  # minutes (the private repository ran out of them on 2026-11-23).
+  scope:
+    name: scope
+    runs-on: ubuntu-latest
+    outputs:
+      heavy: ${{ steps.scope.outputs.heavy }}
+      docs: ${{ steps.scope.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/pipeline/ci-scope.mjs
+
   local-setup:
     name: local setup on Windows
+    needs: scope
+    if: needs.scope.outputs.heavy == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

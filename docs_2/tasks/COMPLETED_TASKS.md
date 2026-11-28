@@ -167,3 +167,12 @@ Last updated: 2026-11-11 (AUDIT-3)
 - **Verified by:** the finding's Verify step on PostgreSQL (disabled row → 409, order still `awaiting_payment`, no payment row; enabled → 201) and an unknown `methodCode`, which gave HTTP 500, now stored as the provider's; 12 of 14 unit tests fail on the previous code; API unit tests 899/899.
 - **Not verified:** the mock provider in production is not registered since FEAT-002 (not re-checked here).
 - **New issues found:** `TEST-04`
+
+### T-407 · Let the pre-commit hook run ESLint
+
+- **Completed:** 2026-11-27 (fix on `main` since 2026-11-13) · **Commit:** `b495b86` (merged with PR #1, `46d8cae`)
+- **Resolves:** [`CI-03`](../FINDINGS.md#ci-03)
+- **What changed:** `eslint` 9.17.0 in the root `devDependencies`, so lint-staged finds it from the repository root.
+- **Files:** `package.json`
+- **Verified by:** 2026-11-27, sync S-055 — in a fresh worktree, the hook first refused a commit with ESLint's own
+  messages (not ENOENT), then accepted the 379-file merge `e245d2c` (9 ESLint batches, 32 s), with no extra `PATH`.
