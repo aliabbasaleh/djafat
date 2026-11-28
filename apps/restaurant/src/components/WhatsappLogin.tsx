@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  WHATSAPP_ICON,
   WHATSAPP_TEXT,
   accountErrorMessage,
   waitForWhatsapp,
@@ -111,6 +112,13 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
         : shown.kind === 'outcome'
           ? shown.view.message
           : '';
+  // The picture in front of the text, never read aloud (SPEC-023-07 « UI »).
+  const icon =
+    shown.kind === 'code'
+      ? WHATSAPP_ICON.waiting
+      : shown.kind === 'outcome'
+        ? WHATSAPP_ICON.warning
+        : null;
 
   return (
     <Stack gap="md">
@@ -132,7 +140,7 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
             <li>{WHATSAPP_TEXT.step2.replace(/^2\. /, '')}</li>
           </ol>
           <div className={cx(styles['box'])}>
-            <span aria-hidden="true">⚠️ </span>
+            <span aria-hidden="true">{WHATSAPP_ICON.warning} </span>
             {WHATSAPP_TEXT.warning}
           </div>
           <a
@@ -141,13 +149,14 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
             rel="noopener noreferrer"
             className={cx(styles['open'])}
           >
-            <span aria-hidden="true">🟢&nbsp;</span>
+            <span aria-hidden="true">{WHATSAPP_ICON.open}&nbsp;</span>
             {WHATSAPP_TEXT.open}
           </a>
           <Text tone="secondary">{whatsappDesktopHint(shown.code.number)}</Text>
         </>
       )}
       <p role="status" className={cx(styles['status'], shown.kind === 'outcome' && styles['box'])}>
+        {icon && <span aria-hidden="true">{icon} </span>}
         {status}
       </p>
       {shown.kind === 'outcome' &&

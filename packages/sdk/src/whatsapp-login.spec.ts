@@ -3,6 +3,7 @@ import type { WhatsappStatus } from './auth.js';
 import { channelButtons, startSignup } from './account-form.js';
 import { ApiClientError } from './http.js';
 import {
+  WHATSAPP_ICON,
   WHATSAPP_TEXT,
   afterSignup,
   phoneFieldValue,
@@ -48,20 +49,35 @@ describe('SPEC-023-05 — the WhatsApp view of the site and the customer app', (
       "N'envoyez ce code que pour vous connecter vous-même. Si quelqu'un vous demande de l'envoyer, refusez : il veut entrer dans votre compte.",
       'Ouvrir WhatsApp',
       'Sur un ordinateur : envoyez ce message depuis votre téléphone au numéro WhatsApp de DJAFAT, +235 66 86 89 73.',
-      '⏳ En attente de votre message… (valable 5 min)',
+      'En attente de votre message… (valable 5 min)',
       '← Autre moyen de connexion',
     ]);
     // The minutes left, never 0 while it waits.
     expect(whatsappWaitingText(expiresAt, now + 150_000)).toBe(
-      '⏳ En attente de votre message… (valable 3 min)',
+      'En attente de votre message… (valable 3 min)',
     );
     expect(whatsappWaitingText(expiresAt, now + 299_000)).toBe(
-      '⏳ En attente de votre message… (valable 1 min)',
+      'En attente de votre message… (valable 1 min)',
     );
     // A screen whose clock is a little behind the server's still reads 5 minutes.
     expect(whatsappWaitingText(expiresAt, now - 2_000)).toBe(
-      '⏳ En attente de votre message… (valable 5 min)',
+      'En attente de votre message… (valable 5 min)',
     );
+  });
+
+  // SPEC-023-05 R9 v2: what a live region or a screen reader says carries no picture.
+  it('SPEC-023-05 R9 — no emoji in the announced texts; the pictures are separate decoration', () => {
+    const pictures = new RegExp(`[${Object.values(WHATSAPP_ICON).join('')}]`, 'u');
+    const said = [
+      ...Object.values(WHATSAPP_TEXT),
+      whatsappWaitingText('2026-11-25T10:05:00.000Z', Date.parse('2026-11-25T10:00:00Z')),
+      whatsappOutcomeView('not_confirmed', { app: 'customer' }).message,
+      whatsappOutcomeView('expired', { app: 'customer' }).message,
+      whatsappOutcomeView('wrong_number', { app: 'customer', accountPhone: '+33612345678' })
+        .message,
+    ];
+    expect(said.filter((text) => pictures.test(text))).toEqual([]);
+    expect(WHATSAPP_ICON).toEqual({ waiting: '⏳', done: '✅', warning: '⚠️', open: '🟢' });
   });
 
   // SPEC-023-05-SC02
@@ -219,7 +235,7 @@ describe('SPEC-023-06 — confirming a number by WhatsApp', () => {
       whatsappForeignIntro(phone),
       WHATSAPP_TEXT.later,
     ]).toEqual([
-      '✅ Votre compte est créé.',
+      'Votre compte est créé.',
       'Votre numéro +33 6 12 34 56 78 ne reçoit pas de SMS. Confirmez-le par WhatsApp pour vous connecter ensuite par WhatsApp.',
       'Plus tard',
     ]);

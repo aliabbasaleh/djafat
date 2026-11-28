@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ndjamenaDate } from '@djafat/core';
-import { WHATSAPP_TEXT, afterSignup, whatsappForeignIntro, type SignedIn } from '@djafat/sdk';
+import {
+  WHATSAPP_ICON,
+  WHATSAPP_TEXT,
+  afterSignup,
+  whatsappForeignIntro,
+  type SignedIn,
+} from '@djafat/sdk';
 import { Text } from '@djafat/ui';
 import { Alert, Button, Checkbox, FieldSuggestion, Input, Radio } from '@/components/ui-client';
 import { api } from '@/lib/api';
@@ -243,7 +249,12 @@ export function RegisterPanel({
     return (
       <WhatsappStep
         purpose="confirm"
-        before={<p className={styles['stepDone']}>{WHATSAPP_TEXT.accountCreated}</p>}
+        before={
+          <p className={styles['stepDone']}>
+            <span aria-hidden="true">{WHATSAPP_ICON.done} </span>
+            {WHATSAPP_TEXT.accountCreated}
+          </p>
+        }
         intro={<Text tone="secondary">{whatsappForeignIntro(confirming.user.phone)}</Text>}
         start={() => api.auth.startPhoneWhatsapp()}
         accountPhone={confirming.user.phone}

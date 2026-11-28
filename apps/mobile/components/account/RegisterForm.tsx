@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { AccessibilityInfo, Linking, Pressable, Text, View, type TextInput } from 'react-native';
 import { ndjamenaDate } from '@djafat/core';
-import { WHATSAPP_TEXT, afterSignup, whatsappForeignIntro, type SignedIn } from '@djafat/sdk';
+import {
+  WHATSAPP_ICON,
+  WHATSAPP_TEXT,
+  afterSignup,
+  whatsappForeignIntro,
+  type SignedIn,
+} from '@djafat/sdk';
 import { Button } from '../Button';
 import { api, appUrl } from '../../lib/api';
 import {
@@ -35,7 +41,7 @@ import {
 import { ChoiceGroup } from './ChoiceGroup';
 import { CodeStep } from './CodeStep';
 import { Field } from './Field';
-import { WhatsappStep } from './WhatsappStep';
+import { PictureLine, WhatsappStep } from './WhatsappStep';
 import { accountStyles as s } from './styles';
 
 type FormField =
@@ -258,7 +264,13 @@ export function RegisterForm({
     return (
       <WhatsappStep
         purpose="confirm"
-        before={<Text style={s.success}>{WHATSAPP_TEXT.accountCreated}</Text>}
+        before={
+          <PictureLine
+            icon={WHATSAPP_ICON.done}
+            text={WHATSAPP_TEXT.accountCreated}
+            style={s.success}
+          />
+        }
         intro={<Text style={s.intro}>{whatsappForeignIntro(confirming.user.phone)}</Text>}
         start={() => api.auth.startPhoneWhatsapp()}
         accountPhone={confirming.user.phone}

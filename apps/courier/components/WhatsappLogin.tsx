@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, AppState, Linking, StyleSheet, Text, View } from 'react-native';
 import {
+  AccessibilityInfo,
+  AppState,
+  Linking,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type TextStyle,
+} from 'react-native';
+import {
+  WHATSAPP_ICON,
   WHATSAPP_TEXT,
   accountErrorMessage,
   waitForWhatsapp,
@@ -30,11 +41,21 @@ interface WhatsappLoginProps {
   readonly onBack: () => void;
 }
 
+/** A picture in front of a text, never read aloud (SPEC-023-05 R9). */
+function Picture({ icon, style }: { readonly icon: string; readonly style: StyleProp<TextStyle> }) {
+  return (
+    <View aria-hidden>
+      <Text style={style}>{icon}</Text>
+    </View>
+  );
+}
+
 /**
  * WhatsApp in the courier app's login (FEAT-023, SPEC-023-07 R1, R6): the
  * message to send, « Ouvrir WhatsApp » (the WhatsApp app), the wait — asked
  * again as soon as the app is back in front — then the courier role check.
- * The title takes the focus; the wait and each outcome are announced.
+ * The title takes the focus; the wait and each outcome are said aloud, on a
+ * phone and in a browser (the courier app's production form, react-native-web).
  */
 export function WhatsappLogin(props: WhatsappLoginProps) {
   const [shown, setShown] = useState<Shown>({ kind: 'loading' });
@@ -65,25 +86,46 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
     asked.current = true;
     ask();
   }, [ask]);
-  // The title takes the focus on a phone; react-native-web (the courier app in a
-  // browser) has no `sendAccessibilityEvent`, so it is only called where it exists.
+  // The title takes the focus when the view opens. react-native-web has no
+  // `sendAccessibilityEvent`: in a browser the title is a DOM element, focused by script.
   useEffect(() => {
-    if (title.current && typeof AccessibilityInfo.sendAccessibilityEvent === 'function') {
-      AccessibilityInfo.sendAccessibilityEvent(title.current, 'focus');
+    const node = title.current;
+    if (!node) return;
+    if (Platform.OS === 'web') {
+      const element = node as unknown as {
+        setAttribute(name: string, value: string): void;
+        focus(): void;
+      };
+      element.setAttribute('tabindex', '-1');
+      element.focus();
+    } else {
+      AccessibilityInfo.sendAccessibilityEvent(node, 'focus');
     }
   }, []);
 
-  const said =
-    shown.kind === 'code'
-      ? WHATSAPP_TEXT.step2
-      : shown.kind === 'outcome'
-        ? shown.view.message
-        : shown.kind === 'error'
-          ? shown.message
+  // The one live region: the wait, then the outcome, in the same place. The
+  // browser (aria-live) and Android read its changes; an iPhone has no live
+  // regions, so the same text is announced there. An error has the alert role,
+  // which the browser reads by itself.
+  const status =
+    shown.kind === 'loading'
+      ? 'Préparation du code…'
+      : shown.kind === 'code'
+        ? whatsappWaitingText(shown.code.expiresAt, now)
+        : shown.kind === 'outcome'
+          ? shown.view.message
           : '';
+  const announced =
+    shown.kind === 'error'
+      ? Platform.OS === 'web'
+        ? ''
+        : shown.message
+      : Platform.OS === 'ios' && shown.kind !== 'loading'
+        ? status
+        : '';
   useEffect(() => {
-    if (said) AccessibilityInfo.announceForAccessibility(said);
-  }, [said]);
+    if (announced) AccessibilityInfo.announceForAccessibility(announced);
+  }, [announced]);
 
   const token = shown.kind === 'code' ? shown.code.token : null;
   useEffect(() => {
@@ -123,23 +165,10 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
       <Text ref={title} style={styles.title} accessibilityRole="header">
         {WHATSAPP_TEXT.loginTitle}
       </Text>
-      {shown.kind === 'loading' ? <Text style={styles.hint}>Préparation du code…</Text> : null}
       {shown.kind === 'error' ? (
         <Text style={styles.error} accessibilityRole="alert">
           {shown.message}
         </Text>
-      ) : null}
-      {shown.kind === 'outcome' ? (
-        <>
-          <Text style={styles.warning}>{shown.view.message}</Text>
-          {shown.view.actions.map((action) => (
-            <BigButton
-              key={action}
-              label={whatsappActionLabel(action)}
-              onPress={() => act(action)}
-            />
-          ))}
-        </>
       ) : null}
       {shown.kind === 'code' ? (
         <>
@@ -154,15 +183,39 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
             « {shown.code.text} »
           </Text>
           <Text style={styles.label}>{WHATSAPP_TEXT.step2}</Text>
-          <Text style={styles.warning}>{WHATSAPP_TEXT.warning}</Text>
+          <View style={[styles.line, styles.box]}>
+            <Picture icon={WHATSAPP_ICON.warning} style={styles.boxText} />
+            <Text style={[styles.boxText, styles.lineText]}>{WHATSAPP_TEXT.warning}</Text>
+          </View>
           <BigButton
             label={WHATSAPP_TEXT.open}
             onPress={() => void Linking.openURL(shown.code.link)}
           />
           <Text style={styles.hint}>{whatsappDesktopHint(shown.code.number)}</Text>
-          <Text style={styles.hint}>{whatsappWaitingText(shown.code.expiresAt, now)}</Text>
         </>
       ) : null}
+      {shown.kind !== 'error' ? (
+        <View aria-live="polite" style={[styles.line, shown.kind === 'outcome' && styles.box]}>
+          {shown.kind === 'code' || shown.kind === 'outcome' ? (
+            <Picture
+              icon={shown.kind === 'code' ? WHATSAPP_ICON.waiting : WHATSAPP_ICON.warning}
+              style={shown.kind === 'outcome' ? styles.boxText : styles.hint}
+            />
+          ) : null}
+          <Text style={[shown.kind === 'outcome' ? styles.boxText : styles.hint, styles.lineText]}>
+            {status}
+          </Text>
+        </View>
+      ) : null}
+      {shown.kind === 'outcome'
+        ? shown.view.actions.map((action) => (
+            <BigButton
+              key={action}
+              label={whatsappActionLabel(action)}
+              onPress={() => act(action)}
+            />
+          ))
+        : null}
       {back}
     </View>
   );
@@ -182,13 +235,14 @@ const styles = StyleSheet.create({
     fontSize: tokens.type.size.body,
     fontWeight: '700',
   },
-  warning: {
+  line: { flexDirection: 'row', gap: tokens.space['2'] },
+  lineText: { flexShrink: 1 },
+  box: {
     padding: tokens.space['3'],
     borderRadius: tokens.radius.md,
     backgroundColor: tokens.color.state.warningBg,
-    color: tokens.color.text.primary,
-    fontSize: tokens.type.size.body,
   },
+  boxText: { color: tokens.color.text.primary, fontSize: tokens.type.size.body },
   hint: { fontSize: tokens.type.size.caption, color: tokens.color.text.secondary },
   error: {
     padding: tokens.space['3'],

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ApiClientError,
+  WHATSAPP_ICON,
   WHATSAPP_TEXT,
   waitForWhatsapp,
   whatsappActionLabel,
@@ -169,6 +170,16 @@ export function WhatsappStep(props: WhatsappStepProps) {
             ? WHATSAPP_TEXT.confirmed
             : '';
 
+  // FEAT-023-VIS02, VIS03: the picture in front of the text, never read aloud (R9).
+  const icon =
+    shown.kind === 'code'
+      ? WHATSAPP_ICON.waiting
+      : shown.kind === 'outcome'
+        ? WHATSAPP_ICON.warning
+        : shown.kind === 'confirmed'
+          ? WHATSAPP_ICON.done
+          : null;
+
   return (
     <div className={styles['panel']}>
       {props.before}
@@ -196,7 +207,7 @@ export function WhatsappStep(props: WhatsappStepProps) {
           </ol>
           {props.purpose === 'login' && (
             <div className={styles['whatsappWarning']}>
-              <span aria-hidden="true">⚠️ </span>
+              <span aria-hidden="true">{WHATSAPP_ICON.warning} </span>
               {WHATSAPP_TEXT.warning}
             </div>
           )}
@@ -206,7 +217,7 @@ export function WhatsappStep(props: WhatsappStepProps) {
             target="_blank"
             rel="noopener noreferrer"
           >
-            <span aria-hidden="true">🟢&nbsp;</span>
+            <span aria-hidden="true">{WHATSAPP_ICON.open}&nbsp;</span>
             {WHATSAPP_TEXT.open}
           </a>
           <p className={styles['whatsappHint']}>{whatsappDesktopHint(shown.code.number)}</p>
@@ -228,6 +239,7 @@ export function WhatsappStep(props: WhatsappStepProps) {
           shown.kind === 'confirmed' && styles['stepDone'],
         )}
       >
+        {icon && <span aria-hidden="true">{icon} </span>}
         {status}
       </p>
 

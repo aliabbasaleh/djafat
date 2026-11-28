@@ -200,6 +200,39 @@ describe('FEAT-023 — free WhatsApp login on PostgreSQL and Redis', () => {
     });
   });
 
+  // SPEC-023-02-SC08 (review round 2, note 3): the real route and the real lock table.
+  it('SPEC-023-02-SC08 — a number locked by wrong SMS codes typed by a stranger still logs in by WhatsApp', async () => {
+    const phone = freshChadPhone();
+    const account = await registered(phone);
+    const confirm = (
+      await request(server)
+        .post('/v1/me/phone/whatsapp')
+        .set('Authorization', `Bearer ${account.access}`)
+        .send({})
+        .expect(201)
+    ).body as WhatsappCode;
+    await customerSends(phone, confirm.text);
+    await status(confirm.token).expect(200, { status: 'confirmed' });
+
+    // A stranger types wrong SMS codes for this number until it is locked (10 by default).
+    for (let i = 0; i < 10; i += 1) {
+      await request(server)
+        .post('/v1/auth/otp/verify')
+        .send({ phone, code: '000000', purpose: 'login' })
+        .expect(401);
+    }
+    await request(server)
+      .post('/v1/auth/otp/verify')
+      .send({ phone, code: '000000', purpose: 'login' })
+      .expect(423);
+
+    const code = (await request(server).post('/v1/auth/whatsapp/start').send({}).expect(201))
+      .body as WhatsappCode;
+    await customerSends(phone, code.text);
+    const signedIn = await status(code.token).expect(200);
+    expect(signedIn.body).toMatchObject({ status: 'signed_in', user: { id: account.user.id } });
+  });
+
   // SPEC-023-02-SC03, SPEC-023-03-SC03
   it('SPEC-023-02-SC03 — SPEC-023-03-SC03 — a number on no account, or typed only: « confirmed on no account », the number given, nothing created', async () => {
     const stranger = '+33612345678';

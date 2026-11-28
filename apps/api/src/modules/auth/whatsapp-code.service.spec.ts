@@ -450,6 +450,23 @@ describe('SPEC-023-03 — the screen waits, then logs in', () => {
     expect(t.sessions.rows).toHaveLength(0);
   });
 
+  // R6 (v2), review round 2: the confirmation is done again before « confirmed » is said.
+  it('SPEC-023-03-SC05 — the confirmation failed when the message came in: done when the screen asks, then « confirmed »', async () => {
+    const t = build({ accounts: [account({ phone: '+33612345678' })] });
+    const { token, code } = await t.service.startPhoneConfirmation('u-awa', SCREEN);
+    t.users.markPhoneVerified.mockRejectedValueOnce(new Error('database down'));
+    await expect(t.service.receive({ from: '+33612345678', code })).rejects.toThrow(
+      'database down',
+    );
+    expect(t.codes.rows[0]).toMatchObject({ outcome: 'matched', matchedUserId: 'u-awa' });
+    expect(t.users.accounts[0]!.phoneVerifiedAt).toBeNull();
+    await expect(t.service.status({ token, rememberDevice: false }, SCREEN)).resolves.toEqual({
+      status: 'confirmed',
+    });
+    const me = t.users.toMeDto(await t.users.getByIdOrThrow('u-awa'), ['customer']);
+    expect(me.phoneVerified).toBe(true);
+  });
+
   // SPEC-023-03-SC06
   it('SPEC-023-03-SC06 — a suspended account: 403 ACCOUNT_INACTIVE, no session, then expired', async () => {
     const t = build({ accounts: [confirmed({ phone: '+23566123456', status: 'suspended' })] });

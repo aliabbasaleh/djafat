@@ -196,6 +196,16 @@ Sur un poste, personne n'envoie de vrai message WhatsApp : un script joue le rô
    numéro n'est confirmé sur aucun compte ». Pour une confirmation de numéro, envoyer le texte
    affiché avec `--text "…"`. Le script refuse toute adresse d'API qui n'est pas ce poste.
 
+### Les photos des restaurants ne s'affichent pas _(ajouté le 28 nov. 2026)_
+
+Les photos téléversées (logos, couvertures, FEAT-022) sont servies par l'API, à l'adresse
+`API_PUBLIC_URL` du `.env`. Le site n'affiche que les images venues de l'hôte de l'API qu'il
+appelle, `NEXT_PUBLIC_API_BASE_URL` (par défaut `http://localhost:3001/v1`). Les deux adresses
+doivent donc avoir **le même hôte** : `localhost` avec `localhost`, jamais `127.0.0.1` d'un côté
+seulement. Après un changement, relancer le site. En production, les deux viennent du même
+`DOMAIN` (`https://api.<domaine>`), et l'image du site reçoit l'adresse aussi à l'exécution
+(`infra/deploy/next.Dockerfile`).
+
 ### Le livreur ne reçoit aucune course
 
 Le dispatch ignore un livreur dont la position date de plus de

@@ -27,9 +27,21 @@ export const WHATSAPP_TEXT = {
   createAccount: 'Créer un compte',
   emailLogin: 'Se connecter par e-mail',
   expired: 'Ce code a expiré.',
-  accountCreated: '✅ Votre compte est créé.',
-  confirmed: '✅ Numéro confirmé : vous pouvez vous connecter par WhatsApp.',
+  accountCreated: 'Votre compte est créé.',
+  confirmed: 'Numéro confirmé : vous pouvez vous connecter par WhatsApp.',
   continue: 'Continuer',
+} as const;
+
+/**
+ * The pictures of FEAT-023-VIS02 and VIS03, drawn by the views as decoration
+ * next to their text, hidden from screen readers (SPEC-023-05 R9): the texts
+ * above, and the ones a live region announces, carry none.
+ */
+export const WHATSAPP_ICON = {
+  waiting: '⏳',
+  done: '✅',
+  warning: '⚠️',
+  open: '🟢',
 } as const;
 
 /**
@@ -50,13 +62,13 @@ export function whatsappDesktopHint(businessNumber: string): string {
 }
 
 /**
- * SPEC-023-05 R1: « ⏳ En attente de votre message… (valable 5 min) » — the
+ * SPEC-023-05 R1: « En attente de votre message… (valable 5 min) » — the
  * minutes left, rounded (a few seconds of clock difference with the server
- * never show « 6 min »), at least 1.
+ * never show « 6 min »), at least 1. The view draws ⏳ in front, as decoration.
  */
 export function whatsappWaitingText(expiresAt: string, now: number = Date.now()): string {
   const minutes = Math.max(1, Math.round((Date.parse(expiresAt) - now) / 60_000));
-  return `⏳ En attente de votre message… (valable ${minutes} min)`;
+  return `En attente de votre message… (valable ${minutes} min)`;
 }
 
 /**
