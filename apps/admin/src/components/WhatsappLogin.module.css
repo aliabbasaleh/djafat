@@ -16,6 +16,8 @@
 }
 .message {
   display: block;
+  /* French quotation marks with their inner no-break spaces (« … »). */
+  quotes: '«\00a0' '\00a0»';
   margin-top: calc(var(--djafat-space-2) * 1px);
   padding: calc(var(--djafat-space-3) * 1px);
   border-left: 4px solid var(--djafat-color-brand-primary);
@@ -39,7 +41,19 @@
   outline: 2px solid var(--djafat-color-focus-ring);
   outline-offset: 2px;
 }
-.waiting {
+/* The one live region: the wait, then the outcome (SPEC-023-05 R9). */
+.status {
   margin: 0;
   color: var(--djafat-color-text-secondary);
+}
+.status:empty {
+  display: none;
+}
+.box {
+  margin: 0;
+  padding: calc(var(--djafat-space-3) * 1px);
+  border: 1px solid var(--djafat-color-state-warning);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  background: var(--djafat-color-state-warning-bg);
+  color: var(--djafat-color-text-primary);
 }

@@ -2,18 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  ApiClientError,
   WHATSAPP_TEXT,
-  notConfirmedActions,
   waitForWhatsapp,
+  whatsappActionLabel,
   whatsappDesktopHint,
+  whatsappOutcomeView,
   whatsappSignedIn,
   whatsappWaitingText,
-  whatsappWrongNumberText,
   type SignedIn,
+  type WhatsappAction,
   type WhatsappCode,
-  type WhatsappOutcome,
+  type WhatsappOutcomeView,
 } from '@djafat/sdk';
-import { Text, VisuallyHidden } from '@djafat/ui';
+import { VisuallyHidden, cx } from '@djafat/ui';
 import { Alert, Button, Checkbox } from '@/components/ui-client';
 import { api } from '@/lib/api';
 import { accountErrorMessage } from '@/lib/account';
@@ -24,7 +26,6 @@ interface WhatsappStepProps {
   readonly purpose: 'login' | 'confirm';
   /** Asks the API for a code to send: `startWhatsapp` or `startPhoneWhatsapp`. */
   readonly start: () => Promise<WhatsappCode>;
-  readonly title?: string;
   /** Shown above the title (FEAT-023-VIS03: « ✅ Votre compte est créé. »). */
   readonly before?: ReactNode;
   /** Shown under the title. */
@@ -34,19 +35,25 @@ interface WhatsappStepProps {
   /** The account's number, named when the message came from another one. */
   readonly accountPhone?: string | null;
   readonly onSignedIn?: (signedIn: SignedIn) => void;
+  /** The number is confirmed — also when the server says it already was (409). */
   readonly onConfirmed?: () => void;
+  /** FEAT-023-VIS03 « Ensuite »: say « Numéro confirmé » and wait for « Continuer ». */
+  readonly confirmedContinue?: boolean;
   /** « Créer un compte » with the number that wrote (SPEC-023-05 R4). */
   readonly onCreateAccount?: (phone: string) => void;
   /** « Se connecter par e-mail ». */
   readonly onEmailLogin?: () => void;
   readonly backLabel?: string;
+  /** « Plus tard » of the sign-up step is a secondary button (SPEC-023-06 « UI »). */
+  readonly backVariant?: 'ghost' | 'secondary';
   readonly onBack: () => void;
 }
 
 type Shown =
   | { readonly kind: 'loading' }
   | { readonly kind: 'code'; readonly code: WhatsappCode }
-  | { readonly kind: 'outcome'; readonly outcome: WhatsappOutcome }
+  | { readonly kind: 'outcome'; readonly view: WhatsappOutcomeView; readonly phone?: string }
+  | { readonly kind: 'confirmed' }
   | { readonly kind: 'error'; readonly message: string };
 
 /** The digits read one by one by a screen reader (SPEC-023-05 R9). */
@@ -56,7 +63,8 @@ const spelled = (text: string, code: string) => text.replace(code, code.split(''
  * The free WhatsApp view (FEAT-023-VIS02, VIS03; SPEC-023-05, SPEC-023-06): the
  * message already written with its code, « Ouvrir WhatsApp », how to send it
  * from a computer, then the wait — every 2 s and at once when the page is
- * visible again — and its outcome. DJAFAT sends nothing on WhatsApp.
+ * visible again — and its outcome. One live region says the wait and the
+ * outcome. DJAFAT sends nothing on WhatsApp.
  */
 export function WhatsappStep(props: WhatsappStepProps) {
   const [shown, setShown] = useState<Shown>({ kind: 'loading' });
@@ -68,6 +76,11 @@ export function WhatsappStep(props: WhatsappStepProps) {
   const handlers = useRef(props);
   handlers.current = props;
 
+  const confirmed = useCallback(() => {
+    if (handlers.current.confirmedContinue) setShown({ kind: 'confirmed' });
+    else handlers.current.onConfirmed?.();
+  }, []);
+
   const ask = useCallback(() => {
     setShown({ kind: 'loading' });
     handlers.current
@@ -76,13 +89,18 @@ export function WhatsappStep(props: WhatsappStepProps) {
         setNow(Date.now()); // the validity counts from the code's arrival
         setShown({ kind: 'code', code });
       })
-      .catch((err: unknown) =>
+      .catch((err: unknown) => {
+        // SPEC-023-06 « Erreurs »: already confirmed elsewhere — the profile is read again.
+        if (err instanceof ApiClientError && err.code === 'PHONE_ALREADY_CONFIRMED') {
+          confirmed();
+          return;
+        }
         setShown({
           kind: 'error',
           message: accountErrorMessage(err, "WhatsApp n'est pas disponible pour le moment."),
-        }),
-      );
-  }, []);
+        });
+      });
+  }, [confirmed]);
 
   // One code when the view opens (R1) — once, even when React runs effects twice
   // in development; « Nouveau code » asks again.
@@ -103,13 +121,19 @@ export function WhatsappStep(props: WhatsappStepProps) {
       onOutcome: (outcome) => {
         if (outcome.status === 'signed_in') {
           handlers.current.onSignedIn?.(whatsappSignedIn(outcome));
-          return;
+        } else if (outcome.status === 'confirmed') {
+          confirmed();
+        } else {
+          const view = whatsappOutcomeView(outcome.status, {
+            app: 'customer',
+            accountPhone: handlers.current.accountPhone ?? null,
+          });
+          setShown(
+            outcome.status === 'not_confirmed'
+              ? { kind: 'outcome', view, phone: outcome.phone }
+              : { kind: 'outcome', view },
+          );
         }
-        if (outcome.status === 'confirmed') {
-          handlers.current.onConfirmed?.();
-          return;
-        }
-        setShown({ kind: 'outcome', outcome });
       },
       onError: (err) =>
         setShown({ kind: 'error', message: accountErrorMessage(err, 'Connexion impossible.') }),
@@ -124,85 +148,34 @@ export function WhatsappStep(props: WhatsappStepProps) {
       document.removeEventListener('visibilitychange', visible);
       clearInterval(clock);
     };
-  }, [token]);
+  }, [token, confirmed]);
 
-  const back = (
-    <Button type="button" variant="ghost" fullWidth onClick={props.onBack}>
-      {props.backLabel ?? WHATSAPP_TEXT.otherWay}
-    </Button>
-  );
-  const newCode = (
-    <Button type="button" fullWidth onClick={ask}>
-      {WHATSAPP_TEXT.newCode}
-    </Button>
-  );
+  function act(action: WhatsappAction) {
+    if (action === 'new_code') ask();
+    else if (action === 'email_login') handlers.current.onEmailLogin?.();
+    else if (shown.kind === 'outcome' && shown.phone)
+      handlers.current.onCreateAccount?.(shown.phone);
+  }
+
+  // The one live region (SPEC-023-05 R9): the wait, then the outcome, in the same place.
+  const status =
+    shown.kind === 'loading'
+      ? 'Préparation du code…'
+      : shown.kind === 'code'
+        ? whatsappWaitingText(shown.code.expiresAt, now)
+        : shown.kind === 'outcome'
+          ? shown.view.message
+          : shown.kind === 'confirmed'
+            ? WHATSAPP_TEXT.confirmed
+            : '';
 
   return (
     <div className={styles['panel']}>
       {props.before}
       <h2 ref={title} tabIndex={-1} className={styles['stepTitle']}>
-        {props.title ??
-          (props.purpose === 'login' ? WHATSAPP_TEXT.loginTitle : WHATSAPP_TEXT.confirmTitle)}
+        {props.purpose === 'login' ? WHATSAPP_TEXT.loginTitle : WHATSAPP_TEXT.confirmTitle}
       </h2>
       {props.intro}
-
-      {shown.kind === 'loading' && <Text tone="secondary">Préparation du code…</Text>}
-
-      {shown.kind === 'error' && (
-        <>
-          <Alert tone="danger">{shown.message}</Alert>
-          {back}
-        </>
-      )}
-
-      {shown.kind === 'outcome' && (
-        <div role="status" className={styles['panel']}>
-          {shown.outcome.status === 'not_confirmed' && (
-            <>
-              <Alert tone="warning">{WHATSAPP_TEXT.notConfirmed}</Alert>
-              {notConfirmedActions('customer').map((action) =>
-                action === 'create_account' ? (
-                  <Button
-                    key={action}
-                    type="button"
-                    fullWidth
-                    onClick={() => {
-                      if (shown.outcome.status === 'not_confirmed') {
-                        handlers.current.onCreateAccount?.(shown.outcome.phone);
-                      }
-                    }}
-                  >
-                    {WHATSAPP_TEXT.createAccount}
-                  </Button>
-                ) : (
-                  <Button
-                    key={action}
-                    type="button"
-                    variant="secondary"
-                    fullWidth
-                    onClick={() => handlers.current.onEmailLogin?.()}
-                  >
-                    {WHATSAPP_TEXT.emailLogin}
-                  </Button>
-                ),
-              )}
-            </>
-          )}
-          {shown.outcome.status === 'expired' && (
-            <>
-              <Alert tone="warning">{WHATSAPP_TEXT.expired}</Alert>
-              {newCode}
-            </>
-          )}
-          {shown.outcome.status === 'wrong_number' && (
-            <>
-              <Alert tone="warning">{whatsappWrongNumberText(props.accountPhone)}</Alert>
-              {newCode}
-            </>
-          )}
-          {back}
-        </div>
-      )}
 
       {shown.kind === 'code' && (
         <>
@@ -221,16 +194,22 @@ export function WhatsappStep(props: WhatsappStepProps) {
               ).replace(/^2\. /, '')}
             </li>
           </ol>
-          {props.purpose === 'login' && <Alert tone="warning">{WHATSAPP_TEXT.warning}</Alert>}
+          {props.purpose === 'login' && (
+            <div className={styles['whatsappWarning']}>
+              <span aria-hidden="true">⚠️ </span>
+              {WHATSAPP_TEXT.warning}
+            </div>
+          )}
           <a
             className={styles['primaryLink']}
             href={shown.code.link}
             target="_blank"
             rel="noopener noreferrer"
           >
-            🟢 {WHATSAPP_TEXT.open}
+            <span aria-hidden="true">🟢&nbsp;</span>
+            {WHATSAPP_TEXT.open}
           </a>
-          <Text tone="secondary">{whatsappDesktopHint(shown.code.number)}</Text>
+          <p className={styles['whatsappHint']}>{whatsappDesktopHint(shown.code.number)}</p>
           {props.remember && (
             <Checkbox
               label="Se souvenir de cet appareil"
@@ -238,11 +217,48 @@ export function WhatsappStep(props: WhatsappStepProps) {
               onChange={(e) => props.remember?.onChange(e.target.checked)}
             />
           )}
-          <p role="status" className={styles['whatsappWaiting']}>
-            {whatsappWaitingText(shown.code.expiresAt, now)}
-          </p>
-          {back}
         </>
+      )}
+
+      <p
+        role="status"
+        className={cx(
+          styles['whatsappStatus'],
+          shown.kind === 'outcome' && styles['whatsappOutcome'],
+          shown.kind === 'confirmed' && styles['stepDone'],
+        )}
+      >
+        {status}
+      </p>
+
+      {shown.kind === 'outcome' &&
+        shown.view.actions.map((action, i) => (
+          <Button
+            key={action}
+            type="button"
+            variant={i === 0 ? 'primary' : 'secondary'}
+            fullWidth
+            onClick={() => act(action)}
+          >
+            {whatsappActionLabel(action)}
+          </Button>
+        ))}
+      {shown.kind === 'confirmed' && (
+        <Button type="button" fullWidth onClick={() => handlers.current.onConfirmed?.()}>
+          {WHATSAPP_TEXT.continue}
+        </Button>
+      )}
+      {shown.kind === 'error' && <Alert tone="danger">{shown.message}</Alert>}
+
+      {shown.kind !== 'confirmed' && (
+        <Button
+          type="button"
+          variant={props.backVariant ?? 'ghost'}
+          fullWidth
+          onClick={props.onBack}
+        >
+          {props.backLabel ?? WHATSAPP_TEXT.otherWay}
+        </Button>
       )}
     </div>
   );

@@ -110,7 +110,7 @@ describe('SPEC-020-07 — the account page', () => {
       { id: 'email', available: true },
     ]);
     expect(later.map((b) => b.enabled)).toEqual([true, true, true]);
-    // SPEC-020-07 v4 (FEAT-023): no wa.me link on the button — it comes with the code
+    // SPEC-020-07 v2 (FEAT-023): no wa.me link on the button — it comes with the code
     // the screen asks for (SPEC-023-01 R4).
     expect(later[1]).not.toHaveProperty('link');
     expect(channelButtons(null).map((b) => b.id)).toEqual(['email']);

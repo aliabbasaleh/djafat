@@ -233,9 +233,19 @@ export function RegisterForm({
     }
   }
 
-  /** SPEC-023-06 R4: the end of today's sign-up — the customer goes on, the others see « et maintenant ? ». */
+  /**
+   * SPEC-023-06 R4: the end of today's sign-up, decided by `afterSignup` once the
+   * WhatsApp step is done or skipped — the customer goes on, the others see
+   * « et maintenant ? ».
+   */
   async function finishSignup(result: SignedIn) {
-    if (type === 'courier' || type === 'restaurant') {
+    const next = afterSignup({
+      type: type ?? 'customer',
+      phone: result.user.phone,
+      methods,
+      whatsappStepDone: true,
+    });
+    if (next === 'what_next' && (type === 'courier' || type === 'restaurant')) {
       await onSignedUp(result);
       setDone({ type });
     } else {
@@ -252,8 +262,10 @@ export function RegisterForm({
         intro={<Text style={s.intro}>{whatsappForeignIntro(confirming.user.phone)}</Text>}
         start={() => api.auth.startPhoneWhatsapp()}
         accountPhone={confirming.user.phone}
+        confirmedContinue
         onConfirmed={() => void finishSignup(confirming)}
         backLabel={WHATSAPP_TEXT.later}
+        backVariant="secondary"
         onBack={() => void finishSignup(confirming)}
       />
     );

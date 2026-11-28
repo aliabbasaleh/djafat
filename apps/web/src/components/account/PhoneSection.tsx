@@ -77,6 +77,8 @@ export function PhoneSection(props: PhoneSectionProps) {
       firstRender.current = false;
       return;
     }
+    // The WhatsApp view focuses its own title (SPEC-023-05 R9, review #11).
+    if (channel === 'whatsapp') return;
     const section = sectionRef.current;
     // After a confirmation nothing is left to press: the section itself takes the focus.
     (

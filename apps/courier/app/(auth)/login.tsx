@@ -512,7 +512,10 @@ export default function LoginScreen() {
         <WhatsappLogin
           onSignedIn={(answer) =>
             void run(async () => {
-              finish(await teamWhatsappSignIn(answer, keeper));
+              const outcome = await teamWhatsappSignIn(answer, keeper);
+              // SPEC-023-07 R2: refused — back to the form, where the refusal shows.
+              if (outcome === 'denied') go({ kind: 'password' });
+              finish(outcome);
             })
           }
           onEmailLogin={() => go({ kind: 'password' })}

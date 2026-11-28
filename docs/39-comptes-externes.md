@@ -95,6 +95,13 @@ coûtent rien, quel que soit leur nombre. Après chaque connexion par WhatsApp, 
 | **A. Un second numéro**, pour les connexions seulement    | Le 66 86 89 73 reste dans l'application WhatsApp Business pour les commandes, comme aujourd'hui (réglage du site `NEXT_PUBLIC_DJAFAT_ORDER_NUMBER`). Les connexions vont au second numéro (`WHATSAPP_BUSINESS_NUMBER`) : rien n'est facturé. Seul cas payant : quelqu'un qui enverrait une commande « DJF1 … » à ce numéro-là reçoit une réponse automatique.                                      |
 | **B. Le numéro des commandes** 66 86 89 73, pour les deux | Un seul numéro à faire connaître. Mais un numéro relié à l'API ne sert plus, en principe, dans l'application WhatsApp Business (sauf « coexistence », si Meta la propose au Tchad). Les commandes par WhatsApp sont alors passées automatiquement (FEAT-017), et **chaque réponse** (numéro de commande, total, code pour le livreur) **est un message payant**. Les connexions restent gratuites. |
 
+À savoir pour le choix B : les messages libres que les clients écrivent à ce numéro (questions,
+réclamations) arrivent à l'API, qui ne lit que les codes et les commandes « DJF1 … » : **personne ne
+les voit**. Il faut alors un autre moyen de répondre aux clients (un numéro pour le service client,
+par exemple). Dans les deux choix, un message qui contient « DJAFAT » et un nombre de 6 chiffres
+est lu comme un code : s'il ne correspond à aucun code en attente, il compte comme un essai raté
+pour ce numéro (10 essais ratés bloquent la connexion par WhatsApp de ce numéro pendant 15 minutes).
+
 **Brancher le webhook** (page WhatsApp > Configuration de l'application Meta) :
 
 - URL de rappel : `https://api.<domaine>/v1/auth/whatsapp/webhook` ;

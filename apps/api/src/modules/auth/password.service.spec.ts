@@ -339,8 +339,8 @@ describe('SPEC-020-04 — log in with email and password, a code on a new device
     }
   });
 
-  // SPEC-020-04 v5: WhatsApp no longer replies with a code (FEAT-023); the customer's
-  // message finishes the login — `whatsapp-code.service.spec.ts`, SPEC-023-03-SC04.
+  // SPEC-020-04 v3: WhatsApp no longer replies with a code (FEAT-023); the customer's
+  // message finishes the login — tested in `whatsapp-code.service.spec.ts`.
   it('SPEC-020-04-SC10 — WhatsApp is offered for the confirmed number, masked, with no link (the code is asked for on screen)', async () => {
     const t = build(
       [account({ passwordHash: HASH, phone: '+23566123456', phoneVerifiedAt: new Date() })],

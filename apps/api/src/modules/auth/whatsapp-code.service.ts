@@ -63,6 +63,17 @@ const MAX_DRAWS = 5;
  */
 const KEEP_AFTER_EXPIRY_MS = 10 * 60 * 1000;
 
+/**
+ * SPEC-023-02 R5 (v2), review #1: the lock of a WhatsApp sender is its own
+ * (`auth_target_locks` under `whatsapp:<number>`), never the number's code
+ * lock — Meta signs the sender, so only messages really sent from that number
+ * can lock it; wrong codes typed on `POST /auth/otp/verify` by a stranger lock
+ * the SMS codes, not WhatsApp.
+ */
+export function whatsappLockKey(phone: string): string {
+  return `whatsapp:${phone}`;
+}
+
 const whatsappUnavailable = () =>
   new ServiceUnavailableException({
     code: 'WHATSAPP_UNAVAILABLE',
@@ -124,7 +135,7 @@ export class WhatsappCodeService {
     const user = await this.users.getByIdOrThrow(challenge.userId);
     if (!user.phoneVerifiedAt) throw phoneNotConfirmed();
     await this.otp.consumePhoneBudget(user.phone); // R6
-    await this.otp.assertNotLocked(user.phone);
+    await this.otp.assertNotLocked(whatsappLockKey(user.phone));
     return this.create('login_device', user.id, challenge.id, number, challenge.expiresAt);
   }
 
@@ -135,7 +146,7 @@ export class WhatsappCodeService {
     if (user.phoneVerifiedAt) throw phoneAlreadyConfirmed();
     if (meta.ip) await this.otp.consumeIpBudget(meta.ip); // R6
     await this.otp.consumePhoneBudget(user.phone);
-    await this.otp.assertNotLocked(user.phone);
+    await this.otp.assertNotLocked(whatsappLockKey(user.phone));
     return this.create('verify_phone', user.id, null, number);
   }
 
@@ -152,7 +163,7 @@ export class WhatsappCodeService {
     const waiting = await this.prisma.whatsappCode.findFirst({
       where: { codeHash, receivedAt: null, expiresAt: { gt: new Date() } },
     });
-    if (!waiting) return this.unknownCode(phone); // R5
+    if (!waiting) return this.alreadyReceived(codeHash, phone); // R5, R6
 
     const purpose = waiting.purpose as WhatsappCodePurpose;
     const { outcome, userId } = await this.verdict(purpose, waiting.userId, phone); // R6
@@ -179,7 +190,7 @@ export class WhatsappCodeService {
           metadata: { channel: 'whatsapp' },
         });
       }
-      await this.otp.clearLock(phone); // R7
+      await this.otp.clearLock(whatsappLockKey(phone)); // R7
       await this.audit.log({
         action: 'AUTH_OTP_VERIFIED',
         entityType: 'phone',
@@ -203,6 +214,8 @@ export class WhatsappCodeService {
         ? { status: 'waiting', expiresAt: row.expiresAt.toISOString() } // R2
         : { status: 'expired' };
     }
+    // R1 (v2), review #3: a message that came in is read soon after, never hours later.
+    if (Date.now() > row.expiresAt.getTime() + KEEP_AFTER_EXPIRY_MS) return { status: 'expired' };
     // R3: each outcome is given once, to one caller.
     const taken = await this.prisma.whatsappCode.updateMany({
       where: { id: row.id, consumedAt: null },
@@ -214,7 +227,11 @@ export class WhatsappCodeService {
       return { status: 'not_confirmed', phone: row.senderPhone }; // R7
     }
     if (row.outcome !== 'matched' || !row.matchedUserId) return { status: 'wrong_number' }; // R8
-    if (row.purpose === 'verify_phone') return { status: 'confirmed' }; // R6
+    if (row.purpose === 'verify_phone') {
+      // R6 (v2), review #2: confirmed for sure before saying so (idempotent).
+      await this.users.markPhoneVerified(row.matchedUserId);
+      return { status: 'confirmed' };
+    }
     if (row.purpose === 'login') {
       return { status: 'signed_in', ...(await this.signIn(row.matchedUserId, meta, false)) }; // R4
     }
@@ -319,9 +336,31 @@ export class WhatsappCodeService {
       : { outcome: 'wrong_number', userId: null };
   }
 
-  /** R5: a code nobody waits for counts as a failure on the sender's lock. */
+  /**
+   * R6 (v2), review #2: the same sender's message again — Meta's redelivery
+   * after a half-done first attempt — gives the same outcome and finishes its
+   * effect, without counting a failure. Any other code nobody waits for is R5.
+   */
+  private async alreadyReceived(codeHash: string, phone: string): Promise<WhatsappReceipt> {
+    const mine = await this.prisma.whatsappCode.findFirst({
+      where: {
+        codeHash,
+        senderPhone: phone,
+        receivedAt: { not: null },
+        expiresAt: { gt: new Date(Date.now() - KEEP_AFTER_EXPIRY_MS) },
+      },
+      orderBy: { receivedAt: 'desc' },
+    });
+    if (!mine?.outcome) return this.unknownCode(phone);
+    if (mine.outcome === 'matched' && mine.purpose === 'verify_phone' && mine.matchedUserId) {
+      await this.users.markPhoneVerified(mine.matchedUserId);
+    }
+    return mine.outcome as Outcome;
+  }
+
+  /** R5: a code nobody waits for counts as a failure on the sender's own WhatsApp lock. */
   private async unknownCode(phone: string): Promise<WhatsappReceipt> {
-    await this.otp.registerFailedAttempt(phone);
+    await this.otp.registerFailedAttempt(whatsappLockKey(phone));
     await this.audit.log({
       action: 'AUTH_OTP_FAILED',
       entityType: 'phone',
@@ -333,7 +372,7 @@ export class WhatsappCodeService {
   /** R5: a locked sender is ignored; any other error is not swallowed. */
   private async isLocked(phone: string): Promise<boolean> {
     try {
-      await this.otp.assertNotLocked(phone);
+      await this.otp.assertNotLocked(whatsappLockKey(phone));
       return false;
     } catch (err) {
       if (err instanceof HttpException && err.getStatus() === 423) return true;

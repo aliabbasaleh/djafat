@@ -1,7 +1,7 @@
 ---
 feature: FEAT-023
 # prettier-ignore
-specs: [SPEC-023-01@1, SPEC-023-02@1, SPEC-023-03@1, SPEC-023-04@1, SPEC-023-05@1, SPEC-023-06@1, SPEC-023-07@1, SPEC-023-08@1]
+specs: [SPEC-023-01@2, SPEC-023-02@2, SPEC-023-03@2, SPEC-023-04@1, SPEC-023-05@2, SPEC-023-06@2, SPEC-023-07@2, SPEC-023-08@1]
 ---
 
 # FEAT-023 — Brief d'exécution
@@ -86,6 +86,9 @@ Pas de nouvelle dépendance npm.
 | SPEC-023-02-SC05 | service                         | `whatsapp-code.service.spec.ts`, `whatsapp-inbound.service.spec.ts`      | le second message ne change rien ; le même `id` traité une fois                                                                                   |
 | SPEC-023-02-SC06 | service                         | `whatsapp-inbound.service.spec.ts`                                       | aucun code pris, aucun échec, rien envoyé                                                                                                         |
 | SPEC-023-02-SC07 | service + intégration           | `whatsapp-code.service.spec.ts`, int                                     | « autre numéro », pas d'échec ; depuis le bon numéro : confirmé dès l'arrivée                                                                     |
+| SPEC-023-02-SC08 | service                         | `whatsapp-code.service.spec.ts`                                          | numéro verrouillé par des codes SMS : « compte à ouvrir » par WhatsApp                                                                            |
+| SPEC-023-02-SC09 | service                         | `whatsapp-code.service.spec.ts`                                          | même message redélivré : « compte à ouvrir », numéro confirmé, aucun échec                                                                        |
+| SPEC-023-02-SC10 | service                         | `whatsapp-inbound.service.spec.ts`                                       | message `DJF1 …` : aux commandes une fois, aucun code pris ni compté                                                                              |
 | SPEC-023-03-SC01 | service + intégration           | `whatsapp-code.service.spec.ts`, int                                     | en attente → session (numéro confirmé) → « expiré » ; une seule session                                                                           |
 | SPEC-023-03-SC02 | service                         | `whatsapp-code.service.spec.ts`                                          | jeton inventé : « expiré », pas de session                                                                                                        |
 | SPEC-023-03-SC03 | service + intégration           | `whatsapp-code.service.spec.ts`, int                                     | issue avec `+33612345678`, sans session, puis « expiré »                                                                                          |
@@ -93,6 +96,7 @@ Pas de nouvelle dépendance npm.
 | SPEC-023-03-SC05 | service + intégration           | `whatsapp-code.service.spec.ts`, int                                     | « numéro confirmé » ; le profil dit confirmé                                                                                                      |
 | SPEC-023-03-SC06 | service                         | `whatsapp-code.service.spec.ts`                                          | 403 `ACCOUNT_INACTIVE`, pas de session, puis « expiré »                                                                                           |
 | SPEC-023-03-SC07 | service                         | `whatsapp-code.service.spec.ts`                                          | « expiré »                                                                                                                                        |
+| SPEC-023-03-SC08 | service (horloge fausse)        | `whatsapp-code.service.spec.ts`                                          | arrivé à 10 h 00, lu à 10 h 15 : « expiré », pas de session                                                                                       |
 | SPEC-023-04-SC01 | service + texte + intégration   | `whatsapp-code.service.spec.ts`, `account-notice.provider.spec.ts`, int  | « Nouvelle connexion par WhatsApp », « 25 novembre 2026 à 15:05 », « Chrome sur Android », ni code ni lien ni IP                                  |
 | SPEC-023-04-SC02 | service                         | `whatsapp-code.service.spec.ts`                                          | aucun e-mail, session rendue                                                                                                                      |
 | SPEC-023-04-SC03 | service                         | `whatsapp-code.service.spec.ts`                                          | session rendue malgré l'échec                                                                                                                     |

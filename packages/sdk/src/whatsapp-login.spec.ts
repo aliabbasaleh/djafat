@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WhatsappStatus } from './auth.js';
-import { channelButtons } from './account-form.js';
+import { channelButtons, startSignup } from './account-form.js';
 import { ApiClientError } from './http.js';
 import {
   WHATSAPP_TEXT,
   afterSignup,
-  notConfirmedActions,
   phoneFieldValue,
   showsWhatsappConfirmStep,
   waitForWhatsapp,
@@ -14,7 +13,8 @@ import {
   whatsappNumberText,
   whatsappSignedIn,
   whatsappWaitingText,
-  whatsappWrongNumberText,
+  whatsappActionLabel,
+  whatsappOutcomeView,
 } from './whatsapp-login.js';
 
 // FEAT-023 — docs/features/FEAT-023-whatsapp-gratuit (SPEC-023-05 to 07), against
@@ -124,30 +124,35 @@ describe('SPEC-023-05 — the WhatsApp view of the site and the customer app', (
   });
 
   // SPEC-023-05-SC03
-  it('SPEC-023-05-SC03 — « confirmed on no account »: two buttons on the site, the number filled in « Créer un compte »', () => {
-    expect(WHATSAPP_TEXT.notConfirmed).toBe("Ce numéro n'est confirmé sur aucun compte");
-    expect(notConfirmedActions('customer')).toEqual(['create_account', 'email_login']);
-    expect([WHATSAPP_TEXT.createAccount, WHATSAPP_TEXT.emailLogin]).toEqual([
+  it('SPEC-023-05-SC03 — « confirmed on no account »: the sentence, « Créer un compte » then « Se connecter par e-mail »; the customer form opens filled in', () => {
+    const view = whatsappOutcomeView('not_confirmed', { app: 'customer' });
+    expect([view.message, ...view.actions.map(whatsappActionLabel)]).toEqual([
+      "Ce numéro n'est confirmé sur aucun compte",
       'Créer un compte',
       'Se connecter par e-mail',
     ]);
-    expect(phoneFieldValue('+33612345678')).toBe('+33 6 12 34 56 78');
+    // « Créer un compte »: what the site and the app open (`startSignup('client', …)`).
+    const flow = startSignup('client', { phone: phoneFieldValue('+33612345678') });
+    expect(flow).toEqual({ step: 'customer', account: { phone: '+33 6 12 34 56 78' } });
     expect(phoneFieldValue('+23566123456')).toBe('66 12 34 56');
   });
 
   // SPEC-023-05-SC04
-  it('SPEC-023-05-SC04 — expired: « Ce code a expiré. » and « Nouveau code »', () => {
-    expect([WHATSAPP_TEXT.expired, WHATSAPP_TEXT.newCode]).toEqual([
+  it('SPEC-023-05-SC04 — expired: « Ce code a expiré. » and « Nouveau code » (a new code, a new wait)', () => {
+    const view = whatsappOutcomeView('expired', { app: 'customer' });
+    expect([view.message, ...view.actions.map(whatsappActionLabel)]).toEqual([
       'Ce code a expiré.',
       'Nouveau code',
     ]);
+    expect(view.actions).toEqual(['new_code']);
   });
 
   // SPEC-023-05-SC05
-  it('SPEC-023-05-SC05 — a new device: the message came from another number', () => {
-    expect(whatsappWrongNumberText()).toBe(
-      'Ce message ne vient pas du numéro de votre compte. Envoyez-le depuis ce numéro.',
-    );
+  it('SPEC-023-05-SC05 — a new device: the message came from another number, then « Nouveau code »', () => {
+    expect(whatsappOutcomeView('wrong_number', { app: 'customer' })).toEqual({
+      message: 'Ce message ne vient pas du numéro de votre compte. Envoyez-le depuis ce numéro.',
+      actions: ['new_code'],
+    });
   });
 
   // SPEC-023-05-SC06
@@ -195,10 +200,14 @@ describe('SPEC-023-06 — confirming a number by WhatsApp', () => {
   });
 
   // SPEC-023-06-SC02
-  it('SPEC-023-06-SC02 — another number: the account’s number is named', () => {
-    expect(whatsappWrongNumberText('+33612345678')).toBe(
-      'Ce message ne vient pas du numéro de votre compte (+33 6 12 34 56 78). Envoyez-le depuis ce numéro.',
-    );
+  it('SPEC-023-06-SC02 — another number: the account’s number is named, then « Nouveau code »', () => {
+    expect(
+      whatsappOutcomeView('wrong_number', { app: 'customer', accountPhone: '+33612345678' }),
+    ).toEqual({
+      message:
+        'Ce message ne vient pas du numéro de votre compte (+33 6 12 34 56 78). Envoyez-le depuis ce numéro.',
+      actions: ['new_code'],
+    });
   });
 
   // SPEC-023-06-SC03
@@ -240,8 +249,11 @@ describe('SPEC-023-06 — confirming a number by WhatsApp', () => {
 
 describe('SPEC-023-07 — the team apps', () => {
   // SPEC-023-07-SC03
-  it('SPEC-023-07-SC03 — « confirmed on no account »: « Se connecter par e-mail » only', () => {
-    expect(notConfirmedActions('team')).toEqual(['email_login']);
+  it('SPEC-023-07-SC03 — a team app: « Se connecter par e-mail » only, no « Créer un compte »', () => {
+    expect(whatsappOutcomeView('not_confirmed', { app: 'team' })).toEqual({
+      message: "Ce numéro n'est confirmé sur aucun compte",
+      actions: ['email_login'],
+    });
   });
 
   // SPEC-023-07-SC04

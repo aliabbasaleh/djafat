@@ -57,8 +57,8 @@ describe('SPEC-020-06 — confirm one’s number from « Mon profil »', () => {
     });
   });
 
-  // SPEC-020-06-SC03 (v5): by WhatsApp the customer SENDS a code (FEAT-023) — no code is
-  // typed here; the confirmation itself is SPEC-023-02-SC07 and SPEC-023-03-SC05.
+  // SPEC-020-06-SC03 (v3): by WhatsApp the customer SENDS a code (FEAT-023) — no code is
+  // typed here; the confirmation itself is tested in whatsapp-code.service.spec.ts.
   it('SPEC-020-06-SC03 — by WhatsApp: no typed code any more, `POST /me/phone/verify` takes the SMS one only', () => {
     expect(PhoneVerifySchema.safeParse({ channel: 'whatsapp', code: '123456' }).success).toBe(
       false,

@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Linking, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, AppState, Linking, StyleSheet, Text, View } from 'react-native';
 import {
   WHATSAPP_TEXT,
   accountErrorMessage,
-  notConfirmedActions,
   waitForWhatsapp,
+  whatsappActionLabel,
   whatsappDesktopHint,
+  whatsappOutcomeView,
   whatsappWaitingText,
   type SignedIn,
+  type WhatsappAction,
   type WhatsappCode,
-  type WhatsappOutcome,
+  type WhatsappOutcomeView,
 } from '@djafat/sdk';
 import { tokens } from '@djafat/tokens';
 import { api } from '../lib/api';
@@ -18,7 +20,7 @@ import { BigButton } from './BigButton';
 type Shown =
   | { readonly kind: 'loading' }
   | { readonly kind: 'code'; readonly code: WhatsappCode }
-  | { readonly kind: 'outcome'; readonly outcome: WhatsappOutcome }
+  | { readonly kind: 'outcome'; readonly view: WhatsappOutcomeView }
   | { readonly kind: 'error'; readonly message: string };
 
 interface WhatsappLoginProps {
@@ -32,10 +34,12 @@ interface WhatsappLoginProps {
  * WhatsApp in the courier app's login (FEAT-023, SPEC-023-07 R1, R6): the
  * message to send, « Ouvrir WhatsApp » (the WhatsApp app), the wait — asked
  * again as soon as the app is back in front — then the courier role check.
+ * The title takes the focus; the wait and each outcome are announced.
  */
 export function WhatsappLogin(props: WhatsappLoginProps) {
   const [shown, setShown] = useState<Shown>({ kind: 'loading' });
   const [now, setNow] = useState(() => Date.now());
+  const title = useRef<Text>(null);
   const handlers = useRef(props);
   handlers.current = props;
 
@@ -61,6 +65,21 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
     asked.current = true;
     ask();
   }, [ask]);
+  useEffect(() => {
+    if (title.current) AccessibilityInfo.sendAccessibilityEvent(title.current, 'focus');
+  }, []);
+
+  const said =
+    shown.kind === 'code'
+      ? WHATSAPP_TEXT.step2
+      : shown.kind === 'outcome'
+        ? shown.view.message
+        : shown.kind === 'error'
+          ? shown.message
+          : '';
+  useEffect(() => {
+    if (said) AccessibilityInfo.announceForAccessibility(said);
+  }, [said]);
 
   const token = shown.kind === 'code' ? shown.code.token : null;
   useEffect(() => {
@@ -68,8 +87,11 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
     const wait = waitForWhatsapp({
       ask: () => api.auth.whatsappStatus({ token }),
       onOutcome: (outcome) => {
-        if (outcome.status === 'signed_in') handlers.current.onSignedIn(outcome);
-        else setShown({ kind: 'outcome', outcome });
+        if (outcome.status === 'signed_in') {
+          handlers.current.onSignedIn(outcome);
+        } else if (outcome.status !== 'confirmed') {
+          setShown({ kind: 'outcome', view: whatsappOutcomeView(outcome.status, { app: 'team' }) });
+        }
       },
       onError: (err) =>
         setShown({ kind: 'error', message: accountErrorMessage(err, 'Connexion impossible.') }),
@@ -85,41 +107,35 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
     };
   }, [token]);
 
+  function act(action: WhatsappAction) {
+    if (action === 'new_code') ask();
+    else handlers.current.onEmailLogin();
+  }
+
   const back = <BigButton label={WHATSAPP_TEXT.otherWay} variant="ghost" onPress={props.onBack} />;
 
   return (
     <View style={styles.form}>
-      <Text style={styles.title} accessibilityRole="header">
+      <Text ref={title} style={styles.title} accessibilityRole="header">
         {WHATSAPP_TEXT.loginTitle}
       </Text>
       {shown.kind === 'loading' ? <Text style={styles.hint}>Préparation du code…</Text> : null}
       {shown.kind === 'error' ? (
-        <>
-          <Text style={styles.error}>{shown.message}</Text>
-          {back}
-        </>
+        <Text style={styles.error} accessibilityRole="alert">
+          {shown.message}
+        </Text>
       ) : null}
       {shown.kind === 'outcome' ? (
-        <View style={styles.form} accessibilityLiveRegion="polite">
-          {shown.outcome.status === 'not_confirmed' ? (
-            <>
-              <Text style={styles.warning}>{WHATSAPP_TEXT.notConfirmed}</Text>
-              {notConfirmedActions('team').map((action) => (
-                <BigButton
-                  key={action}
-                  label={WHATSAPP_TEXT.emailLogin}
-                  onPress={() => handlers.current.onEmailLogin()}
-                />
-              ))}
-            </>
-          ) : (
-            <>
-              <Text style={styles.warning}>{WHATSAPP_TEXT.expired}</Text>
-              <BigButton label={WHATSAPP_TEXT.newCode} onPress={ask} />
-            </>
-          )}
-          {back}
-        </View>
+        <>
+          <Text style={styles.warning}>{shown.view.message}</Text>
+          {shown.view.actions.map((action) => (
+            <BigButton
+              key={action}
+              label={whatsappActionLabel(action)}
+              onPress={() => act(action)}
+            />
+          ))}
+        </>
       ) : null}
       {shown.kind === 'code' ? (
         <>
@@ -134,18 +150,16 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
             « {shown.code.text} »
           </Text>
           <Text style={styles.label}>{WHATSAPP_TEXT.step2}</Text>
-          <Text style={styles.warning}>⚠️ {WHATSAPP_TEXT.warning}</Text>
+          <Text style={styles.warning}>{WHATSAPP_TEXT.warning}</Text>
           <BigButton
-            label={`🟢 ${WHATSAPP_TEXT.open}`}
+            label={WHATSAPP_TEXT.open}
             onPress={() => void Linking.openURL(shown.code.link)}
           />
           <Text style={styles.hint}>{whatsappDesktopHint(shown.code.number)}</Text>
-          <Text style={styles.hint} accessibilityLiveRegion="polite">
-            {whatsappWaitingText(shown.code.expiresAt, now)}
-          </Text>
-          {back}
+          <Text style={styles.hint}>{whatsappWaitingText(shown.code.expiresAt, now)}</Text>
         </>
       ) : null}
+      {back}
     </View>
   );
 }

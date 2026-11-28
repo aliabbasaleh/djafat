@@ -1,6 +1,6 @@
 ---
 feature: FEAT-008
-specs: [SPEC-008-01@4, SPEC-008-02@3, SPEC-008-03@2, SPEC-008-04@2]
+specs: [SPEC-008-01@4, SPEC-008-02@3, SPEC-008-03@3, SPEC-008-04@2]
 ---
 
 # FEAT-008 — Brief d'exécution

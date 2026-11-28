@@ -286,9 +286,33 @@ describe('SPEC-023-02 — the customer’s message arrives', () => {
       ).resolves.toBe('no_code');
     }
     expect(t.otp.registerFailedAttempt).toHaveBeenCalledTimes(10);
+    expect(t.otp.registerFailedAttempt).toHaveBeenCalledWith('whatsapp:+23566123456');
     const { code } = await t.service.startLogin({}, SCREEN);
     await expect(t.service.receive({ from: '+23566123456', code })).resolves.toBe('locked');
     expect(t.codes.rows[0]!.receivedAt).toBeNull();
+  });
+
+  // SPEC-023-02-SC08 (v2), review #1: the WhatsApp lock is the sender's own.
+  it('SPEC-023-02-SC08 — a number locked by wrong SMS codes typed by a stranger still logs in by WhatsApp', async () => {
+    const t = build({ accounts: [confirmed({ phone: '+23566123456' })] });
+    for (let i = 0; i < 10; i += 1) await t.otp.registerFailedAttempt('+23566123456'); // POST /auth/otp/verify
+    await expect(t.otp.assertNotLocked('+23566123456')).rejects.toMatchObject({ status: 423 });
+    const { code } = await t.service.startLogin({}, SCREEN);
+    await expect(t.service.receive({ from: '+23566123456', code })).resolves.toBe('matched');
+  });
+
+  // SPEC-023-02-SC09 (v2), review #2: Meta's redelivery after a half-done first attempt.
+  it('SPEC-023-02-SC09 — the same sender’s message again finishes the confirmation, without a failure', async () => {
+    const t = build({ accounts: [account({ phone: '+33612345678' })] });
+    const { code } = await t.service.startPhoneConfirmation('u-awa', SCREEN);
+    t.users.markPhoneVerified.mockRejectedValueOnce(new Error('database down'));
+    await expect(t.service.receive({ from: '+33612345678', code })).rejects.toThrow(
+      'database down',
+    );
+    expect(t.users.accounts[0]!.phoneVerifiedAt).toBeNull();
+    await expect(t.service.receive({ from: '+33612345678', code })).resolves.toBe('matched');
+    expect(t.users.accounts[0]!.phoneVerifiedAt).toBeInstanceOf(Date);
+    expect(t.otp.registerFailedAttempt).not.toHaveBeenCalled();
   });
 
   // SPEC-023-02-SC05
@@ -298,7 +322,7 @@ describe('SPEC-023-02 — the customer’s message arrives', () => {
     await t.service.receive({ from: '+23566123456', code });
     await expect(t.service.receive({ from: '+23599887766', code })).resolves.toBe('no_code');
     expect(t.codes.rows[0]).toMatchObject({ senderPhone: '+23566123456', outcome: 'matched' });
-    expect(t.otp.registerFailedAttempt).toHaveBeenCalledWith('+23599887766');
+    expect(t.otp.registerFailedAttempt).toHaveBeenCalledWith('whatsapp:+23599887766'); // R5 v2
   });
 
   // SPEC-023-02-SC07
@@ -439,6 +463,20 @@ describe('SPEC-023-03 — the screen waits, then logs in', () => {
     await expect(t.service.status({ token, rememberDevice: false }, SCREEN)).resolves.toEqual({
       status: 'expired',
     });
+  });
+
+  // SPEC-023-03-SC08 (v2), review #3
+  it('SPEC-023-03-SC08 — a message that came in is not read hours later: expired, no session', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-25T10:00:00Z'));
+    const t = build({ accounts: [confirmed({ phone: '+23566123456' })] });
+    const { token, code } = await t.service.startLogin({}, SCREEN);
+    await t.service.receive({ from: '+23566123456', code });
+    vi.setSystemTime(new Date('2026-11-25T10:15:01Z')); // validity 5 min + 10 min kept
+    await expect(t.service.status({ token, rememberDevice: false }, SCREEN)).resolves.toEqual({
+      status: 'expired',
+    });
+    expect(t.sessions.rows).toHaveLength(0);
   });
 
   // SPEC-023-03-SC07

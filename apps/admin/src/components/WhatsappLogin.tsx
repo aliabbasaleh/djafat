@@ -4,13 +4,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   WHATSAPP_TEXT,
   accountErrorMessage,
-  notConfirmedActions,
   waitForWhatsapp,
+  whatsappActionLabel,
   whatsappDesktopHint,
+  whatsappOutcomeView,
   whatsappWaitingText,
   type SignedIn,
+  type WhatsappAction,
   type WhatsappCode,
-  type WhatsappOutcome,
+  type WhatsappOutcomeView,
 } from '@djafat/sdk';
 import { Stack, Text, VisuallyHidden, cx } from '@djafat/ui';
 import { Alert, Button } from '@/components/ui-client';
@@ -20,7 +22,7 @@ import styles from './WhatsappLogin.module.css';
 type Shown =
   | { readonly kind: 'loading' }
   | { readonly kind: 'code'; readonly code: WhatsappCode }
-  | { readonly kind: 'outcome'; readonly outcome: WhatsappOutcome }
+  | { readonly kind: 'outcome'; readonly view: WhatsappOutcomeView }
   | { readonly kind: 'error'; readonly message: string };
 
 interface WhatsappLoginProps {
@@ -33,8 +35,9 @@ interface WhatsappLoginProps {
 /**
  * WhatsApp in a team console's login (FEAT-023, SPEC-023-07): the same view
  * as the site (FEAT-023-VIS02) — the message to send, « Ouvrir WhatsApp », the
- * wait every 2 s — then the console's role check. « Ce numéro n'est confirmé
- * sur aucun compte » offers « Se connecter par e-mail » only (R3).
+ * wait every 2 s — then the console's role check. One live region says the
+ * wait and the outcome; « Ce numéro n'est confirmé sur aucun compte » offers
+ * « Se connecter par e-mail » only (R3).
  */
 export function WhatsappLogin(props: WhatsappLoginProps) {
   const [shown, setShown] = useState<Shown>({ kind: 'loading' });
@@ -73,8 +76,11 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
     const wait = waitForWhatsapp({
       ask: () => api.auth.whatsappStatus({ token }),
       onOutcome: (outcome) => {
-        if (outcome.status === 'signed_in') handlers.current.onSignedIn(outcome);
-        else setShown({ kind: 'outcome', outcome });
+        if (outcome.status === 'signed_in') {
+          handlers.current.onSignedIn(outcome);
+        } else if (outcome.status !== 'confirmed') {
+          setShown({ kind: 'outcome', view: whatsappOutcomeView(outcome.status, { app: 'team' }) });
+        }
       },
       onError: (err) =>
         setShown({ kind: 'error', message: accountErrorMessage(err, 'Connexion impossible.') }),
@@ -91,54 +97,26 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
     };
   }, [token]);
 
-  const back = (
-    <Button type="button" variant="ghost" fullWidth onClick={props.onBack}>
-      {WHATSAPP_TEXT.otherWay}
-    </Button>
-  );
+  function act(action: WhatsappAction) {
+    if (action === 'new_code') ask();
+    else handlers.current.onEmailLogin();
+  }
+
+  // The one live region: the wait, then the outcome, in the same place.
+  const status =
+    shown.kind === 'loading'
+      ? 'Préparation du code…'
+      : shown.kind === 'code'
+        ? whatsappWaitingText(shown.code.expiresAt, now)
+        : shown.kind === 'outcome'
+          ? shown.view.message
+          : '';
 
   return (
     <Stack gap="md">
       <h2 ref={title} tabIndex={-1} className={cx(styles['title'])}>
         {WHATSAPP_TEXT.loginTitle}
       </h2>
-      {shown.kind === 'loading' && <Text tone="secondary">Préparation du code…</Text>}
-      {shown.kind === 'error' && (
-        <>
-          <Alert tone="danger">{shown.message}</Alert>
-          {back}
-        </>
-      )}
-      {shown.kind === 'outcome' && (
-        <div role="status">
-          <Stack gap="md">
-            {shown.outcome.status === 'not_confirmed' && (
-              <>
-                <Alert tone="warning">{WHATSAPP_TEXT.notConfirmed}</Alert>
-                {notConfirmedActions('team').map((action) => (
-                  <Button
-                    key={action}
-                    type="button"
-                    fullWidth
-                    onClick={() => handlers.current.onEmailLogin()}
-                  >
-                    {WHATSAPP_TEXT.emailLogin}
-                  </Button>
-                ))}
-              </>
-            )}
-            {(shown.outcome.status === 'expired' || shown.outcome.status === 'wrong_number') && (
-              <>
-                <Alert tone="warning">{WHATSAPP_TEXT.expired}</Alert>
-                <Button type="button" fullWidth onClick={ask}>
-                  {WHATSAPP_TEXT.newCode}
-                </Button>
-              </>
-            )}
-            {back}
-          </Stack>
-        </div>
-      )}
       {shown.kind === 'code' && (
         <>
           <ol className={cx(styles['steps'])}>
@@ -153,22 +131,35 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
             </li>
             <li>{WHATSAPP_TEXT.step2.replace(/^2\. /, '')}</li>
           </ol>
-          <Alert tone="warning">{WHATSAPP_TEXT.warning}</Alert>
+          <div className={cx(styles['box'])}>
+            <span aria-hidden="true">⚠️ </span>
+            {WHATSAPP_TEXT.warning}
+          </div>
           <a
             href={shown.code.link}
             target="_blank"
             rel="noopener noreferrer"
             className={cx(styles['open'])}
           >
-            🟢 {WHATSAPP_TEXT.open}
+            <span aria-hidden="true">🟢&nbsp;</span>
+            {WHATSAPP_TEXT.open}
           </a>
           <Text tone="secondary">{whatsappDesktopHint(shown.code.number)}</Text>
-          <p role="status" className={cx(styles['waiting'])}>
-            {whatsappWaitingText(shown.code.expiresAt, now)}
-          </p>
-          {back}
         </>
       )}
+      <p role="status" className={cx(styles['status'], shown.kind === 'outcome' && styles['box'])}>
+        {status}
+      </p>
+      {shown.kind === 'outcome' &&
+        shown.view.actions.map((action) => (
+          <Button key={action} type="button" fullWidth onClick={() => act(action)}>
+            {whatsappActionLabel(action)}
+          </Button>
+        ))}
+      {shown.kind === 'error' && <Alert tone="danger">{shown.message}</Alert>}
+      <Button type="button" variant="ghost" fullWidth onClick={props.onBack}>
+        {WHATSAPP_TEXT.otherWay}
+      </Button>
     </Stack>
   );
 }

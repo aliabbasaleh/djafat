@@ -28,7 +28,8 @@ export const WHATSAPP_TEXT = {
   emailLogin: 'Se connecter par e-mail',
   expired: 'Ce code a expiré.',
   accountCreated: '✅ Votre compte est créé.',
-  confirmed: 'Numéro confirmé : vous pouvez vous connecter par WhatsApp.',
+  confirmed: '✅ Numéro confirmé : vous pouvez vous connecter par WhatsApp.',
+  continue: 'Continuer',
 } as const;
 
 /**
@@ -116,16 +117,48 @@ export function phoneFieldValue(e164: string): string {
   return chad ? chad.slice(1).join(' ') : whatsappNumberText(e164);
 }
 
-/** What the buttons under « Ce numéro n'est confirmé sur aucun compte » do. */
-export type NotConfirmedAction = 'create_account' | 'email_login';
+/** What an outcome's buttons do, in their order. */
+export type WhatsappAction = 'create_account' | 'email_login' | 'new_code';
+
+/** What a screen shows for an outcome that opens nothing: the sentence, then the buttons. */
+export interface WhatsappOutcomeView {
+  readonly message: string;
+  readonly actions: readonly WhatsappAction[];
+}
 
 /**
- * SPEC-023-05 R4, SPEC-023-07 R3: the site and the customer app offer
- * « Créer un compte » then « Se connecter par e-mail »; a team app only the
- * second — a team account is not created from its login (FEAT-023-Q16).
+ * The outcomes that open nothing, as every WhatsApp view shows them
+ * (SPEC-023-05 R4-R6, SPEC-023-06 R2, SPEC-023-07 R3, R4):
+ * - « Ce numéro n'est confirmé sur aucun compte » — the site and the customer
+ *   app offer « Créer un compte » then « Se connecter par e-mail »; a team app
+ *   only the second (a team account is not created there, FEAT-023-Q16);
+ * - another number than the account's — said, with the account's number when
+ *   known, then « Nouveau code »;
+ * - expired — « Ce code a expiré. » then « Nouveau code ».
  */
-export function notConfirmedActions(app: 'customer' | 'team'): readonly NotConfirmedAction[] {
-  return app === 'customer' ? ['create_account', 'email_login'] : ['email_login'];
+export function whatsappOutcomeView(
+  status: 'not_confirmed' | 'wrong_number' | 'expired',
+  options: { readonly app: 'customer' | 'team'; readonly accountPhone?: string | null },
+): WhatsappOutcomeView {
+  if (status === 'not_confirmed') {
+    return {
+      message: WHATSAPP_TEXT.notConfirmed,
+      actions: options.app === 'customer' ? ['create_account', 'email_login'] : ['email_login'],
+    };
+  }
+  if (status === 'wrong_number') {
+    return { message: whatsappWrongNumberText(options.accountPhone), actions: ['new_code'] };
+  }
+  return { message: WHATSAPP_TEXT.expired, actions: ['new_code'] };
+}
+
+/** The label of an outcome's button. */
+export function whatsappActionLabel(action: WhatsappAction): string {
+  return {
+    create_account: WHATSAPP_TEXT.createAccount,
+    email_login: WHATSAPP_TEXT.emailLogin,
+    new_code: WHATSAPP_TEXT.newCode,
+  }[action];
 }
 
 /** The session of a `signed_in` answer, as every login gives it (without `status`). */

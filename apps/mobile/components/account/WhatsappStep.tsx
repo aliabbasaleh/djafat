@@ -1,16 +1,26 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { AppState, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
+  AccessibilityInfo,
+  AppState,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import {
+  ApiClientError,
   WHATSAPP_TEXT,
-  notConfirmedActions,
   waitForWhatsapp,
+  whatsappActionLabel,
   whatsappDesktopHint,
+  whatsappOutcomeView,
   whatsappSignedIn,
   whatsappWaitingText,
-  whatsappWrongNumberText,
   type SignedIn,
+  type WhatsappAction,
   type WhatsappCode,
-  type WhatsappOutcome,
+  type WhatsappOutcomeView,
 } from '@djafat/sdk';
 import { tokens } from '@djafat/tokens';
 import { Button } from '../Button';
@@ -31,31 +41,45 @@ interface WhatsappStepProps {
   readonly remember?: { readonly checked: boolean; readonly onChange: (v: boolean) => void };
   readonly accountPhone?: string | null;
   readonly onSignedIn?: (signedIn: SignedIn) => void | Promise<void>;
+  /** The number is confirmed — also when the server says it already was (409). */
   readonly onConfirmed?: () => void;
+  /** FEAT-023-VIS03 « Ensuite »: say « Numéro confirmé » and wait for « Continuer ». */
+  readonly confirmedContinue?: boolean;
   readonly onCreateAccount?: (phone: string) => void;
   readonly onEmailLogin?: () => void;
   readonly backLabel?: string;
+  /** « Plus tard » of the sign-up step is a secondary button (SPEC-023-06 « UI »). */
+  readonly backVariant?: 'ghost' | 'secondary';
   readonly onBack: () => void;
 }
 
 type Shown =
   | { readonly kind: 'loading' }
   | { readonly kind: 'code'; readonly code: WhatsappCode }
-  | { readonly kind: 'outcome'; readonly outcome: WhatsappOutcome }
+  | { readonly kind: 'outcome'; readonly view: WhatsappOutcomeView; readonly phone?: string }
+  | { readonly kind: 'confirmed' }
   | { readonly kind: 'error'; readonly message: string };
 
 /**
  * The free WhatsApp view in the customer app (FEAT-023-VIS02, VIS03;
- * SPEC-023-05 R8): « Ouvrir WhatsApp » opens WhatsApp with the message, and the
- * wait asks again as soon as the app is back in front. DJAFAT sends nothing.
+ * SPEC-023-05 R8, R9): « Ouvrir WhatsApp » opens WhatsApp with the message, and
+ * the wait asks again as soon as the app is back in front. The title takes
+ * the focus; the wait and each outcome are announced on Android and iPhone.
+ * DJAFAT sends nothing.
  */
 export function WhatsappStep(props: WhatsappStepProps) {
   const [shown, setShown] = useState<Shown>({ kind: 'loading' });
   const [now, setNow] = useState(() => Date.now());
+  const title = useRef<Text>(null);
   const rememberRef = useRef(props.remember?.checked ?? false);
   rememberRef.current = props.remember?.checked ?? false;
   const handlers = useRef(props);
   handlers.current = props;
+
+  const confirmed = useCallback(() => {
+    if (handlers.current.confirmedContinue) setShown({ kind: 'confirmed' });
+    else handlers.current.onConfirmed?.();
+  }, []);
 
   const ask = useCallback(() => {
     setShown({ kind: 'loading' });
@@ -65,13 +89,18 @@ export function WhatsappStep(props: WhatsappStepProps) {
         setNow(Date.now()); // the validity counts from the code's arrival
         setShown({ kind: 'code', code });
       })
-      .catch((err: unknown) =>
+      .catch((err: unknown) => {
+        // SPEC-023-06 « Erreurs »: already confirmed elsewhere.
+        if (err instanceof ApiClientError && err.code === 'PHONE_ALREADY_CONFIRMED') {
+          confirmed();
+          return;
+        }
         setShown({
           kind: 'error',
           message: accountErrorMessage(err, "WhatsApp n'est pas disponible pour le moment."),
-        }),
-      );
-  }, []);
+        });
+      });
+  }, [confirmed]);
 
   const asked = useRef(false);
   useEffect(() => {
@@ -79,6 +108,25 @@ export function WhatsappStep(props: WhatsappStepProps) {
     asked.current = true;
     ask();
   }, [ask]);
+  // R9: the title takes the focus when the view opens.
+  useEffect(() => {
+    if (title.current) AccessibilityInfo.sendAccessibilityEvent(title.current, 'focus');
+  }, []);
+
+  // R9: the wait and each outcome said aloud, on iPhone too.
+  const said =
+    shown.kind === 'code'
+      ? WHATSAPP_TEXT.step2
+      : shown.kind === 'outcome'
+        ? shown.view.message
+        : shown.kind === 'confirmed'
+          ? WHATSAPP_TEXT.confirmed
+          : shown.kind === 'error'
+            ? shown.message
+            : '';
+  useEffect(() => {
+    if (said) AccessibilityInfo.announceForAccessibility(said);
+  }, [said]);
 
   const token = shown.kind === 'code' ? shown.code.token : null;
   useEffect(() => {
@@ -88,13 +136,19 @@ export function WhatsappStep(props: WhatsappStepProps) {
       onOutcome: (outcome) => {
         if (outcome.status === 'signed_in') {
           void handlers.current.onSignedIn?.(whatsappSignedIn(outcome));
-          return;
+        } else if (outcome.status === 'confirmed') {
+          confirmed();
+        } else {
+          const view = whatsappOutcomeView(outcome.status, {
+            app: 'customer',
+            accountPhone: handlers.current.accountPhone ?? null,
+          });
+          setShown(
+            outcome.status === 'not_confirmed'
+              ? { kind: 'outcome', view, phone: outcome.phone }
+              : { kind: 'outcome', view },
+          );
         }
-        if (outcome.status === 'confirmed') {
-          handlers.current.onConfirmed?.();
-          return;
-        }
-        setShown({ kind: 'outcome', outcome });
       },
       onError: (err) =>
         setShown({ kind: 'error', message: accountErrorMessage(err, 'Connexion impossible.') }),
@@ -109,22 +163,19 @@ export function WhatsappStep(props: WhatsappStepProps) {
       subscription.remove();
       clearInterval(clock);
     };
-  }, [token]);
+  }, [token, confirmed]);
 
-  const back = (
-    <Button
-      label={props.backLabel ?? WHATSAPP_TEXT.otherWay}
-      variant="ghost"
-      fullWidth
-      onPress={props.onBack}
-    />
-  );
-  const newCode = <Button label={WHATSAPP_TEXT.newCode} fullWidth onPress={ask} />;
+  function act(action: WhatsappAction) {
+    if (action === 'new_code') ask();
+    else if (action === 'email_login') handlers.current.onEmailLogin?.();
+    else if (shown.kind === 'outcome' && shown.phone)
+      handlers.current.onCreateAccount?.(shown.phone);
+  }
 
   return (
     <View style={s.form}>
       {props.before}
-      <Text style={s.heading} accessibilityRole="header">
+      <Text ref={title} style={s.heading} accessibilityRole="header">
         {props.purpose === 'login' ? WHATSAPP_TEXT.loginTitle : WHATSAPP_TEXT.confirmTitle}
       </Text>
       {props.intro}
@@ -132,65 +183,37 @@ export function WhatsappStep(props: WhatsappStepProps) {
       {shown.kind === 'loading' ? <Text style={s.intro}>Préparation du code…</Text> : null}
 
       {shown.kind === 'error' ? (
-        <>
-          <View style={s.errorBox}>
-            <Text style={s.errorText}>{shown.message}</Text>
-          </View>
-          {back}
-        </>
+        <View style={s.errorBox} accessibilityRole="alert">
+          <Text style={s.errorText}>{shown.message}</Text>
+        </View>
       ) : null}
 
       {shown.kind === 'outcome' ? (
-        <View style={s.form} accessibilityLiveRegion="polite">
-          {shown.outcome.status === 'not_confirmed' ? (
-            <>
-              <View style={styles.warningBox}>
-                <Text style={styles.warningText}>{WHATSAPP_TEXT.notConfirmed}</Text>
-              </View>
-              {notConfirmedActions('customer').map((action) =>
-                action === 'create_account' ? (
-                  <Button
-                    key={action}
-                    label={WHATSAPP_TEXT.createAccount}
-                    fullWidth
-                    onPress={() => {
-                      if (shown.outcome.status === 'not_confirmed') {
-                        handlers.current.onCreateAccount?.(shown.outcome.phone);
-                      }
-                    }}
-                  />
-                ) : (
-                  <Button
-                    key={action}
-                    label={WHATSAPP_TEXT.emailLogin}
-                    variant="secondary"
-                    fullWidth
-                    onPress={() => handlers.current.onEmailLogin?.()}
-                  />
-                ),
-              )}
-            </>
-          ) : null}
-          {shown.outcome.status === 'expired' ? (
-            <>
-              <View style={styles.warningBox}>
-                <Text style={styles.warningText}>{WHATSAPP_TEXT.expired}</Text>
-              </View>
-              {newCode}
-            </>
-          ) : null}
-          {shown.outcome.status === 'wrong_number' ? (
-            <>
-              <View style={styles.warningBox}>
-                <Text style={styles.warningText}>
-                  {whatsappWrongNumberText(props.accountPhone)}
-                </Text>
-              </View>
-              {newCode}
-            </>
-          ) : null}
-          {back}
-        </View>
+        <>
+          <View style={styles.warningBox}>
+            <Text style={styles.warningText}>{shown.view.message}</Text>
+          </View>
+          {shown.view.actions.map((action, i) => (
+            <Button
+              key={action}
+              label={whatsappActionLabel(action)}
+              variant={i === 0 ? 'primary' : 'secondary'}
+              fullWidth
+              onPress={() => act(action)}
+            />
+          ))}
+        </>
+      ) : null}
+
+      {shown.kind === 'confirmed' ? (
+        <>
+          <Text style={s.success}>{WHATSAPP_TEXT.confirmed}</Text>
+          <Button
+            label={WHATSAPP_TEXT.continue}
+            fullWidth
+            onPress={() => handlers.current.onConfirmed?.()}
+          />
+        </>
       ) : null}
 
       {shown.kind === 'code' ? (
@@ -210,11 +233,11 @@ export function WhatsappStep(props: WhatsappStepProps) {
           </Text>
           {props.purpose === 'login' ? (
             <View style={styles.warningBox}>
-              <Text style={styles.warningText}>⚠️ {WHATSAPP_TEXT.warning}</Text>
+              <Text style={styles.warningText}>{WHATSAPP_TEXT.warning}</Text>
             </View>
           ) : null}
           <Button
-            label={`🟢 ${WHATSAPP_TEXT.open}`}
+            label={WHATSAPP_TEXT.open}
             fullWidth
             onPress={() => void Linking.openURL(shown.code.link)}
           />
@@ -232,11 +255,17 @@ export function WhatsappStep(props: WhatsappStepProps) {
               <Text style={s.label}>Se souvenir de cet appareil</Text>
             </Pressable>
           ) : null}
-          <Text style={s.intro} accessibilityLiveRegion="polite">
-            {whatsappWaitingText(shown.code.expiresAt, now)}
-          </Text>
-          {back}
+          <Text style={s.intro}>{whatsappWaitingText(shown.code.expiresAt, now)}</Text>
         </>
+      ) : null}
+
+      {shown.kind !== 'confirmed' ? (
+        <Button
+          label={props.backLabel ?? WHATSAPP_TEXT.otherWay}
+          variant={props.backVariant ?? 'ghost'}
+          fullWidth
+          onPress={props.onBack}
+        />
       ) : null}
     </View>
   );

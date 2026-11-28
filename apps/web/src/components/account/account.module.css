@@ -216,6 +216,8 @@
 }
 .whatsappMessage {
   display: block;
+  /* French quotation marks with their inner no-break spaces (« … »). */
+  quotes: '«\00a0' '\00a0»';
   margin-top: calc(var(--djafat-space-2) * 1px);
   padding: calc(var(--djafat-space-3) * 1px);
   border-left: 4px solid var(--djafat-color-brand-primary);
@@ -224,9 +226,26 @@
   font-weight: 700;
   overflow-wrap: anywhere;
 }
-.whatsappWaiting {
+.whatsappHint {
   margin: 0;
   color: var(--djafat-color-text-secondary);
+}
+/* The one live region: the wait, then the outcome (SPEC-023-05 R9). */
+.whatsappStatus {
+  margin: 0;
+  color: var(--djafat-color-text-secondary);
+}
+.whatsappStatus:empty {
+  display: none;
+}
+.whatsappOutcome,
+.whatsappWarning {
+  margin: 0;
+  padding: calc(var(--djafat-space-3) * 1px);
+  border: 1px solid var(--djafat-color-state-warning);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  background: var(--djafat-color-state-warning-bg);
+  color: var(--djafat-color-text-primary);
 }
 .stepDone {
   margin: 0;

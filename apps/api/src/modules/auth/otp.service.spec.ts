@@ -191,5 +191,5 @@ describe('SPEC-024-01 — SMS: Chad mobiles only', () => {
 
   // SPEC-024-01 R7 (WhatsApp has no country rule) moved with WhatsApp itself: since
   // FEAT-023 no code leaves by WhatsApp; `whatsapp-code.service.spec.ts` logs a
-  // confirmed foreign number in by its message (SPEC-023-02-SC02).
+  // confirmed foreign number in by its message.
 });

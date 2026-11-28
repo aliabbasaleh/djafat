@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppConfigService } from '../../common/config/config.service';
 import type { RedisService } from '../../common/redis/redis.service';
@@ -87,12 +88,14 @@ function build(
       return opts.receipt ?? 'matched';
     }),
   };
+  const events = { emitAsync: vi.fn(async () => []) };
   const service = new WhatsappInboundService(
     codes as unknown as WhatsappCodeService,
     config,
     redis,
+    events as unknown as EventEmitter2,
   );
-  return { service, codes, redis };
+  return { service, codes, redis, events };
 }
 
 afterEach(() => {
@@ -188,6 +191,21 @@ describe('SPEC-023-02 — a message carrying a code', () => {
     expect(failing.redis.client.del).toHaveBeenCalledWith('wa:msg:wamid.RETRY');
     await expect(failing.service.handle(raw, sign(raw), NOW)).rejects.toThrow('database down');
     expect(failing.codes.receive).toHaveBeenCalledTimes(2);
+  });
+
+  // SPEC-023-02-SC10 (FEAT-017), review #8: an order is never read as a code.
+  it('SPEC-023-02-SC10 — an order message « DJF1 … » with « DJAFAT » and a 6-digit amount goes to the orders only', async () => {
+    const { service, codes, events } = build();
+    const order = 'DJF1 r=1a2b3c4d i=5e6f7a8b*2 a=9c0d1e2f p=cash k=K-7 DJAFAT total 125000';
+    const raw = body([msg({ id: 'wamid.ORDER', text: { body: order } })]);
+    await expect(service.handle(raw, sign(raw), NOW)).resolves.toEqual({ codesReceived: 0 });
+    expect(events.emitAsync).toHaveBeenCalledTimes(1);
+    expect(events.emitAsync).toHaveBeenCalledWith('order_message.received', {
+      phone: '+23566123456',
+      text: order,
+      channel: 'whatsapp',
+    });
+    expect(codes.receive).not.toHaveBeenCalled();
   });
 
   it('a code nobody waits for or a locked sender: handled without error, counted as not received', async () => {

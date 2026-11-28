@@ -30,7 +30,8 @@ type Where = Partial<{
   id: string;
   codeHash: string;
   tokenHash: string;
-  receivedAt: null;
+  senderPhone: string;
+  receivedAt: null | { not: null };
   consumedAt: null;
   expiresAt: { gt?: Date; lt?: Date };
 }>;
@@ -52,7 +53,9 @@ export function fakeWhatsappCodes() {
     (w.id === undefined || r.id === w.id) &&
     (w.codeHash === undefined || r.codeHash === w.codeHash) &&
     (w.tokenHash === undefined || r.tokenHash === w.tokenHash) &&
-    (!('receivedAt' in w) || r.receivedAt === null) &&
+    (w.senderPhone === undefined || r.senderPhone === w.senderPhone) &&
+    (!('receivedAt' in w) ||
+      (w.receivedAt === null ? r.receivedAt === null : r.receivedAt !== null)) &&
     (!('consumedAt' in w) || r.consumedAt === null) &&
     (!w.expiresAt?.gt || r.expiresAt > w.expiresAt.gt) &&
     (!w.expiresAt?.lt || r.expiresAt < w.expiresAt.lt);
@@ -86,7 +89,13 @@ export function fakeWhatsappCodes() {
       ),
     ),
     findFirst: vi.fn(
-      later(({ where }: { where: Where }) => rows.find((r) => matches(r, where)) ?? null),
+      later(({ where, orderBy }: { where: Where; orderBy?: { receivedAt: 'desc' } }) => {
+        const hits = rows.filter((r) => matches(r, where));
+        if (orderBy) {
+          hits.sort((a, b) => (b.receivedAt?.getTime() ?? 0) - (a.receivedAt?.getTime() ?? 0));
+        }
+        return hits[0] ?? null;
+      }),
     ),
     findUnique: vi.fn(
       later(

@@ -30,8 +30,8 @@ const emailAccount = (over: Partial<Account> = {}) =>
   account({ phone: PHONE, phoneVerifiedAt: null, passwordHash: 'scrypt$…', ...over });
 
 describe('SPEC-020-06 — phone codes on an account created by email', () => {
-  // SPEC-020-06-SC05 (v5): by WhatsApp, a message from that number answers « confirmed on
-  // no account » and opens nothing (FEAT-023, SPEC-023-02-SC03 in whatsapp-code.service.spec.ts).
+  // SPEC-020-06-SC05 (v3): by WhatsApp, a message from that number answers « confirmed on
+  // no account » and opens nothing (FEAT-023, tested in whatsapp-code.service.spec.ts).
   it('SPEC-020-06-SC05 — an SMS code on the unconfirmed number: 409 PHONE_NOT_CONFIRMED, no session', async () => {
     const { auth, otp, users, sessions } = build(emailAccount());
 

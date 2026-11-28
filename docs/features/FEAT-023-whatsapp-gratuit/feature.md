@@ -1,7 +1,7 @@
 ---
 id: FEAT-023
 title: Connexion WhatsApp gratuite — le client envoie le code, DJAFAT n'envoie rien
-status: draft
+status: ready
 type: change
 ui: yes
 ---
@@ -10,8 +10,8 @@ ui: yes
 Feature transcrite par l'agent à partir des messages de l'utilisateur du
 2026-11-22 (en anglais), confirmée par l'utilisateur le 2026-11-22
 (« Yes, build in this order ») ; complétée le 2026-11-25 avec les réponses de
-l'utilisateur aux questions ouvertes ; reste draft jusqu'à ses specs
-(check-specs exige qu'une feature ready ait tous ses critères couverts).
+l'utilisateur aux questions ouvertes, confirmée (« Yes, build it ») ; ready
+depuis le 2026-11-28 : chaque critère est couvert par une spec (SPEC-023-01 à 08).
 
 Messages d'origine :
 « we will check how we can send the OTP on WhatsApp as well. But make sure it
