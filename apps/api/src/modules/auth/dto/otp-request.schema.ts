@@ -18,9 +18,3 @@ export const OtpVerifySchema = z
   })
   .strict();
 export type OtpVerifyInput = z.infer<typeof OtpVerifySchema>;
-
-/** WhatsApp login (FEAT-008): the code always has the `login` purpose. */
-export const WhatsappVerifySchema = z
-  .object({ phone: PhoneInput, code: z.string().regex(/^\d{6}$/, 'code must be 6 digits') })
-  .strict();
-export type WhatsappVerifyInput = z.infer<typeof WhatsappVerifySchema>;

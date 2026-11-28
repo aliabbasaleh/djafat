@@ -30,18 +30,14 @@ const emailAccount = (over: Partial<Account> = {}) =>
   account({ phone: PHONE, phoneVerifiedAt: null, passwordHash: 'scrypt$…', ...over });
 
 describe('SPEC-020-06 — phone codes on an account created by email', () => {
-  // SPEC-020-06-SC05
-  it('SPEC-020-06-SC05 — SMS then WhatsApp code on the unconfirmed number: 409 PHONE_NOT_CONFIRMED, no session', async () => {
+  // SPEC-020-06-SC05 (v3): by WhatsApp, a message from that number answers « confirmed on
+  // no account » and opens nothing (FEAT-023, tested in whatsapp-code.service.spec.ts).
+  it('SPEC-020-06-SC05 — an SMS code on the unconfirmed number: 409 PHONE_NOT_CONFIRMED, no session', async () => {
     const { auth, otp, users, sessions } = build(emailAccount());
 
     await otp.requestCode({ channel: 'sms', target: PHONE }, 'login', null);
     await expect(
       auth.verifyOtpAndLogin(PHONE, otp.lastCode().code, 'login', LOGIN),
-    ).rejects.toMatchObject({ status: 409, response: { code: 'PHONE_NOT_CONFIRMED' } });
-
-    await otp.requestCode({ channel: 'whatsapp', target: PHONE }, 'login', null);
-    await expect(
-      auth.verifyWhatsappAndLogin(PHONE, otp.lastCode().code, LOGIN),
     ).rejects.toMatchObject({ status: 409, response: { code: 'PHONE_NOT_CONFIRMED' } });
 
     expect(sessions.rows).toHaveLength(0);

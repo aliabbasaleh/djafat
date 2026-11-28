@@ -253,3 +253,25 @@ describe('SPEC-022-02 R8, SPEC-022-03 R6 — « Bienvenue sur DJAFAT »', () => 
     }
   });
 });
+
+// FEAT-023 — docs/features/FEAT-023-whatsapp-gratuit (SPEC-023-04 R3, R4).
+describe('SPEC-023-04 — « Nouvelle connexion par WhatsApp »', () => {
+  // SPEC-023-04-SC01
+  it('SPEC-023-04-SC01 — when and on which device, what to do if it was not you; no code, no link, no address', () => {
+    const { subject, text } = accountNoticeMessage({
+      kind: 'whatsapp_login',
+      to: 'awa@example.com',
+      at: new Date('2026-11-25T14:05:00Z'),
+      device: 'Chrome sur Android',
+    });
+    expect(subject).toBe('Nouvelle connexion par WhatsApp');
+    expect(text).toContain(
+      "Votre compte DJAFAT vient d'être ouvert par WhatsApp le 25 novembre 2026 à 15:05 (heure de N'Djamena), sur : Chrome sur Android.",
+    );
+    expect(text).toContain("Si c'est vous, il n'y a rien à faire.");
+    expect(text).toContain("n'envoyez jamais un code DJAFAT pour une autre personne");
+    expect(text).toContain('« Mot de passe oublié ? »');
+    expect(text).toContain('déconnecte tous les appareils');
+    expect(text).not.toMatch(/https?:|\b\d{6}\b|awa@example\.com/);
+  });
+});

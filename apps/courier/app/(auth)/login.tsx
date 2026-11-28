@@ -11,6 +11,7 @@ import {
   teamResetPassword,
   teamVerifyCode,
   teamVerifyPhoneCode,
+  teamWhatsappSignIn,
   type ChannelButton,
 } from '@djafat/sdk';
 import { tokens } from '@djafat/tokens';
@@ -18,18 +19,20 @@ import { Screen } from '../../components/Screen';
 import { BigButton } from '../../components/BigButton';
 import { EmailSuggestion } from '../../components/EmailSuggestion';
 import { PhoneInput } from '../../components/PhoneInput';
+import { WhatsappLogin } from '../../components/WhatsappLogin';
 import { COURIER_SIGNUP_URL, api } from '../../lib/api';
 import { courierSessionKeeper, loadDeviceToken } from '../../lib/auth-storage';
 import { useAuth } from '../../lib/auth-context';
 
-type PhoneChannel = 'sms' | 'whatsapp';
 type Step =
   | { readonly kind: 'password' }
   | { readonly kind: 'code'; readonly challengeId: string; readonly destination: string }
   | { readonly kind: 'forgot' }
   | { readonly kind: 'reset' }
-  | { readonly kind: 'phone'; readonly channel: PhoneChannel }
-  | { readonly kind: 'phone-code'; readonly channel: PhoneChannel };
+  | { readonly kind: 'phone' }
+  | { readonly kind: 'phone-code' }
+  /** FEAT-023 (SPEC-023-07): the code to send on WhatsApp. */
+  | { readonly kind: 'whatsapp' };
 
 const HOME = '/(app)/home';
 const FALLBACK = 'Connexion impossible pour le moment.';
@@ -199,12 +202,7 @@ export default function LoginScreen() {
 
   function choosePhone(button: ChannelButton) {
     if (!button.enabled) return;
-    if (button.id === 'whatsapp') {
-      if (button.link) void Linking.openURL(button.link);
-      go({ kind: 'phone-code', channel: 'whatsapp' });
-    } else {
-      go({ kind: 'phone', channel: 'sms' });
-    }
+    go(button.id === 'whatsapp' ? { kind: 'whatsapp' } : { kind: 'phone' });
   }
 
   function requestSmsCode() {
@@ -218,13 +216,13 @@ export default function LoginScreen() {
     }
     void run(async () => {
       await api.auth.requestPhoneLoginCode(phone);
-      go({ kind: 'phone-code', channel: 'sms' });
+      go({ kind: 'phone-code' });
     });
   }
 
-  function verifyPhoneCode(channel: PhoneChannel) {
+  function verifyPhoneCode() {
     void run(async () => {
-      finish(await teamVerifyPhoneCode(api.auth, { channel, phone, code }, keeper));
+      finish(await teamVerifyPhoneCode(api.auth, { channel: 'sms', phone, code }, keeper));
     });
   }
 
@@ -236,9 +234,7 @@ export default function LoginScreen() {
         : step.kind === 'reset'
           ? `Saisissez le code reçu à ${email} et votre nouveau mot de passe.`
           : step.kind === 'phone-code'
-            ? step.channel === 'whatsapp'
-              ? 'Envoyez « Code DJAFAT » sur WhatsApp, puis saisissez le code reçu.'
-              : `Code envoyé au ${phone}.`
+            ? `Code envoyé au ${phone}.`
             : 'Connexion livreur.';
 
   const back = (
@@ -506,15 +502,25 @@ export default function LoginScreen() {
 
       {step.kind === 'phone-code' && (
         <View style={styles.form}>
-          {step.channel === 'whatsapp' && phoneInput(true)}
-          {codeInput(step.channel !== 'whatsapp')}
-          <BigButton
-            label="Vérifier"
-            onPress={() => verifyPhoneCode(step.channel)}
-            loading={loading}
-          />
+          {codeInput(true)}
+          <BigButton label="Vérifier" onPress={verifyPhoneCode} loading={loading} />
           {back}
         </View>
+      )}
+
+      {step.kind === 'whatsapp' && (
+        <WhatsappLogin
+          onSignedIn={(answer) =>
+            void run(async () => {
+              const outcome = await teamWhatsappSignIn(answer, keeper);
+              // SPEC-023-07 R2: refused — back to the form, where the refusal shows.
+              if (outcome === 'denied') go({ kind: 'password' });
+              finish(outcome);
+            })
+          }
+          onEmailLogin={() => go({ kind: 'password' })}
+          onBack={() => go({ kind: 'password' })}
+        />
       )}
     </Screen>
   );

@@ -34,7 +34,7 @@ export const API_ERROR_CODES = [
   'EMAIL_UNAVAILABLE',
   /** SMS login is switched off on this deployment (503) — FEAT-008. */
   'SMS_UNAVAILABLE',
-  /** WhatsApp login is not configured on this deployment (503) — FEAT-008. */
+  /** WhatsApp login is not in service on this deployment (503) — FEAT-008, FEAT-023. */
   'WHATSAPP_UNAVAILABLE',
   /** The email is already verified on another account (409) — FEAT-007. */
   'EMAIL_ALREADY_USED',
@@ -48,6 +48,8 @@ export const API_ERROR_CODES = [
   'EMAIL_REQUIRED',
   /** A phone code on an email account whose number was never confirmed (409) — FEAT-020. */
   'PHONE_NOT_CONFIRMED',
+  /** FEAT-023 — a WhatsApp code to confirm a number that already is (409, SPEC-023-01 R8). */
+  'PHONE_ALREADY_CONFIRMED',
   /** FEAT-024 — DJAFAT sends no SMS to a foreign number: WhatsApp or e-mail instead (422, SPEC-024-01 R2). */
   'SMS_FOREIGN_NUMBER',
   /** FEAT-024 — a fixed line receives neither SMS nor WhatsApp (422, SPEC-024-01 R3). */

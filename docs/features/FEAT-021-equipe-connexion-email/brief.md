@@ -1,6 +1,6 @@
 ---
 feature: FEAT-021
-specs: [SPEC-021-01@1, SPEC-021-02@2, SPEC-021-03@1, SPEC-021-04@1, SPEC-021-05@2]
+specs: [SPEC-021-01@1, SPEC-021-02@3, SPEC-021-03@1, SPEC-021-04@1, SPEC-021-05@2]
 ---
 
 # FEAT-021 — Brief d'exécution

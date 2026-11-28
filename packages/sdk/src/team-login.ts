@@ -11,6 +11,7 @@ import type {
   PasswordLoginResult,
   SignedIn,
 } from './auth.js';
+import { whatsappSignedIn } from './whatsapp-login.js';
 
 /**
  * Client logic of the team apps' login (FEAT-021, SPEC-021-02): the admin
@@ -29,7 +30,7 @@ const PHONE_CHANNELS: readonly CodeChannelId[] = ['sms', 'whatsapp'];
  * no row at all when that list could not be read.
  */
 export function phoneCodeButtons(
-  methods: ReadonlyArray<{ id: string; available: boolean; link?: string }> | null,
+  methods: ReadonlyArray<{ id: string; available: boolean }> | null,
 ): ChannelButton[] {
   if (methods === null) return [];
   const byId = new Map(channelButtons(methods).map((button) => [button.id, button]));
@@ -86,11 +87,7 @@ export interface TeamAuthCalls {
     rememberDevice: boolean;
   }): Promise<SignedIn>;
   resetPassword(input: { email: string; code: string; password: string }): Promise<SignedIn>;
-  verifyPhoneLoginCode(input: {
-    channel: 'sms' | 'whatsapp';
-    phone: string;
-    code: string;
-  }): Promise<SignedIn>;
+  verifyPhoneLoginCode(input: { channel: 'sms'; phone: string; code: string }): Promise<SignedIn>;
 }
 
 /** Where the login screen goes after « Se connecter ». */
@@ -166,13 +163,25 @@ export async function teamResetPassword(
 }
 
 /**
- * R5 — a phone code (the SMS code, or the one WhatsApp replied), when the
- * server offers that channel: then R3, as for every other way in.
+ * R5 — the SMS code, when the server offers SMS: then R3, as for every other
+ * way in.
  */
 export async function teamVerifyPhoneCode(
   auth: Pick<TeamAuthCalls, 'verifyPhoneLoginCode'>,
-  input: { channel: 'sms' | 'whatsapp'; phone: string; code: string },
+  input: { channel: 'sms'; phone: string; code: string },
   keeper: TeamSessionKeeper,
 ): Promise<'signed_in' | 'denied'> {
   return acceptTeamSignIn(await auth.verifyPhoneLoginCode(input), keeper);
+}
+
+/**
+ * FEAT-023 (SPEC-023-07 R2): the session a WhatsApp wait ended with goes
+ * through the same role check (R3) — kept with the app's role, otherwise
+ * nothing at all.
+ */
+export function teamWhatsappSignIn(
+  answer: { readonly status: 'signed_in' } & SignedIn,
+  keeper: TeamSessionKeeper,
+): Promise<'signed_in' | 'denied'> {
+  return acceptTeamSignIn(whatsappSignedIn(answer), keeper);
 }

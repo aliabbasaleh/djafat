@@ -53,6 +53,17 @@ export function hashDeviceToken(token: string, secret: string): string {
   return createHmac('sha256', secret).update(`trusted-device:${token}`).digest('hex');
 }
 
+// ── WhatsApp codes (FEAT-023, SPEC-023-01 R5) ────────────────────────────
+
+/**
+ * HMAC of the token a screen holds for its WhatsApp code — what
+ * `whatsapp_codes.token_hash` stores. Its own prefix keeps it apart from the
+ * other hashes made with the same secret.
+ */
+export function hashWhatsappToken(token: string, secret: string): string {
+  return createHmac('sha256', secret).update(`whatsapp-code:${token}`).digest('hex');
+}
+
 // ── Constant-time comparison ─────────────────────────────────────────────
 
 /** Constant-time hex-string comparison — never `===` on a secret-derived hash. */

@@ -8,6 +8,18 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-28 — Sync S-058: free WhatsApp login (FEAT-023, 0.29.0) in a pull request; `FE-08` found and fixed
+
+FEAT-023 replaces FEAT-008's paid reply: the customer sends the code shown on screen from WhatsApp, the screen signs
+in by itself, and DJAFAT sends nothing (Meta bills business messages since 2026-10-01). Unknown numbers are offered
+« Créer un compte » instead of getting an account; every WhatsApp login sends the e-mail « Nouvelle connexion par
+WhatsApp »; a foreign number can be confirmed by WhatsApp right after sign-up. Areas: `auth` (migration `0042`, three
+routes added, one removed), `@djafat/sdk`, the five login screens. Verification: `verify --full` at `aea1461` on a fresh database: 12 of 12 checks pass, e2e unavailable (no versioned suite); integration 6/6 on a
+fresh database; browser 22/22. New issue: `FE-08` (Medium) — an uploaded restaurant photo broke the site's home page;
+fixed on the branch. Off in production until the Meta account exists.
+
+---
+
 ## 2026-11-28 — Sync S-057: PR #29 merged (0.28.4); follow-up 0.28.5
 
 With the repository public again, PR #29's checks were re-run and all passed on Linux and Windows; it is merged

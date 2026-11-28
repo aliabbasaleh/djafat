@@ -529,9 +529,12 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-616 · Free WhatsApp login: the customer sends the code (FEAT-023) _(added 2026-11-22, sync S-038)_
 
-- **Area:** `auth` (WhatsApp webhook), web and mobile login · **Priority:** Medium · **Why:** Meta charges every business-sent message since 2026-10-01, including FEAT-008's reply with the code; customer-sent messages stay free (`docs/features/FEAT-023-whatsapp-gratuit`) · **Status:** Confirmed by the user, specs to write; switched on only once DJAFAT's number is on Meta's WhatsApp Cloud API
+- **Area:** `auth` (WhatsApp webhook), web and mobile login · **Priority:** Medium · **Why:** Meta charges every business-sent message since 2026-10-01, including FEAT-008's reply with the code; customer-sent messages stay free (`docs/features/FEAT-023-whatsapp-gratuit`) · **Status:** Completed on `feat/whatsapp-gratuit` (0.29.0), pull request to `main` open _(updated 2026-11-28, sync S-058)_; switched on only once DJAFAT's number is on Meta's WhatsApp Cloud API
 - **Done when:** a customer logs in by sending the displayed code from WhatsApp, and DJAFAT sends no WhatsApp message.
 - **Test:** the FEAT-023 specs' tests.
+- **Progress** _(updated 2026-11-28, sync S-058)_: RUN — `verify --full` at `aea1461` on a fresh database: 12 of 12 checks pass, e2e unavailable (no versioned suite); integration 6/6 on a fresh database; browser 22/22 (site,
+  restaurant console, courier web app, the customer's message simulated). Not seen: the customer Expo app on a phone,
+  a real Meta account.
 
 ### T-617 · Let `verify --full` build the web apps with `.env` exported _(added 2026-11-27, sync S-055)_
 

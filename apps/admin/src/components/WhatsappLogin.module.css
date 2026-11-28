@@ -1,0 +1,59 @@
+/* FEAT-023 — WhatsApp in a team console's login (FEAT-023-VIS02). Tokens only. */
+.title {
+  margin: 0;
+  font-size: calc(var(--djafat-type-size-h2) * 1px);
+  font-weight: 700;
+}
+.title:focus-visible {
+  outline: 2px solid var(--djafat-color-focus-ring);
+  outline-offset: 2px;
+}
+.steps {
+  display: grid;
+  gap: calc(var(--djafat-space-3) * 1px);
+  margin: 0;
+  padding-left: 1.25em;
+}
+.message {
+  display: block;
+  /* French quotation marks with their inner no-break spaces (« … »). */
+  quotes: '«\00a0' '\00a0»';
+  margin-top: calc(var(--djafat-space-2) * 1px);
+  padding: calc(var(--djafat-space-3) * 1px);
+  border-left: 4px solid var(--djafat-color-brand-primary);
+  border-radius: calc(var(--djafat-radius-sm) * 1px);
+  background: var(--djafat-color-bg-surface-alt);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--djafat-touch-target-min) * 1px);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  background: var(--djafat-color-brand-primary);
+  color: var(--djafat-color-brand-on-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+.open:focus-visible {
+  outline: 2px solid var(--djafat-color-focus-ring);
+  outline-offset: 2px;
+}
+/* The one live region: the wait, then the outcome (SPEC-023-05 R9). */
+.status {
+  margin: 0;
+  color: var(--djafat-color-text-secondary);
+}
+.status:empty {
+  display: none;
+}
+.box {
+  margin: 0;
+  padding: calc(var(--djafat-space-3) * 1px);
+  border: 1px solid var(--djafat-color-state-warning);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  background: var(--djafat-color-state-warning-bg);
+  color: var(--djafat-color-text-primary);
+}

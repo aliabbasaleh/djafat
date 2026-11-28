@@ -33,6 +33,8 @@ import {
   type RestaurantRoleSignupInput,
 } from './dto/register.schema';
 import { RoleSignupService } from './role-signup.service';
+import { PhoneWhatsappSchema, type PhoneWhatsappInput } from './dto/whatsapp.schema';
+import { WhatsappCodeService } from './whatsapp-code.service';
 
 /**
  * `GET /v1/me` (docs/07 §"Auth") — lives in `auth`, not `users`: `users`
@@ -49,6 +51,7 @@ export class MeController {
     private readonly emailChange: EmailChangeService,
     private readonly phones: PhoneLinkService,
     private readonly roleSignup: RoleSignupService,
+    private readonly whatsapp: WhatsappCodeService,
   ) {}
 
   @Get()
@@ -128,7 +131,7 @@ export class MeController {
     return { status: 'sent' };
   }
 
-  /** FEAT-020 (SPEC-020-06 R2-R3): the SMS code, or the code WhatsApp replied — the number is confirmed. */
+  /** FEAT-020 (SPEC-020-06 R2): the SMS code — the number is confirmed. */
   @Post('phone/verify')
   @HttpCode(200)
   @RequireAuth()
@@ -137,8 +140,23 @@ export class MeController {
     @Body(new ZodValidationPipe(PhoneVerifySchema)) body: PhoneVerifyInput,
     @ReqMeta() meta: RequestMeta,
   ) {
-    const user = await this.phones.verify(actor.userId, body.channel, body.code, meta);
+    const user = await this.phones.verify(actor.userId, body.code, meta);
     return this.users.toMeDto(user, await this.users.getRoles(actor.userId));
+  }
+
+  /**
+   * FEAT-023 (SPEC-023-01 R8, SPEC-023-06): a code to SEND from the account's
+   * number on WhatsApp; the screen then waits on `POST /auth/whatsapp/status`.
+   */
+  @Post('phone/whatsapp')
+  @HttpCode(201)
+  @RequireAuth()
+  startPhoneWhatsapp(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Body(new ZodValidationPipe(PhoneWhatsappSchema)) _body: PhoneWhatsappInput,
+    @ReqMeta() meta: RequestMeta,
+  ) {
+    return this.whatsapp.startPhoneConfirmation(actor.userId, meta);
   }
 
   /** FEAT-022 (SPEC-022-08): « Devenir livreur » — the same account becomes a courier. */

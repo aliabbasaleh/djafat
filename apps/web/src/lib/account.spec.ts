@@ -105,12 +105,14 @@ describe('SPEC-020-07 — the account page', () => {
       ['sms', false, 'Bientôt disponible'],
     ]);
     const later = channelButtons([
-      { id: 'whatsapp', available: true, link: 'https://wa.me/23560000001?text=Code%20DJAFAT' },
+      { id: 'whatsapp', available: true },
       { id: 'sms', available: true },
       { id: 'email', available: true },
     ]);
     expect(later.map((b) => b.enabled)).toEqual([true, true, true]);
-    expect(later[1]?.link).toContain('wa.me');
+    // SPEC-020-07 v2 (FEAT-023): no wa.me link on the button — it comes with the code
+    // the screen asks for (SPEC-023-01 R4).
+    expect(later[1]).not.toHaveProperty('link');
     expect(channelButtons(null).map((b) => b.id)).toEqual(['email']);
   });
 });

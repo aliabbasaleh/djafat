@@ -247,6 +247,10 @@ _(updated 2026-11-28, sync S-057)_ **#29 merged.** The repository is public agai
 on Linux and Windows, and it went in as `982cdf2`; its branch is deleted. No pull request of ours is open; the only
 other branch on GitHub is the owner's `fix/payment-reliability-backlog` (§2).
 
+_(updated 2026-11-28, sync S-058)_ PR #35 (S-057's record, 0.28.5) merged as `413bedc`, its branch deleted. **New pull request of ours:**
+`feat/whatsapp-gratuit` → `main` — FEAT-023, free WhatsApp login (0.29.0), with the `FE-08` fix; rebased onto
+`413bedc`. It waits for its checks on Linux and Windows.
+
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007); branch deleted on 2026-11-28 (sync S-056)
 
 ### What it adds

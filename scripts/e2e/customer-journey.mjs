@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Full customer journey against a REAL running API + worker (docs/36's 19 pilot
-// steps, plus WhatsApp login FEAT-008, cash and Airtel payment FEAT-009, courier
+// steps, plus the free WhatsApp login FEAT-023, cash and Airtel payment FEAT-009, courier
 // cash FEAT-010). Report: docs/pipeline/customer-journey-2026-11-07.md.
 //
 //   node scripts/e2e/customer-journey.mjs cash|airtel
@@ -66,10 +66,12 @@ async function waitFor(fn, ms = 60000, every = 1000) {
   return null;
 }
 
-// ── 1. Login by WhatsApp (FEAT-008): the customer writes, DJAFAT replies, the code logs in ──
+// ── 1. Login by WhatsApp (FEAT-023): the screen shows a code, the customer SENDS it,
+//       the screen is signed in — DJAFAT sends nothing on WhatsApp ──
 const CUSTOMER = '+23566000001';
 const methods = await call('GET', '/auth/methods');
 const wa = methods.body?.methods?.find((m) => m.id === 'whatsapp');
+const started = await call('POST', '/auth/whatsapp/start', { body: {} });
 const body = JSON.stringify({
   object: 'whatsapp_business_account',
   entry: [
@@ -87,7 +89,7 @@ const body = JSON.stringify({
                 id: `wamid.${randomUUID()}`,
                 timestamp: String(Math.floor(Date.now() / 1000)),
                 type: 'text',
-                text: { body: 'Code DJAFAT' },
+                text: { body: started.body?.text ?? '' },
               },
             ],
           },
@@ -102,23 +104,27 @@ const hook = await fetch(`${API}/auth/whatsapp/webhook`, {
   headers: { 'content-type': 'application/json', 'x-hub-signature-256': sig },
   body,
 });
-const waCode = await waitFor(
-  async () => redis(`get otp:mock:whatsapp:${CUSTOMER}`) || null,
+const login = (await waitFor(
+  async () => {
+    const r = await call('POST', '/auth/whatsapp/status', {
+      body: { token: started.body?.token },
+    });
+    return r.body?.status === 'waiting' ? null : r;
+  },
   5000,
-  200,
-);
-const login = await call('POST', '/auth/whatsapp/verify', {
-  body: { phone: '66 00 00 01', code: waCode },
-});
+  300,
+)) ?? { status: 0, body: null };
 const TOK = login.body?.access;
 step(
   1,
-  'Connexion WhatsApp (client écrit → code → session)',
+  'Connexion WhatsApp (code affiché → message du client → session)',
   !!wa?.available &&
+    started.status === 201 &&
     hook.status === 200 &&
     login.status === 200 &&
+    login.body?.status === 'signed_in' &&
     login.body?.user?.roles?.includes('customer'),
-  `méthodes=${methods.body?.methods?.map((m) => m.id + (m.available ? '✓' : '✗')).join(',')} webhook=${hook.status} verify=${login.status}`,
+  `méthodes=${methods.body?.methods?.map((m) => m.id + (m.available ? '✓' : '✗')).join(',')} start=${started.status} webhook=${hook.status} status=${login.body?.status}`,
 );
 
 // ── 2-3. Restaurant and menu ──

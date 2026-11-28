@@ -53,15 +53,40 @@ export interface SignedIn {
 
 export type CodeChannelId = 'email' | 'sms' | 'whatsapp';
 
-/** A way to receive a code; `available: false` = « Bientôt disponible » (FEAT-020-Q05). */
+/**
+ * A way to receive a code; `available: false` = « Bientôt disponible »
+ * (FEAT-020-Q05). WhatsApp gives no code: the screen asks for one to SEND
+ * (`startWhatsapp`, FEAT-023).
+ */
 export interface CodeChannel {
   readonly id: CodeChannelId;
   readonly available: boolean;
   /** Masked destination (`a***@gmail.com`, `+235 •• •• 34 56`). */
   readonly destination?: string;
-  /** WhatsApp: DJAFAT's chat with « Code DJAFAT » pre-filled (FEAT-008). */
-  readonly link?: string;
 }
+
+/**
+ * FEAT-023 (SPEC-023-01): a code to send on WhatsApp — the message already
+ * written, the link that opens WhatsApp with it, DJAFAT's number (E.164) and a
+ * token only this screen holds (it waits with it, `whatsappStatus`).
+ */
+export interface WhatsappCode {
+  readonly token: string;
+  readonly code: string;
+  readonly text: string;
+  readonly link: string;
+  readonly number: string;
+  readonly expiresAt: string;
+}
+
+/** FEAT-023 (SPEC-023-03): where a code stands, for the screen that showed it. */
+export type WhatsappStatus =
+  | { readonly status: 'waiting'; readonly expiresAt: string }
+  | { readonly status: 'expired' }
+  | ({ readonly status: 'signed_in' } & SignedIn)
+  | { readonly status: 'not_confirmed'; readonly phone: string }
+  | { readonly status: 'wrong_number' }
+  | { readonly status: 'confirmed' };
 
 /** `POST /auth/password/login`: signed in on a remembered device, or a code to type. */
 export type PasswordLoginResult =
@@ -212,12 +237,27 @@ export function createAuthClient(http: ApiHttp) {
       http.post<{ status: 'sent' }>('/auth/password/challenge/send', {
         body: { challengeId, channel },
       }),
+    /** A typed code (e-mail or SMS); WhatsApp finishes the login by `whatsappStatus` (FEAT-023). */
     verifyLoginCode: (input: {
       challengeId: string;
-      channel: CodeChannelId;
+      channel: 'email' | 'sms';
       code: string;
       rememberDevice: boolean;
     }) => http.post<SignedIn>('/auth/password/challenge/verify', { body: input }),
+    /**
+     * FEAT-023 (SPEC-023-01): a code to SEND on WhatsApp — a login, or, with the
+     * pending login's `challengeId`, a new device's code. 503
+     * `WHATSAPP_UNAVAILABLE` when WhatsApp is off.
+     */
+    startWhatsapp: (input: { challengeId?: string } = {}) =>
+      http.post<WhatsappCode>('/auth/whatsapp/start', {
+        body: input.challengeId ? { challengeId: input.challengeId } : {},
+      }),
+    /** FEAT-023 (SPEC-023-03): « waiting », then the outcome once; `rememberDevice` for a new device. */
+    whatsappStatus: (input: { token: string; rememberDevice?: boolean }) =>
+      http.post<WhatsappStatus>('/auth/whatsapp/status', {
+        body: { token: input.token, rememberDevice: input.rememberDevice ?? false },
+      }),
     /** « Mot de passe oublié ? » — always accepted; a code only for a known address. */
     forgotPassword: (email: string) =>
       http.post<{ status: 'sent' }>('/auth/password/forgot', { body: { email } }),
@@ -235,28 +275,30 @@ export function createAuthClient(http: ApiHttp) {
      */
     requestPhoneLoginCode: (phone: string) =>
       http.post<{ status: 'sent' }>('/auth/otp/request', { body: { phone, purpose: 'login' } }),
-    /** The SMS code, or the code WhatsApp replied to « Code DJAFAT » (FEAT-008): signs in. */
-    verifyPhoneLoginCode: (input: { channel: 'sms' | 'whatsapp'; phone: string; code: string }) =>
-      input.channel === 'whatsapp'
-        ? http.post<SignedIn>('/auth/whatsapp/verify', {
-            body: { phone: input.phone, code: input.code },
-          })
-        : http.post<SignedIn>('/auth/otp/verify', {
-            body: { phone: input.phone, code: input.code, purpose: 'login' },
-          }),
+    /** The SMS code: signs in. By WhatsApp the customer sends a code instead (FEAT-023). */
+    verifyPhoneLoginCode: (input: { channel: 'sms'; phone: string; code: string }) =>
+      http.post<SignedIn>('/auth/otp/verify', {
+        body: { phone: input.phone, code: input.code, purpose: 'login' },
+      }),
     /** « Mon profil »: set a first password, or change it (the current one is asked). */
     changePassword: (input: { currentPassword?: string; newPassword: string }) =>
       http.put<void>('/me/password', { body: input }),
     /** « Mon profil »: confirm the account's number by an SMS code. */
     requestPhoneCode: () =>
       http.post<{ status: 'sent' }>('/me/phone/request', { body: { channel: 'sms' } }),
-    /** The SMS code, or the code WhatsApp replied to « Code DJAFAT ». */
-    verifyPhone: (channel: 'sms' | 'whatsapp', code: string) =>
-      http.post<MeProfile>('/me/phone/verify', { body: { channel, code } }),
+    /** The SMS code confirms the number. */
+    verifyPhone: (code: string) =>
+      http.post<MeProfile>('/me/phone/verify', { body: { channel: 'sms', code } }),
+    /**
+     * FEAT-023 (SPEC-023-06): a code to SEND from the account's own number on
+     * WhatsApp; then `whatsappStatus` says « confirmed ». 409
+     * `PHONE_ALREADY_CONFIRMED` when it is.
+     */
+    startPhoneWhatsapp: () => http.post<WhatsappCode>('/me/phone/whatsapp', { body: {} }),
     /** Login methods available on this deployment (FEAT-008): WhatsApp, SMS, e-mail. */
     methods: () =>
       http.get<{
-        methods: Array<{ id: 'whatsapp' | 'sms' | 'email'; available: boolean; link?: string }>;
+        methods: Array<{ id: 'whatsapp' | 'sms' | 'email'; available: boolean }>;
       }>('/auth/methods'),
     /**
      * User-initiated sign-out: revoke on the server FIRST (it needs the

@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { AccessibilityInfo, Linking, Pressable, Text, View, type TextInput } from 'react-native';
 import { ndjamenaDate } from '@djafat/core';
-import type { SignedIn } from '@djafat/sdk';
+import {
+  WHATSAPP_ICON,
+  WHATSAPP_TEXT,
+  afterSignup,
+  whatsappForeignIntro,
+  type SignedIn,
+} from '@djafat/sdk';
 import { Button } from '../Button';
 import { api, appUrl } from '../../lib/api';
 import {
@@ -35,6 +41,7 @@ import {
 import { ChoiceGroup } from './ChoiceGroup';
 import { CodeStep } from './CodeStep';
 import { Field } from './Field';
+import { PictureLine, WhatsappStep } from './WhatsappStep';
 import { accountStyles as s } from './styles';
 
 type FormField =
@@ -91,6 +98,8 @@ export function RegisterForm({
   onSignedUp,
   onContinue,
   onGoToLogin,
+  initialPhone,
+  methods,
 }: {
   /** A customer: the session is kept and the app goes on (FEAT-020, unchanged). */
   readonly onSignedIn: (result: SignedIn) => Promise<void>;
@@ -99,8 +108,16 @@ export function RegisterForm({
   /** « Continuer dans DJAFAT » after « what next ». */
   readonly onContinue: () => void;
   readonly onGoToLogin: () => void;
+  /** FEAT-023 (SPEC-023-05 R4): the number that wrote on WhatsApp — the customer form, filled in. */
+  readonly initialPhone?: string | null;
+  /** `GET /auth/methods`: WhatsApp in service decides the step after the code (SPEC-023-06 R3). */
+  readonly methods?: ReadonlyArray<{ id: string; available: boolean }> | null;
 }) {
-  const [flow, setFlow] = useState<SignupFlow<RegisterFormValues>>(() => startSignup(null, EMPTY));
+  const [flow, setFlow] = useState<SignupFlow<RegisterFormValues>>(() =>
+    startSignup(initialPhone ? 'client' : null, { ...EMPTY, phone: initialPhone ?? '' }),
+  );
+  /** FEAT-023 (SPEC-023-06 R3): the session of a foreign number, waiting for its WhatsApp step. */
+  const [confirming, setConfirming] = useState<SignedIn | null>(null);
   const [courier, setCourier] = useState<CourierFieldValues>(EMPTY_COURIER);
   /** What was typed in the birth date field (« 12/04/2001 »); the form keeps `YYYY-MM-DD`. */
   const [birthDateTyped, setBirthDateTyped] = useState('');
@@ -222,6 +239,50 @@ export function RegisterForm({
     }
   }
 
+  /**
+   * SPEC-023-06 R4: the end of today's sign-up, decided by `afterSignup` once the
+   * WhatsApp step is done or skipped — the customer goes on, the others see
+   * « et maintenant ? ».
+   */
+  async function finishSignup(result: SignedIn) {
+    const next = afterSignup({
+      type: type ?? 'customer',
+      phone: result.user.phone,
+      methods,
+      whatsappStepDone: true,
+    });
+    if (next === 'what_next' && (type === 'courier' || type === 'restaurant')) {
+      await onSignedUp(result);
+      setDone({ type });
+    } else {
+      await onSignedIn(result);
+    }
+  }
+
+  // FEAT-023 (SPEC-023-06 R3, FEAT-023-VIS03): a foreign number confirms itself by WhatsApp, or later.
+  if (confirming) {
+    return (
+      <WhatsappStep
+        purpose="confirm"
+        before={
+          <PictureLine
+            icon={WHATSAPP_ICON.done}
+            text={WHATSAPP_TEXT.accountCreated}
+            style={s.success}
+          />
+        }
+        intro={<Text style={s.intro}>{whatsappForeignIntro(confirming.user.phone)}</Text>}
+        start={() => api.auth.startPhoneWhatsapp()}
+        accountPhone={confirming.user.phone}
+        confirmedContinue
+        onConfirmed={() => void finishSignup(confirming)}
+        backLabel={WHATSAPP_TEXT.later}
+        backVariant="secondary"
+        onBack={() => void finishSignup(confirming)}
+      />
+    );
+  }
+
   if (done) {
     const text = signupDoneText(done.type, restaurant.restaurantName.trim());
     const target = appUrl(done.type === 'courier' ? 'courier' : 'restaurant');
@@ -254,12 +315,18 @@ export function RegisterForm({
             setBusy(true);
             try {
               const result = await api.auth.verifyRegistration(registration.id, code);
-              // A courier or a restaurant: the session at once, then what to complete (SPEC-022-02 R4, R6).
-              if (type === 'courier' || type === 'restaurant') {
+              const next = afterSignup({
+                type: type ?? 'customer',
+                phone: result.user.phone,
+                methods,
+              });
+              if (next === 'whatsapp_confirm') {
+                // The session first: the confirmation is a signed-in route (SPEC-023-06 R6).
                 await onSignedUp(result);
-                setDone({ type });
+                setConfirming(result);
               } else {
-                await onSignedIn(result);
+                // A courier or a restaurant: the session at once, then what to complete (SPEC-022-02 R4, R6).
+                await finishSignup(result);
               }
             } catch (err) {
               setGeneral(accountErrorMessage(err, 'Code invalide ou expiré.'));

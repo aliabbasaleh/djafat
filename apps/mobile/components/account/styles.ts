@@ -115,6 +115,12 @@ export const accountStyles = StyleSheet.create({
   },
   checkboxMark: { color: tokens.color.brand.onPrimary, fontWeight: '700' },
   hint: { fontSize: tokens.type.size.caption, color: tokens.color.text.secondary },
+  /** FEAT-023-VIS03: « ✅ Votre compte est créé. » */
+  success: {
+    fontSize: tokens.type.size.body,
+    fontWeight: '700',
+    color: tokens.color.state.success,
+  },
   // FEAT-022: the type choice, the chips of a choice, the « what next » screen.
   typeCard: {
     flexDirection: 'row',

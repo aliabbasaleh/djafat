@@ -204,3 +204,51 @@
   outline: 2px solid var(--djafat-color-focus-ring);
   outline-offset: 2px;
 }
+
+/* FEAT-023 — the free WhatsApp view (FEAT-023-VIS02, VIS03). */
+.whatsappSteps {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--djafat-space-3) * 1px);
+  margin: 0;
+  padding-left: 1.25em;
+  color: var(--djafat-color-text-primary);
+}
+.whatsappMessage {
+  display: block;
+  /* French quotation marks with their inner no-break spaces (« … »). */
+  quotes: '«\00a0' '\00a0»';
+  margin-top: calc(var(--djafat-space-2) * 1px);
+  padding: calc(var(--djafat-space-3) * 1px);
+  border-left: 4px solid var(--djafat-color-brand-primary);
+  border-radius: calc(var(--djafat-radius-sm) * 1px);
+  background: var(--djafat-color-bg-surface-alt);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.whatsappHint {
+  margin: 0;
+  color: var(--djafat-color-text-secondary);
+}
+/* The one live region: the wait, then the outcome (SPEC-023-05 R9). */
+.whatsappStatus {
+  margin: 0;
+  color: var(--djafat-color-text-secondary);
+}
+.whatsappStatus:empty {
+  display: none;
+}
+.whatsappOutcome,
+.whatsappWarning {
+  margin: 0;
+  padding: calc(var(--djafat-space-3) * 1px);
+  border: 1px solid var(--djafat-color-state-warning);
+  border-radius: calc(var(--djafat-radius-md) * 1px);
+  background: var(--djafat-color-state-warning-bg);
+  color: var(--djafat-color-text-primary);
+}
+.stepDone {
+  margin: 0;
+  color: var(--djafat-color-state-success);
+  font-weight: 700;
+}

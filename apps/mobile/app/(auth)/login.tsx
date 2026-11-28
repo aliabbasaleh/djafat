@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { SignedIn } from '@djafat/sdk';
+import { phoneFieldValue, type SignedIn } from '@djafat/sdk';
 import { tokens } from '@djafat/tokens';
 import { Screen } from '../../components/Screen';
 import { LoginForm, type AuthMethods } from '../../components/account/LoginForm';
@@ -25,6 +25,8 @@ export default function AccountScreen() {
   const { signIn } = useAuth();
   const [tab, setTab] = useState<TabId>('connexion');
   const [methods, setMethods] = useState<AuthMethods | undefined>(undefined);
+  /** FEAT-023 (SPEC-023-05 R4): « Créer un compte » after WhatsApp, the number that wrote filled in. */
+  const [prefillPhone, setPrefillPhone] = useState<string | null>(null);
 
   useEffect(() => {
     api.auth
@@ -81,13 +83,22 @@ export default function AccountScreen() {
       </View>
 
       {tab === 'connexion' ? (
-        <LoginForm methods={methods ?? null} onSignedIn={onSignedIn} />
+        <LoginForm
+          methods={methods ?? null}
+          onSignedIn={onSignedIn}
+          onCreateAccount={(phone) => {
+            setPrefillPhone(phoneFieldValue(phone));
+            setTab('inscription');
+          }}
+        />
       ) : (
         <RegisterForm
           onSignedIn={onSignedIn}
           onSignedUp={keepSession}
           onContinue={() => router.replace(afterLoginRoute(redirect) as Href)}
           onGoToLogin={() => setTab('connexion')}
+          initialPhone={prefillPhone}
+          methods={methods ?? null}
         />
       )}
     </Screen>

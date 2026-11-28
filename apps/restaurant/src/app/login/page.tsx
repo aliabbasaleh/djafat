@@ -15,22 +15,25 @@ import {
   teamResetPassword,
   teamVerifyCode,
   teamVerifyPhoneCode,
+  teamWhatsappSignIn,
   type ChannelButton,
 } from '@djafat/sdk';
 import { Container, Heading, Text, Stack, cx } from '@djafat/ui';
 import { Button, Input, Alert, Checkbox, FieldSuggestion } from '@/components/ui-client';
 import { RESTAURANT_SIGNUP_URL, api } from '@/lib/api';
 import { restaurantSessionKeeper, getDeviceToken } from '@/lib/auth-storage';
+import { WhatsappLogin } from '@/components/WhatsappLogin';
 import styles from './page.module.css';
 
-type PhoneChannel = 'sms' | 'whatsapp';
 type View =
   | { readonly kind: 'password' }
   | { readonly kind: 'code'; readonly challengeId: string; readonly destination: string }
   | { readonly kind: 'forgot' }
   | { readonly kind: 'reset' }
-  | { readonly kind: 'phone'; readonly channel: PhoneChannel }
-  | { readonly kind: 'phone-code'; readonly channel: PhoneChannel };
+  | { readonly kind: 'phone' }
+  | { readonly kind: 'phone-code' }
+  /** FEAT-023 (SPEC-023-07): the code to send on WhatsApp. */
+  | { readonly kind: 'whatsapp' };
 
 const HOME = '/restaurant';
 const FALLBACK = 'Connexion impossible pour le moment.';
@@ -220,12 +223,7 @@ export default function LoginPage() {
 
   function choosePhone(button: ChannelButton) {
     if (!button.enabled) return;
-    if (button.id === 'whatsapp') {
-      if (button.link) window.open(button.link, '_blank', 'noopener');
-      go({ kind: 'phone-code', channel: 'whatsapp' });
-    } else {
-      go({ kind: 'phone', channel: 'sms' });
-    }
+    go(button.id === 'whatsapp' ? { kind: 'whatsapp' } : { kind: 'phone' });
   }
 
   function requestSmsCode() {
@@ -239,14 +237,18 @@ export default function LoginPage() {
     }
     void run(async () => {
       await api.auth.requestPhoneLoginCode(phone);
-      go({ kind: 'phone-code', channel: 'sms' });
+      go({ kind: 'phone-code' });
     });
   }
 
-  function verifyPhoneCode(channel: PhoneChannel) {
+  function verifyPhoneCode() {
     void run(async () => {
       finish(
-        await teamVerifyPhoneCode(api.auth, { channel, phone, code }, restaurantSessionKeeper),
+        await teamVerifyPhoneCode(
+          api.auth,
+          { channel: 'sms', phone, code },
+          restaurantSessionKeeper,
+        ),
       );
     });
   }
@@ -259,9 +261,7 @@ export default function LoginPage() {
         : view.kind === 'reset'
           ? `Saisissez le code reçu à ${email} et votre nouveau mot de passe.`
           : view.kind === 'phone-code'
-            ? view.channel === 'whatsapp'
-              ? 'Envoyez « Code DJAFAT » sur WhatsApp, puis saisissez le code reçu.'
-              : `Entrez le code envoyé au ${phone}.`
+            ? `Entrez le code envoyé au ${phone}.`
             : 'Connexion réservée aux comptes restaurant.';
 
   return (
@@ -552,23 +552,10 @@ export default function LoginPage() {
             ref={form}
             onSubmit={(e) => {
               e.preventDefault();
-              verifyPhoneCode(view.channel);
+              verifyPhoneCode();
             }}
           >
             <Stack gap="md">
-              {view.channel === 'whatsapp' && (
-                <Input
-                  label="Numéro de téléphone"
-                  type="tel"
-                  placeholder="66 12 34 56"
-                  {...(phoneFieldShowsDialCode(phone) ? { leadingText: DIAL_CODE } : {})}
-                  value={phone}
-                  onChange={(e) => typed(setPhone)(e.target.value)}
-                  aria-describedby="login-subtitle"
-                  required
-                  autoFocus
-                />
-              )}
               <Input
                 label="Code à 6 chiffres"
                 inputMode="numeric"
@@ -577,9 +564,9 @@ export default function LoginPage() {
                 value={code}
                 onChange={(e) => typed(setCode)(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 maxLength={6}
-                {...(view.channel === 'whatsapp' ? {} : { 'aria-describedby': 'login-subtitle' })}
+                aria-describedby="login-subtitle"
                 required
-                autoFocus={view.channel !== 'whatsapp'}
+                autoFocus
               />
               <Button type="submit" loading={loading} fullWidth>
                 Vérifier
@@ -594,6 +581,21 @@ export default function LoginPage() {
               </Button>
             </Stack>
           </form>
+        )}
+
+        {view.kind === 'whatsapp' && (
+          <WhatsappLogin
+            onSignedIn={(answer) =>
+              void run(async () => {
+                const outcome = await teamWhatsappSignIn(answer, restaurantSessionKeeper);
+                // SPEC-023-07 R2: refused — back to the form, where the refusal shows.
+                if (outcome === 'denied') go({ kind: 'password' });
+                finish(outcome);
+              })
+            }
+            onEmailLogin={() => go({ kind: 'password' })}
+            onBack={() => go({ kind: 'password' })}
+          />
         )}
       </Stack>
     </Container>

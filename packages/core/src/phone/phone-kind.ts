@@ -76,10 +76,13 @@ export function readPhoneInput(raw: string, market: PhoneMarket, use: PhoneUse):
 }
 
 /**
- * SPEC-024-01 R2: why a foreign number gets no SMS, and what it can use —
- * WhatsApp only when the deployment has it (`GET /auth/methods`).
+ * SPEC-024-01 R2 (v2): why a foreign number gets no SMS, and what it can use —
+ * WhatsApp only when the deployment has it (`GET /auth/methods`). By WhatsApp
+ * the customer SENDS the code shown on screen (FEAT-023): nothing to receive.
  */
 export function smsForeignMessage(whatsappAvailable: boolean): string {
-  const ways = whatsappAvailable ? 'par WhatsApp ou par e-mail' : 'par e-mail';
-  return `Le code par SMS n'est envoyé qu'aux numéros du Tchad. Avec un numéro étranger, recevez le code ${ways}.`;
+  const ways = whatsappAvailable
+    ? 'connectez-vous par WhatsApp ou recevez le code par e-mail'
+    : 'recevez le code par e-mail';
+  return `Le code par SMS n'est envoyé qu'aux numéros du Tchad. Avec un numéro étranger, ${ways}.`;
 }

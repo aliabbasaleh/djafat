@@ -22,7 +22,12 @@ RUN pnpm install --frozen-lockfile --filter "@djafat/${APP}..." \
 
 FROM base AS runtime
 ARG APP
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 APP=${APP}
+# `next start` reads next.config.mjs again: the site's image server allows the
+# API's own host (uploaded photos, FEAT-022) from this variable, so it must be
+# the same here as in the build stage.
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 APP=${APP} \
+    NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 WORKDIR /repo
 COPY --from=build /repo /repo
 USER node

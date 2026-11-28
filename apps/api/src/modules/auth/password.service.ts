@@ -14,6 +14,7 @@ import {
   evaluatePassword,
   phoneKind,
 } from '@djafat/core';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AppConfigService } from '../../common/config/config.service';
 import { AuditService } from '../../common/audit/audit.service';
@@ -33,14 +34,30 @@ import { TrustedDeviceService } from './trusted-device.service';
 /** A password login waits 10 minutes for its new device's code. */
 const LOGIN_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 
-/** One way to receive the new device's code (FEAT-020-Q05: off channels are listed, unavailable). */
+/**
+ * One way to receive the new device's code (FEAT-020-Q05: off channels are
+ * listed, unavailable). WhatsApp: the screen asks for a code to SEND
+ * (`POST /auth/whatsapp/start` with the challenge, FEAT-023).
+ */
 export interface CodeChannelDto {
   readonly id: 'email' | 'sms' | 'whatsapp';
   readonly available: boolean;
   /** Masked destination, when the channel is usable for this account. */
   readonly destination?: string;
-  /** WhatsApp: DJAFAT's chat with « Code DJAFAT » pre-filled (FEAT-008). */
-  readonly link?: string;
+}
+
+/**
+ * A password login still waiting for its new device's code (SPEC-020-04 R5):
+ * finished by an e-mail or SMS code here, or by a WhatsApp message
+ * (`WhatsappCodeService`, SPEC-023-03 R5) — one definition for both.
+ */
+export function pendingPasswordLoginWhere(id: string) {
+  return {
+    id,
+    kind: 'password_login',
+    consumedAt: null,
+    expiresAt: { gt: new Date() },
+  } satisfies Prisma.AuthChallengeWhereInput;
 }
 
 export type PasswordLoginResultDto =
@@ -158,11 +175,15 @@ export class PasswordService {
     }); // SMS switched off -> 503 SMS_UNAVAILABLE
   }
 
-  /** R8, R9: the right code consumes the pending login (once), opens the session, may remember the device. */
+  /**
+   * R8, R9: the right code consumes the pending login (once), opens the session,
+   * may remember the device. WhatsApp finishes it through `WhatsappCodeService`
+   * (FEAT-023), not with a code typed here.
+   */
   async verifyChallenge(
     input: {
       challengeId: string;
-      channel: 'email' | 'sms' | 'whatsapp';
+      channel: 'email' | 'sms';
       code: string;
       rememberDevice: boolean;
     },
@@ -182,24 +203,13 @@ export class PasswordService {
       );
     } else {
       if (!user.phoneVerifiedAt) throw phoneNotConfirmed();
-      if (input.channel === 'sms') {
-        await this.otp.verifyCode(
-          { channel: 'sms', target: user.phone },
-          input.code,
-          'login_device',
-          meta.ip,
-          { context: challenge.id },
-        );
-      } else {
-        // DJAFAT cannot write first on WhatsApp: the code is the one it replied
-        // to « Code DJAFAT » sent from the confirmed number (FEAT-008).
-        await this.otp.verifyCode(
-          { channel: 'whatsapp', target: user.phone },
-          input.code,
-          'login',
-          meta.ip,
-        );
-      }
+      await this.otp.verifyCode(
+        { channel: 'sms', target: user.phone },
+        input.code,
+        'login_device',
+        meta.ip,
+        { context: challenge.id },
+      );
     }
 
     const consumed = await this.prisma.authChallenge.updateMany({
@@ -395,18 +405,12 @@ export class PasswordService {
     return [
       { id: 'email', available: true, destination: maskEmail(email) },
       { id: 'sms', available: smsUsable, ...(smsUsable ? phone : {}) },
-      {
-        id: 'whatsapp',
-        available: whatsappUsable,
-        ...(whatsappUsable ? { ...phone, ...(whatsapp?.link ? { link: whatsapp.link } : {}) } : {}),
-      },
+      { id: 'whatsapp', available: whatsappUsable, ...(whatsappUsable ? phone : {}) },
     ];
   }
 
   private pendingLogin(id: string) {
-    return this.prisma.authChallenge.findFirst({
-      where: { id, kind: 'password_login', consumedAt: null, expiresAt: { gt: new Date() } },
-    });
+    return this.prisma.authChallenge.findFirst({ where: pendingPasswordLoginWhere(id) });
   }
 
   /** FEAT-020-Q15. */

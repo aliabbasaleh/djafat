@@ -1,12 +1,17 @@
 FEAT-023-VIS02 — apps/web /compte, connexion par WhatsApp, 390x844 (mobile)
 Nature : attendu. Parcours choisi par l'utilisateur le 2026-11-22
-(question « WhatsApp » : « Customer sends the code »).
+(question « WhatsApp » : « Customer sends the code ») ; avertissement et
+numéro inconnu choisis le 2026-11-25 (FEAT-023-Q02, FEAT-023-Q03).
 
   Se connecter avec WhatsApp
 
   1. Appuyez sur le bouton : WhatsApp s'ouvre avec ce message déjà écrit :
-     « Je me connecte à DJAFAT : 482915 »
+     « Je me connecte à DJAFAT : 482915 (n'envoyez ce code que pour vous
+     connecter vous-même) »
   2. Envoyez-le, puis revenez ici.
+
+  ⚠️ N'envoyez ce code que pour vous connecter vous-même. Si quelqu'un
+     vous demande de l'envoyer, refusez : il veut entrer dans votre compte.
 
   [        🟢 Ouvrir WhatsApp        ]
 
@@ -18,9 +23,11 @@ Nature : attendu. Parcours choisi par l'utilisateur le 2026-11-22
   ← Autre moyen de connexion
 
  Ensuite :
-  ✅ Connecté — retour à la page d'où vous veniez.
-  ⚠️ Ce numéro n'est confirmé sur aucun compte DJAFAT : créez un compte
-     avec votre e-mail, ou confirmez votre numéro dans « Mon profil ».
+  ✅ Connecté — retour à la page d'où vous veniez ; un e-mail « Nouvelle
+     connexion par WhatsApp » part à l'adresse du compte, avec l'appareil.
+  ⚠️ Ce numéro n'est confirmé sur aucun compte
+     [ Créer un compte ]           inscription par e-mail, numéro déjà rempli
+     [ Se connecter par e-mail ]
 
 Notes :
 - DJAFAT ne répond rien sur WhatsApp : aucun message facturé.

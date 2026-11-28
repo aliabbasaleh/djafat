@@ -179,6 +179,33 @@ connexion au serveur alors que l'API tourne, c'est presque toujours un
 **paquet JavaScript périmé** dans l'onglet : recharger avec **Ctrl+Shift+R**.
 Si ça persiste, arrêter le site, supprimer son dossier `.next`, relancer.
 
+### Se connecter par WhatsApp en local _(ajouté le 26 nov. 2026, FEAT-023)_
+
+Sur un poste, personne n'envoie de vrai message WhatsApp : un script joue le rôle du client.
+
+1. Dans `.env` (valeurs inventées, jamais de vraies) :
+   `WHATSAPP_PROVIDER=mock`, `WHATSAPP_BUSINESS_NUMBER=+23560000001`,
+   `WHATSAPP_PHONE_NUMBER_ID=100000000000001`, `WHATSAPP_APP_SECRET=` et `WHATSAPP_VERIFY_TOKEN=`
+   deux mots au hasard. Relancer l'API : WhatsApp n'est plus « Bientôt disponible ».
+2. Sur le site : « Se connecter » → WhatsApp. Noter le code affiché (6 chiffres).
+3. Dans un terminal, avec le `.env` exporté (`set -a; source .env; set +a`) :
+   ```bash
+   node scripts/dev/whatsapp-message.mjs --from +23566000001 --code 482915
+   ```
+   Le numéro est celui « qui écrit » ; l'écran se connecte dans les 2 secondes, ou dit « Ce
+   numéro n'est confirmé sur aucun compte ». Pour une confirmation de numéro, envoyer le texte
+   affiché avec `--text "…"`. Le script refuse toute adresse d'API qui n'est pas ce poste.
+
+### Les photos des restaurants ne s'affichent pas _(ajouté le 28 nov. 2026)_
+
+Les photos téléversées (logos, couvertures, FEAT-022) sont servies par l'API, à l'adresse
+`API_PUBLIC_URL` du `.env`. Le site n'affiche que les images venues de l'hôte de l'API qu'il
+appelle, `NEXT_PUBLIC_API_BASE_URL` (par défaut `http://localhost:3001/v1`). Les deux adresses
+doivent donc avoir **le même hôte** : `localhost` avec `localhost`, jamais `127.0.0.1` d'un côté
+seulement. Après un changement, relancer le site. En production, les deux viennent du même
+`DOMAIN` (`https://api.<domaine>`), et l'image du site reçoit l'adresse aussi à l'exécution
+(`infra/deploy/next.Dockerfile`).
+
 ### Le livreur ne reçoit aucune course
 
 Le dispatch ignore un livreur dont la position date de plus de

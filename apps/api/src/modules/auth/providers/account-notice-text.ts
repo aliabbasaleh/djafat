@@ -28,6 +28,7 @@ export function accountNoticeMessage(notice: AccountNotice): { subject: string; 
     return rejectedMessage(notice.applicant, notice.reason);
   }
   if (notice.kind === 'change_decided') return changeDecidedMessage(notice);
+  if (notice.kind === 'whatsapp_login') return whatsappLoginMessage(notice.at, notice.device);
   if (notice.kind === 'email_changed') {
     return {
       subject: 'L’adresse e-mail de votre compte DJAFAT a été changée',
@@ -213,6 +214,29 @@ function changeDecidedMessage(notice: Extract<AccountNotice, { kind: 'change_dec
       courier
         ? "Vous pouvez en envoyer un autre depuis l'application DJAFAT Livreur."
         : 'Vous pouvez en envoyer un autre depuis la console restaurant.',
+      '',
+      "L'équipe DJAFAT",
+    ].join('\n'),
+  };
+}
+
+/**
+ * FEAT-023 (SPEC-023-04 R3, R4): « Nouvelle connexion par WhatsApp » — when and
+ * on which device, and what to do if it was not you. No code, no link that
+ * logs in, no IP address.
+ */
+function whatsappLoginMessage(at: Date, device: string): { subject: string; text: string } {
+  return {
+    subject: 'Nouvelle connexion par WhatsApp',
+    text: [
+      'Bonjour,',
+      '',
+      `Votre compte DJAFAT vient d'être ouvert par WhatsApp le ${ndjamenaTime(at)} (heure de N'Djamena), sur : ${device}.`,
+      '',
+      "Si c'est vous, il n'y a rien à faire.",
+      '',
+      "Si ce n'est pas vous, quelqu'un vous a sans doute demandé d'envoyer un code sur WhatsApp : n'envoyez jamais un code DJAFAT pour une autre personne.",
+      'Utilisez tout de suite « Mot de passe oublié ? » sur la page « Compte » : le nouveau mot de passe déconnecte tous les appareils. Puis contactez DJAFAT.',
       '',
       "L'équipe DJAFAT",
     ].join('\n'),

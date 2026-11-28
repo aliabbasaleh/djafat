@@ -24,6 +24,16 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+/**
+ * FEAT-020 (SPEC-020-06 R4): may a proof of the number (an SMS code; since
+ * FEAT-023 a WhatsApp message, SPEC-023-02 R6) open this account? Yes once the
+ * number is confirmed, or when the account has neither a verified e-mail nor
+ * a password (created by SMS or by phone): the number is then all it has.
+ */
+export function phoneMayOpen(user: UserRecord): boolean {
+  return Boolean(user.phoneVerifiedAt) || (!user.emailVerifiedAt && !user.hasPassword);
+}
+
 export interface TokenPairDto {
   readonly access: string;
   readonly accessExpiresAt: string;
@@ -129,25 +139,8 @@ export class AuthService {
     return this.openSession(owner.id, meta);
   }
 
-  // ── WhatsApp: the customer writes, DJAFAT replies with the code (FEAT-008) ──
-
-  /**
-   * WhatsApp login: the code was sent as a reply to the customer's own
-   * message (`WhatsappInboundService`). Proof of possession of the number,
-   * exactly like an SMS code: the account is found or created, the phone is
-   * marked verified, and the session opens through the shared path.
-   */
-  async verifyWhatsappAndLogin(
-    phone: string,
-    code: string,
-    meta: RequestMeta & { countryId: string | null },
-  ): Promise<LoginResultDto> {
-    await this.otp.verifyCode({ channel: 'whatsapp', target: phone }, code, 'login', meta.ip); // throws OTP_INVALID / OTP_LOCKED
-    const { userId, isNew } = await this.users.findOrCreateByPhone(phone, meta.countryId);
-    if (!isNew) await this.assertPhoneMayOpen(userId); // FEAT-020 SPEC-020-06 R4
-    await this.users.markPhoneVerified(userId);
-    return this.openSession(userId, meta);
-  }
+  // WhatsApp (FEAT-023): the customer SENDS the code shown on screen — see
+  // `WhatsappCodeService`; FEAT-008's reply with a code is gone (billed by Meta).
 
   /**
    * FEAT-020 (SPEC-020-06 R4): a phone code proves the number, but the number
@@ -158,7 +151,7 @@ export class AuthService {
    */
   private async assertPhoneMayOpen(userId: string): Promise<void> {
     const user = await this.users.getByIdOrThrow(userId);
-    if (!user.phoneVerifiedAt && (user.emailVerifiedAt || user.hasPassword)) {
+    if (!phoneMayOpen(user)) {
       throw new ConflictException({
         code: 'PHONE_NOT_CONFIRMED',
         message:
