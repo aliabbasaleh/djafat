@@ -10,7 +10,7 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
-## S-055 — 2026-11-27 — the sign-up stack merged into `main` (PR #34); PR #29 brought up to date as 0.28.4
+## S-055 — 2026-11-27/28 — the sign-up stack merged into `main` (PR #34); PR #29 brought up to date as 0.28.4
 
 **Trigger:** the user said the repository is now public, so GitHub's checks run again, and asked to merge all the
 branches. **PR #34** (`feat/connexion-integration` → `main`, opened by us on the teammate's branch with S-053, S-054
@@ -32,7 +32,9 @@ a real 379-file merge (9 ESLint and 8 Prettier batches, 32 s, nothing changed), 
 built and its dependencies installed. **Fixed:** [`CI-03`](../FINDINGS.md#ci-03), resolved on `main` since PR #1
 (root `eslint` 9.17.0) and now verified by that commit, which needed no extra `PATH`; T-407 done. **New findings:**
 `TEST-07`. **Not verified:** the customer mobile app on a phone (it has no web build); real e-mail delivery; the
-deployment of 0.28.x to the server (not done yet).
+deployment of 0.28.x to the server (not done yet). **CI on PR #29 (2026-11-28 note):** the first run failed only on the
+known flake [`TEST-06`](../FINDINGS.md#test-06), with the same code and hash as when it was found; new task T-618;
+the run is repeated, the test untouched.
 
 ---
 

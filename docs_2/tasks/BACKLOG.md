@@ -539,4 +539,12 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 - **Done when:** the documented full verification (export `.env`, then `pnpm verify --full`) reports `build` 16/16.
 - **Test:** `set -a; . ./.env; set +a; pnpm verify --full` on a clean checkout.
 
+### T-618 · Make the delivery-code test independent of a chance digit match _(added 2026-11-28, sync S-055)_
+
+- **Area:** `apps/api/src/modules/deliveries/delivery-code-retrieval.spec.ts` · **Priority:** Medium · **Why:** [`TEST-06`](../FINDINGS.md#test-06), which failed PR #29's CI run on 2026-11-27 · **Status:** Not started
+- **Done when:** the test asserts what it means (the stored value is a 64-character hash and the reference an
+  encrypted triple, neither equal to the code) without searching the hash for the code's digits, reviewed as a test
+  correction on its own pull request.
+- **Test:** 5,000 runs of that spec without a failure.
+
 Last updated: 2026-11-23 (sync S-043)

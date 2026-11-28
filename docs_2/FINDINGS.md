@@ -1439,6 +1439,11 @@ hook in a fresh worktree, with no extra `PATH` (9 ESLint batches of `lint-staged
 - **Fix:** assert what the test means — the stored value is a hash (64 hex characters) and never the code —
   instead of searching the hash for the code's digits; keep the check on the encrypted reference.
 - **Verify:** the spec passes repeatedly (e.g. 5,000 runs of that test) without a failure.
+- **Seen in CI** _(updated 2026-11-28, sync S-055)_: PR #29's Linux job (run `46023953698`, 2026-11-27) failed on this
+  assertion alone, 1 of 1,226 unit tests, with the identical pair — code « 6731 », hash `9579fed16c7fe6731713…`. The
+  stored value is a keyed hash of the code with the test's fixed key, so the test fails whenever the random draw lands
+  on one of the few codes (about 1 in 1,000) whose hash happens to contain their own digits. Now that GitHub's checks
+  run again, it can block a merge; the remedy until T-618 is a fresh run, never a change to the expected value.
 
 ### TEST-07
 

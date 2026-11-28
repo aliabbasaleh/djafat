@@ -15,7 +15,8 @@ five checks green; #28 marked merged, #31 to #33 closed, their branches deleted;
 0.28.4. Verification: `verify --full` on a separate database (all pass but a `build` failure caused by
 `NODE_ENV=development`, `TEST-07`), and the sign-up and sign-in of customers, couriers, restaurants and admins in a
 real browser, 31/31. `CI-03` resolved, T-407 done. Learned: a fresh worktree needs `pnpm install` and the workspace
-packages built before the type-aware pre-commit ESLint means anything.
+packages built before the type-aware pre-commit ESLint means anything. PR #29's first CI run hit the known flake
+`TEST-06` (same code and hash as on 2026-11-24); task T-618 added, the run repeated without touching the test.
 
 ---
 
