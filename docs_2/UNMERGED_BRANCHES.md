@@ -119,6 +119,10 @@ seed were all on `main` in a newer form, so `main`'s side is kept for their file
 (`0d60445`) and the design document (`92e8d52`) come in unchanged. The branch is to be deleted once the pull request
 is merged.
 
+_(updated 2026-11-28, sync S-061)_ **PR #37 merged** as `e691424` with every check green on Linux and Windows. `merge/payment-reliability-backlog`
+and `fix/payment-reliability-backlog` are deleted; GitHub has only `main`. New pull request of ours:
+`fix/ui-aria-passthrough` (`FE-09`, 0.30.1).
+
 ## 2b. `fix/next-15.5`, pull request #3 (4 commits) _(added 2026-11-12, sync S-004; updated sync S-005)_ — merged into `main` on 2026-11-17 (`f9a8f41`, sync S-013)
 
 Our own branch, from `main` `d1439c6`, made at the user's request.
