@@ -12,6 +12,7 @@ these IDs instead of repeating the detail.
 - **Counts:** 3 Critical · 11 High · 22 Medium · 13 Low = 49 open findings, plus 22 resolved
   _(updated 2026-11-27, sync S-055: `CI-03` resolved on `main`; new `TEST-07`)_
   _(updated 2026-11-18, sync S-034: `TEST-05`, `ADM-01`, `ADM-02`, `ORD-01`, `PAY-04`, `ORD-02`, `ADM-03`, `SEC-02` and `OPS-05` resolved on `main`)_
+  _(updated 2026-11-28, sync S-058: new `FE-08`, on `main` since the sign-up stack, fixed on `feat/whatsapp-gratuit` — open until that pull request is merged)_
   _(updated 2026-11-25, sync S-050: new `SEC-09` and `SEC-10`, found by review and fixed on `feat/inscription-restaurants` before any merge — never on `main`, not counted as open)_
   _(updated 2026-11-18, sync S-030: new `OPS-06`; sync S-032: `TEST-04` and `DOC-03` resolved on `main`)_
   _(updated 2026-11-14, sync S-008: new `DOC-03`; 2026-11-17, sync S-011: new `TEST-04`; sync
@@ -91,6 +92,7 @@ verified.
 | [API-02](#api-02)     | Browsers cannot send PUT, PATCH or DELETE to the API from another origin                    | Broken              | High     | LIVE     |
 | [DOC-03](#doc-03)     | The local guide's placeholder secrets block local deliveries                                | Broken              | Medium   | CODE     |
 | [TEST-04](#test-04)   | The API integration suite fails intermittently on a local machine                           | Needs Improvement   | Medium   | RUN      |
+| [FE-08](#fe-08)       | An uploaded restaurant photo breaks the site's home page                                    | Broken              | Medium   | RUN      |
 | [FE-05](#fe-05)       | Seeded restaurant and product images do not render                                          | Broken              | Low      | LIVE     |
 | [FE-06](#fe-06)       | Interface polish gaps                                                                       | Needs Improvement   | Low      | LIVE     |
 | [DB-01](#db-01)       | Schema hygiene: retention, indexes, a missing primary key, a reused column                  | Needs Improvement   | Low      | LIVE     |
@@ -1364,6 +1366,22 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
   failing runs out of 12 before. Verify asks for 20 consecutive runs: 5 done.
 
 ---
+
+### FE-08
+
+**An uploaded restaurant photo breaks the site's home page** · Broken · Medium · RUN · Status: Open on `main`, fixed on
+`feat/whatsapp-gratuit` (`c7259e6`, `12a14f9`) _(added 2026-11-28, sync S-058)_
+
+- **Where:** `apps/web/next.config.mjs` (`images.remotePatterns` allowed only `placehold.co`);
+  `infra/deploy/next.Dockerfile` (the runtime stage had no `NEXT_PUBLIC_API_BASE_URL`).
+- **Observed:** FEAT-022 serves uploaded logos and covers from the API (`<API>/v1/files/public-…`). On the branch's
+  stack, the home page answered « Une erreur est survenue » after a WhatsApp login, because `next/image` refuses an
+  undeclared host in development; in production its image server answered 400 (« "url" parameter is not allowed »),
+  so the photos did not show.
+- **Fix:** allow the API's own host, path `/v1/files/**`, from `NEXT_PUBLIC_API_BASE_URL`, and pass that variable to
+  the runtime stage too (`next start` reads `next.config.mjs` again). Checked: `/_next/image` answers 400 without the
+  variable and accepts the photo with it; the home page loads (FEAT-023 capture). `NEXT_PUBLIC_API_BASE_URL` and
+  `API_PUBLIC_URL` must keep the same host (`docs/TRAVAILLER-EN-LOCAL.md`).
 
 ## Low
 

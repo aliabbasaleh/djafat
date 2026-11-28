@@ -10,6 +10,29 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-058 — 2026-11-28 — our FEAT-023 (free WhatsApp login, 0.29.0) on `feat/whatsapp-gratuit`; pull request opened
+
+**Trigger:** our own commits outside `docs_2/` — the FEAT-023 branch, rebased onto `main` `413bedc` — and the pull
+request to `main` opened with them. **On `main` since S-057:** PR #35 (`docs/audit-s057`: S-057's record and version
+0.28.5) merged as `413bedc`; its branch is deleted. **Added** (on the branch, not on `main` yet): free WhatsApp login
+(FEAT-023) — the customer sends DJAFAT, from WhatsApp, a written message holding the code shown on screen, and the
+screen signs in by itself; DJAFAT sends nothing on WhatsApp; table `whatsapp_codes` (migration `0042`); routes
+`POST /v1/auth/whatsapp/start`, `POST /v1/auth/whatsapp/status` and `POST /v1/me/phone/whatsapp`; a number confirmed
+on no account gets « Créer un compte » (number filled in), never a new account; the account e-mail « Nouvelle
+connexion par WhatsApp » after each WhatsApp login; a skippable « Confirmer mon numéro par WhatsApp » step after a
+sign-up with a foreign number; the same view in both consoles and the courier app; WhatsApp failures counted on a
+lock of their own (`whatsapp:<number>`). **Removed:** FEAT-008's paid reply (« Code DJAFAT » answered with a code),
+its route `POST /v1/auth/whatsapp/verify`, its WhatsApp delivery providers, `WHATSAPP_MAX_CODES_PER_HOUR`.
+**Fixed:** an uploaded restaurant logo or cover broke the site's home page — new finding `FE-08`, on `main` since the
+sign-up stack, fixed on the branch (`c7259e6`, `12a14f9`). **Verification:** `verify --full` at `aea1461` on a fresh database: 12 of 12 checks pass, e2e unavailable (no versioned suite); integration on a fresh
+database, `whatsapp-login.int.spec.ts` 6/6 (signed webhook, wait, session, alert e-mail, and the lock with ten wrong
+SMS codes on the real route); browser 22/22 on the branch's stack (site, restaurant console, courier web app, the
+customer's message simulated); independent review rounds 1 and 2 corrected, round 3 cut short by the usage limit.
+Not seen: the customer Expo app on a phone, a real Meta account, the real alert e-mail. WhatsApp stays off in
+production until DJAFAT's Meta account exists. **Marker:** `origin/feat/whatsapp-gratuit` added.
+
+---
+
 ## S-057 — 2026-11-28 — repository public again: PR #29 merged (0.28.4); follow-up 0.28.5
 
 **Trigger:** the user said the repository is public again (`gh api` confirms `visibility=public`). **PR #29**
