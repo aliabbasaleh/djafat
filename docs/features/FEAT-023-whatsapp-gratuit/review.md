@@ -82,12 +82,25 @@ version web du livreur devient R2-1) ; les n° 18 et 21 vont à la PR (`pr.md`, 
 | R2-7 | note     | formulations : SC09, stratégies de SPEC-023-02 et 05, section « UI » de SPEC-023-05, Q06                                                                                                | corrigées, sans nouvelle version (formulation, aucun comportement changé)                                                                                                                                         |
 | R2-8 | note     | `pr.md` absent ; deux commits non cités ; `verification.md` ancien                                                                                                                      | `pr.md` écrit ; commits cités ; `verification.md` régénéré au commit final                                                                                                                                        |
 
+### Tour 3 (`6214994`) — prêt pour PR : 3 notes
+
+Clos : R2-1 à R2-8 (R2-8 par les commits de documentation qui suivent). Aucune régression : seul
+`Platform.OS` choisit le chemin d'accessibilité, plus aucun appel absent de react-native-web ; les
+annonces sont réparties sans doublon (iPhone : le statut et l'erreur ; Android : l'erreur, sa région
+vivante dit le reste ; navigateur : rôle `alert` et `aria-live`) ; R2-7 sans nouvelle version
+approuvé (rédaction, aucun comportement changé).
+
+| #    | Sévérité | Constat (résumé)                                                                                                       | Suite                                                                                              |
+| ---- | -------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| R3-1 | note     | « Ouvrir WhatsApp » natif et livreur sans le rond vert de VIS02 : le bouton ne prend qu'un libellé, qui serait lu      | accepté pour cette PR (icône décorative) ; plus tard, une prop d'icône sur `Button` et `BigButton` |
+| R3-2 | note     | le test de R6 v2 porte l'identifiant SPEC-023-03-SC05, dont le texte ne décrit pas une confirmation qui échoue d'abord | laissé tel quel : le test vérifie la règle ; un scénario dédié à la prochaine version de la spec   |
+| R3-3 | note     | sur iPhone, le texte d'attente est réannoncé à chaque changement de minute (comme les régions vivantes)                | accepté : même comportement que le web et Android                                                  |
+
 ## 3. Verdict
 
 Tour 2 : « Corrections requises — R2-1 et R2-2 seulement ; prête pour la PR quand ces deux points
-seront corrigés ». Les deux sont corrigés dans `6214994`. Tour 3 (vérification de `6214994`) :
-interrompu par la limite d'usage du compte (reprise à 15 h, heure de N'Djamena) ; il sera fait
-avant la fusion et son résultat ajouté ici.
+seront corrigés ». Les deux sont corrigés dans `6214994`. Tour 3 (après la limite d'usage, repris à 15 h) : **« Prêt pour PR »** — les
+huit constats du tour 2 clos, aucune régression, trois notes acceptées.
 
 Axes couverts au tour 1 : exactitude fonctionnelle vs specs · régressions (FEAT-017, 020, 021,
 022, 024, consommateurs du SDK) · sécurité (signature, jetons, collisions, verrou, énumération) ·

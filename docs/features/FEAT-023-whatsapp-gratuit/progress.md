@@ -7,16 +7,16 @@ Un résultat de vérification n'est valable que pour le commit indiqué :
 après toute modification de code, spec, capture ou config qualité, relancer.
 -->
 
-| Étape                   | Statut   | Date       | Notes                                                                                                                                                                  |
-| ----------------------- | -------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Intake                  | fait     | 2026-11-25 | `feature.md` complétée avec les réponses de l'utilisateur, confirmée (« Yes, build it »)                                                                               |
-| Specs                   | fait     | 2026-11-25 | SPEC-023-01 à 08                                                                                                                                                       |
-| Grill-me                | fait     | 2026-11-25 | aucune question produit ouverte ; Q05 à Q18 hypothèses techniques                                                                                                      |
-| Brief                   | fait     | 2026-11-26 | huit specs épinglées v1                                                                                                                                                |
-| Tests dérivés des specs | fait     | 2026-11-26 | API, SDK, intégration réelle ; voir « Preuves »                                                                                                                        |
-| Implémentation          | fait     | 2026-11-27 | API (`ebeca93`), écrans, SDK, guide (`9f24224`), correctifs des captures                                                                                               |
-| Revue qualité           | tour 3   | 2026-11-28 | tour 1 : 1 majeur, 13 mineurs, 7 notes — corrigés (`7ab03bf`, `c7259e6`, `fe72313`, `12a14f9`) ; tour 2 : 2 mineurs, 6 notes — corrigés (`6214994`) ; voir `review.md` |
-| PR                      | en cours | 2026-11-28 | branche rebasée sur `main` (`413bedc`, 0.28.5) ; `pr.md` ; version 0.29.0                                                                                              |
+| Étape                   | Statut   | Date       | Notes                                                                                                                                                                                                       |
+| ----------------------- | -------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Intake                  | fait     | 2026-11-25 | `feature.md` complétée avec les réponses de l'utilisateur, confirmée (« Yes, build it »)                                                                                                                    |
+| Specs                   | fait     | 2026-11-25 | SPEC-023-01 à 08                                                                                                                                                                                            |
+| Grill-me                | fait     | 2026-11-25 | aucune question produit ouverte ; Q05 à Q18 hypothèses techniques                                                                                                                                           |
+| Brief                   | fait     | 2026-11-26 | huit specs épinglées v1                                                                                                                                                                                     |
+| Tests dérivés des specs | fait     | 2026-11-26 | API, SDK, intégration réelle ; voir « Preuves »                                                                                                                                                             |
+| Implémentation          | fait     | 2026-11-27 | API (`ebeca93`), écrans, SDK, guide (`9f24224`), correctifs des captures                                                                                                                                    |
+| Revue qualité           | fait     | 2026-11-28 | tour 1 : 1 majeur, 13 mineurs, 7 notes — corrigés (`7ab03bf`, `c7259e6`, `fe72313`, `12a14f9`) ; tour 2 : 2 mineurs, 6 notes — corrigés (`6214994`) ; tour 3 : « Prêt pour PR », 3 notes ; voir `review.md` |
+| PR                      | en cours | 2026-11-28 | branche rebasée sur `main` (`413bedc`, 0.28.5) ; `pr.md` ; version 0.29.0                                                                                                                                   |
 
 ## Intake (2026-11-25)
 
@@ -135,10 +135,9 @@ aux commandes.
 
 ## Dernière vérification
 
-`verify:fast` sans échec aux corrections du tour 2 (`6214994`, avant le rebase `96e55b0`) ;
-`verify --full` au commit final (`verification.md`).
+`verify --full` à `aea1461` (base neuve) : 12 contrôles sur 12 passent, e2e indisponible —
+aucun nouvel échec, pas « tout vert » (`verification.md`).
 
 ## Reste à faire
 
-- Tour 3 de la revue, `verify --full` au commit final, envoi, PR vers `main`, fusion quand les
-  vérifications Linux et Windows sont vertes.
+- Envoi, PR vers `main`, fusion quand les vérifications Linux et Windows sont vertes.
