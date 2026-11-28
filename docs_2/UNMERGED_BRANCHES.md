@@ -240,7 +240,10 @@ _(updated 2026-11-27, sync S-055)_ **Merged.** PR #34 (`feat/connexion-integrati
 as `e93536b`. GitHub marked #28 merged; #31, #32 and #33 are closed with a pointer to #34; the five branches are
 deleted. #29 is brought up to date with `main` as 0.28.4 (`e245d2c`).
 
-## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007)
+_(updated 2026-11-28, sync S-056)_ The repository is private again and GitHub refuses #29's checks; at the user's
+decision #29 stays open until they can run.
+
+## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007); branch deleted on 2026-11-28 (sync S-056)
 
 ### What it adds
 

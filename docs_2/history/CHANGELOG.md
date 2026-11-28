@@ -8,6 +8,13 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-28 — Sync S-056: repository private again; PR #29 left open; a merged branch deleted
+
+GitHub refuses #29's checks again (repository private, billing). At the user's decision #29 waits until they can run,
+and `claude/compassionate-franklin-k23vcj`, already in `main`, is deleted. Nothing verified beyond the GitHub state.
+
+---
+
 ## 2026-11-27 — Sync S-055: the sign-up stack in `main` (PR #34, 0.28.3); PR #29 updated (0.28.4)
 
 The repository is public, so GitHub's checks run again: PR #34 (the teammate's integration branch) merged with its

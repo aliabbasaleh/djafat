@@ -10,6 +10,20 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-056 — 2026-11-28 — repository private again: PR #29 left open; `claude/compassionate-franklin-k23vcj` deleted
+
+**Observed:** the repository is private again (`gh api repos/aliabbasaleh/djafat` gives `visibility=private`; it was
+public on 2026-11-27), and GitHub refuses every job again (« recent account payments have failed or your spending
+limit needs to be increased »): PR #29's second run (`3e8d441`, 2026-11-28 04:01 UTC) failed in 1-2 s without
+starting. **Decided by the user:** #29 stays open until its checks can run (repository public again or billing
+fixed) and merges once Linux and Windows are green; `claude/compassionate-franklin-k23vcj` is deleted (0 commits ahead
+of `main`, merged with PR #1 on 2026-11-13); the owner's `fix/payment-reliability-backlog` stays for them to decide
+([`../UNMERGED_BRANCHES.md`](../UNMERGED_BRANCHES.md) §2). **Removed:** that branch and its marker line. **Added /
+Fixed / New findings:** none. The roadmap item on GitHub's checks, ticked in #29, is true again by the time #29 can
+merge, since its merge needs the checks to run.
+
+---
+
 ## S-055 — 2026-11-27/28 — the sign-up stack merged into `main` (PR #34); PR #29 brought up to date as 0.28.4
 
 **Trigger:** the user said the repository is now public, so GitHub's checks run again, and asked to merge all the
