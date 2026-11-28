@@ -8,6 +8,24 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-28 — Sync S-060: the owner's `fix/payment-reliability-backlog` merged (0.30.0), in a pull request
+
+Merged by us at the user's request. Four of its six commits were already on `main` in a newer form (payments
+`PAY-01`/`PAY-05`, the integration suite, the SDK's `fetch`, the seed's images): `main`'s version is kept. New on
+`main`: closed restaurants after open ones under every sort, their photo dimmed, the home page split into « Ouverts
+maintenant » / « Fermés pour le moment », and `docs/DESIGN-SPEC-EXTRACT.md`. Verification: unit tests, the API's order
+under four sort keys, Chrome at 390 and 1280 px; `verify --full` at `dd560d5` on a fresh database: 12 of 12 checks pass, e2e unavailable (no versioned suite). New issue: `FE-09` (Low, accessibility).
+
+---
+
+## 2026-11-28 — Sync S-059: PR #36 merged — FEAT-023 and the `FE-08` fix on `main` (0.29.0)
+
+PR #36 went in as `4ff5a34` with every check green on Linux and Windows; its branch is deleted. `main` now has the
+free WhatsApp login (off in production until the Meta account exists) and the fix for uploaded restaurant photos
+(`FE-08`, resolved on `main`). Verification: GitHub's checks on `28a5e3a`; `main`'s push runs on `4ff5a34`: CI and Security green.
+
+---
+
 ## 2026-11-28 — Sync S-058: free WhatsApp login (FEAT-023, 0.29.0) in a pull request; `FE-08` found and fixed
 
 FEAT-023 replaces FEAT-008's paid reply: the customer sends the code shown on screen from WhatsApp, the screen signs

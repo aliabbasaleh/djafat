@@ -31,6 +31,34 @@ describe('RestaurantCard (docs/21 §5)', () => {
     expect(fallback).toHaveStyle({ background: '#0E7C66' });
   });
 
+  it('keeps the coloured block underneath even WITH an image — a slow or broken photo never leaves an empty card', () => {
+    render(
+      <RestaurantCard
+        href="/x"
+        name="Pizza N'Djam"
+        status="OPEN"
+        imageColor="#C43D0C"
+        imageUrl="https://example.test/cover.png"
+      />,
+    );
+    expect(screen.getByText("Pizza N'Djam", { selector: '[aria-hidden="true"]' })).toHaveStyle({
+      background: '#C43D0C',
+    });
+  });
+
+  it('marks every non-orderable status as recessed, and never an open one', () => {
+    const classOf = (status: 'OPEN' | 'CLOSED' | 'PAUSED' | 'UNAVAILABLE') => {
+      const { unmount } = render(<RestaurantCard href="/x" name="X" status={status} />);
+      const cls = screen.getByRole('link').className;
+      unmount();
+      return cls;
+    };
+    expect(classOf('OPEN')).not.toMatch(/cardClosed/);
+    expect(classOf('CLOSED')).toMatch(/cardClosed/);
+    expect(classOf('PAUSED')).toMatch(/cardClosed/);
+    expect(classOf('UNAVAILABLE')).toMatch(/cardClosed/);
+  });
+
   it('a paused restaurant shows PAUSED wording, not "Ouvert"', () => {
     render(<RestaurantCard href="/x" name="Snack Rapide" status="PAUSED" />);
     expect(screen.getByText('Fermé temporairement')).toBeInTheDocument();

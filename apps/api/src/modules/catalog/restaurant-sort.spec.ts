@@ -6,6 +6,7 @@ const r = (overrides: Partial<SortableRestaurant> & { name: string }): SortableR
   ratingCount: 0,
   prepTimeMin: 20,
   createdAt: new Date('2026-01-01'),
+  availability: 'OPEN',
   ...overrides,
 });
 
@@ -72,5 +73,53 @@ describe('sortRestaurants', () => {
 
   it('handles an empty list', () => {
     expect(sortRestaurants([], 'recommended')).toEqual([]);
+  });
+
+  describe('orderable restaurants always outrank non-orderable ones', () => {
+    it('recommended: a lower-rated OPEN restaurant beats a higher-rated CLOSED one', () => {
+      const closedStar = r({ name: 'ClosedStar', ratingAvg: 4.9, availability: 'CLOSED' });
+      const openAverage = r({ name: 'OpenAverage', ratingAvg: 3.1, availability: 'OPEN' });
+      expect(sortRestaurants([closedStar, openAverage], 'recommended').map((x) => x.name)).toEqual([
+        'OpenAverage',
+        'ClosedStar',
+      ]);
+    });
+
+    it('delivery_time: a slow OPEN restaurant beats a fast PAUSED one', () => {
+      const pausedFast = r({ name: 'PausedFast', prepTimeMin: 5, availability: 'PAUSED' });
+      const openSlow = r({ name: 'OpenSlow', prepTimeMin: 60, availability: 'OPEN' });
+      expect(sortRestaurants([pausedFast, openSlow], 'delivery_time').map((x) => x.name)).toEqual([
+        'OpenSlow',
+        'PausedFast',
+      ]);
+    });
+
+    it('name: alphabetical order applies within each group, never across them', () => {
+      const items = [
+        r({ name: 'Ananas', availability: 'UNAVAILABLE' }),
+        r({ name: 'Zèbre', availability: 'OPEN' }),
+        r({ name: 'Banane', availability: 'CLOSED' }),
+        r({ name: 'Mangue', availability: 'OPEN' }),
+      ];
+      expect(sortRestaurants(items, 'name').map((x) => x.name)).toEqual([
+        'Mangue',
+        'Zèbre',
+        'Ananas',
+        'Banane',
+      ]);
+    });
+
+    it('CLOSED, PAUSED and UNAVAILABLE rank equally — their own sort order decides', () => {
+      const items = [
+        r({ name: 'Unavailable', ratingAvg: 4.0, availability: 'UNAVAILABLE' }),
+        r({ name: 'Paused', ratingAvg: 4.5, availability: 'PAUSED' }),
+        r({ name: 'Closed', ratingAvg: 4.2, availability: 'CLOSED' }),
+      ];
+      expect(sortRestaurants(items, 'rating').map((x) => x.name)).toEqual([
+        'Paused',
+        'Closed',
+        'Unavailable',
+      ]);
+    });
   });
 });

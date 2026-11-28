@@ -229,3 +229,16 @@
   place-items: center;
   font-size: calc(var(--djafat-type-size-h1) * 1px);
 }
+
+/*
+  A restaurant you cannot order from must not look identical to one you can.
+  Only the PHOTO is dimmed — the name, rating and status badge keep full
+  contrast, so the card stays readable (and accessible) while clearly reading
+  as unavailable at a glance.
+*/
+.cardClosed .imageWrap {
+  opacity: 0.55;
+}
+.cardClosed:hover {
+  box-shadow: none;
+}

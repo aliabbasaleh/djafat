@@ -10,6 +10,41 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-060 — 2026-11-28 — the owner's `fix/payment-reliability-backlog` merged by us (0.30.0); pull request opened
+
+**Trigger:** the user asked to bring `main` fully up to date and to merge `fix/payment-reliability-backlog` (`kcerha`,
+six commits of 1–9 Nov on `d1439c6`; `main` had moved 266 commits). **Our commits:** `0f39dd9` merges the branch into
+`main` + S-059; `dd560d5` makes it 0.30.0 with its journal line. **Kept in `main`'s newer form** (the branch's side
+left out, each change already on `main`): `6cf7c9b` — webhook signature before the idempotency row (`PAY-05`) and
+provider enablement at creation (`PAY-01`), ported on 2026-11-17 (`a017f48`); `a68934d` — integration suite in CI,
+replaced by `main`'s own (`int-setup.ts`; the branch's `setup.int.ts`, `open-restaurant.helper.ts` and fixed CI keys,
+which gitleaks flags, `CI-01`, are not brought in); `1600bdb` — `fetch` binding (`SDK-01`, fixed differently) and OTP
+error causes on `/connexion` (now a redirect to `/compte`, FEAT-020); `cb84077` — PNG seed images (superseded by
+`c804526`, `FE-05`). **Added:** `0d60445` — open restaurants ranked first under every sort, the photo of a closed one
+dimmed, the home page split into « Ouverts maintenant » / « Fermés pour le moment », the open count on the list page;
+`92e8d52` — `docs/DESIGN-SPEC-EXTRACT.md`. **Verification:** `restaurant-sort.spec.ts` 13/13,
+`RestaurantCard.spec.tsx` 5/5; the API orders open restaurants first under all four sort keys (2 open, 1 closed, 1
+paused in the test database); in Chrome at 390 and 1280 px, the two sections in order and only the two closed cards
+dimmed, no error page, « 4 restaurants · 2 ouverts sur cette page » on the list; `verify --full` at `dd560d5` on a fresh database: 12 of 12 checks pass, e2e unavailable (no versioned suite). **New finding:** `FE-09`
+(Low) — `Stack` drops `aria-labelledby`, so the home page's sections have no accessible name (already so on `main`).
+**Marker:** the branch's line removed — its six commits are in `HEAD`'s history; it is to be deleted once the pull
+request is merged.
+
+---
+
+## S-059 — 2026-11-28 — PR #36 merged: free WhatsApp login (FEAT-023) and the `FE-08` fix on `main` (0.29.0)
+
+**Trigger:** our PR #36 (`feat/whatsapp-gratuit`), recorded in S-058, merged. Its checks on `28a5e3a`: lint,
+typecheck, test and build on Linux, integration (PostgreSQL + Redis), local setup on Windows, gitleaks, pnpm audit
+and both scope jobs green; the docs-only job skipped as designed. Merged with a merge commit, `4ff5a34`, whose tree is
+the branch's (`28a5e3a`): nothing beyond what S-058 reviewed. The branch is deleted. `main` is DJAFAT 0.29.0; its push
+runs on `4ff5a34`: CI and Security green. **Fixed on `main`:** `FE-08` (the fix verified on the branch, identical code). **Added /
+Removed:** as in S-058. **New findings:** none. **Marker:** `origin/feat/whatsapp-gratuit` removed (branch deleted);
+`HEAD` and `origin/main` moved to `4ff5a34`. Not deployed to the server; WhatsApp stays off in production until the
+Meta account exists.
+
+---
+
 ## S-058 — 2026-11-28 — our FEAT-023 (free WhatsApp login, 0.29.0) on `feat/whatsapp-gratuit`; pull request opened
 
 **Trigger:** our own commits outside `docs_2/` — the FEAT-023 branch, rebased onto `main` `413bedc` — and the pull

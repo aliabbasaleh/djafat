@@ -12,6 +12,8 @@ these IDs instead of repeating the detail.
 - **Counts:** 3 Critical · 11 High · 22 Medium · 13 Low = 49 open findings, plus 22 resolved
   _(updated 2026-11-27, sync S-055: `CI-03` resolved on `main`; new `TEST-07`)_
   _(updated 2026-11-18, sync S-034: `TEST-05`, `ADM-01`, `ADM-02`, `ORD-01`, `PAY-04`, `ORD-02`, `ADM-03`, `SEC-02` and `OPS-05` resolved on `main`)_
+  _(updated 2026-11-28, sync S-060: new `FE-09`, already on `main`)_
+  _(updated 2026-11-28, sync S-059: `FE-08` resolved on `main`, PR #36 merged as `4ff5a34`)_
   _(updated 2026-11-28, sync S-058: new `FE-08`, on `main` since the sign-up stack, fixed on `feat/whatsapp-gratuit` — open until that pull request is merged)_
   _(updated 2026-11-25, sync S-050: new `SEC-09` and `SEC-10`, found by review and fixed on `feat/inscription-restaurants` before any merge — never on `main`, not counted as open)_
   _(updated 2026-11-18, sync S-030: new `OPS-06`; sync S-032: `TEST-04` and `DOC-03` resolved on `main`)_
@@ -104,6 +106,7 @@ verified.
 | [QA-01](#qa-01)       | Accessibility and performance were not measured                                             | Needs Verification  | Low      | —        |
 | [CI-02](#ci-02)       | The pre-push secret scan never reads the pushed commits                                     | Broken              | Low      | RUN      |
 | [CI-03](#ci-03)       | The pre-commit hook cannot run ESLint on `main`                                             | Broken              | Low      | RUN      |
+| [FE-09](#fe-09)       | The home page's sections have no accessible name                                            | Needs Improvement   | Low      | RUN      |
 | [FE-07](#fe-07)       | Typed routes are configured but never checked                                               | Broken              | Low      | RUN      |
 | [PAY-09](#pay-09)     | Payment idempotency scope is global; attempt counter never moves                            | Needs Improvement   | Low      | CODE     |
 | [TEST-05](#test-05)   | The mobile typecheck is silenced by a known-failure entry                                   | Needs Improvement   | Low      | CODE     |
@@ -1369,8 +1372,8 @@ linux/arm64`). The stack started only with MinIO skipped and PostgreSQL forced t
 
 ### FE-08
 
-**An uploaded restaurant photo breaks the site's home page** · Broken · Medium · RUN · Status: Open on `main`, fixed on
-`feat/whatsapp-gratuit` (`c7259e6`, `12a14f9`) _(added 2026-11-28, sync S-058)_
+**An uploaded restaurant photo breaks the site's home page** · Broken · Medium · RUN · Status: Resolved on `main` (PR #36,
+`4ff5a34`) _(updated 2026-11-28, sync S-059)_; fixed on the branch as `c7259e6`, `12a14f9` _(added 2026-11-28, sync S-058)_
 
 - **Where:** `apps/web/next.config.mjs` (`images.remotePatterns` allowed only `placehold.co`);
   `infra/deploy/next.Dockerfile` (the runtime stage had no `NEXT_PUBLIC_API_BASE_URL`).
@@ -1434,6 +1437,19 @@ hook in a fresh worktree, with no extra `PATH` (9 ESLint batches of `lint-staged
 ### FE-07
 
 **Typed routes are configured but never checked** · Broken · Low · RUN — `apps/web` enables `typedRoutes`, but its `tsconfig.json` lists `.next` under `exclude`, and an exclusion overrides the `.next/types/**/*.ts` include. So the generated link types are loaded neither by `tsc` nor by `next build`. On `next` 15.5.29, a page linking to a route that does not exist built without error. With the generated types loaded, `tsc` reports that link, and one existing one: a plain `string` passed as `href` in `src/app/restaurants/[slug]/products/[productId]/page.tsx` (line 29). The same `tsconfig.json` is on `main` (CODE). Fix: remove `.next` from `exclude` (the `include` list only pulls in `.next/types`) and type that link; optionally run `next typegen` before `tsc` so the typecheck step catches it before the build (T-408). Found in sync S-004.
+
+### FE-09
+
+**The home page's sections have no accessible name** · Needs Improvement · Low · RUN · Status: Open _(added 2026-11-28, sync S-060)_
+
+- **Where:** `packages/ui` `Stack` (it renders only its own props: `aria-labelledby` and other `aria-*` attributes are
+  dropped); used with `aria-labelledby` by `apps/web/src/app/page.tsx` for its sections.
+- **Observed:** on the merge of `fix/payment-reliability-backlog`, the rendered home page has four `<section>` elements
+  and no `aria-labelledby` at all (`curl` of `/`), so « Ouverts maintenant » and « Fermés pour le moment » are not
+  announced as region names. `main`'s home page already used the same pattern before the merge.
+- **Why it matters:** screen-reader users lose the landmarks that tell the open restaurants from the closed ones.
+- **Fix:** let `Stack` pass `aria-*` attributes (and `id`) to its element; a `packages/ui` test that renders
+  `<Stack aria-labelledby="x">` and finds the attribute.
 
 ### PAY-09
 

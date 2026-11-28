@@ -31,7 +31,7 @@ Tables: `restaurants`, `menu_categories`, `products`, `product_option_groups`, `
 
 | Feature                                                      | State                          | Evidence                                                                                   |
 | ------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------------------------------------------ |
-| List, search, filter, sort, paginate restaurants             | Completed                      | LIVE                                                                                       |
+| List, search, filter, sort, paginate restaurants             | Completed                      | LIVE; open restaurants first under every sort, closed ones dimmed (RUN, merged in S-060)   |
 | Restaurant page, menu, product, categories                   | Completed                      | LIVE                                                                                       |
 | Availability from hours and time zone                        | Completed                      | LIVE (open, closed and paused restaurants shown correctly)                                 |
 | Unknown slug → 404; malformed identifier → 400               | Completed                      | LIVE                                                                                       |

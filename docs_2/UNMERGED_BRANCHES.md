@@ -85,7 +85,7 @@ _(updated 2026-11-18, sync S-033)_ New: `fix/live-bootstrap` (#24, 0.23.4), stac
 _(updated 2026-11-18, sync S-034)_ All of #13 to #24 are merged into `main` (`afaa7c2`, DJAFAT 0.23.4). Left on GitHub:
 `claude/compassionate-franklin-k23vcj` (already in `main`) and the owner's `fix/payment-reliability-backlog`.
 
-## 2. `fix/payment-reliability-backlog` (2 commits)
+## 2. `fix/payment-reliability-backlog` (6 commits) — merged by us on 2026-11-28 (`0f39dd9`, sync S-060)
 
 | Commit                                                                             | What it does                                                                            | Audit finding                              |
 | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------ |
@@ -112,6 +112,12 @@ integration tests and their configuration, `packages/sdk/src/http.ts`, the login
 `apps/api/package.json` and the lockfile. Its unique changes are better taken one at a time: the
 webhook order (`6cf7c9b`, [`PAY-05`](FINDINGS.md#pay-05)), the PNG seed, the login messages, the
 restaurant ranking, the design document.
+
+_(updated 2026-11-28, sync S-060)_ **Merged at the user's request** by our merge commit `0f39dd9` (0.30.0, `dd560d5`), in a pull request. By then
+the webhook order and provider enablement (`PAY-05`, `PAY-01`), the integration suite, the `fetch` fix and the PNG
+seed were all on `main` in a newer form, so `main`'s side is kept for their files; the restaurant ranking
+(`0d60445`) and the design document (`92e8d52`) come in unchanged. The branch is to be deleted once the pull request
+is merged.
 
 ## 2b. `fix/next-15.5`, pull request #3 (4 commits) _(added 2026-11-12, sync S-004; updated sync S-005)_ — merged into `main` on 2026-11-17 (`f9a8f41`, sync S-013)
 
@@ -250,6 +256,10 @@ other branch on GitHub is the owner's `fix/payment-reliability-backlog` (§2).
 _(updated 2026-11-28, sync S-058)_ PR #35 (S-057's record, 0.28.5) merged as `413bedc`, its branch deleted. **New pull request of ours:**
 `feat/whatsapp-gratuit` → `main` — FEAT-023, free WhatsApp login (0.29.0), with the `FE-08` fix; rebased onto
 `413bedc`. It waits for its checks on Linux and Windows.
+
+_(updated 2026-11-28, sync S-059)_ **#36 merged.** Every check green on Linux and Windows; it went in as `4ff5a34` and its branch is
+deleted. No pull request of ours is open; the only other branch on GitHub is the owner's
+`fix/payment-reliability-backlog` (§2).
 
 ## 3. `claude/compassionate-franklin-k23vcj` (41 commits) — merged into `main` on 2026-11-13 (`46d8cae`, sync S-007); branch deleted on 2026-11-28 (sync S-056)
 
