@@ -10,6 +10,19 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-057 — 2026-11-28 — repository public again: PR #29 merged (0.28.4); follow-up 0.28.5
+
+**Trigger:** the user said the repository is public again (`gh api` confirms `visibility=public`). **PR #29**
+(`ci/cheaper-runs`): its three workflows on `1d6858c` were re-run — integration, Linux lint/typecheck/test/build
+(this time without the `TEST-06` flake), local setup on Windows, gitleaks, pnpm audit and both scope jobs green, the
+docs-only job skipped as designed for a pull request that touches code; merged with a merge commit, `982cdf2`, and
+the branch deleted. `main` is DJAFAT 0.28.4; its push runs on `982cdf2`: Security and CI green. Left on
+GitHub: `main` and the owner's `fix/payment-reliability-backlog`. **Our own commit** `e7f1128`: version 0.28.5 and its
+journal line, for this follow-up (documentation only). **Removed:** `ci/cheaper-runs` and its marker line. **Added /
+Fixed / New findings:** none.
+
+---
+
 ## S-056 — 2026-11-28 — repository private again: PR #29 left open; `claude/compassionate-franklin-k23vcj` deleted
 
 **Observed:** the repository is private again (`gh api repos/aliabbasaleh/djafat` gives `visibility=private`; it was
