@@ -7,16 +7,16 @@ Un résultat de vérification n'est valable que pour le commit indiqué :
 après toute modification de code, spec, capture ou config qualité, relancer.
 -->
 
-| Étape                   | Statut  | Date       | Notes                                                                                       |
-| ----------------------- | ------- | ---------- | ------------------------------------------------------------------------------------------- |
-| Intake                  | fait    | 2026-11-25 | `feature.md` complétée avec les réponses de l'utilisateur, confirmée (« Yes, build it »)    |
-| Specs                   | fait    | 2026-11-25 | SPEC-023-01 à 08                                                                            |
-| Grill-me                | fait    | 2026-11-25 | aucune question produit ouverte ; Q05 à Q18 hypothèses techniques                           |
-| Brief                   | fait    | 2026-11-26 | huit specs épinglées v1                                                                     |
-| Tests dérivés des specs | fait    | 2026-11-26 | API, SDK, intégration réelle ; voir « Preuves »                                             |
-| Implémentation          | fait    | 2026-11-27 | API (`f9a8023`), écrans, SDK, guide (`7f4640c`), correctifs des captures                    |
-| Revue qualité           | tour 2  | 2026-11-28 | tour 1 : 1 majeur, 13 mineurs, 7 notes — corrigés (`7ddde1c`, `67b6fb4`) ; voir `review.md` |
-| PR                      | à faire |            |                                                                                             |
+| Étape                   | Statut   | Date       | Notes                                                                                                                                                                  |
+| ----------------------- | -------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Intake                  | fait     | 2026-11-25 | `feature.md` complétée avec les réponses de l'utilisateur, confirmée (« Yes, build it »)                                                                               |
+| Specs                   | fait     | 2026-11-25 | SPEC-023-01 à 08                                                                                                                                                       |
+| Grill-me                | fait     | 2026-11-25 | aucune question produit ouverte ; Q05 à Q18 hypothèses techniques                                                                                                      |
+| Brief                   | fait     | 2026-11-26 | huit specs épinglées v1                                                                                                                                                |
+| Tests dérivés des specs | fait     | 2026-11-26 | API, SDK, intégration réelle ; voir « Preuves »                                                                                                                        |
+| Implémentation          | fait     | 2026-11-27 | API (`ebeca93`), écrans, SDK, guide (`9f24224`), correctifs des captures                                                                                               |
+| Revue qualité           | tour 3   | 2026-11-28 | tour 1 : 1 majeur, 13 mineurs, 7 notes — corrigés (`7ab03bf`, `c7259e6`, `fe72313`, `12a14f9`) ; tour 2 : 2 mineurs, 6 notes — corrigés (`6214994`) ; voir `review.md` |
+| PR                      | en cours | 2026-11-28 | branche rebasée sur `main` (`413bedc`, 0.28.5) ; `pr.md` ; version 0.29.0                                                                                              |
 
 ## Intake (2026-11-25)
 
@@ -105,7 +105,8 @@ aux commandes.
   code, minutes arrondies au-dessus) ; arrondi à la minute la plus proche, heure prise à
   l'arrivée du code.
 - Défauts trouvés par les captures : la page d'arrivée en erreur après la connexion venait de
-  FEAT-022 (`next/image` n'acceptait pas les photos téléversées, corrigé à part en `67b6fb4`) ;
+  FEAT-022 (`next/image` n'acceptait pas les photos téléversées, corrigé à part en `c7259e6` et
+  `12a14f9`) ;
   l'application livreur dans un navigateur plantait sur `sendAccessibilityEvent` (absent de
   react-native-web), appel protégé.
 - **Non vérifié** : l'application client (Expo) en image — son export web échoue ici
@@ -113,14 +114,31 @@ aux commandes.
   à contrôler sur un téléphone ; le vrai Meta (aucun compte) ; l'envoi réel de l'e-mail
   d'alerte (faux fournisseur).
 
+## Preuves du tour 2 (2026-11-28)
+
+- Corrections `6214994` : région vivante de l'attente et de l'issue dans l'application livreur et
+  l'application client (rendue `aria-live` dans un navigateur), titre focalisé par le DOM dans un
+  navigateur, annonces sur iPhone ; textes annoncés sans émoji, images en décoration cachée.
+- `verify:fast` sans échec (format, specs, hygiène, architecture, lint 24/24, typecheck 24/24,
+  tests 24/24) ; `whatsapp-code.service.spec.ts` 27/27 — le nouveau test (SPEC-023-03-SC05,
+  confirmation refaite avant « confirmé ») échoue si la confirmation est retirée de `status`.
+- Intégration sur une base neuve : `whatsapp-login.int.spec.ts` **6/6**, dont SPEC-023-02-SC08 sur la
+  vraie route (dix mauvais codes SMS, 423, puis connexion WhatsApp).
+- Navigateur : **22 contrôles sur 22**, dont six nouveaux — une seule région vivante, lue sans
+  émoji, sur le site (attente et issue), la console restaurant et l'application livreur ; dans
+  l'application livreur (web), le titre a le focus et l'avertissement garde son image cachée.
+  Captures refaites (`assets/exec-*`).
+
 ## Bloquants
 
 - Aucun pour le code. Mise en service : le compte Meta (DJAFAT).
 
 ## Dernière vérification
 
-`verify:fast` sans échec au commit `7f4640c` ; `verify --full` au commit final (`verification.md`).
+`verify:fast` sans échec aux corrections du tour 2 (`6214994`, avant le rebase `96e55b0`) ;
+`verify --full` au commit final (`verification.md`).
 
 ## Reste à faire
 
-- Revue indépendante, `verify --full`, PR.
+- Tour 3 de la revue, `verify --full` au commit final, envoi, PR vers `main`, fusion quand les
+  vérifications Linux et Windows sont vertes.
