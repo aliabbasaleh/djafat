@@ -10,6 +10,23 @@ One entry per review of new commits against this documentation, newest first. Th
 
 ---
 
+## S-061 — 2026-11-28 — PR #37 merged (0.30.0); `FE-09` fixed on `fix/ui-aria-passthrough` (0.30.1), pull request opened
+
+**PR #37** (S-060's record): every check green on Linux and Windows; merged with a merge commit, `e691424`, whose tree
+is the branch's; `merge/payment-reliability-backlog` and the owner's `fix/payment-reliability-backlog` deleted (all
+six of the owner's commits are in `main`). `main` is DJAFAT 0.30.0; its push runs on `e691424`: CI and Security
+green. GitHub now has only `main`. **Our commits** (the user chose to fix `FE-09`): `39ddfc3` — `Stack` and
+`Container` accept `aria-*`, `id` and `role` and pass them to their element (they rendered only their own props, and
+TypeScript does not check hyphenated JSX attributes); `6e3c21c` — version 0.30.1 and its journal line. **Fixed**
+(on the branch): `FE-09` — the home page's three sections are named by their headings, and the loading states of the
+site (11 call sites of `Container`) and of the restaurant console (9 of `Stack`) keep `aria-busy` and `aria-label`.
+**Verification:** three new tests (a section named by its heading, a busy loading state, a named busy `main`) fail
+against the old components (3 failed, 3 passed) and pass with the fix (6/6); the rendered home page carries
+`aria-labelledby` on its three sections, each pointing at its heading; `verify --full` at `6e3c21c` on a fresh database: 12 of 12 checks pass, e2e unavailable (no versioned suite). **Marker:** `HEAD` at `6e3c21c`,
+`origin/main` at `e691424`; no branch line — the pull request's commits are in `HEAD`'s history.
+
+---
+
 ## S-060 — 2026-11-28 — the owner's `fix/payment-reliability-backlog` merged by us (0.30.0); pull request opened
 
 **Trigger:** the user asked to bring `main` fully up to date and to merge `fix/payment-reliability-backlog` (`kcerha`,

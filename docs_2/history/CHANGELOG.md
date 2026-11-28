@@ -8,6 +8,15 @@ Format: date · what changed · affected areas · verification · newly discover
 
 ---
 
+## 2026-11-28 — Sync S-061: PR #37 merged (0.30.0); `FE-09` fixed in a pull request (0.30.1)
+
+PR #37 went in as `e691424` with every check green; both payment-reliability branches are deleted and `main`'s push
+runs are green. Then `FE-09`: `Stack` and `Container` now pass `aria-*`, `id` and `role` to their element, so the home
+page's sections have names for screen readers and the loading states keep `aria-busy`. Verification: three new tests
+that fail against the old components, the rendered home page; `verify --full` at `6e3c21c` on a fresh database: 12 of 12 checks pass, e2e unavailable (no versioned suite).
+
+---
+
 ## 2026-11-28 — Sync S-060: the owner's `fix/payment-reliability-backlog` merged (0.30.0), in a pull request
 
 Merged by us at the user's request. Four of its six commits were already on `main` in a newer form (payments

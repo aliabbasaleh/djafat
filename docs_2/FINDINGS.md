@@ -12,6 +12,7 @@ these IDs instead of repeating the detail.
 - **Counts:** 3 Critical · 11 High · 22 Medium · 13 Low = 49 open findings, plus 22 resolved
   _(updated 2026-11-27, sync S-055: `CI-03` resolved on `main`; new `TEST-07`)_
   _(updated 2026-11-18, sync S-034: `TEST-05`, `ADM-01`, `ADM-02`, `ORD-01`, `PAY-04`, `ORD-02`, `ADM-03`, `SEC-02` and `OPS-05` resolved on `main`)_
+  _(updated 2026-11-28, sync S-061: `FE-09` fixed on `fix/ui-aria-passthrough`, open on `main` until that pull request is merged)_
   _(updated 2026-11-28, sync S-060: new `FE-09`, already on `main`)_
   _(updated 2026-11-28, sync S-059: `FE-08` resolved on `main`, PR #36 merged as `4ff5a34`)_
   _(updated 2026-11-28, sync S-058: new `FE-08`, on `main` since the sign-up stack, fixed on `feat/whatsapp-gratuit` — open until that pull request is merged)_
@@ -1440,7 +1441,7 @@ hook in a fresh worktree, with no extra `PATH` (9 ESLint batches of `lint-staged
 
 ### FE-09
 
-**The home page's sections have no accessible name** · Needs Improvement · Low · RUN · Status: Open _(added 2026-11-28, sync S-060)_
+**The home page's sections have no accessible name** · Needs Improvement · Low · RUN · Status: Open on `main`, fixed on `fix/ui-aria-passthrough` (`39ddfc3`) _(updated 2026-11-28, sync S-061)_ _(added 2026-11-28, sync S-060)_
 
 - **Where:** `packages/ui` `Stack` (it renders only its own props: `aria-labelledby` and other `aria-*` attributes are
   dropped); used with `aria-labelledby` by `apps/web/src/app/page.tsx` for its sections.
@@ -1450,6 +1451,8 @@ hook in a fresh worktree, with no extra `PATH` (9 ESLint batches of `lint-staged
 - **Why it matters:** screen-reader users lose the landmarks that tell the open restaurants from the closed ones.
 - **Fix:** let `Stack` pass `aria-*` attributes (and `id`) to its element; a `packages/ui` test that renders
   `<Stack aria-labelledby="x">` and finds the attribute.
+- **Also affected** _(updated 2026-11-28, sync S-061)_: `Container` dropped them the same way — the site's loading pages (11 call sites) lost
+  `aria-busy` and `aria-label`, as did the restaurant console's loading states through `Stack` (9). Both fixed on the branch.
 
 ### PAY-09
 

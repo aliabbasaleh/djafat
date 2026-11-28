@@ -552,8 +552,10 @@ Every known task, grouped by roadmap phase. Order of execution and the reasoning
 
 ### T-619 · Let `Stack` pass its `aria-*` attributes _(added 2026-11-28, sync S-060)_
 
-- **Area:** `packages/ui` (`Stack`), the site's home page · **Priority:** Low · **Why:** [`FE-09`](../FINDINGS.md#fe-09) · **Status:** Not started
+- **Area:** `packages/ui` (`Stack`, `Container`), the site's home page · **Priority:** Low · **Why:** [`FE-09`](../FINDINGS.md#fe-09) · **Status:** Completed on `fix/ui-aria-passthrough` (0.30.1), pull request to `main` open _(updated 2026-11-28, sync S-061)_
 - **Done when:** the home page's sections carry `aria-labelledby` pointing at their headings.
 - **Test:** a `packages/ui` test on `Stack`; `curl /` lists the `aria-labelledby` attributes.
+- **Progress** _(updated 2026-11-28, sync S-061)_: RUN — the new tests fail before the fix and pass after; `curl /` lists `aria-labelledby` on the
+  three sections.
 
 Last updated: 2026-11-23 (sync S-043)

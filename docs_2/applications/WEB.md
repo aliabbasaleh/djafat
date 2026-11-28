@@ -78,6 +78,8 @@ behind login runs in the browser.
   sync S-004)_.
 - An uploaded restaurant logo or cover broke the home page: `next/image` allowed only `placehold.co`
   ([`FE-08`](../FINDINGS.md#fe-08)); fixed on `main` by PR #36 _(added 2026-11-28, sync S-058; updated sync S-059)_.
+- Sections and loading states lost their `aria-*` attributes through `Stack` and `Container`
+  ([`FE-09`](../FINDINGS.md#fe-09)); fixed on `fix/ui-aria-passthrough` _(updated 2026-11-28, sync S-061)_.
 - Interface review: [`../UI_UX_AUDIT.md`](../UI_UX_AUDIT.md) §2.
 
 ## 4. Outstanding tasks
