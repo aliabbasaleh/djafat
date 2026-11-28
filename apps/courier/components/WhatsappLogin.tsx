@@ -65,8 +65,12 @@ export function WhatsappLogin(props: WhatsappLoginProps) {
     asked.current = true;
     ask();
   }, [ask]);
+  // The title takes the focus on a phone; react-native-web (the courier app in a
+  // browser) has no `sendAccessibilityEvent`, so it is only called where it exists.
   useEffect(() => {
-    if (title.current) AccessibilityInfo.sendAccessibilityEvent(title.current, 'focus');
+    if (title.current && typeof AccessibilityInfo.sendAccessibilityEvent === 'function') {
+      AccessibilityInfo.sendAccessibilityEvent(title.current, 'focus');
+    }
   }, []);
 
   const said =

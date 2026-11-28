@@ -7,16 +7,16 @@ Un résultat de vérification n'est valable que pour le commit indiqué :
 après toute modification de code, spec, capture ou config qualité, relancer.
 -->
 
-| Étape                   | Statut  | Date       | Notes                                                                                    |
-| ----------------------- | ------- | ---------- | ---------------------------------------------------------------------------------------- |
-| Intake                  | fait    | 2026-11-25 | `feature.md` complétée avec les réponses de l'utilisateur, confirmée (« Yes, build it ») |
-| Specs                   | fait    | 2026-11-25 | SPEC-023-01 à 08                                                                         |
-| Grill-me                | fait    | 2026-11-25 | aucune question produit ouverte ; Q05 à Q18 hypothèses techniques                        |
-| Brief                   | fait    | 2026-11-26 | huit specs épinglées v1                                                                  |
-| Tests dérivés des specs | fait    | 2026-11-26 | API, SDK, intégration réelle ; voir « Preuves »                                          |
-| Implémentation          | fait    | 2026-11-27 | API (`f9a8023`), écrans, SDK, guide (`7f4640c`), correctifs des captures                 |
-| Revue qualité           | à faire |            |                                                                                          |
-| PR                      | à faire |            |                                                                                          |
+| Étape                   | Statut  | Date       | Notes                                                                                       |
+| ----------------------- | ------- | ---------- | ------------------------------------------------------------------------------------------- |
+| Intake                  | fait    | 2026-11-25 | `feature.md` complétée avec les réponses de l'utilisateur, confirmée (« Yes, build it »)    |
+| Specs                   | fait    | 2026-11-25 | SPEC-023-01 à 08                                                                            |
+| Grill-me                | fait    | 2026-11-25 | aucune question produit ouverte ; Q05 à Q18 hypothèses techniques                           |
+| Brief                   | fait    | 2026-11-26 | huit specs épinglées v1                                                                     |
+| Tests dérivés des specs | fait    | 2026-11-26 | API, SDK, intégration réelle ; voir « Preuves »                                             |
+| Implémentation          | fait    | 2026-11-27 | API (`f9a8023`), écrans, SDK, guide (`7f4640c`), correctifs des captures                    |
+| Revue qualité           | tour 2  | 2026-11-28 | tour 1 : 1 majeur, 13 mineurs, 7 notes — corrigés (`7ddde1c`, `67b6fb4`) ; voir `review.md` |
+| PR                      | à faire |            |                                                                                             |
 
 ## Intake (2026-11-25)
 
@@ -87,7 +87,11 @@ aux commandes.
 - Intégration sur une base neuve (PostgreSQL + PostGIS, Redis) : 15 fichiers, 160/160, dont
   `whatsapp-login.int.spec.ts` 5/5 (webhook signé, attente, session, e-mail du faux fournisseur).
 - Navigateur (Chrome sans tête, pile de la branche sur des ports libres, message simulé par
-  `scripts/dev/whatsapp-message.mjs`) : 13 contrôles sur 13 —
+  `scripts/dev/whatsapp-message.mjs`) : 13 contrôles sur 13 au tour 1, **16 sur 16** après les
+  corrections du tour 1 (2026-11-28 : page d'arrivée chargée après la connexion, « Numéro
+  confirmé » puis « Continuer » pendant l'inscription, refus d'un compte client par la console
+  restaurant : `exec-SPEC-023-06-SC03-confirme-pendant-inscription-390.png`,
+  `exec-SPEC-023-07-SC02-refuse-1280.png`) —
   - site 390×844 : `exec-SPEC-023-05-SC07-whatsapp-390.png` (textes de FEAT-023-VIS02 dans
     l'ordre, pas de champ de numéro, lien `wa.me` avec le message), `…-connecte-390.png`,
     `…-inconnu-390.png` (les deux boutons), `…-creer-un-compte-390.png` (numéro rempli) ;
@@ -100,6 +104,10 @@ aux commandes.
 - Corrigé grâce aux captures : « valable 6 min » au lieu de 5 (heure prise avant l'arrivée du
   code, minutes arrondies au-dessus) ; arrondi à la minute la plus proche, heure prise à
   l'arrivée du code.
+- Défauts trouvés par les captures : la page d'arrivée en erreur après la connexion venait de
+  FEAT-022 (`next/image` n'acceptait pas les photos téléversées, corrigé à part en `67b6fb4`) ;
+  l'application livreur dans un navigateur plantait sur `sendAccessibilityEvent` (absent de
+  react-native-web), appel protégé.
 - **Non vérifié** : l'application client (Expo) en image — son export web échoue ici
   (`react-native-web` absent d'`apps/mobile`, sur un écran existant, sans lien avec FEAT-023) :
   à contrôler sur un téléphone ; le vrai Meta (aucun compte) ; l'envoi réel de l'e-mail

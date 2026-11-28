@@ -109,8 +109,11 @@ export function WhatsappStep(props: WhatsappStepProps) {
     ask();
   }, [ask]);
   // R9: the title takes the focus when the view opens.
+  // (react-native-web has no `sendAccessibilityEvent`: only called where it exists.)
   useEffect(() => {
-    if (title.current) AccessibilityInfo.sendAccessibilityEvent(title.current, 'focus');
+    if (title.current && typeof AccessibilityInfo.sendAccessibilityEvent === 'function') {
+      AccessibilityInfo.sendAccessibilityEvent(title.current, 'focus');
+    }
   }, []);
 
   // R9: the wait and each outcome said aloud, on iPhone too.
